@@ -3348,38 +3348,73 @@ ______________________________________________________________________
 - Create: `crates/vpt-adapters/src/prompt.rs`, `crates/vpt-adapters/src/config/write.rs`
 - Modify: `crates/vpt-adapters/src/lib.rs`, `crates/vpt-adapters/src/config/mod.rs`
 - Create: `crates/vpt/src/commands/setup.rs`, `crates/vpt/src/compose.rs`
-- Modify: `crates/vpt/src/lib.rs`, `crates/vpt/src/commands/mod.rs`
-- Test: `crates/vpt/tests/setup.rs`
+- Modify: `crates/vpt/src/lib.rs`, `crates/vpt/src/commands/mod.rs`, `crates/vpt/Cargo.toml`
+- Test: `crates/vpt/tests/setup.rs`; `crates/vpt/tests/support/mod.rs` (`vpt()` detaches from the
+  terminal)
 
 **Interfaces:**
 
-- Consumes: `config::render::template`, `config::paths::{config_path, default_state_dir}`,
-  `config::settings::from_table`, `config::load::load_text`, `config::roots::{resolve, Creation}`.
+- Consumes: `config::{template, config_path, default_state_dir, from_table, load_text}`.
 
 - Produces:
 
-  - `vpt_application::ports::prompt::{Prompt, PromptError}`:
-    `fn choose(&mut self, question: &str, options: &[&str], preselected: usize) ->`
-    `Result<usize, PromptError>`; `PromptError::{NoTerminal, Closed}`.
-  - `vpt_application::setup::{Setup, SetupWriter, SetupError, SetupOutcome}`; `SetupWriter` is a port:
-    `fn config_exists(&self) -> bool`,
-    `fn write_config(&self, text: &str) -> Result<PathBuf, SetupError>`,
-    `fn create_private_dir(&self, path: &Path) -> Result<(), SetupError>`;
-    `Setup::run(&self, prompt: &mut dyn Prompt, writer: &dyn SetupWriter, force: bool) ->`
-    `Result<SetupOutcome, SetupError>` where
-    `Setup { pub engines: Vec<String>, pub render: Box<dyn Fn(&str) -> String>,`
-    `pub directories: Vec<PathBuf> }` and
-    `SetupOutcome { pub written: PathBuf, pub main_engine: String }`;
-    `SetupError::{NoTerminal, Exists(PathBuf), Io(String)}`.
-  - `vpt_adapters::prompt::TtyPrompt::open() -> Result<TtyPrompt, PromptError>`.
-  - `vpt_adapters::config::write::FilesystemSetupWriter::new(config_path: PathBuf) ->`
-    `FilesystemSetupWriter`.
-  - `vpt::compose::Environment::from_process() -> Environment` with `fn config_path(&self) -> PathBuf`,
-    `fn home_dir(&self) -> PathBuf`, `fn var(&self, name: &str) -> Option<String>`.
+  - `vpt_application::ports::{Prompt, PromptError}` (the files below `ports/` are private modules):
+    `PromptError::{NoTerminal, Closed}`; `trait Prompt { fn choose(&mut self, question: &str,`
+    `options: &[&str], preselected: usize) -> Result<usize, PromptError>; }`.
+  - `vpt_application::{Setup, SetupWriter, SetupError, SetupOutcome}`:
+    `SetupError::{NoTerminal, Exists(PathBuf), Io(String)}`;
+    `trait SetupWriter { fn config_path(&self) -> PathBuf; fn config_exists(&self) -> bool;`
+    `fn write_config(&self, text: &str, force: bool) -> Result<PathBuf, SetupError>;`
+    `fn create_private_dir(&self, path: &Path) -> Result<(), SetupError>; }`;
+    `SetupOutcome { pub written: PathBuf, pub main_engine: String }` (`Debug`);
+    `Setup<R: Fn(&str) -> String> { pub engines: Vec<String>, pub render: R,`
+    `pub directories: Vec<PathBuf> }` with
+    `run<P: Prompt, W: SetupWriter>(&self, prompt: &mut P, writer: &W, force: bool) ->`
+    `Result<SetupOutcome, SetupError>`.
+  - `vpt_adapters::prompt::TtyPrompt::open() -> Result<TtyPrompt, PromptError>` (implements `Prompt`; end
+    of file on the terminal is `Closed`, never a default choice).
+  - `vpt_adapters::config::FilesystemSetupWriter::new(config_path: PathBuf) -> FilesystemSetupWriter`
+    (implements `SetupWriter`; the file is 0600 and every directory 0700, existing ones repaired).
+  - `compose::Environment::from_process() -> Environment` with
+    `var(&self, name: &str) -> Option<String>`, `config_path(&self) -> PathBuf`,
+    `home_dir(&self) -> PathBuf`, `state_dir_default(&self) -> String`.
+  - `commands::setup::run(environment: &Environment, config: Option<&Path>, force: bool) -> Outcome`.
+  - Test support: `Sandbox::vpt()` now starts the binary in a new session, so no test can reach the
+    operator's terminal; the interactive test attaches to a pseudoterminal it creates itself.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-application/src/setup.rs`, test section:
+Declare the modules first. `crates/vpt-application/src/lib.rs`:
+
+```rust
+//! Use cases and the ports they own.
+
+pub mod ports;
+mod settings;
+mod setup;
+
+pub use settings::{NotifyMode, NotifySettings, RetentionSettings, Settings, SourceSettings, StorePaths};
+pub use setup::{Setup, SetupError, SetupOutcome, SetupWriter};
+```
+
+`crates/vpt-application/src/ports/mod.rs`:
+
+```rust
+//! The external capabilities the use cases consume, one trait each. The files
+//! below are private; every port is re-exported here.
+
+mod prompt;
+
+pub use prompt::{Prompt, PromptError};
+```
+
+`crates/vpt-adapters/src/lib.rs` gains `pub mod prompt;`; `crates/vpt-adapters/src/config/mod.rs` gains
+`mod write;` and `pub use write::FilesystemSetupWriter;`; `crates/vpt/src/lib.rs` gains `mod compose;`;
+`crates/vpt/src/commands/mod.rs` gains `pub(crate) mod setup;`. `ports/prompt.rs`, `prompt.rs`,
+`compose.rs` and `commands/setup.rs` start as their doc lines. `crates/vpt/Cargo.toml` gains
+`libc = "0.2.189"` under `[dev-dependencies]`.
+
+`crates/vpt-application/src/setup.rs` starts as its test module alone:
 
 ```rust
 #[cfg(test)]
@@ -3396,15 +3431,18 @@ mod tests {
 
     struct FakeWriter {
         exists: bool,
-        written: RefCell<Vec<String>>,
+        written: RefCell<Vec<(String, bool)>>,
         dirs: RefCell<Vec<PathBuf>>,
     }
     impl SetupWriter for FakeWriter {
+        fn config_path(&self) -> PathBuf {
+            PathBuf::from("/c/config.toml")
+        }
         fn config_exists(&self) -> bool {
             self.exists
         }
-        fn write_config(&self, text: &str) -> Result<PathBuf, SetupError> {
-            self.written.borrow_mut().push(text.to_owned());
+        fn write_config(&self, text: &str, force: bool) -> Result<PathBuf, SetupError> {
+            self.written.borrow_mut().push((text.to_owned(), force));
             Ok(PathBuf::from("/c/config.toml"))
         }
         fn create_private_dir(&self, path: &Path) -> Result<(), SetupError> {
@@ -3413,10 +3451,10 @@ mod tests {
         }
     }
 
-    fn setup() -> Setup {
+    fn setup() -> Setup<impl Fn(&str) -> String> {
         Setup {
             engines: vec!["apple".into(), "whisply".into()],
-            render: Box::new(|engine| format!("main = \"{engine}\"\n")),
+            render: |engine: &str| format!("main = \"{engine}\"\n"),
             directories: vec![PathBuf::from("/h"), PathBuf::from("/s"), PathBuf::from("/h/audio")],
         }
     }
@@ -3430,7 +3468,7 @@ mod tests {
         let writer = writer(false);
         let outcome = setup().run(&mut FakePrompt(Some(1)), &writer, false).expect("setup");
         assert_eq!(outcome.main_engine, "whisply");
-        assert_eq!(writer.written.borrow().as_slice(), ["main = \"whisply\"\n"]);
+        assert_eq!(writer.written.borrow().as_slice(), [("main = \"whisply\"\n".to_owned(), false)]);
         assert_eq!(writer.dirs.borrow().len(), 3);
     }
 
@@ -3451,10 +3489,10 @@ mod tests {
     }
 
     #[test]
-    fn force_overwrites_an_existing_config() {
+    fn force_overwrites_an_existing_config_and_says_so_to_the_writer() {
         let writer = writer(true);
         assert!(setup().run(&mut FakePrompt(Some(0)), &writer, true).is_ok());
-        assert_eq!(writer.written.borrow().len(), 1);
+        assert_eq!(writer.written.borrow().as_slice(), [("main = \"apple\"\n".to_owned(), true)]);
     }
 
     #[test]
@@ -3466,8 +3504,83 @@ mod tests {
 }
 ```
 
-The fake writer needs `config_exists` to know the path; make `SetupError::Exists` carry the path the
-writer reports through `fn config_path(&self) -> PathBuf` on `SetupWriter`.
+`crates/vpt-adapters/src/config/write.rs` starts as its test module alone:
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn mode(path: &Path) -> u32 {
+        std::fs::metadata(path).expect("meta").permissions().mode() & 0o777
+    }
+
+    #[test]
+    fn a_new_config_is_0600_inside_a_0700_directory() {
+        let temp = tempfile::tempdir().expect("temp");
+        let writer = FilesystemSetupWriter::new(temp.path().join("vpt/config.toml"));
+        let written = writer.write_config("config_version = 1\n", false).expect("written");
+        assert_eq!(mode(&written), 0o600);
+        assert_eq!(mode(&temp.path().join("vpt")), 0o700);
+    }
+
+    #[test]
+    fn without_force_an_existing_file_is_exists_even_when_created_after_the_check() {
+        let temp = tempfile::tempdir().expect("temp");
+        let path = temp.path().join("config.toml");
+        std::fs::write(&path, b"old").expect("existing");
+        let writer = FilesystemSetupWriter::new(path.clone());
+        assert_eq!(writer.write_config("new", false).unwrap_err(), SetupError::Exists(path.clone()));
+        assert_eq!(std::fs::read(&path).expect("kept"), b"old");
+    }
+
+    #[test]
+    fn force_replaces_the_text_and_repairs_a_permissive_mode() {
+        let temp = tempfile::tempdir().expect("temp");
+        let path = temp.path().join("config.toml");
+        std::fs::write(&path, b"old").expect("existing");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).expect("permissive");
+        let writer = FilesystemSetupWriter::new(path.clone());
+        writer.write_config("new", true).expect("replaced");
+        assert_eq!(std::fs::read(&path).expect("read"), b"new");
+        assert_eq!(mode(&path), 0o600);
+    }
+
+    #[test]
+    fn an_existing_permissive_directory_is_repaired_to_0700() {
+        let temp = tempfile::tempdir().expect("temp");
+        let dir = temp.path().join("home");
+        std::fs::create_dir(&dir).expect("dir");
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).expect("permissive");
+        FilesystemSetupWriter::new(temp.path().join("c.toml")).create_private_dir(&dir).expect("repaired");
+        assert_eq!(mode(&dir), 0o700);
+    }
+}
+```
+
+`crates/vpt/tests/support/mod.rs`: `vpt()` gains a session detach so the child has no controlling
+terminal, whatever the test runner's stdin is:
+
+```rust
+    pub fn vpt(&self) -> Command {
+        use std::os::unix::process::CommandExt;
+        let mut command = Command::new(VPT);
+        command
+            .env_clear()
+            .env("HOME", self.root.join("home"))
+            .env("XDG_CONFIG_HOME", self.root.join("config"))
+            .env("XDG_DATA_HOME", self.root.join("data"))
+            .env("XDG_STATE_HOME", self.root.join("state"))
+            .env("VPT_CONFIG", self.config_path())
+            .env("PATH", self.root.join("bin"));
+        // SAFETY: setsid is async-signal-safe and the forked child has no other threads.
+        unsafe {
+            command.pre_exec(|| if libc::setsid() == -1 { Err(std::io::Error::last_os_error()) } else { Ok(()) });
+        }
+        command
+    }
+```
 
 `crates/vpt/tests/setup.rs`:
 
@@ -3481,12 +3594,13 @@ use support::{Sandbox, run, stderr, stdout};
 fn setup_without_a_terminal_exits_2_and_writes_nothing() {
     let sandbox = Sandbox::new("setup-no-tty");
 
-    let output = run(sandbox.vpt().args(["setup", "--json"]).stdin(std::process::Stdio::null()));
+    let output = run(sandbox.vpt().args(["setup", "--json"]));
 
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(stdout(&output), "");
     let document: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("error document");
     assert_eq!(document["error"]["kind"], "usage");
+    assert_eq!(document["error"]["message"], "vpt setup needs a controlling terminal");
     assert!(!sandbox.config_path().exists());
     assert!(!sandbox.path().join("home/.vpt").exists());
 }
@@ -3497,7 +3611,7 @@ fn setup_under_a_pty_writes_the_config_home_state_and_store_leaves() {
 
     let mut command = std::process::Command::new("/usr/bin/script");
     command.args(["-q", "/dev/null", support::VPT, "setup"]);
-    let mut vpt = sandbox.vpt();
+    let vpt = sandbox.vpt();
     let envs: Vec<(String, String)> = vpt
         .get_envs()
         .filter_map(|(key, value)| Some((key.to_string_lossy().into_owned(), value?.to_string_lossy().into_owned())))
@@ -3523,40 +3637,49 @@ fn setup_under_a_pty_writes_the_config_home_state_and_store_leaves() {
 }
 
 #[test]
-fn setup_refuses_an_existing_config_without_force() {
+fn setup_refuses_an_existing_config_without_force_and_before_any_terminal() {
     let sandbox = Sandbox::new("setup-exists");
     std::fs::create_dir_all(sandbox.config_path().parent().expect("dir")).expect("config dir");
     std::fs::write(sandbox.config_path(), "config_version = 1\n").expect("existing");
 
-    let output = run(sandbox.vpt().args(["setup"]).stdin(std::process::Stdio::null()));
+    let output = run(sandbox.vpt().args(["setup"]));
 
     assert_eq!(output.status.code(), Some(2));
-    assert!(stderr(&output).contains("exists"), "{}", stderr(&output));
+    assert!(stderr(&output).contains("exists; pass --force"), "{}", stderr(&output));
+}
+
+#[test]
+fn setup_honours_an_explicit_config_path() {
+    let sandbox = Sandbox::new("setup-config-flag");
+    let elsewhere = sandbox.path().join("elsewhere/config.toml");
+    std::fs::create_dir_all(elsewhere.parent().expect("dir")).expect("dir");
+    std::fs::write(&elsewhere, "config_version = 1\n").expect("existing");
+
+    let output = run(sandbox.vpt().args(["setup", "--config", elsewhere.to_str().expect("utf8")]));
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(stderr(&output).contains("elsewhere/config.toml exists"), "{}", stderr(&output));
 }
 ```
 
+The `script` process is started outside `Sandbox::vpt()` on purpose: it allocates the pseudoterminal the
+interactive test attaches to, so it is the one child that keeps a terminal.
+
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p vpt-application setup`
+Run: `cargo test -p vpt-application setup && cargo test -p vpt-adapters write`
 
-Expected: compile error, `Setup` not found.
+Expected: the builds fail with `cannot find` for `Setup`, `SetupWriter`, `Prompt`,
+`FilesystemSetupWriter`. Both test modules are compiled and selected; a run that selects zero tests, or
+that succeeds, does not satisfy this step.
 
 Run: `cargo test -p vpt --test setup`
 
-Expected: `setup_without_a_terminal_exits_2_and_writes_nothing` passes by accident (the verb is
-unimplemented and exits 2 with kind usage), so tighten it: assert the message equals
-`"vpt setup needs a controlling terminal"`. It then FAILS on the message. The pty test FAILS on the
-missing config.
+Expected: `setup_without_a_terminal_exits_2_and_writes_nothing` FAILS on the message (the verb is
+unimplemented and says so); the pty test FAILS on the missing config; the two refusal tests FAIL on their
+stderr text.
 
 - [ ] **Step 3: Write the minimal implementation**
-
-`crates/vpt-application/src/ports/mod.rs`:
-
-```rust
-//! The external capabilities the use cases consume, one trait each.
-
-pub mod prompt;
-```
 
 `crates/vpt-application/src/ports/prompt.rs`:
 
@@ -3574,12 +3697,12 @@ pub trait Prompt {
 }
 ```
 
-`crates/vpt-application/src/setup.rs`:
+`crates/vpt-application/src/setup.rs`, above its test module:
 
 ```rust
 //! `vpt setup`: one prompt, one rendered file, the directories the spec names.
 
-use crate::ports::prompt::{Prompt, PromptError};
+use crate::ports::{Prompt, PromptError};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -3592,23 +3715,25 @@ pub enum SetupError {
 pub trait SetupWriter {
     fn config_path(&self) -> PathBuf;
     fn config_exists(&self) -> bool;
-    fn write_config(&self, text: &str) -> Result<PathBuf, SetupError>;
+    /// Exclusive creation unless `force`; an existing file is `Exists`.
+    fn write_config(&self, text: &str, force: bool) -> Result<PathBuf, SetupError>;
     fn create_private_dir(&self, path: &Path) -> Result<(), SetupError>;
 }
 
+#[derive(Debug)]
 pub struct SetupOutcome {
     pub written: PathBuf,
     pub main_engine: String,
 }
 
-pub struct Setup {
+pub struct Setup<R: Fn(&str) -> String> {
     pub engines: Vec<String>,
-    pub render: Box<dyn Fn(&str) -> String>,
+    pub render: R,
     pub directories: Vec<PathBuf>,
 }
 
-impl Setup {
-    pub fn run(&self, prompt: &mut dyn Prompt, writer: &dyn SetupWriter, force: bool) -> Result<SetupOutcome, SetupError> {
+impl<R: Fn(&str) -> String> Setup<R> {
+    pub fn run<P: Prompt, W: SetupWriter>(&self, prompt: &mut P, writer: &W, force: bool) -> Result<SetupOutcome, SetupError> {
         if writer.config_exists() && !force {
             return Err(SetupError::Exists(writer.config_path()));
         }
@@ -3618,7 +3743,7 @@ impl Setup {
             PromptError::Closed => SetupError::Io("the terminal closed before an answer".into()),
         })?;
         let main_engine = self.engines.get(chosen).cloned().unwrap_or_else(|| self.engines[0].clone());
-        let written = writer.write_config(&(self.render)(&main_engine))?;
+        let written = writer.write_config(&(self.render)(&main_engine), force)?;
         for directory in &self.directories {
             writer.create_private_dir(directory)?;
         }
@@ -3627,11 +3752,6 @@ impl Setup {
 }
 ```
 
-The fake in the test above must gain
-`fn config_path(&self) -> PathBuf { PathBuf::from("/c/config.toml") }`.
-
-`crates/vpt-application/src/lib.rs` adds `pub mod ports;` and `pub mod setup;`.
-
 `crates/vpt-adapters/src/prompt.rs`:
 
 ```rust
@@ -3639,7 +3759,7 @@ The fake in the test above must gain
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use vpt_application::ports::prompt::{Prompt, PromptError};
+use vpt_application::ports::{Prompt, PromptError};
 
 pub struct TtyPrompt {
     tty: File,
@@ -3662,7 +3782,9 @@ impl Prompt for TtyPrompt {
         self.tty.write_all(text.as_bytes()).map_err(|_| PromptError::Closed)?;
         let mut answer = String::new();
         let mut reader = BufReader::new(self.tty.try_clone().map_err(|_| PromptError::Closed)?);
-        reader.read_line(&mut answer).map_err(|_| PromptError::Closed)?;
+        if reader.read_line(&mut answer).map_err(|_| PromptError::Closed)? == 0 {
+            return Err(PromptError::Closed);
+        }
         let answer = answer.trim();
         if answer.is_empty() {
             return Ok(preselected);
@@ -3675,16 +3797,20 @@ impl Prompt for TtyPrompt {
 }
 ```
 
-`crates/vpt-adapters/src/config/write.rs`:
+A zero-length read is the terminal closing, so setup stops rather than writing the default engine after
+the operator has gone.
+
+`crates/vpt-adapters/src/config/write.rs`, above its test module:
 
 ```rust
-//! What `vpt setup` writes: a 0600 file in a 0700 directory, and 0700 directories.
+//! What `vpt setup` writes: a 0600 file in a 0700 directory, and 0700 directories,
+//! existing ones repaired to those modes.
 
-use std::fs::{DirBuilder, OpenOptions};
+use std::fs::{DirBuilder, OpenOptions, Permissions};
 use std::io::Write;
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
-use vpt_application::setup::{SetupError, SetupWriter};
+use vpt_application::{SetupError, SetupWriter};
 
 pub struct FilesystemSetupWriter {
     config_path: PathBuf,
@@ -3697,7 +3823,7 @@ impl FilesystemSetupWriter {
 }
 
 fn io(error: std::io::Error) -> SetupError {
-    SetupError::Io(error.to_string())
+    SetupError::Io(error.kind().to_string())
 }
 
 impl SetupWriter for FilesystemSetupWriter {
@@ -3709,24 +3835,34 @@ impl SetupWriter for FilesystemSetupWriter {
         self.config_path.exists()
     }
 
-    fn write_config(&self, text: &str) -> Result<PathBuf, SetupError> {
+    fn write_config(&self, text: &str, force: bool) -> Result<PathBuf, SetupError> {
         if let Some(parent) = self.config_path.parent() {
             self.create_private_dir(parent)?;
         }
         let mut file = OpenOptions::new()
             .write(true)
-            .create(true)
-            .truncate(true)
+            .create(force)
+            .create_new(!force)
+            .truncate(force)
             .mode(0o600)
             .open(&self.config_path)
-            .map_err(io)?;
+            .map_err(|error| match error.kind() {
+                std::io::ErrorKind::AlreadyExists => SetupError::Exists(self.config_path.clone()),
+                _ => io(error),
+            })?;
+        file.set_permissions(Permissions::from_mode(0o600)).map_err(io)?;
         file.write_all(text.as_bytes()).map_err(io)?;
         file.sync_all().map_err(io)?;
         Ok(self.config_path.clone())
     }
 
     fn create_private_dir(&self, path: &Path) -> Result<(), SetupError> {
-        DirBuilder::new().recursive(true).mode(0o700).create(path).map_err(io)
+        match DirBuilder::new().recursive(true).mode(0o700).create(path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(io(error)),
+        }
+        std::fs::set_permissions(path, Permissions::from_mode(0o700)).map_err(io)
     }
 }
 ```
@@ -3738,7 +3874,7 @@ impl SetupWriter for FilesystemSetupWriter {
 //! command shares. Nothing here decides policy.
 
 use std::path::PathBuf;
-use vpt_adapters::config::paths::{config_path, default_state_dir};
+use vpt_adapters::config::{config_path, default_state_dir};
 
 pub struct Environment {
     vars: Vec<(String, String)>,
@@ -3754,7 +3890,7 @@ impl Environment {
     }
 
     pub fn config_path(&self) -> PathBuf {
-        config_path(&|name| self.var(name))
+        config_path(|name| self.var(name))
     }
 
     pub fn home_dir(&self) -> PathBuf {
@@ -3762,7 +3898,7 @@ impl Environment {
     }
 
     pub fn state_dir_default(&self) -> String {
-        default_state_dir(&|name| self.var(name))
+        default_state_dir(|name| self.var(name))
     }
 }
 ```
@@ -3775,37 +3911,37 @@ impl Environment {
 use crate::cli::output::Outcome;
 use crate::compose::Environment;
 use serde_json::json;
-use vpt_adapters::config::load::load_text;
-use vpt_adapters::config::render::template;
-use vpt_adapters::config::settings::from_table;
-use vpt_adapters::config::write::FilesystemSetupWriter;
+use std::path::Path;
+use vpt_adapters::config::{FilesystemSetupWriter, from_table, load_text, template};
 use vpt_adapters::prompt::TtyPrompt;
-use vpt_application::ports::prompt::PromptError;
-use vpt_application::setup::{Setup, SetupError};
+use vpt_application::ports::PromptError;
+use vpt_application::{Setup, SetupError, SetupWriter};
 use vpt_domain::layout::StoreKey;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
-pub fn run(environment: &Environment, force: bool) -> Outcome {
+pub fn run(environment: &Environment, config: Option<&Path>, force: bool) -> Outcome {
+    let writer = FilesystemSetupWriter::new(config.map(Path::to_path_buf).unwrap_or_else(|| environment.config_path()));
+    if writer.config_exists() && !force {
+        let message = format!("{} exists; pass --force to overwrite it", writer.config_path().display());
+        return Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, message));
+    }
     let state_dir = environment.state_dir_default();
     let home_dir = environment.home_dir();
     let rendered_defaults = template("apple", &state_dir);
-    let directories = match load_text(&rendered_defaults).map_err(|e| format!("{e:?}")).and_then(|table| {
-        from_table(&table, &home_dir).map_err(|e| format!("{e:?}"))
-    }) {
+    let directories = match load_text(&rendered_defaults).and_then(|table| from_table(&table, &home_dir)) {
         Ok(settings) => {
             let mut directories = vec![settings.home.clone(), settings.state_dir.clone()];
             directories.extend(StoreKey::all().iter().map(|key| settings.stores.get(*key).to_path_buf()));
             directories
         }
-        Err(detail) => return Outcome::Failure(ErrorDocument::new(ErrorKind::Config, detail)),
+        Err(error) => return Outcome::Failure(ErrorDocument::new(ErrorKind::Config, format!("{error:?}"))),
     };
     let setup = Setup {
         engines: vec!["apple".into(), "whisply".into()],
-        render: Box::new(move |engine| template(engine, &state_dir)),
+        render: move |engine: &str| template(engine, &state_dir),
         directories,
     };
-    let writer = FilesystemSetupWriter::new(environment.config_path());
     let mut prompt = match TtyPrompt::open() {
         Ok(prompt) => prompt,
         Err(PromptError::NoTerminal) | Err(PromptError::Closed) => {
@@ -3827,15 +3963,16 @@ pub fn run(environment: &Environment, force: bool) -> Outcome {
 }
 ```
 
-Setup checks for the existing config before opening the terminal so the refusal needs no tty: move the
-`writer.config_exists() && !force` check ahead of `TtyPrompt::open()` in `run` (mirror the use case's
-first line). `crates/vpt/src/lib.rs` gains `pub mod compose;` and the dispatch arm:
+The existence check runs before the terminal is opened, so the refusal needs no tty, and the writer is
+built from the selected configuration path, `--config` and `VPT_CONFIG` included. The `ConfigError` Debug
+form names keys and kinds, never values, so formatting it here quotes nothing from the file. In
+`crates/vpt/src/lib.rs` the dispatch arm is
 
 ```rust
-        Verb::Setup { force } => commands::setup::run(&Environment::from_process(), *force),
+        Verb::Setup { force } => commands::setup::run(&Environment::from_process(), invocation.config.as_deref(), *force),
 ```
 
-with `use compose::Environment;` at the top, and `commands/mod.rs` lists `setup`.
+with `use compose::Environment;` at the top.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
