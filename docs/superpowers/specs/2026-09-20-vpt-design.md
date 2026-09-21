@@ -176,7 +176,7 @@ not depend on `vpt-protocol`.
 | `Archive`                 | clone bytes to the audio store with `EEXIST` semantics                                    | `clonefile` (the raw syscall, byte-copy fallback on `EXDEV`)                                       |
 | `Engine`                  | transcribe an audio path into a `Transcript`; report its model family and locality        | `apple` (the Swift helper), `whisply`, `command`                                                   |
 | `Clock`                   | now, in UTC and in the local zone                                                         | system clock; fixed clock in tests                                                                 |
-| `Ledger`                  | the seen, recordings, flags, occasions, and tags and relations repositories               | `sqlite` (one database, write-ahead log, busy timeout); in-memory (tests)                          |
+| `Ledger`                  | the repositories of section 4.4                                                           | `sqlite` (one database, write-ahead log, busy timeout); in-memory (tests)                          |
 | `Stores`                  | resolve a store path; write a file atomically; read; list; walk up for a git working tree | `filesystem`                                                                                       |
 | `Trash`                   | move a path to the system Trash                                                           | `macos_helper` (`vpt-macos trash`)                                                                 |
 | `Notifier`                | deliver a `Notification`                                                                  | `desktop` (`vpt-macos notify`), `command` (argv tokens plus stdin), `off`                          |
@@ -466,8 +466,8 @@ path and takes nothing.
 | `ENOSPC`                                               | abort, exit 1                                 | `ingest_failed`                                                                             |
 | audio store parent missing                             | refuse at startup, exit 2                     | `config_refused`                                                                            |
 
-`vpt ingest --dry-run` runs every gate and writes nothing: no clone, no row, no event. `--once <path>`
-ingests exactly one file by path, gates included.
+`vpt ingest --dry-run` runs every gate and writes nothing durable: no clone, no row, no event (the title
+copy may be refreshed). `--once <path>` ingests exactly one file by path, gates included.
 
 ### 5.6 What stage 1 does not do
 
@@ -621,6 +621,8 @@ the note records `vptReadability: true` when it ran.
 ### 6.6 What gets written
 
 - `engine_outputs/<id>.<engine>.json`: each engine's raw document, verbatim, kept.
+- the accepted transcript of record (segments and word timings) in the ledger's `transcripts` repository,
+  committed before the note is published.
 - the `flags` rows in the ledger, with state `open`.
 - the transcript note (stage 3 renders it; stage 2 supplies its body).
 - one `vpt.event/1` (`event = "review_needed"`) when any surfaced flag is open, carrying counts per
@@ -821,8 +823,8 @@ directory commit them. Consequences vpt states rather than hides:
 
 `[synthesis] command` is an argv list, empty by default, which means stage 4 is off and `vpt run` skips
 it. When set, `vpt synthesize <id>` runs the command with `{transcript}` (the note path), `{id}` and
-`{language}` substituted, writes the transcript note's body on the command's stdin, and reads one
-`vpt.proposal/1` document from its stdout within `[synthesis] timeout_secs` (default 600):
+`{language}` substituted, writes the transcript note's content region on the command's stdin, and reads
+one `vpt.proposal/1` document from its stdout within `[synthesis] timeout_secs` (default 600):
 
 ```json
 {
@@ -1008,9 +1010,10 @@ vpt redact <id> [--stage transcript|analysis] [--to <dir>] [--title <t>] [--json
 Two ways to produce a copy: `[share] automatic = true` makes `vpt run` redact every recording's
 transcript note (and analysis note when one exists) as soon as the note is written; `vpt redact` does it
 on demand for one recording. Both write into `[stores] released`, and `--to <dir>` names a different
-destination for that run. The destination may not resolve inside the `audio`, `transcripts`, `analysis`,
-`briefs`, `engine_outputs` or `drafts` stores (a refusal naming which); any other directory is allowed,
-including one that syncs elsewhere, because sending is the point.
+destination for that run. The destination may not resolve inside a private store (`audio`, `transcripts`,
+`analysis`, `briefs`, `engine_outputs`, `drafts`), the state directory, the config directory or the Voice
+Memos container (a refusal naming which); any other directory is allowed, including one that syncs
+elsewhere, because sending is the point.
 
 The released file is assembled, not filtered. Its frontmatter carries at most `title` (from `--title`,
 else absent), `date` (when `[share] include_date`), and `source` (`[share] source_line`, default
@@ -1134,7 +1137,8 @@ and the deterministic `title` is what makes the duplicate findable.
     "proper_noun": 2,
     "low_confidence": 4,
     "unsupported": 1,
-    "agreed_unverified": 11
+    "agreed_unverified": 11,
+    "diagnostics": 0
   },
   "paths": {
     "note": "<transcripts store>/2026-08-24-invoice-call-4f3ab19c.md"
@@ -1212,14 +1216,16 @@ The error document:
     "kind": "refused",
     "rule": "same_family",
     "message": "engines apple and whisply both report family whisper",
-    "ids": []
+    "ids": [],
+    "completed": []
   }
 }
 ```
 
 `kind` is one of `refused`, `usage`, `config`, `engine`, `helper`, `command`, `store`, `ledger`; `rule`
 names the rule for `refused` and is null otherwise; `ids` lists the identities the message names, in
-order. Every rule vpt keeps reports code 3 and nothing else does.
+order; `completed` lists the identities of work committed before the failure. Every rule vpt keeps
+reports code 3 and nothing else does.
 
 `--dry-run`, wherever a verb offers it, opens existing state read-only and performs no migration,
 directory creation, ledger write, artifact write, notification or Trash move. `run`, `transcribe` and
@@ -1455,7 +1461,8 @@ Refused during a run, the recording or artifact left as it was:
 - a resolved path escaping its store or traversing a symlink (3, `path_escape`).
 - a `vptSchema` above the build's (3, `schema_ahead`, the note read and never rewritten).
 - residue after redaction (3, `residue`); a byte-identical released duplicate (3, `duplicate`).
-- a released destination inside a private store (3, `private_destination`).
+- a released destination inside a private store, the state directory, the config directory or the Voice
+  Memos container (3, `private_destination`).
 - retention with the helper absent (3, `no_trash`).
 - an engine, agent or context command exceeding its deadline, exiting non-zero, or answering with a
   document of the wrong schema or major version (1 for engines and the agent; a collector failure
@@ -1559,20 +1566,21 @@ complete, tested and documented, and `main` is installable after every merge.
 
 Ships the workspace skeleton (five crates, `Cargo.lock`, CI, `justfile`, the file-size check), the config
 loader and `vpt setup`, the home, stores and `stores` refusals, the managed symlink and `vpt symlink`,
-the SQLite ledger with its in-memory twin and migrations, `vpt ingest` with the wholeness gate, the
-private database copy and the clone, `vpt show`, `vpt list`, `vpt storage`, `vpt doctor` (config, stores,
-helper presence, recordings directory readability, symlink, git trees, subdirectory counts), the
-`vpt-macos` helper package with `notify` and `trash`, `[notify]` with all three modes and `vpt.event/1`,
-and `vpt retention run`. Depends on nothing.
+the SQLite ledger with its in-memory twin, migrations, the write lock and the dirty-artifact publication
+protocol, `vpt ingest` with the wholeness gate, the title copy, staging and publication, `vpt show`,
+`vpt list`, `vpt storage`, `vpt doctor` (config, stores, helper presence, recordings directory
+readability, symlink, git trees, subdirectory counts), the `vpt-macos` helper package with `notify` and
+`trash`, `[notify]` with all three modes and `vpt.event/1`, and `vpt retention run`. Depends on nothing.
 
 ### Stage 2: Transcribe
 
 Ships the `Engine` port, the `apple` (helper `transcribe`), `whisply` and `command` adapters,
 `vpt.engine/1`, the two slots and `checker_runs`, per-language pairs, the same-family refusal, the
-normalizer, aligner and classifier, the flag ledger, `known-terms.txt`, `vpt transcribe`, `vpt review`,
-`vpt confirm --term`, the readability pass, the `review_needed` and `transcribe_failed` events, and a
-minimal transcript note in the portable profile (frontmatter, H1, the content region with the timecoded
-transcript and its inline markers) so a transcript is readable before stage 3. Depends on stage 1.
+normalizer, aligner and classifier, the accepted transcript and the flags in the ledger,
+`known-terms.txt`, `vpt transcribe`, `vpt review`, `vpt confirm --term`, the readability pass, the
+`review_needed` and `transcribe_failed` events, and a minimal transcript note in the portable profile
+(frontmatter, H1, the content region with the timecoded transcript and its inline markers) so a
+transcript is readable before stage 3. Depends on stage 1.
 
 ### Stage 3: Vault note
 
@@ -1585,9 +1593,9 @@ composing stages 1 to 3. Depends on stage 2.
 
 Ships `[synthesis]`, `vpt.proposal/1`, `vpt synthesize`, `vpt verify-note` and the analysis note;
 occasions, `vpt brief` in all three forms, `vpt occasions`, `vpt.brief/1`, `vpt.context/1`, the `dam`,
-`google` and `none` context sources, the calendar trigger and `brief_written`; `vpt redact`, `[share]`
-and the draft reports; `vpt handoff` and `vpt.handoff/1`; and `vpt run` extended with synthesis and
-automatic redaction. Depends on stage 3.
+`google` and `none` context sources, the calendar trigger and `brief_written`; `vpt redact`, `[share]`,
+the release rows and the draft reports; `vpt handoff` and `vpt.handoff/1`; and `vpt run` extended with
+synthesis and automatic redaction. Depends on stage 3.
 
 ### Deferred until the external notebook is deployed
 
