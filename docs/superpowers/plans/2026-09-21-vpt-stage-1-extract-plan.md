@@ -7661,6 +7661,12 @@ ______________________________________________________________________
 
 ### Task 15: The Voice Memos store, read-only
 
+The recorder port is generic over its handle: the adapter's handle is the open read-only descriptor, and
+every operation on it (metadata, bounded reads, the staging clone) is a method of the port, so the domain
+gate reads through a closure and the application never names a file type. The recordings directory is
+held as a root descriptor; a listing entry is judged through it and a candidate path is validated against
+it before anything is opened.
+
 **Files:**
 
 - Create: `crates/vpt-application/src/ports/recorder.rs`
@@ -7670,41 +7676,61 @@ ______________________________________________________________________
 
 **Interfaces:**
 
-- Consumes: `vpt_domain::container::{BoxReader, ReadFailure}`, `vpt_domain::time::FileTime`.
+- Consumes: `vpt_domain::container::ReadFailure`, `vpt_domain::time::FileTime`,
+  `vpt_adapters::contained::{Access, ContainedError, Kind, RootDir}`.
 
-- Produces, in `vpt_application::ports::recorder`:
+- Produces, in `vpt_application::ports` (from the private file `ports/recorder.rs`):
 
-  - `Candidate { pub path: PathBuf, pub file_name: String, pub size: u64,`
-    `pub mtime: FileTime, pub dataless: bool }`;
+  - `Candidate { pub path: PathBuf, pub file_name: String, pub size: u64, pub mtime: FileTime,`
+    `pub flags: u32 }` (the whole `st_flags` word);
     `SourceMetadata { pub device: u64, pub inode: u64, pub size: u64, pub mtime: FileTime }`;
-    `RecorderError::{Unreadable(String), NotRegular(PathBuf), NotFound(PathBuf), Io(String)}`;
-    `CloneKind::{CopyOnWrite, ByteCopy}`; `CloneError::{NoSpace, Io(String)}`;
-    `TitleLookup::{Titled(String), Unavailable}`.
-  - `trait SourceHandle: BoxReader { fn metadata(&self) -> Result<SourceMetadata,`
-    `RecorderError>; fn clone_into(&self, destination: &Path) -> Result<CloneKind,` `CloneError>; }`
-  - `trait TitleSource { fn title(&self, file_name: &str) -> TitleLookup; }`
-  - `trait RecorderStore { fn candidates(&self) -> Result<Vec<Candidate>, RecorderError>;`
-    `fn candidate(&self, path: &Path) -> Result<Candidate, RecorderError>; fn open(&self,`
-    `path: &Path) -> Result<Box<dyn SourceHandle>, RecorderError>; fn titles(&self) ->`
-    `Box<dyn TitleSource>; fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)>; }`
+    `RecorderError::{Unreadable(String), NotRegular(PathBuf), NotFound(PathBuf), Escape(PathBuf),`
+    `Io(String)}`; `CloneKind::{CopyOnWrite, ByteCopy}`; `CloneError::{NoSpace, Io(String)}`.
+  - `trait RecorderStore { type Handle; fn candidates(&self) -> Result<Vec<Candidate>, RecorderError>;`
+    `fn candidate(&self, path: &Path) -> Result<Candidate, RecorderError>;`
+    `fn open(&self, path: &Path) -> Result<Self::Handle, RecorderError>;`
+    `fn metadata(&self, handle: &Self::Handle) -> Result<SourceMetadata, RecorderError>;`
+    `fn read_at(&self, handle: &Self::Handle, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure>;`
+    `fn clone_into(&self, handle: &Self::Handle, directory: &Path, name: &str) -> Result<CloneKind,`
+    `CloneError>; fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)>; }`. `clone_into` clones
+    the open descriptor to `<directory>/<name>` relative to that directory's own descriptor, with the
+    byte-copy fallback on `EXDEV` only; Task 16 adds `title`.
 
-- `vpt_adapters::voice_memos::store::VoiceMemosStore::new(recordings_dir: PathBuf,`
-  `state_dir: PathBuf, read_titles: bool) -> VoiceMemosStore`;
-  `pub const APPLE_SUBDIRECTORIES: [&str; 4]`.
+- `vpt_adapters::voice_memos::VoiceMemosStore::open(recordings_dir: &Path) ->`
+  `Result<VoiceMemosStore, ContainedError>` with `type Handle = std::fs::File`, and
+  `vpt_adapters::voice_memos::APPLE_SUBDIRECTORIES: [&str; 4]` (`voice_memos/mod.rs` keeps `store`
+  private and re-exports both).
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-adapters/src/voice_memos/store.rs`, test section:
+Declare the modules first: `crates/vpt-application/src/ports/mod.rs` gains `mod recorder;` and
+`pub use recorder::{Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata};`;
+`crates/vpt-adapters/src/lib.rs` gains `pub mod voice_memos;`;
+`crates/vpt-adapters/src/voice_memos/mod.rs` is:
+
+```rust
+//! Apple's Voice Memos store, read-only: the listing, the descriptors and
+//! the private copy of its database.
+
+mod store;
+
+pub use store::{APPLE_SUBDIRECTORIES, VoiceMemosStore};
+```
+
+`crates/vpt-adapters/src/voice_memos/store.rs` starts as its test module alone:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
     use vpt_domain::fixtures::m4a;
+    use vpt_domain::sweep::SF_DATALESS;
 
-    fn store_with(files: &[(&str, &[u8])]) -> (tempfile::TempDir, VoiceMemosStore) {
+    fn store_with(files: &[(&str, &[u8])]) -> (tempfile::TempDir, PathBuf, VoiceMemosStore) {
         let temp = tempfile::tempdir().expect("temp");
-        let recordings = temp.path().join("Recordings");
+        let recordings = temp.path().canonicalize().expect("canonical").join("Recordings");
         std::fs::create_dir_all(&recordings).expect("recordings");
         for subdirectory in APPLE_SUBDIRECTORIES {
             std::fs::create_dir_all(recordings.join(subdirectory)).expect("subdirectory");
@@ -7713,65 +7739,100 @@ mod tests {
         for (name, bytes) in files {
             std::fs::write(recordings.join(name), bytes).expect("fixture");
         }
-        let store = VoiceMemosStore::new(recordings, temp.path().join("state"), true);
-        (temp, store)
+        let store = VoiceMemosStore::open(&recordings).expect("opens");
+        (temp, recordings, store)
     }
 
     #[test]
-    fn candidates_are_the_m4a_entries_at_depth_one_and_nothing_else() {
-        let (_temp, store) = store_with(&[("a.m4a", b"aaa"), ("b.M4A", b"bbb"), ("a.waveform", b"w"), ("notes.txt", b"n")]);
-        let mut names: Vec<String> = store.candidates().expect("list").into_iter().map(|c| c.file_name).collect();
-        names.sort();
+    fn candidates_are_the_m4a_files_at_depth_one_and_nothing_else() {
+        let (_temp, recordings, store) = store_with(&[("a.m4a", b"aaa"), ("b.M4A", b"bbb"), ("a.waveform", b"w"), ("notes.txt", b"n")]);
+        std::os::unix::fs::symlink(recordings.join("a.m4a"), recordings.join("link.m4a")).expect("link");
+        let names: Vec<String> = store.candidates().expect("list").into_iter().map(|c| c.file_name).collect();
         assert_eq!(names, vec!["a.m4a"]);
     }
 
     #[test]
-    fn a_candidate_carries_size_mtime_and_a_false_dataless_flag_for_a_plain_file() {
-        let (_temp, store) = store_with(&[("a.m4a", b"aaaa")]);
+    fn a_candidate_carries_size_mtime_and_its_flags_word() {
+        let (_temp, recordings, store) = store_with(&[("a.m4a", b"aaaa")]);
         let candidate = store.candidates().expect("list").remove(0);
+        assert_eq!(candidate.path, recordings.join("a.m4a"));
         assert_eq!(candidate.size, 4);
-        assert!(candidate.mtime.secs > 0);
-        assert!(!candidate.dataless);
+        assert!(candidate.mtime.secs > 0 && candidate.mtime.nanos < 1_000_000_000);
+        assert_eq!(candidate.flags & SF_DATALESS, 0);
+        assert_eq!(store.candidate(&recordings.join("a.m4a")).expect("one"), candidate);
     }
 
     #[test]
-    fn open_refuses_a_symbolic_link_and_reads_a_regular_file_by_descriptor() {
-        let (temp, store) = store_with(&[("a.m4a", b"hello world")]);
-        let link = temp.path().join("Recordings/link.m4a");
-        std::os::unix::fs::symlink(temp.path().join("Recordings/a.m4a"), &link).expect("link");
-        assert!(matches!(store.open(&link), Err(RecorderError::NotRegular(_))));
-        let mut handle = store.open(&temp.path().join("Recordings/a.m4a")).expect("open");
+    fn a_candidate_is_refused_when_absent_a_link_a_directory_or_outside_the_root() {
+        let (temp, recordings, store) = store_with(&[("a.m4a", b"aaaa")]);
+        std::os::unix::fs::symlink(recordings.join("a.m4a"), recordings.join("link.m4a")).expect("link");
+        let absent = recordings.join("absent.m4a");
+        assert_eq!(store.candidate(&absent), Err(RecorderError::NotFound(absent)));
+        assert_eq!(store.candidate(&recordings.join("link.m4a")), Err(RecorderError::NotRegular(recordings.join("link.m4a"))));
+        assert_eq!(store.candidate(&recordings.join("Capture")), Err(RecorderError::NotFound(recordings.join("Capture"))));
+        let outside = temp.path().canonicalize().expect("canonical").join("a.m4a");
+        assert_eq!(store.candidate(&outside), Err(RecorderError::Escape(outside.clone())));
+        assert_eq!(store.open(&outside).err(), Some(RecorderError::Escape(outside)));
+        let nested = recordings.join("Capture/inner.m4a");
+        assert_eq!(store.open(&nested).err(), Some(RecorderError::Escape(nested)));
+    }
+
+    #[test]
+    fn open_refuses_a_link_and_reads_a_regular_file_by_descriptor() {
+        let (_temp, recordings, store) = store_with(&[("a.m4a", b"hello world")]);
+        std::os::unix::fs::symlink(recordings.join("a.m4a"), recordings.join("link.m4a")).expect("link");
+        assert_eq!(store.open(&recordings.join("link.m4a")).err(), Some(RecorderError::NotRegular(recordings.join("link.m4a"))));
+        let handle = store.open(&recordings.join("a.m4a")).expect("open");
         let mut buffer = [0u8; 5];
-        handle.read_exact_at(6, &mut buffer).expect("read");
+        store.read_at(&handle, 6, &mut buffer).expect("read");
         assert_eq!(&buffer, b"world");
-        assert_eq!(handle.len(), 11);
-        let metadata = handle.metadata().expect("metadata");
+        assert!(store.read_at(&handle, 7, &mut buffer).is_err());
+        let metadata = store.metadata(&handle).expect("metadata");
         assert_eq!(metadata.size, 11);
         assert!(metadata.inode > 0);
     }
 
     #[test]
     fn clone_into_reproduces_the_bytes_and_reports_copy_on_write_on_the_same_volume() {
-        let (temp, store) = store_with(&[("a.m4a", &m4a(1_787_690_856, 3, b"payload"))]);
-        let handle = store.open(&temp.path().join("Recordings/a.m4a")).expect("open");
-        let destination = temp.path().join("staged");
-        let kind = handle.clone_into(&destination).expect("clone");
-        assert_eq!(std::fs::read(&destination).expect("read"), m4a(1_787_690_856, 3, b"payload"));
+        let (temp, recordings, store) = store_with(&[("a.m4a", &m4a(1_787_604_456, 3, b"payload"))]);
+        let audio = temp.path().canonicalize().expect("canonical").join("audio");
+        std::fs::create_dir(&audio).expect("audio");
+        let handle = store.open(&recordings.join("a.m4a")).expect("open");
+        let kind = store.clone_into(&handle, &audio, ".vpt-staging-1.m4a").expect("clone");
+        assert_eq!(std::fs::read(audio.join(".vpt-staging-1.m4a")).expect("read"), m4a(1_787_604_456, 3, b"payload"));
         assert_eq!(kind, CloneKind::CopyOnWrite);
+        let again = store.clone_into(&handle, &audio, ".vpt-staging-1.m4a");
+        assert!(matches!(again, Err(CloneError::Io(_))), "{again:?}");
+        assert!(matches!(store.clone_into(&handle, &audio, "sub/x.m4a"), Err(CloneError::Io(_))));
     }
 
     #[test]
-    fn subdirectory_counts_report_each_apple_directory_without_entering_it_for_candidates() {
-        let (_temp, store) = store_with(&[]);
+    fn the_byte_copy_reproduces_the_bytes_privately_and_reports_itself() {
+        let (temp, recordings, store) = store_with(&[("a.m4a", &[7u8; 200_000])]);
+        let audio = temp.path().canonicalize().expect("canonical").join("audio");
+        std::fs::create_dir(&audio).expect("audio");
+        let handle = store.open(&recordings.join("a.m4a")).expect("open");
+        let directory = RootDir::open(&audio).expect("root");
+        assert_eq!(byte_copy(&handle, &directory, Path::new("copy.m4a")), Ok(CloneKind::ByteCopy));
+        assert_eq!(std::fs::read(audio.join("copy.m4a")).expect("read"), vec![7u8; 200_000]);
+        assert_eq!(std::fs::metadata(audio.join("copy.m4a")).expect("meta").permissions().mode() & 0o777, 0o600);
+    }
+
+    #[test]
+    fn subdirectory_counts_report_each_apple_directory_without_listing_it_as_candidates() {
+        let (_temp, _recordings, store) = store_with(&[]);
         let counts = store.subdirectory_counts();
         assert_eq!(counts.len(), 4);
         assert!(counts.iter().all(|(_, count)| *count == Some(1)), "{counts:?}");
+        assert!(store.candidates().expect("list").is_empty());
     }
 
     #[test]
-    fn a_missing_recordings_directory_is_unreadable() {
-        let store = VoiceMemosStore::new(PathBuf::from("/nonexistent/vpt-test"), PathBuf::from("/tmp"), true);
-        assert!(matches!(store.candidates(), Err(RecorderError::Unreadable(_))));
+    fn a_missing_recordings_directory_is_refused_at_open() {
+        let temp = tempfile::tempdir().expect("temp");
+        let absent = temp.path().canonicalize().expect("canonical").join("Recordings");
+        let outcome = VoiceMemosStore::open(&absent);
+        assert!(matches!(outcome, Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. })), "{outcome:?}");
     }
 }
 ```
@@ -7780,17 +7841,18 @@ mod tests {
 
 Run: `cargo test -p vpt-adapters voice_memos`
 
-Expected: compile error, `VoiceMemosStore` not found.
+Expected: the build fails with `unresolved import` for the recorder names in `ports/mod.rs` and
+`cannot find` for `VoiceMemosStore`, `APPLE_SUBDIRECTORIES` and `byte_copy`.
 
 - [ ] **Step 3: Write the minimal implementation**
 
 `crates/vpt-application/src/ports/recorder.rs`:
 
 ```rust
-//! The recorder store: list, open read-only, clone from a descriptor, titles.
+//! The recorder store: list, open read-only, read and clone through the handle.
 
 use std::path::{Path, PathBuf};
-use vpt_domain::container::BoxReader;
+use vpt_domain::container::ReadFailure;
 use vpt_domain::time::FileTime;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -7799,7 +7861,7 @@ pub struct Candidate {
     pub file_name: String,
     pub size: u64,
     pub mtime: FileTime,
-    pub dataless: bool,
+    pub flags: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -7815,6 +7877,8 @@ pub enum RecorderError {
     Unreadable(String),
     NotRegular(PathBuf),
     NotFound(PathBuf),
+    /// Below no recordings root or nested: exit 3, `path_escape`.
+    Escape(PathBuf),
     Io(String),
 }
 
@@ -7830,243 +7894,193 @@ pub enum CloneError {
     Io(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TitleLookup {
-    Titled(String),
-    Unavailable,
-}
-
-pub trait SourceHandle: BoxReader {
-    fn metadata(&self) -> Result<SourceMetadata, RecorderError>;
-    fn clone_into(&self, destination: &Path) -> Result<CloneKind, CloneError>;
-}
-
-pub trait TitleSource {
-    fn title(&self, file_name: &str) -> TitleLookup;
-}
-
 pub trait RecorderStore {
+    /// The open read-only descriptor of one candidate.
+    type Handle;
+
     fn candidates(&self) -> Result<Vec<Candidate>, RecorderError>;
     fn candidate(&self, path: &Path) -> Result<Candidate, RecorderError>;
-    fn open(&self, path: &Path) -> Result<Box<dyn SourceHandle>, RecorderError>;
-    /// Performs the private database copy; a copy that fails answers `Unavailable`.
-    fn titles(&self) -> Box<dyn TitleSource>;
+    fn open(&self, path: &Path) -> Result<Self::Handle, RecorderError>;
+    fn metadata(&self, handle: &Self::Handle) -> Result<SourceMetadata, RecorderError>;
+    /// Fill `buf` from `offset`, or fail; the wholeness gate's read callback.
+    fn read_at(&self, handle: &Self::Handle, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure>;
+    /// Clone the descriptor to `<directory>/<name>`, relative to that directory's
+    /// own descriptor; a byte copy on `EXDEV` only.
+    fn clone_into(&self, handle: &Self::Handle, directory: &Path, name: &str) -> Result<CloneKind, CloneError>;
     fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)>;
 }
 ```
 
-`crates/vpt-adapters/src/voice_memos/mod.rs`:
-
-```rust
-//! Apple's Voice Memos store, read-only: the listing, the descriptors and
-//! the private copy of its database.
-
-pub mod store;
-pub mod titles;
-```
-
-(`titles` arrives in the next task; until then leave the line out.)
-
-`crates/vpt-adapters/src/voice_memos/store.rs`:
+`crates/vpt-adapters/src/voice_memos/store.rs`, above its test module:
 
 ```rust
 //! The listing at depth one and read-only descriptors that never follow a link.
 
-use std::fs::{File, OpenOptions};
-use std::os::macos::fs::MetadataExt;
-use std::os::unix::fs::OpenOptionsExt;
+use crate::contained::{Access, ContainedError, Kind, RootDir};
+use std::fs::File;
+use std::io::Write;
+use std::os::fd::AsFd;
+use std::os::unix::fs::{FileExt, MetadataExt};
 use std::os::unix::io::AsRawFd;
-use std::path::{Path, PathBuf};
-use vpt_application::ports::recorder::*;
-use vpt_domain::container::{BoxReader, ReadFailure};
+use std::path::Path;
+use vpt_application::ports::{Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata};
+use vpt_domain::container::ReadFailure;
 use vpt_domain::time::FileTime;
 
 pub const APPLE_SUBDIRECTORIES: [&str; 4] = ["Capture", "CaptureRecovery", "CloudRecordings_ckAssets", "EncryptedCloudRecordings"];
 
-/// The `st_flags` bit macOS sets on a file whose bytes are still in iCloud.
-const SF_DATALESS: u32 = 0x4000_0000;
+const BUFFER: usize = 64 * 1024;
 
 pub struct VoiceMemosStore {
-    recordings_dir: PathBuf,
-    state_dir: PathBuf,
-    read_titles: bool,
+    recordings: RootDir,
+}
+
+fn recorder_error(path: &Path, error: ContainedError) -> RecorderError {
+    match error {
+        ContainedError::Escape { .. } | ContainedError::NotADirectory(_) => RecorderError::Escape(path.to_path_buf()),
+        ContainedError::NotRegular(leaf) => RecorderError::NotRegular(leaf),
+        ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. } => RecorderError::NotFound(path.to_path_buf()),
+        ContainedError::Io { kind, .. } => RecorderError::Io(format!("{kind} at {}", path.display())),
+    }
+}
+
+fn file_time(secs: i64, nanos: i64) -> FileTime {
+    FileTime { secs, nanos: u32::try_from(nanos).unwrap_or(0) }
 }
 
 impl VoiceMemosStore {
-    pub fn new(recordings_dir: PathBuf, state_dir: PathBuf, read_titles: bool) -> VoiceMemosStore {
-        VoiceMemosStore { recordings_dir, state_dir, read_titles }
+    pub fn open(recordings_dir: &Path) -> Result<VoiceMemosStore, ContainedError> {
+        Ok(VoiceMemosStore { recordings: RootDir::open(recordings_dir)? })
     }
 
     pub fn recordings_dir(&self) -> &Path {
-        &self.recordings_dir
+        self.recordings.path()
     }
 
-    fn candidate_from(&self, path: PathBuf) -> Result<Option<Candidate>, RecorderError> {
-        let file_name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        if !file_name.ends_with(".m4a") {
+    /// The candidate at one validated name, `None` when the name is not an
+    /// `.m4a` file.
+    fn candidate_named(&self, name: &str) -> Result<Option<Candidate>, RecorderError> {
+        if !name.ends_with(".m4a") {
             return Ok(None);
         }
-        let metadata = std::fs::symlink_metadata(&path).map_err(|error| RecorderError::Io(error.to_string()))?;
-        if !metadata.file_type().is_file() {
-            return Ok(None);
+        let path = self.recordings.path().join(name);
+        let stat = self.recordings.stat(Path::new(name)).map_err(|error| recorder_error(&path, error))?;
+        match stat.kind {
+            Kind::File => Ok(Some(Candidate {
+                path,
+                file_name: name.to_owned(),
+                size: stat.size,
+                mtime: FileTime { secs: stat.mtime_secs, nanos: stat.mtime_nanos },
+                flags: stat.flags,
+            })),
+            Kind::Link => Err(RecorderError::NotRegular(path)),
+            Kind::Directory | Kind::Other => Ok(None),
         }
-        Ok(Some(Candidate {
-            file_name,
-            size: metadata.len(),
-            mtime: FileTime { secs: metadata.st_mtime(), nanos: metadata.st_mtime_nsec() as u32 },
-            dataless: metadata.st_flags() & SF_DATALESS != 0,
-            path,
-        }))
     }
 }
 
 impl RecorderStore for VoiceMemosStore {
+    type Handle = File;
+
     fn candidates(&self) -> Result<Vec<Candidate>, RecorderError> {
-        let entries = std::fs::read_dir(&self.recordings_dir).map_err(|error| RecorderError::Unreadable(error.to_string()))?;
+        let names = self.recordings.names().map_err(|error| RecorderError::Unreadable(format!("{error:?}")))?;
         let mut candidates = Vec::new();
-        for entry in entries {
-            let entry = entry.map_err(|error| RecorderError::Unreadable(error.to_string()))?;
-            if let Some(candidate) = self.candidate_from(entry.path())? {
-                candidates.push(candidate);
+        for name in names {
+            match self.candidate_named(&name) {
+                Ok(Some(candidate)) => candidates.push(candidate),
+                Ok(None) | Err(RecorderError::NotRegular(_)) => {}
+                Err(error) => return Err(error),
             }
         }
-        candidates.sort_by(|a, b| a.file_name.cmp(&b.file_name));
         Ok(candidates)
     }
 
     fn candidate(&self, path: &Path) -> Result<Candidate, RecorderError> {
-        match self.candidate_from(path.to_path_buf())? {
-            Some(candidate) => Ok(candidate),
-            None => Err(RecorderError::NotFound(path.to_path_buf())),
-        }
+        let leaf = self.recordings.leaf(path).map_err(|error| recorder_error(path, error))?;
+        let name = leaf.file_name().and_then(|name| name.to_str()).ok_or_else(|| RecorderError::Escape(path.to_path_buf()))?;
+        self.candidate_named(name)?.ok_or_else(|| RecorderError::NotFound(path.to_path_buf()))
     }
 
-    fn open(&self, path: &Path) -> Result<Box<dyn SourceHandle>, RecorderError> {
-        let file = OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(path)
-            .map_err(|error| {
-                if error.raw_os_error() == Some(libc::ELOOP) {
-                    RecorderError::NotRegular(path.to_path_buf())
-                } else {
-                    RecorderError::Io(error.to_string())
-                }
-            })?;
-        let metadata = file.metadata().map_err(|error| RecorderError::Io(error.to_string()))?;
-        if !metadata.file_type().is_file() {
-            return Err(RecorderError::NotRegular(path.to_path_buf()));
-        }
-        Ok(Box::new(FileHandle { file }))
+    fn open(&self, path: &Path) -> Result<File, RecorderError> {
+        self.recordings.open_file(path, Access::Read).map_err(|error| recorder_error(path, error))
     }
 
-    fn titles(&self) -> Box<dyn TitleSource> {
-        Box::new(super::titles::TitleCopy::refresh(&self.recordings_dir, &self.state_dir, self.read_titles))
+    fn metadata(&self, handle: &File) -> Result<SourceMetadata, RecorderError> {
+        let metadata = handle.metadata().map_err(|error| RecorderError::Io(error.kind().to_string()))?;
+        Ok(SourceMetadata {
+            device: metadata.dev(),
+            inode: metadata.ino(),
+            size: metadata.len(),
+            mtime: file_time(metadata.mtime(), metadata.mtime_nsec()),
+        })
+    }
+
+    fn read_at(&self, handle: &File, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
+        handle.read_exact_at(buf, offset).map_err(|_| ReadFailure)
+    }
+
+    fn clone_into(&self, handle: &File, directory: &Path, name: &str) -> Result<CloneKind, CloneError> {
+        let directory = RootDir::open(directory).map_err(|error| CloneError::Io(format!("{error:?}")))?;
+        let target = directory.c_name(Path::new(name)).map_err(|error| CloneError::Io(format!("{error:?}")))?;
+        // SAFETY: `target` is NUL-terminated and outlives the call; both descriptors
+        // stay open for the lifetime of their owners.
+        let outcome = unsafe { libc::fclonefileat(handle.as_raw_fd(), directory.as_fd().as_raw_fd(), target.as_ptr(), 0) };
+        if outcome == 0 {
+            return Ok(CloneKind::CopyOnWrite);
+        }
+        let error = std::io::Error::last_os_error();
+        match error.raw_os_error() {
+            Some(libc::EXDEV) => byte_copy(handle, &directory, Path::new(name)),
+            Some(libc::ENOSPC) => Err(CloneError::NoSpace),
+            _ => Err(CloneError::Io(error.kind().to_string())),
+        }
     }
 
     fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)> {
         APPLE_SUBDIRECTORIES
             .iter()
             .map(|name| {
-                let count = std::fs::read_dir(self.recordings_dir.join(name)).ok().map(|entries| entries.count() as u64);
+                let count = std::fs::read_dir(self.recordings.path().join(name)).ok().map(|entries| entries.count() as u64);
                 ((*name).to_owned(), count)
             })
             .collect()
     }
 }
 
-pub struct FileHandle {
-    file: File,
-}
-
-impl BoxReader for FileHandle {
-    fn len(&self) -> u64 {
-        self.file.metadata().map(|m| m.len()).unwrap_or(0)
+/// The `EXDEV` fallback: a private 0600 file below the directory, filled in
+/// 64 KiB bounded reads from the descriptor.
+fn byte_copy(source: &File, directory: &RootDir, name: &Path) -> Result<CloneKind, CloneError> {
+    let mut out = directory.create_file(name, 0o600).map_err(|error| match error {
+        ContainedError::Io { kind: std::io::ErrorKind::StorageFull, .. } => CloneError::NoSpace,
+        other => CloneError::Io(format!("{other:?}")),
+    })?;
+    let total = source.metadata().map_err(|error| CloneError::Io(error.kind().to_string()))?.len();
+    let mut buffer = vec![0u8; BUFFER];
+    let mut offset = 0u64;
+    while offset < total {
+        let chunk = usize::try_from((total - offset).min(BUFFER as u64)).unwrap_or(BUFFER);
+        source.read_exact_at(&mut buffer[..chunk], offset).map_err(|error| CloneError::Io(error.kind().to_string()))?;
+        out.write_all(&buffer[..chunk]).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::StorageFull { CloneError::NoSpace } else { CloneError::Io(error.kind().to_string()) }
+        })?;
+        offset += chunk as u64;
     }
-
-    fn read_exact_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
-        let mut done = 0usize;
-        while done < buf.len() {
-            let position = i64::try_from(offset + done as u64).map_err(|_| ReadFailure)?;
-            // SAFETY: `buf` outlives the call and its length bounds the read; the
-            // descriptor is open for the lifetime of `self.file`.
-            let read = unsafe {
-                libc::pread(self.file.as_raw_fd(), buf[done..].as_mut_ptr().cast(), buf.len() - done, position)
-            };
-            if read <= 0 {
-                return Err(ReadFailure);
-            }
-            done += read as usize;
-        }
-        Ok(())
-    }
-}
-
-impl SourceHandle for FileHandle {
-    fn metadata(&self) -> Result<SourceMetadata, RecorderError> {
-        let metadata = self.file.metadata().map_err(|error| RecorderError::Io(error.to_string()))?;
-        Ok(SourceMetadata {
-            device: metadata.st_dev() as u64,
-            inode: metadata.st_ino(),
-            size: metadata.len(),
-            mtime: FileTime { secs: metadata.st_mtime(), nanos: metadata.st_mtime_nsec() as u32 },
-        })
-    }
-
-    fn clone_into(&self, destination: &Path) -> Result<CloneKind, CloneError> {
-        let target = std::ffi::CString::new(destination.as_os_str().as_encoded_bytes())
-            .map_err(|_| CloneError::Io("destination holds a NUL byte".into()))?;
-        // SAFETY: `target` is a NUL-terminated path that outlives the call; the
-        // source descriptor is open; AT_FDCWD resolves an absolute destination.
-        let outcome = unsafe { libc::fclonefileat(self.file.as_raw_fd(), libc::AT_FDCWD, target.as_ptr(), 0) };
-        if outcome == 0 {
-            return Ok(CloneKind::CopyOnWrite);
-        }
-        let error = std::io::Error::last_os_error();
-        match error.raw_os_error() {
-            Some(libc::EXDEV) | Some(libc::ENOTSUP) => self.byte_copy(destination),
-            Some(libc::ENOSPC) => Err(CloneError::NoSpace),
-            _ => Err(CloneError::Io(error.to_string())),
-        }
-    }
-}
-
-impl FileHandle {
-    fn byte_copy(&self, destination: &Path) -> Result<CloneKind, CloneError> {
-        use std::io::Write;
-        let mut out = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(destination)
-            .map_err(|error| CloneError::Io(error.to_string()))?;
-        let total = self.len();
-        let mut offset = 0u64;
-        let mut buffer = vec![0u8; 64 * 1024];
-        let mut reader = FileHandle { file: self.file.try_clone().map_err(|error| CloneError::Io(error.to_string()))? };
-        while offset < total {
-            let chunk = usize::try_from((total - offset).min(buffer.len() as u64)).unwrap_or(buffer.len());
-            reader.read_exact_at(offset, &mut buffer[..chunk]).map_err(|_| CloneError::Io("read failed".into()))?;
-            out.write_all(&buffer[..chunk]).map_err(|error| {
-                if error.raw_os_error() == Some(libc::ENOSPC) { CloneError::NoSpace } else { CloneError::Io(error.to_string()) }
-            })?;
-            offset += chunk as u64;
-        }
-        Ok(CloneKind::ByteCopy)
-    }
+    Ok(CloneKind::ByteCopy)
 }
 ```
 
-`crates/vpt-application/src/ports/mod.rs` adds `pub mod recorder;`; `crates/vpt-adapters/src/lib.rs` adds
-`pub mod voice_memos;`. Until Task 16 lands, make `titles()` return a source that always answers
-`Unavailable` by pointing the module at a two-line `titles.rs` holding `pub struct TitleCopy;` with
-`refresh` returning it and `title` returning `TitleLookup::Unavailable`; Task 16 replaces that file.
+`read_exact_at` is `std::os::unix::fs::FileExt`, whose offset arithmetic is checked in the standard
+library. The destination directory is opened as its own descriptor for the clone, so `fclonefileat` names
+the new file relative to it and never through a path that could have changed since the archive resolved
+it. A byte-copy destination that runs out of space at creation or during a write is `NoSpace`; every
+other failure keeps its kind and no raw path text reaches the error.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters voice_memos`
 
-Expected: 6 tests PASS.
+Expected: 8 tests PASS. Run `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no
+warnings.
 
 - [ ] **Step 5: Commit**
 
