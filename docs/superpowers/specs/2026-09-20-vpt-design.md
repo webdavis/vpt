@@ -444,18 +444,21 @@ publishes nothing.
 
 ### 5.3 Cloning and duplicates
 
-Publication moves the staged file to `<id>.m4a` in one step and never replaces an existing target: an
-existing `<id>.m4a` is a refusal naming the path, and that refusal is the duplicate guard between two
-racing sweeps, which needs no lock beyond the one every mutating command holds. The plan verifies the
-exclusive-rename primitive available on the platform before choosing it. On that refusal vpt verifies the
-existing archive: its full digest must equal the staged digest and its container must validate. It then
-recovers any missing recording or seen row in one transaction, moves the staged duplicate to the Trash,
-and reports `already ingested`. A digest mismatch is exit 3 `archive_collision`, and nothing is replaced.
-The staging clone is the `clonefile` family through `libc`, from the opened descriptor; `EXDEV` (the
-store on another volume) falls back to a byte copy into a unique mode-0600 temporary file, synced before
-the same no-replace publish, with one log line saying the archive is not copy-on-write. `ENOSPC` aborts
-the sweep. At the start of every sweep, an archive file with no ledger row is recovered by validating and
-digesting it, even when its source is gone.
+Publication syncs the completed staging file to disk (on the clone path and the byte-copy path alike),
+moves it to `<id>.m4a` in one step that never replaces an existing target, and syncs the archive
+directory before the recording and seen rows commit, so a committed ingestion always has its archive on
+disk. A sync that fails is exit 1 and never records an ingestion. An existing `<id>.m4a` is a refusal
+naming the path, and that refusal is the duplicate guard between two racing sweeps, which needs no lock
+beyond the one every mutating command holds. The plan verifies the exclusive-rename primitive available
+on the platform before choosing it. On that refusal vpt verifies the existing archive: its full digest
+must equal the staged digest and its container must validate. It then syncs the verified archive and its
+directory, recovers any missing recording or seen row in one transaction, moves the staged duplicate to
+the Trash, and reports `already ingested`. A digest mismatch is exit 3 `archive_collision`, and nothing
+is replaced. The staging clone is the `clonefile` family through `libc`, from the opened descriptor;
+`EXDEV` (the store on another volume) falls back to a byte copy into a unique mode-0600 temporary file
+that takes the same publish path, with one log line saying the archive is not copy-on-write. `ENOSPC`
+aborts the sweep. At the start of every sweep, an archive file with no ledger row is recovered by
+validating and digesting it, even when its source is gone.
 
 ### 5.4 Deleted, edited and moved recordings
 
@@ -467,19 +470,20 @@ path and takes nothing.
 
 ### 5.5 Failure modes and pages
 
-| Condition                                              | Sweep behavior                                | Event                                                                                       |
-| ------------------------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `recordings_dir` unreadable                            | abort, exit 1, nothing ingested               | `ingest_failed`, once per run                                                               |
-| readable, zero `.m4a`, store previously seen non-empty | abort, exit 1                                 | `ingest_failed` (an empty store is the silent failure)                                      |
-| database copy or read fails                            | continue, untitled                            | none, recorded per recording                                                                |
-| a gate fails                                           | defer, retry next sweep                       | `deferred` after `[source] deferral_page_threshold` (default 4) consecutive deferrals, once |
-| `SF_DATALESS`                                          | defer, never open                             | as above                                                                                    |
-| entry larger than `max_audio_bytes`                    | defer, never read                             | as a gate                                                                                   |
-| source changed while staged                            | defer with `changed_during_read`              | as a gate                                                                                   |
-| publish finds `<id>.m4a` with the same digest          | recover missing rows, report already ingested | none                                                                                        |
-| publish finds `<id>.m4a` with a different digest       | refuse, exit 3 `archive_collision`            | `ingest_failed`                                                                             |
-| `ENOSPC`                                               | abort, exit 1                                 | `ingest_failed`                                                                             |
-| audio store parent missing                             | refuse at startup, exit 2                     | `config_refused`                                                                            |
+| Condition                                                | Sweep behavior                                | Event                                                                                       |
+| -------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `recordings_dir` unreadable                              | abort, exit 1, nothing ingested               | `ingest_failed`, once per run                                                               |
+| readable, zero `.m4a`, store previously seen non-empty   | abort, exit 1                                 | `ingest_failed` (an empty store is the silent failure)                                      |
+| database copy or read fails                              | continue, untitled                            | none, recorded per recording                                                                |
+| a gate fails                                             | defer, retry next sweep                       | `deferred` after `[source] deferral_page_threshold` (default 4) consecutive deferrals, once |
+| `SF_DATALESS`                                            | defer, never open                             | as above                                                                                    |
+| entry larger than `max_audio_bytes`                      | defer, never read                             | as a gate                                                                                   |
+| source changed while staged                              | defer with `changed_during_read`              | as a gate                                                                                   |
+| publish finds `<id>.m4a` with the same digest            | recover missing rows, report already ingested | none                                                                                        |
+| publish finds `<id>.m4a` with a different digest         | refuse, exit 3 `archive_collision`            | `ingest_failed`                                                                             |
+| `ENOSPC`                                                 | abort, exit 1                                 | `ingest_failed`                                                                             |
+| a sync of the staged file or the archive directory fails | abort, exit 1, no row recorded                | `ingest_failed`                                                                             |
+| audio store parent missing                               | refuse at startup, exit 2                     | `config_refused`                                                                            |
 
 `vpt ingest --dry-run` runs every gate and writes nothing durable: no clone, no row, no event (the title
 copy may be refreshed). `--once <path>` ingests exactly one file by path, gates included.
