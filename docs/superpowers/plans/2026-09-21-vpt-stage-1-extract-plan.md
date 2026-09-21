@@ -5942,13 +5942,22 @@ SKIP_AI_COMMIT=1 git commit -m "feat(ledger): SQLite open through the state root
 
 ______________________________________________________________________
 
-### Task 12: The recording ledger and its in-memory twin, under one contract
+### Task 12: The recording ledger, the publication journal and the in-memory twin, under one contract
+
+The ledger's write protocol is one operation: a `LedgerCommit` batch of recordings, seen rows and dirty
+publication entries lands in one SQLite transaction or not at all, and the memory twin applies the same
+batch atomically. That is what spec section 4.4 requires of a publication: the state a rendering depends
+on and the journal entry that makes its target dirty are committed together, never as two calls. The
+contract tests run the same scenarios against both implementations, including a batch whose last write
+violates a uniqueness constraint after the seen row and the journal entry were written, and require both
+of those to roll back.
 
 **Files:**
 
-- Modify: `crates/vpt-application/src/ports/ledger.rs`
+- Modify: `crates/vpt-application/src/ports/ledger.rs`, `crates/vpt-application/src/ports/mod.rs`
 - Create: `crates/vpt-adapters/src/ledger/sqlite/recordings.rs`,
-  `crates/vpt-adapters/src/ledger/memory.rs`, `crates/vpt-adapters/src/ledger/contract.rs`
+  `crates/vpt-adapters/src/ledger/sqlite/journal.rs`, `crates/vpt-adapters/src/ledger/memory.rs`,
+  `crates/vpt-adapters/src/ledger/contract.rs`
 - Modify: `crates/vpt-adapters/src/ledger/mod.rs`, `crates/vpt-adapters/src/ledger/sqlite/mod.rs`
 
 **Interfaces:**
@@ -5956,53 +5965,80 @@ ______________________________________________________________________
 - Consumes: `SqliteLedger::{transaction, read}`, `map`; domain `RecordingId`, `Sha256Digest`,
   `UtcInstant`, `UtcOffset`, `FileTime`, `DeferralReason`.
 
-- Produces, in `vpt_application::ports::ledger`:
+- Produces, in `vpt_application::ports` (the file `ports/ledger.rs` stays private, `ports/mod.rs`
+  re-exports every name below):
 
   - `SeenRow { pub path: PathBuf, pub file_name: String, pub size: u64, pub mtime: FileTime,`
-    `pub dataless: bool, pub first_seen: UtcInstant, pub last_seen: UtcInstant,`
+    `pub flags: u32, pub first_seen: UtcInstant, pub last_seen: UtcInstant,`
     `pub deferral_count: u32, pub deferral_reason: Option<DeferralReason>,`
     `pub deferred_size: Option<u64>, pub source_gone_at: Option<UtcInstant>,`
-    `pub recording: Option<RecordingId> }`
+    `pub recording: Option<RecordingId> }` (`flags` is the source's whole `st_flags` word).
   - `StageState::{Pending, Succeeded, Failed, Disabled, Expired}` with `as_str`/`parse`;
     `StageStates { pub transcribe: StageState, pub note: StageState, pub synthesis: StageState }` with
     `StageStates::fresh()` (all `Pending`).
   - `TitleOrigin::{VoiceMemos, Unavailable}` with `as_str`/`parse` (named apart from the recorder port's
-    `TitleSource` trait of Task 15).
+    `TitleLookup` of Task 15).
   - `RecordingRecord { pub id: RecordingId, pub source_path: Option<PathBuf>,`
     `pub digest: Sha256Digest, pub captured_at: UtcInstant, pub captured_offset: UtcOffset,`
     `pub duration_secs: u64, pub title: Option<String>, pub title_source: TitleOrigin,`
     `pub ingested_at: UtcInstant, pub audio_path: PathBuf, pub stages: StageStates,`
     `pub audio_trashed_at: Option<UtcInstant> }`
+  - `DirtyPublication { pub target: PathBuf, pub expected_previous: Option<Sha256Digest>,`
+    `pub intended: Sha256Digest, pub recorded_at: UtcInstant }`
+  - `LedgerCommit { pub recordings: Vec<RecordingRecord>, pub seen: Vec<SeenRow>,`
+    `pub publications: Vec<DirtyPublication> }` (`Default`, `Clone`, `Debug`, `PartialEq`).
   - `trait RecordingLedger { fn seen(&self, path: &Path) -> Result<Option<SeenRow>,`
     `LedgerError>; fn seen_all(&self) -> Result<Vec<SeenRow>, LedgerError>;`
     `fn record_seen(&self, row: &SeenRow) -> Result<(), LedgerError>; fn by_digest(&self,`
     `digest: &Sha256Digest) -> Result<Option<RecordingRecord>, LedgerError>; fn by_id(&self,`
     `id: &RecordingId) -> Result<Option<RecordingRecord>, LedgerError>;`
     `fn recordings(&self) -> Result<Vec<RecordingRecord>, LedgerError>;`
-    `fn commit_ingest(&self, recording: &RecordingRecord, seen: &SeenRow) -> Result<(),`
-    `LedgerError>; fn commit_recovered(&self, recording: &RecordingRecord) -> Result<(),`
-    `LedgerError>; fn set_source_path(&self, id: &RecordingId, path: &Path) -> Result<(),`
-    `LedgerError>; fn set_audio_trashed(&self, id: &RecordingId, at: UtcInstant) ->`
-    `Result<(), LedgerError>; }`
+    `fn commit(&self, batch: &LedgerCommit) -> Result<(), LedgerError>;`
+    `fn set_source_path(&self, id: &RecordingId, path: &Path) -> Result<(), LedgerError>;`
+    `fn set_audio_trashed(&self, id: &RecordingId, at: UtcInstant) -> Result<(), LedgerError>; }`.
+    `seen_all` is ordered by path, `recordings` by capture instant then identity; `record_seen` keeps the
+    stored `first_seen`; `commit` writes every row or none.
+  - `trait PublicationJournal { fn pending_publications(&self) -> Result<Vec<DirtyPublication>,`
+    `LedgerError>; fn clear_publication(&self, target: &Path) -> Result<(), LedgerError>; }`, pending
+    entries ordered by instant then target; an entry is recorded only through `commit`.
 
-- `vpt_adapters::ledger::memory::MemoryLedger::new() -> MemoryLedger` (implements every ledger trait,
-  state behind one `std::sync::Mutex`).
+- `vpt_adapters::ledger::MemoryLedger::new() -> MemoryLedger` (implements both traits, state behind one
+  `std::sync::Mutex`; `ledger/mod.rs` keeps `memory` private and re-exports the type).
 
-- `crates/vpt-adapters/src/ledger/contract.rs`: `pub(crate) mod recording` with one function per scenario
-  taking `&dyn RecordingLedger`, and the macro `recording_ledger_contract!(make)` that emits one
-  `#[test]` per scenario.
+- `crates/vpt-adapters/src/ledger/contract.rs` (test-only): `pub(crate) mod recording` and
+  `pub(crate) mod journal` with one generic function per scenario, and the macros
+  `recording_ledger_contract!(make)` and `publication_journal_contract!(make)` that emit one `#[test]`
+  per scenario; `make` returns `(guard, ledger)` where the guard keeps a temporary directory alive for
+  SQLite and is `()` for memory.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-adapters/src/ledger/contract.rs`:
+Declare the modules first. `crates/vpt-adapters/src/ledger/mod.rs` becomes:
+
+```rust
+//! The ledger: one SQLite type implementing every repository, and an
+//! in-memory twin that runs the same contract.
+
+#[cfg(test)]
+pub(crate) mod contract;
+mod memory;
+mod sqlite;
+
+pub use memory::MemoryLedger;
+pub use sqlite::{OpenError, SCHEMA_VERSION, SqliteLedger};
+```
+
+`crates/vpt-adapters/src/ledger/sqlite/mod.rs` gains `mod journal;` and `mod recordings;` beside
+`mod migrations;`, both files empty for now. `crates/vpt-adapters/src/ledger/contract.rs`:
 
 ```rust
 //! The behavioral contract every ledger implementation runs.
 
-#![cfg(test)]
-
 use std::path::{Path, PathBuf};
-use vpt_application::ports::ledger::*;
+use vpt_application::ports::{
+    DirtyPublication, LedgerCommit, LedgerError, PublicationJournal, RecordingLedger, RecordingRecord, SeenRow,
+    StageStates, TitleOrigin,
+};
 use vpt_domain::digest::Sha256Digest;
 use vpt_domain::identity::RecordingId;
 use vpt_domain::sweep::DeferralReason;
@@ -6019,8 +6055,8 @@ pub fn seen_row(path: &str) -> SeenRow {
         path: PathBuf::from(path),
         file_name: Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
         size: 1_024,
-        mtime: FileTime { secs: 1_787_690_856, nanos: 17 },
-        dataless: false,
+        mtime: FileTime { secs: 1_787_604_456, nanos: 17 },
+        flags: 0,
         first_seen: UtcInstant { secs: 1_787_700_000 },
         last_seen: UtcInstant { secs: 1_787_700_000 },
         deferral_count: 0,
@@ -6033,10 +6069,10 @@ pub fn seen_row(path: &str) -> SeenRow {
 
 pub fn record(seed: u8) -> RecordingRecord {
     let digest = digest(seed);
-    let captured_at = UtcInstant { secs: 1_787_690_856 };
+    let captured_at = UtcInstant { secs: 1_787_604_456 + i64::from(seed) };
     let captured_offset = UtcOffset { secs: -21_600 };
     RecordingRecord {
-        id: RecordingId::derive(captured_at, captured_offset, &digest),
+        id: RecordingId::derive(captured_at, captured_offset, &digest).expect("representable"),
         source_path: Some(PathBuf::from(format!("/vm/Recordings/{seed}.m4a"))),
         digest,
         captured_at,
@@ -6051,12 +6087,26 @@ pub fn record(seed: u8) -> RecordingRecord {
     }
 }
 
+pub fn publication(target: &str, seed: u8, at: i64) -> DirtyPublication {
+    DirtyPublication {
+        target: PathBuf::from(target),
+        expected_previous: None,
+        intended: digest(seed),
+        recorded_at: UtcInstant { secs: at },
+    }
+}
+
+pub fn ingest(recording: RecordingRecord, seen: SeenRow) -> LedgerCommit {
+    LedgerCommit { recordings: vec![recording], seen: vec![seen], publications: vec![] }
+}
+
 pub mod recording {
     use super::*;
 
-    pub fn seen_is_absent_until_recorded_and_updated_by_a_second_record(ledger: &dyn RecordingLedger) {
+    pub fn seen_is_absent_until_recorded_and_updated_by_a_second_record<L: RecordingLedger>(ledger: &L) {
         assert_eq!(ledger.seen(Path::new("/vm/Recordings/a.m4a")).expect("read"), None);
         let mut row = seen_row("/vm/Recordings/a.m4a");
+        row.flags = 0x0000_8000;
         ledger.record_seen(&row).expect("record");
         assert_eq!(ledger.seen(&row.path).expect("read"), Some(row.clone()));
         row.deferral_count = 1;
@@ -6067,32 +6117,64 @@ pub mod recording {
         assert_eq!(ledger.seen_all().expect("all").len(), 1);
     }
 
-    pub fn commit_ingest_writes_the_recording_and_its_seen_row_together(ledger: &dyn RecordingLedger) {
+    pub fn a_second_record_keeps_the_first_seen_instant_and_moves_last_seen<L: RecordingLedger>(ledger: &L) {
+        let mut row = seen_row("/vm/Recordings/a.m4a");
+        ledger.record_seen(&row).expect("first");
+        row.first_seen = UtcInstant { secs: 1_787_800_000 };
+        row.last_seen = UtcInstant { secs: 1_787_800_000 };
+        ledger.record_seen(&row).expect("second");
+        let stored = ledger.seen(&row.path).expect("read").expect("present");
+        assert_eq!(stored.first_seen, UtcInstant { secs: 1_787_700_000 });
+        assert_eq!(stored.last_seen, UtcInstant { secs: 1_787_800_000 });
+    }
+
+    pub fn seen_all_is_ordered_by_path_whatever_the_insertion_order<L: RecordingLedger>(ledger: &L) {
+        for name in ["c.m4a", "a.m4a", "b.m4a"] {
+            ledger.record_seen(&seen_row(&format!("/vm/Recordings/{name}"))).expect("record");
+        }
+        let paths: Vec<PathBuf> = ledger.seen_all().expect("all").into_iter().map(|row| row.path).collect();
+        assert_eq!(paths, ["a.m4a", "b.m4a", "c.m4a"].map(|name| PathBuf::from(format!("/vm/Recordings/{name}"))));
+    }
+
+    pub fn commit_writes_the_recording_its_seen_row_and_its_publication_together<L>(ledger: &L)
+    where
+        L: RecordingLedger + PublicationJournal,
+    {
         let recording = record(1);
         let mut seen = seen_row("/vm/Recordings/1.m4a");
         seen.recording = Some(recording.id.clone());
-        ledger.commit_ingest(&recording, &seen).expect("commit");
+        let entry = publication("/h/transcripts/1.md", 11, 1);
+        let mut batch = ingest(recording.clone(), seen.clone());
+        batch.publications.push(entry.clone());
+        ledger.commit(&batch).expect("commit");
         assert_eq!(ledger.by_id(&recording.id).expect("read"), Some(recording.clone()));
         assert_eq!(ledger.by_digest(&recording.digest).expect("read"), Some(recording.clone()));
         assert_eq!(ledger.seen(&seen.path).expect("read").and_then(|row| row.recording), Some(recording.id.clone()));
         assert_eq!(ledger.recordings().expect("list"), vec![recording]);
+        assert_eq!(ledger.pending_publications().expect("pending"), vec![entry]);
     }
 
-    pub fn a_second_identity_for_one_digest_is_a_conflict_and_writes_nothing(ledger: &dyn RecordingLedger) {
+    pub fn a_conflicting_recording_rolls_back_the_rows_written_before_it<L>(ledger: &L)
+    where
+        L: RecordingLedger + PublicationJournal,
+    {
         let first = record(2);
-        ledger.commit_ingest(&first, &seen_row("/vm/Recordings/2.m4a")).expect("first");
+        ledger.commit(&ingest(first, seen_row("/vm/Recordings/2.m4a"))).expect("first");
         let mut second = record(2);
         second.id = RecordingId::parse("2026-08-24T144736-000000000002").expect("id");
         second.source_path = Some(PathBuf::from("/vm/Recordings/2b.m4a"));
-        let outcome = ledger.commit_ingest(&second, &seen_row("/vm/Recordings/2b.m4a"));
+        let mut batch = ingest(second, seen_row("/vm/Recordings/2b.m4a"));
+        batch.publications.push(publication("/h/transcripts/2b.md", 12, 1));
+        let outcome = ledger.commit(&batch);
         assert!(matches!(outcome, Err(LedgerError::Conflict(_))), "{outcome:?}");
         assert_eq!(ledger.seen(Path::new("/vm/Recordings/2b.m4a")).expect("read"), None);
+        assert_eq!(ledger.pending_publications().expect("pending"), vec![]);
         assert_eq!(ledger.recordings().expect("list").len(), 1);
     }
 
-    pub fn the_source_path_and_the_audio_trashed_instant_are_updatable(ledger: &dyn RecordingLedger) {
+    pub fn the_source_path_and_the_audio_trashed_instant_are_updatable<L: RecordingLedger>(ledger: &L) {
         let recording = record(3);
-        ledger.commit_ingest(&recording, &seen_row("/vm/Recordings/3.m4a")).expect("commit");
+        ledger.commit(&ingest(recording.clone(), seen_row("/vm/Recordings/3.m4a"))).expect("commit");
         ledger.set_source_path(&recording.id, Path::new("/vm/Recordings/renamed.m4a")).expect("path");
         ledger.set_audio_trashed(&recording.id, UtcInstant { secs: 1_787_800_000 }).expect("trashed");
         let stored = ledger.by_id(&recording.id).expect("read").expect("present");
@@ -6100,86 +6182,183 @@ pub mod recording {
         assert_eq!(stored.audio_trashed_at, Some(UtcInstant { secs: 1_787_800_000 }));
     }
 
-    pub fn an_unknown_identity_reads_as_absent(ledger: &dyn RecordingLedger) {
+    pub fn an_unknown_identity_reads_as_absent<L: RecordingLedger>(ledger: &L) {
         let id = RecordingId::parse("2026-08-24T144736-ffffffffffff").expect("id");
         assert_eq!(ledger.by_id(&id).expect("read"), None);
         assert_eq!(ledger.by_digest(&digest(9)).expect("read"), None);
     }
 
-    pub fn commit_recovered_writes_a_recording_with_no_source_and_no_seen_row(ledger: &dyn RecordingLedger) {
+    pub fn a_recording_with_no_source_and_no_seen_row_commits_alone<L: RecordingLedger>(ledger: &L) {
         let mut recording = record(4);
         recording.source_path = None;
-        ledger.commit_recovered(&recording).expect("recovered");
+        let batch = LedgerCommit { recordings: vec![recording.clone()], ..LedgerCommit::default() };
+        ledger.commit(&batch).expect("recovered");
         assert_eq!(ledger.by_id(&recording.id).expect("read"), Some(recording));
         assert!(ledger.seen_all().expect("all").is_empty());
+    }
+
+    pub fn recordings_are_ordered_by_capture_instant_then_identity<L: RecordingLedger>(ledger: &L) {
+        for seed in [7, 5, 6] {
+            let batch = LedgerCommit { recordings: vec![record(seed)], ..LedgerCommit::default() };
+            ledger.commit(&batch).expect("commit");
+        }
+        let captured: Vec<i64> = ledger.recordings().expect("list").iter().map(|r| r.captured_at.secs).collect();
+        assert_eq!(captured, [5, 6, 7].map(|seed| 1_787_604_456 + seed));
+    }
+}
+
+pub mod journal {
+    use super::*;
+
+    pub fn a_pending_publication_is_listed_until_cleared<L>(ledger: &L)
+    where
+        L: RecordingLedger + PublicationJournal,
+    {
+        let entry = publication("/h/transcripts/a.md", 4, 1);
+        let batch = LedgerCommit { publications: vec![entry.clone()], ..LedgerCommit::default() };
+        ledger.commit(&batch).expect("record");
+        assert_eq!(ledger.pending_publications().expect("pending"), vec![entry.clone()]);
+        ledger.clear_publication(&entry.target).expect("clear");
+        assert_eq!(ledger.pending_publications().expect("pending"), vec![]);
+    }
+
+    pub fn recording_the_same_target_twice_keeps_the_latest_entry<L>(ledger: &L)
+    where
+        L: RecordingLedger + PublicationJournal,
+    {
+        let mut entry = publication("/h/transcripts/a.md", 6, 1);
+        entry.expected_previous = Some(digest(5));
+        ledger.commit(&LedgerCommit { publications: vec![entry.clone()], ..LedgerCommit::default() }).expect("first");
+        entry.intended = digest(7);
+        ledger.commit(&LedgerCommit { publications: vec![entry.clone()], ..LedgerCommit::default() }).expect("second");
+        assert_eq!(ledger.pending_publications().expect("pending"), vec![entry]);
+    }
+
+    pub fn pending_publications_are_ordered_by_instant_then_target<L>(ledger: &L)
+    where
+        L: RecordingLedger + PublicationJournal,
+    {
+        let entries = vec![
+            publication("/h/transcripts/z.md", 1, 2),
+            publication("/h/transcripts/b.md", 2, 1),
+            publication("/h/transcripts/a.md", 3, 1),
+        ];
+        ledger.commit(&LedgerCommit { publications: entries.clone(), ..LedgerCommit::default() }).expect("commit");
+        let targets: Vec<PathBuf> = ledger.pending_publications().expect("pending").into_iter().map(|e| e.target).collect();
+        assert_eq!(targets, ["a.md", "b.md", "z.md"].map(|name| PathBuf::from(format!("/h/transcripts/{name}"))));
     }
 }
 
 macro_rules! recording_ledger_contract {
     ($make:expr) => {
         mod recording_ledger_contract {
+            use super::*;
             use crate::ledger::contract::recording::*;
 
             #[test]
             fn seen_is_absent_until_recorded_and_updated_by_a_second_record_() {
                 let (_guard, ledger) = $make();
-                seen_is_absent_until_recorded_and_updated_by_a_second_record(&*ledger);
+                seen_is_absent_until_recorded_and_updated_by_a_second_record(&ledger);
             }
             #[test]
-            fn commit_ingest_writes_the_recording_and_its_seen_row_together_() {
+            fn a_second_record_keeps_the_first_seen_instant_and_moves_last_seen_() {
                 let (_guard, ledger) = $make();
-                commit_ingest_writes_the_recording_and_its_seen_row_together(&*ledger);
+                a_second_record_keeps_the_first_seen_instant_and_moves_last_seen(&ledger);
             }
             #[test]
-            fn a_second_identity_for_one_digest_is_a_conflict_and_writes_nothing_() {
+            fn seen_all_is_ordered_by_path_whatever_the_insertion_order_() {
                 let (_guard, ledger) = $make();
-                a_second_identity_for_one_digest_is_a_conflict_and_writes_nothing(&*ledger);
+                seen_all_is_ordered_by_path_whatever_the_insertion_order(&ledger);
+            }
+            #[test]
+            fn commit_writes_the_recording_its_seen_row_and_its_publication_together_() {
+                let (_guard, ledger) = $make();
+                commit_writes_the_recording_its_seen_row_and_its_publication_together(&ledger);
+            }
+            #[test]
+            fn a_conflicting_recording_rolls_back_the_rows_written_before_it_() {
+                let (_guard, ledger) = $make();
+                a_conflicting_recording_rolls_back_the_rows_written_before_it(&ledger);
             }
             #[test]
             fn the_source_path_and_the_audio_trashed_instant_are_updatable_() {
                 let (_guard, ledger) = $make();
-                the_source_path_and_the_audio_trashed_instant_are_updatable(&*ledger);
+                the_source_path_and_the_audio_trashed_instant_are_updatable(&ledger);
             }
             #[test]
             fn an_unknown_identity_reads_as_absent_() {
                 let (_guard, ledger) = $make();
-                an_unknown_identity_reads_as_absent(&*ledger);
+                an_unknown_identity_reads_as_absent(&ledger);
             }
             #[test]
-            fn commit_recovered_writes_a_recording_with_no_source_and_no_seen_row_() {
+            fn a_recording_with_no_source_and_no_seen_row_commits_alone_() {
                 let (_guard, ledger) = $make();
-                commit_recovered_writes_a_recording_with_no_source_and_no_seen_row(&*ledger);
+                a_recording_with_no_source_and_no_seen_row_commits_alone(&ledger);
+            }
+            #[test]
+            fn recordings_are_ordered_by_capture_instant_then_identity_() {
+                let (_guard, ledger) = $make();
+                recordings_are_ordered_by_capture_instant_then_identity(&ledger);
             }
         }
     };
 }
 pub(crate) use recording_ledger_contract;
+
+macro_rules! publication_journal_contract {
+    ($make:expr) => {
+        mod publication_journal_contract {
+            use super::*;
+            use crate::ledger::contract::journal::*;
+
+            #[test]
+            fn a_pending_publication_is_listed_until_cleared_() {
+                let (_guard, ledger) = $make();
+                a_pending_publication_is_listed_until_cleared(&ledger);
+            }
+            #[test]
+            fn recording_the_same_target_twice_keeps_the_latest_entry_() {
+                let (_guard, ledger) = $make();
+                recording_the_same_target_twice_keeps_the_latest_entry(&ledger);
+            }
+            #[test]
+            fn pending_publications_are_ordered_by_instant_then_target_() {
+                let (_guard, ledger) = $make();
+                pending_publications_are_ordered_by_instant_then_target(&ledger);
+            }
+        }
+    };
+}
+pub(crate) use publication_journal_contract;
 ```
 
-`$make` returns `(guard, Box<dyn RecordingLedger>)`; the guard keeps a temporary directory alive for the
-SQLite case and is `()` for the memory case.
-
-At the bottom of `crates/vpt-adapters/src/ledger/sqlite/mod.rs` (inside the existing `tests` module,
-after the four tests):
+At the bottom of the `tests` module of `crates/vpt-adapters/src/ledger/sqlite/mod.rs`, after its seven
+tests, add a factory beside them and both invocations:
 
 ```rust
-    crate::ledger::contract::recording_ledger_contract!(|| {
-        let temp = tempfile::tempdir().expect("temp");
-        let ledger = SqliteLedger::open(temp.path()).expect("opens");
-        (temp, Box::new(ledger) as Box<dyn vpt_application::ports::ledger::RecordingLedger>)
-    });
+    fn open_ledger() -> (tempfile::TempDir, SqliteLedger) {
+        let (temp, state) = state();
+        let ledger = SqliteLedger::open(&state).expect("opens");
+        (temp, ledger)
+    }
+
+    crate::ledger::contract::recording_ledger_contract!(open_ledger);
+    crate::ledger::contract::publication_journal_contract!(open_ledger);
 ```
 
-`crates/vpt-adapters/src/ledger/memory.rs`, test section:
+`crates/vpt-adapters/src/ledger/memory.rs` starts as its test module alone:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    crate::ledger::contract::recording_ledger_contract!(|| {
-        ((), Box::new(MemoryLedger::new()) as Box<dyn vpt_application::ports::ledger::RecordingLedger>)
-    });
+    fn fresh() -> ((), MemoryLedger) {
+        ((), MemoryLedger::new())
+    }
+
+    crate::ledger::contract::recording_ledger_contract!(fresh);
+    crate::ledger::contract::publication_journal_contract!(fresh);
 }
 ```
 
@@ -6187,7 +6366,9 @@ mod tests {
 
 Run: `cargo test -p vpt-adapters ledger`
 
-Expected: compile errors: `SeenRow`, `RecordingRecord`, `RecordingLedger` and `MemoryLedger` not found.
+Expected: the build fails with `unresolved import` for `SeenRow`, `RecordingRecord`, `RecordingLedger`,
+`LedgerCommit`, `DirtyPublication` and `PublicationJournal` in `contract.rs`, and `cannot find`
+`MemoryLedger` in `memory.rs`.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -6206,7 +6387,7 @@ pub struct SeenRow {
     pub file_name: String,
     pub size: u64,
     pub mtime: FileTime,
-    pub dataless: bool,
+    pub flags: u32,
     pub first_seen: UtcInstant,
     pub last_seen: UtcInstant,
     pub deferral_count: u32,
@@ -6256,7 +6437,7 @@ impl StageStates {
     }
 }
 
-/// Where a title came from; named apart from the recorder port's `TitleSource` trait.
+/// Where a title came from; named apart from the recorder port's `TitleLookup`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TitleOrigin {
     VoiceMemos,
@@ -6292,39 +6473,100 @@ pub struct RecordingRecord {
     pub audio_trashed_at: Option<UtcInstant>,
 }
 
+/// A target whose bytes may not match the ledger until the entry is cleared.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirtyPublication {
+    pub target: PathBuf,
+    pub expected_previous: Option<Sha256Digest>,
+    pub intended: Sha256Digest,
+    pub recorded_at: UtcInstant,
+}
+
+/// Everything one operation writes: all of it lands, or none of it does.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LedgerCommit {
+    pub recordings: Vec<RecordingRecord>,
+    pub seen: Vec<SeenRow>,
+    pub publications: Vec<DirtyPublication>,
+}
+
 pub trait RecordingLedger {
     fn seen(&self, path: &Path) -> Result<Option<SeenRow>, LedgerError>;
+    /// Ordered by path.
     fn seen_all(&self) -> Result<Vec<SeenRow>, LedgerError>;
+    /// Inserts or updates by path; a stored `first_seen` is kept.
     fn record_seen(&self, row: &SeenRow) -> Result<(), LedgerError>;
     fn by_digest(&self, digest: &Sha256Digest) -> Result<Option<RecordingRecord>, LedgerError>;
     fn by_id(&self, id: &RecordingId) -> Result<Option<RecordingRecord>, LedgerError>;
+    /// Ordered by capture instant, then identity.
     fn recordings(&self) -> Result<Vec<RecordingRecord>, LedgerError>;
-    fn commit_ingest(&self, recording: &RecordingRecord, seen: &SeenRow) -> Result<(), LedgerError>;
-    fn commit_recovered(&self, recording: &RecordingRecord) -> Result<(), LedgerError>;
+    /// One transaction for the whole batch; a second identity for a known
+    /// digest is `Conflict` and nothing in the batch is written.
+    fn commit(&self, batch: &LedgerCommit) -> Result<(), LedgerError>;
     fn set_source_path(&self, id: &RecordingId, path: &Path) -> Result<(), LedgerError>;
     fn set_audio_trashed(&self, id: &RecordingId, at: UtcInstant) -> Result<(), LedgerError>;
 }
+
+pub trait PublicationJournal {
+    /// Ordered by the instant recorded, then target.
+    fn pending_publications(&self) -> Result<Vec<DirtyPublication>, LedgerError>;
+    fn clear_publication(&self, target: &Path) -> Result<(), LedgerError>;
+}
 ```
+
+`crates/vpt-application/src/ports/mod.rs` now re-exports
+`ledger::{DirtyPublication, LedgerCommit, LedgerError, PublicationJournal, RecordingLedger,`
+`RecordingRecord, SeenRow, StageState, StageStates, TitleOrigin}`.
 
 `crates/vpt-adapters/src/ledger/sqlite/recordings.rs`:
 
 ```rust
-//! `RecordingLedger` over SQLite: the `seen` and `recordings` tables.
+//! `RecordingLedger` over SQLite: the `seen` and `recordings` tables and the
+//! one-transaction commit. Every stored integer is range-checked on the way
+//! out and on the way in.
 
-use super::{SqliteLedger, map};
+use super::{SqliteLedger, journal, map};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use std::path::{Path, PathBuf};
-use vpt_application::ports::ledger::*;
+use vpt_application::ports::{LedgerCommit, LedgerError, RecordingLedger, RecordingRecord, SeenRow, StageState, StageStates, TitleOrigin};
 use vpt_domain::digest::Sha256Digest;
 use vpt_domain::identity::RecordingId;
 use vpt_domain::sweep::DeferralReason;
 use vpt_domain::time::{FileTime, UtcInstant, UtcOffset};
 
+const SEEN_COLUMNS: &str = "path, file_name, size, mtime_secs, mtime_nanos, flags, first_seen, last_seen, deferral_count, \
+    deferral_reason, deferred_size, source_gone_at, recording";
 const RECORDING_COLUMNS: &str = "id, source_path, digest, captured_at, captured_offset, duration_secs, title, \
     title_source, ingested_at, audio_path, stage_transcribe, stage_note, stage_synthesis, audio_trashed_at";
 
 fn corrupt(what: &str) -> LedgerError {
     LedgerError::Corrupt(format!("unreadable {what}"))
+}
+
+fn unsigned(value: i64, what: &str) -> Result<u64, LedgerError> {
+    u64::try_from(value).map_err(|_| corrupt(what))
+}
+
+fn narrow(value: i64, what: &str) -> Result<u32, LedgerError> {
+    u32::try_from(value).map_err(|_| corrupt(what))
+}
+
+fn stored(value: u64, what: &str) -> Result<i64, LedgerError> {
+    i64::try_from(value).map_err(|_| corrupt(what))
+}
+
+fn nanos(value: i64) -> Result<u32, LedgerError> {
+    match narrow(value, "mtime nanoseconds")? {
+        nanos if nanos < 1_000_000_000 => Ok(nanos),
+        _ => Err(corrupt("mtime nanoseconds")),
+    }
+}
+
+fn offset(value: i64) -> Result<UtcOffset, LedgerError> {
+    match i32::try_from(value) {
+        Ok(secs) if secs.unsigned_abs() < 86_400 => Ok(UtcOffset { secs }),
+        _ => Err(corrupt("captured offset")),
+    }
 }
 
 fn seen_from_row(row: &Row<'_>) -> Result<SeenRow, LedgerError> {
@@ -6333,14 +6575,14 @@ fn seen_from_row(row: &Row<'_>) -> Result<SeenRow, LedgerError> {
     Ok(SeenRow {
         path: PathBuf::from(row.get::<_, String>(0).map_err(map)?),
         file_name: row.get(1).map_err(map)?,
-        size: row.get::<_, i64>(2).map_err(map)? as u64,
-        mtime: FileTime { secs: row.get(3).map_err(map)?, nanos: row.get::<_, i64>(4).map_err(map)? as u32 },
-        dataless: row.get::<_, i64>(5).map_err(map)? != 0,
+        size: unsigned(row.get(2).map_err(map)?, "size")?,
+        mtime: FileTime { secs: row.get(3).map_err(map)?, nanos: nanos(row.get(4).map_err(map)?)? },
+        flags: narrow(row.get(5).map_err(map)?, "flags")?,
         first_seen: UtcInstant { secs: row.get(6).map_err(map)? },
         last_seen: UtcInstant { secs: row.get(7).map_err(map)? },
-        deferral_count: row.get::<_, i64>(8).map_err(map)? as u32,
+        deferral_count: narrow(row.get(8).map_err(map)?, "deferral count")?,
         deferral_reason: reason.map(|text| DeferralReason::parse(&text).ok_or_else(|| corrupt("deferral reason"))).transpose()?,
-        deferred_size: row.get::<_, Option<i64>>(10).map_err(map)?.map(|n| n as u64),
+        deferred_size: row.get::<_, Option<i64>>(10).map_err(map)?.map(|n| unsigned(n, "deferred size")).transpose()?,
         source_gone_at: row.get::<_, Option<i64>>(11).map_err(map)?.map(|secs| UtcInstant { secs }),
         recording: recording.map(|text| RecordingId::parse(&text).map_err(|_| corrupt("recording id"))).transpose()?,
     })
@@ -6356,8 +6598,8 @@ fn record_from_row(row: &Row<'_>) -> Result<RecordingRecord, LedgerError> {
         source_path: row.get::<_, Option<String>>(1).map_err(map)?.map(PathBuf::from),
         digest: Sha256Digest::from_hex(&digest).ok_or_else(|| corrupt("digest"))?,
         captured_at: UtcInstant { secs: row.get(3).map_err(map)? },
-        captured_offset: UtcOffset { secs: row.get(4).map_err(map)? },
-        duration_secs: row.get::<_, i64>(5).map_err(map)? as u64,
+        captured_offset: offset(row.get(4).map_err(map)?)?,
+        duration_secs: unsigned(row.get(5).map_err(map)?, "duration")?,
         title: row.get(6).map_err(map)?,
         title_source: TitleOrigin::parse(&row.get::<_, String>(7).map_err(map)?).ok_or_else(|| corrupt("title source"))?,
         ingested_at: UtcInstant { secs: row.get(8).map_err(map)? },
@@ -6370,26 +6612,26 @@ fn record_from_row(row: &Row<'_>) -> Result<RecordingRecord, LedgerError> {
 fn upsert_seen(connection: &Connection, row: &SeenRow) -> Result<(), LedgerError> {
     connection
         .execute(
-            "INSERT INTO seen (path, file_name, size, mtime_secs, mtime_nanos, dataless, first_seen, last_seen, \
-             deferral_count, deferral_reason, deferred_size, source_gone_at, recording) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13) \
-             ON CONFLICT(path) DO UPDATE SET file_name = excluded.file_name, size = excluded.size, \
-             mtime_secs = excluded.mtime_secs, mtime_nanos = excluded.mtime_nanos, dataless = excluded.dataless, \
-             last_seen = excluded.last_seen, deferral_count = excluded.deferral_count, \
-             deferral_reason = excluded.deferral_reason, deferred_size = excluded.deferred_size, \
-             source_gone_at = excluded.source_gone_at, recording = excluded.recording",
+            &format!(
+                "INSERT INTO seen ({SEEN_COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13) \
+                 ON CONFLICT(path) DO UPDATE SET file_name = excluded.file_name, size = excluded.size, \
+                 mtime_secs = excluded.mtime_secs, mtime_nanos = excluded.mtime_nanos, flags = excluded.flags, \
+                 last_seen = excluded.last_seen, deferral_count = excluded.deferral_count, \
+                 deferral_reason = excluded.deferral_reason, deferred_size = excluded.deferred_size, \
+                 source_gone_at = excluded.source_gone_at, recording = excluded.recording"
+            ),
             params![
                 row.path.to_string_lossy(),
                 row.file_name,
-                row.size as i64,
+                stored(row.size, "size")?,
                 row.mtime.secs,
                 i64::from(row.mtime.nanos),
-                i64::from(row.dataless),
+                i64::from(row.flags),
                 row.first_seen.secs,
                 row.last_seen.secs,
                 i64::from(row.deferral_count),
                 row.deferral_reason.map(DeferralReason::as_str),
-                row.deferred_size.map(|n| n as i64),
+                row.deferred_size.map(|n| stored(n, "deferred size")).transpose()?,
                 row.source_gone_at.map(|at| at.secs),
                 row.recording.as_ref().map(RecordingId::as_str),
             ],
@@ -6408,7 +6650,7 @@ fn insert_recording(connection: &Connection, recording: &RecordingRecord) -> Res
                 recording.digest.hex(),
                 recording.captured_at.secs,
                 recording.captured_offset.secs,
-                recording.duration_secs as i64,
+                stored(recording.duration_secs, "duration")?,
                 recording.title,
                 recording.title_source.as_str(),
                 recording.ingested_at.secs,
@@ -6423,31 +6665,29 @@ fn insert_recording(connection: &Connection, recording: &RecordingRecord) -> Res
         .map_err(map)
 }
 
+fn one_record(connection: &Connection, filter: &str, key: &str) -> Result<Option<RecordingRecord>, LedgerError> {
+    connection
+        .query_row(&format!("SELECT {RECORDING_COLUMNS} FROM recordings WHERE {filter} = ?1"), [key], |row| Ok(record_from_row(row)))
+        .optional()
+        .map_err(map)?
+        .transpose()
+}
+
 impl RecordingLedger for SqliteLedger {
     fn seen(&self, path: &Path) -> Result<Option<SeenRow>, LedgerError> {
         self.read(|c| {
-            c.query_row(
-                "SELECT path, file_name, size, mtime_secs, mtime_nanos, dataless, first_seen, last_seen, deferral_count, \
-                 deferral_reason, deferred_size, source_gone_at, recording FROM seen WHERE path = ?1",
-                [path.to_string_lossy()],
-                |row| Ok(seen_from_row(row)),
-            )
-            .optional()
-            .map_err(map)?
-            .transpose()
+            c.query_row(&format!("SELECT {SEEN_COLUMNS} FROM seen WHERE path = ?1"), [path.to_string_lossy()], |row| Ok(seen_from_row(row)))
+                .optional()
+                .map_err(map)?
+                .transpose()
         })
     }
 
     fn seen_all(&self) -> Result<Vec<SeenRow>, LedgerError> {
         self.read(|c| {
-            let mut statement = c
-                .prepare(
-                    "SELECT path, file_name, size, mtime_secs, mtime_nanos, dataless, first_seen, last_seen, deferral_count, \
-                     deferral_reason, deferred_size, source_gone_at, recording FROM seen ORDER BY path",
-                )
-                .map_err(map)?;
+            let mut statement = c.prepare(&format!("SELECT {SEEN_COLUMNS} FROM seen ORDER BY path")).map_err(map)?;
             let rows = statement.query_map([], |row| Ok(seen_from_row(row))).map_err(map)?;
-            rows.map(|row| row.map_err(map)?).collect()
+            rows.map(|row| row.map_err(map).and_then(|row| row)).collect()
         })
     }
 
@@ -6456,44 +6696,34 @@ impl RecordingLedger for SqliteLedger {
     }
 
     fn by_digest(&self, digest: &Sha256Digest) -> Result<Option<RecordingRecord>, LedgerError> {
-        self.read(|c| {
-            c.query_row(&format!("SELECT {RECORDING_COLUMNS} FROM recordings WHERE digest = ?1"), [digest.hex()], |row| {
-                Ok(record_from_row(row))
-            })
-            .optional()
-            .map_err(map)?
-            .transpose()
-        })
+        self.read(|c| one_record(c, "digest", &digest.hex()))
     }
 
     fn by_id(&self, id: &RecordingId) -> Result<Option<RecordingRecord>, LedgerError> {
-        self.read(|c| {
-            c.query_row(&format!("SELECT {RECORDING_COLUMNS} FROM recordings WHERE id = ?1"), [id.as_str()], |row| {
-                Ok(record_from_row(row))
-            })
-            .optional()
-            .map_err(map)?
-            .transpose()
-        })
+        self.read(|c| one_record(c, "id", id.as_str()))
     }
 
     fn recordings(&self) -> Result<Vec<RecordingRecord>, LedgerError> {
         self.read(|c| {
             let mut statement = c.prepare(&format!("SELECT {RECORDING_COLUMNS} FROM recordings ORDER BY captured_at, id")).map_err(map)?;
             let rows = statement.query_map([], |row| Ok(record_from_row(row))).map_err(map)?;
-            rows.map(|row| row.map_err(map)?).collect()
+            rows.map(|row| row.map_err(map).and_then(|row| row)).collect()
         })
     }
 
-    fn commit_ingest(&self, recording: &RecordingRecord, seen: &SeenRow) -> Result<(), LedgerError> {
+    fn commit(&self, batch: &LedgerCommit) -> Result<(), LedgerError> {
         self.transaction(|t| {
-            insert_recording(t, recording)?;
-            upsert_seen(t, seen)
+            for row in &batch.seen {
+                upsert_seen(t, row)?;
+            }
+            for entry in &batch.publications {
+                journal::upsert_publication(t, entry)?;
+            }
+            for recording in &batch.recordings {
+                insert_recording(t, recording)?;
+            }
+            Ok(())
         })
-    }
-
-    fn commit_recovered(&self, recording: &RecordingRecord) -> Result<(), LedgerError> {
-        self.transaction(|t| insert_recording(t, recording))
     }
 
     fn set_source_path(&self, id: &RecordingId, path: &Path) -> Result<(), LedgerError> {
@@ -6514,17 +6744,89 @@ impl RecordingLedger for SqliteLedger {
 }
 ```
 
-Add `pub mod recordings;` to `crates/vpt-adapters/src/ledger/sqlite/mod.rs` and, in the `tests` module
-there, the `recording_ledger_contract!` invocation shown in Step 1.
+The commit writes the seen rows and the journal entries before the recordings, so the uniqueness
+constraints on `recordings` are the last thing checked and a violation rolls back everything before it.
 
-`crates/vpt-adapters/src/ledger/memory.rs`:
+`crates/vpt-adapters/src/ledger/sqlite/journal.rs`:
+
+```rust
+//! `PublicationJournal` over SQLite: the `dirty_publications` table. An entry
+//! is written only inside the ledger's one-transaction commit.
+
+use super::{SqliteLedger, map};
+use rusqlite::{Connection, params};
+use std::path::{Path, PathBuf};
+use vpt_application::ports::{DirtyPublication, LedgerError, PublicationJournal};
+use vpt_domain::digest::Sha256Digest;
+use vpt_domain::time::UtcInstant;
+
+pub(super) fn upsert_publication(connection: &Connection, entry: &DirtyPublication) -> Result<(), LedgerError> {
+    connection
+        .execute(
+            "INSERT INTO dirty_publications (target, expected_previous, intended, recorded_at) VALUES (?1, ?2, ?3, ?4) \
+             ON CONFLICT(target) DO UPDATE SET expected_previous = excluded.expected_previous, \
+             intended = excluded.intended, recorded_at = excluded.recorded_at",
+            params![
+                entry.target.to_string_lossy(),
+                entry.expected_previous.as_ref().map(Sha256Digest::hex),
+                entry.intended.hex(),
+                entry.recorded_at.secs,
+            ],
+        )
+        .map(|_| ())
+        .map_err(map)
+}
+
+fn digest_column(text: &str, what: &str) -> Result<Sha256Digest, LedgerError> {
+    Sha256Digest::from_hex(text).ok_or_else(|| LedgerError::Corrupt(format!("unreadable {what}")))
+}
+
+impl PublicationJournal for SqliteLedger {
+    fn pending_publications(&self) -> Result<Vec<DirtyPublication>, LedgerError> {
+        self.read(|c| {
+            let mut statement = c
+                .prepare("SELECT target, expected_previous, intended, recorded_at FROM dirty_publications ORDER BY recorded_at, target")
+                .map_err(map)?;
+            let rows = statement
+                .query_map([], |row| {
+                    let target: String = row.get(0)?;
+                    let previous: Option<String> = row.get(1)?;
+                    let intended: String = row.get(2)?;
+                    let recorded_at: i64 = row.get(3)?;
+                    Ok((target, previous, intended, recorded_at))
+                })
+                .map_err(map)?;
+            rows.map(|row| {
+                let (target, previous, intended, recorded_at) = row.map_err(map)?;
+                Ok(DirtyPublication {
+                    target: PathBuf::from(target),
+                    expected_previous: previous.map(|hex| digest_column(&hex, "expected digest")).transpose()?,
+                    intended: digest_column(&intended, "intended digest")?,
+                    recorded_at: UtcInstant { secs: recorded_at },
+                })
+            })
+            .collect()
+        })
+    }
+
+    fn clear_publication(&self, target: &Path) -> Result<(), LedgerError> {
+        self.transaction(|t| {
+            t.execute("DELETE FROM dirty_publications WHERE target = ?1", [target.to_string_lossy()])
+                .map(|_| ())
+                .map_err(map)
+        })
+    }
+}
+```
+
+`crates/vpt-adapters/src/ledger/memory.rs`, above its test module:
 
 ```rust
 //! The in-memory ledger: the same contract as SQLite, for use-case tests.
 
 use std::path::Path;
 use std::sync::Mutex;
-use vpt_application::ports::ledger::*;
+use vpt_application::ports::{DirtyPublication, LedgerCommit, LedgerError, PublicationJournal, RecordingLedger, RecordingRecord, SeenRow};
 use vpt_domain::digest::Sha256Digest;
 use vpt_domain::identity::RecordingId;
 use vpt_domain::time::UtcInstant;
@@ -6533,6 +6835,7 @@ use vpt_domain::time::UtcInstant;
 struct State {
     seen: Vec<SeenRow>,
     recordings: Vec<RecordingRecord>,
+    publications: Vec<DirtyPublication>,
 }
 
 #[derive(Default)]
@@ -6551,11 +6854,21 @@ impl MemoryLedger {
     }
 }
 
+/// Insert or update by path; a stored `first_seen` survives the update.
 fn upsert(seen: &mut Vec<SeenRow>, row: &SeenRow) {
     match seen.iter_mut().find(|existing| existing.path == row.path) {
-        Some(existing) => *existing = row.clone(),
+        Some(existing) => *existing = SeenRow { first_seen: existing.first_seen, ..row.clone() },
         None => seen.push(row.clone()),
     }
+}
+
+fn record_publication(publications: &mut Vec<DirtyPublication>, entry: &DirtyPublication) {
+    publications.retain(|existing| existing.target != entry.target);
+    publications.push(entry.clone());
+}
+
+fn conflicts(known: &[RecordingRecord], candidate: &RecordingRecord) -> bool {
+    known.iter().any(|r| r.digest == candidate.digest || r.id == candidate.id)
 }
 
 impl RecordingLedger for MemoryLedger {
@@ -6564,7 +6877,11 @@ impl RecordingLedger for MemoryLedger {
     }
 
     fn seen_all(&self) -> Result<Vec<SeenRow>, LedgerError> {
-        Ok(self.with(|s| s.seen.clone()))
+        Ok(self.with(|s| {
+            let mut all = s.seen.clone();
+            all.sort_by(|a, b| a.path.cmp(&b.path));
+            all
+        }))
     }
 
     fn record_seen(&self, row: &SeenRow) -> Result<(), LedgerError> {
@@ -6588,23 +6905,22 @@ impl RecordingLedger for MemoryLedger {
         }))
     }
 
-    fn commit_ingest(&self, recording: &RecordingRecord, seen: &SeenRow) -> Result<(), LedgerError> {
+    fn commit(&self, batch: &LedgerCommit) -> Result<(), LedgerError> {
         self.with(|s| {
-            if s.recordings.iter().any(|r| r.digest == recording.digest || r.id == recording.id) {
-                return Err(LedgerError::Conflict("digest or identity already recorded".into()));
+            let mut recordings = s.recordings.clone();
+            for recording in &batch.recordings {
+                if conflicts(&recordings, recording) {
+                    return Err(LedgerError::Conflict("digest or identity already recorded".into()));
+                }
+                recordings.push(recording.clone());
             }
-            s.recordings.push(recording.clone());
-            upsert(&mut s.seen, seen);
-            Ok(())
-        })
-    }
-
-    fn commit_recovered(&self, recording: &RecordingRecord) -> Result<(), LedgerError> {
-        self.with(|s| {
-            if s.recordings.iter().any(|r| r.digest == recording.digest || r.id == recording.id) {
-                return Err(LedgerError::Conflict("digest or identity already recorded".into()));
+            s.recordings = recordings;
+            for row in &batch.seen {
+                upsert(&mut s.seen, row);
             }
-            s.recordings.push(recording.clone());
+            for entry in &batch.publications {
+                record_publication(&mut s.publications, entry);
+            }
             Ok(())
         })
     }
@@ -6627,31 +6943,39 @@ impl RecordingLedger for MemoryLedger {
         Ok(())
     }
 }
+
+impl PublicationJournal for MemoryLedger {
+    fn pending_publications(&self) -> Result<Vec<DirtyPublication>, LedgerError> {
+        Ok(self.with(|s| {
+            let mut all = s.publications.clone();
+            all.sort_by(|a, b| (a.recorded_at, &a.target).cmp(&(b.recorded_at, &b.target)));
+            all
+        }))
+    }
+
+    fn clear_publication(&self, target: &Path) -> Result<(), LedgerError> {
+        self.with(|s| s.publications.retain(|existing| existing.target != target));
+        Ok(())
+    }
+}
 ```
 
-`crates/vpt-adapters/src/ledger/mod.rs`:
-
-```rust
-//! The ledger: one SQLite type implementing every repository, and an
-//! in-memory twin that runs the same contract.
-
-#[cfg(test)]
-pub(crate) mod contract;
-pub mod memory;
-pub mod sqlite;
-```
+The memory commit validates every recording of the batch against the rows it already holds and the
+earlier rows of the same batch before it changes anything, which is the transaction the SQLite side gets
+from the database.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters ledger`
 
-Expected: the four open tests plus five contract tests per implementation, all PASS.
+Expected: the seven open tests plus twelve contract tests per implementation, 31 in all, PASS. Run
+`cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add crates
-SKIP_AI_COMMIT=1 git commit -m "feat(ledger): the recording ledger over SQLite and in memory under one contract"
+SKIP_AI_COMMIT=1 git commit -m "feat(ledger): recordings, seen rows and the publication journal under one commit"
 ```
 
 ______________________________________________________________________
