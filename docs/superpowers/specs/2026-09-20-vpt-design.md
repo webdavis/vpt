@@ -418,24 +418,29 @@ For each candidate, in this order, cheapest first:
    deferred with reason `dataless`. Opening one triggers a silent iCloud download.
 1. Skip an entry whose `(filename, size, mtime)` triple is unchanged in `seen` and already ingested. This
    is an optimization only; deleting the ledger costs one full rehash and changes no outcome.
-1. Defer with `audio_too_large` an entry larger than `[source] max_audio_bytes` (default 2,147,483,648)
-   before reading any content.
-1. Run the wholeness gate: walk the top-level MPEG-4 boxes reading bounded headers with checked offsets,
-   never the whole file; the sum of box lengths must equal the file size exactly and a `moov` box must be
-   present (Voice Memos writes `moov` last, so a truncated download loses it). An invalid length, an
-   overflow, a box extending past the file or a missing `mvhd` defers with `invalid_container`. About
-   forty lines, no audio library.
-1. Require the file at rest: mtime at least `[source] quiet_period_secs` (default 30) in the past, and
-   for an entry deferred on an earlier sweep, size unchanged since that sweep.
-1. Stage, verify, hash, publish: open the source through one read-only descriptor (a regular file, never
-   a symbolic link) and record its device, inode, size and nanosecond mtime; clone it to a private
-   staging name inside the `audio` store; read the descriptor's metadata again and defer with
-   `changed_during_read` if anything moved; hash the staged bytes in 64 KiB buffers and derive the
-   identity from them; set mode 0600; publish the staged file at `<id>.m4a` (section 5.3); and insert the
-   recording and seen rows in one transaction. The record is part of the run's result document.
+1. Open the source through one read-only descriptor (a regular file, never a symbolic link) and record
+   its device, inode, size and nanosecond mtime. Every gate below reads that descriptor's metadata and
+   bytes, never the path again.
+1. Defer with `audio_too_large` when the descriptor's size exceeds `[source] max_audio_bytes` (default
+   2,147,483,648), before reading any content.
+1. Run the wholeness gate over the descriptor: walk the top-level MPEG-4 boxes reading bounded headers
+   with checked offsets, never the whole file; the sum of box lengths must equal the file size exactly
+   and a `moov` box must be present (Voice Memos writes `moov` last, so a truncated download loses it).
+   An invalid length, an overflow, a box extending past the file or a missing `mvhd` defers with
+   `invalid_container`. About forty lines, no audio library.
+1. Require the file at rest: the descriptor's mtime at least `[source] quiet_period_secs` (default 30) in
+   the past, and for an entry deferred on an earlier sweep, size unchanged since that sweep.
+1. Stage, verify, hash, publish: clone the descriptor to a private staging name inside the `audio` store;
+   read the descriptor's metadata again and defer with `changed_during_read` if anything moved; run the
+   wholeness gate again over the staged bytes and derive the capture time, the duration, the digest
+   (hashed in 64 KiB buffers) and the identity from the staged bytes alone, never from the source; set
+   mode 0600; publish the staged file at `<id>.m4a` (section 5.3); and insert the recording and seen rows
+   in one transaction. The record is part of the run's result document.
 
 A candidate that fails any gate is deferred with its reason and retried next sweep. It is never partially
-ingested: the clone is the first durable act and happens only after every gate passes.
+ingested: the clone is the first durable act and happens only after every source gate passes, and a
+staged gate that fails defers the candidate, moves the staged file to the Trash (section 11) and
+publishes nothing.
 
 ### 5.3 Cloning and duplicates
 
@@ -446,11 +451,11 @@ exclusive-rename primitive available on the platform before choosing it. On that
 existing archive: its full digest must equal the staged digest and its container must validate. It then
 recovers any missing recording or seen row in one transaction, moves the staged duplicate to the Trash,
 and reports `already ingested`. A digest mismatch is exit 3 `archive_collision`, and nothing is replaced.
-The staging clone is `clonefile(2)` through `libc`; `EXDEV` (the store on another volume) falls back to a
-byte copy into a unique mode-0600 temporary file, synced before the same no-replace publish, with one log
-line saying the archive is not copy-on-write. `ENOSPC` aborts the sweep. At the start of every sweep, an
-archive file with no ledger row is recovered by validating and digesting it, even when its source is
-gone.
+The staging clone is the `clonefile` family through `libc`, from the opened descriptor; `EXDEV` (the
+store on another volume) falls back to a byte copy into a unique mode-0600 temporary file, synced before
+the same no-replace publish, with one log line saying the archive is not copy-on-write. `ENOSPC` aborts
+the sweep. At the start of every sweep, an archive file with no ledger row is recovered by validating and
+digesting it, even when its source is gone.
 
 ### 5.4 Deleted, edited and moved recordings
 
