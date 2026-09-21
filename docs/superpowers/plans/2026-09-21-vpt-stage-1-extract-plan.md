@@ -7685,7 +7685,8 @@ it before anything is opened.
     `pub flags: u32 }` (the whole `st_flags` word);
     `SourceMetadata { pub device: u64, pub inode: u64, pub size: u64, pub mtime: FileTime }`;
     `RecorderError::{Unreadable(String), NotRegular(PathBuf), NotFound(PathBuf), Escape(PathBuf),`
-    `Io(String)}`; `CloneKind::{CopyOnWrite, ByteCopy}`; `CloneError::{NoSpace, Io(String)}`.
+    `Io(String)}`; `CloneKind::{CopyOnWrite, ByteCopy}`; `CloneError::{NoSpace, Exists, Io(String)}`
+    (`Exists` when the destination name was already taken, so nothing of it is the caller's).
   - `trait RecorderStore { type Handle; fn candidates(&self) -> Result<Vec<Candidate>, RecorderError>;`
     `fn candidate(&self, path: &Path) -> Result<Candidate, RecorderError>;`
     `fn open(&self, path: &Path) -> Result<Self::Handle, RecorderError>;`
@@ -7801,8 +7802,7 @@ mod tests {
         let kind = store.clone_into(&handle, &audio, ".vpt-staging-1.m4a").expect("clone");
         assert_eq!(std::fs::read(audio.join(".vpt-staging-1.m4a")).expect("read"), m4a(1_787_604_456, 3, b"payload"));
         assert_eq!(kind, CloneKind::CopyOnWrite);
-        let again = store.clone_into(&handle, &audio, ".vpt-staging-1.m4a");
-        assert!(matches!(again, Err(CloneError::Io(_))), "{again:?}");
+        assert_eq!(store.clone_into(&handle, &audio, ".vpt-staging-1.m4a"), Err(CloneError::Exists));
         assert!(matches!(store.clone_into(&handle, &audio, "sub/x.m4a"), Err(CloneError::Io(_))));
     }
 
@@ -7891,6 +7891,8 @@ pub enum CloneKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CloneError {
     NoSpace,
+    /// The destination name was already taken; nothing there is the caller's.
+    Exists,
     Io(String),
 }
 
@@ -8031,6 +8033,7 @@ impl RecorderStore for VoiceMemosStore {
         let error = std::io::Error::last_os_error();
         match error.raw_os_error() {
             Some(libc::EXDEV) => byte_copy(handle, &directory, Path::new(name)),
+            Some(libc::EEXIST) => Err(CloneError::Exists),
             Some(libc::ENOSPC) => Err(CloneError::NoSpace),
             _ => Err(CloneError::Io(error.kind().to_string())),
         }
@@ -8052,6 +8055,7 @@ impl RecorderStore for VoiceMemosStore {
 fn byte_copy(source: &File, directory: &RootDir, name: &Path) -> Result<CloneKind, CloneError> {
     let mut out = directory.create_file(name, 0o600).map_err(|error| match error {
         ContainedError::Io { kind: std::io::ErrorKind::StorageFull, .. } => CloneError::NoSpace,
+        ContainedError::Io { kind: std::io::ErrorKind::AlreadyExists, .. } => CloneError::Exists,
         other => CloneError::Io(format!("{other:?}")),
     })?;
     let total = source.metadata().map_err(|error| CloneError::Io(error.kind().to_string()))?.len();
