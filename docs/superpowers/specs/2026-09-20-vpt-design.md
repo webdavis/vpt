@@ -254,15 +254,15 @@ protocol limits and is never quoted raw in a log line or an error document.
 
 The home is one directory, default `~/.vpt`, under which every store lands by default:
 
-| Store            | Default path under the home | Holds                                                                                       | Sensitivity                               |
-| ---------------- | --------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `audio`          | `audio/`                    | the archive clone of each recording, `<id>.m4a`, mode 0600                                  | the recording itself                      |
-| `transcripts`    | `transcripts/`              | the transcript note per recording                                                           | searchable text of the recording          |
-| `analysis`       | `analysis/`                 | the synthesis note per recording                                                            | derived text                              |
-| `briefs`         | `briefs/`                   | one brief per occasion                                                                      | names the people in a room                |
-| `engine_outputs` | `engine-outputs/`           | each engine's raw `vpt.engine/1` document, `<id>.<engine>.json`, mode 0600                  | full transcripts with timings             |
-| `drafts`         | `drafts/`                   | each redacted copy's private report, `<id>.<stage>.<content-sha256>.report.json`, mode 0600 | the map from every mask to its real value |
-| `released`       | `released/`                 | the shared folder: redacted copies ready to send                                            | intended to leave the machine             |
+| Store            | Default path under the home | Holds                                                                                          | Sensitivity                               |
+| ---------------- | --------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `audio`          | `audio/`                    | the archive clone of each recording, `<id>.m4a`, mode 0600                                     | the recording itself                      |
+| `transcripts`    | `transcripts/`              | the transcript note per recording                                                              | searchable text of the recording          |
+| `analysis`       | `analysis/`                 | the synthesis note per recording                                                               | derived text                              |
+| `briefs`         | `briefs/`                   | one brief per occasion                                                                         | names the people in a room                |
+| `engine_outputs` | `engine-outputs/`           | each engine's raw `vpt.engine/1` document, `<id>.<engine>.json`, mode 0600                     | full transcripts with timings             |
+| `drafts`         | `drafts/`                   | each redacted copy's private report, `<id>.<stage>.<creation-sequence>.report.json`, mode 0600 | the map from every mask to its real value |
+| `released`       | `released/`                 | the shared folder: redacted copies ready to send                                               | intended to leave the machine             |
 
 Each store has its own key under `[stores]` and may point anywhere. A store path is expanded from `~`
 (and from a leading `<home>/`, which `vpt setup` emits for a derived default) and must be absolute after
@@ -349,7 +349,7 @@ runs the same contract tests:
 | `flags`                | per flag: recording, identifier, shape (lexical, diagnostic or verification), class, occurrence ranges (null for a verification finding without a source), the artifact, claim index and claim digest of a verification finding, record text, alternative text, confidence, state, resolution text, resolved_at |
 | `occasions`            | per occasion: identity, provider key (unique), source (`manual`, `dam`, `google`), at, duration, title, participants, tags, the assembled pack with its source identities and digests, brief path, briefed_at                                                                                                   |
 | `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                                                                                                                                    |
-| `releases`             | per released copy: recording, source stage, absolute destination, content digest, source-artifact digest, creation sequence, report path                                                                                                                                                                        |
+| `releases`             | per released copy: recording, source stage, absolute destination, content digest, source-artifact digest, creation sequence, report path, and a provenance snapshot (capture instant, engines, open lexical flags, diagnostics, reviewed state) taken from the source artifact at release                       |
 
 The ledger holds the render inputs: the accepted transcript, the accepted proposal and each assembled
 brief pack commit before the artifact they render is published, and they survive the retention of raw
@@ -1098,9 +1098,13 @@ happen under the write lock of section 4.4, so two concurrent runs cannot both w
 byte-identical before and after.
 
 Every release is an immutable row in the ledger's `releases` repository: recording, source stage,
-absolute destination, content digest, source-artifact digest, creation sequence and report path. The
-private report is named `drafts/<id>.<stage>.<content-sha256>.report.json`, so a second release never
-overwrites the first release's mask map.
+absolute destination, content digest, source-artifact digest, creation sequence, report path and the
+provenance snapshot of the source artifact at that moment (capture instant, engines, open lexical flags,
+diagnostics and reviewed state). The creation sequence is allocated in the ledger, unique and durable,
+before the copy is published. The private report is named
+`drafts/<id>.<stage>.<creation-sequence>.report.json` and records both the released-content digest and
+the source-artifact digest, so every release keeps its own mask map even when another release of the same
+recording has byte-identical redacted text.
 
 Audio is never a redaction source. A brief is not a redaction source in this version. The released file
 does not name vpt.
@@ -1143,13 +1147,15 @@ no socket, resolves no name, reads no credential and writes no file:
 permitted: `--stage transcript|analysis|brief` is refused with exit 3 unless
 `[handoff] allow_private = true`. `--stage released` selects the recording's newest release by creation
 sequence whose file still exists and verifies its digest; no release is exit 2, and a file whose bytes
-changed since release is exit 3 `artifact_changed`. `content` is text always; the schema has no field
-that can carry audio, and an identifier that resolves to a recording rather than to a rendering is
-refused listing the stages that exist. The note's frontmatter does not cross; a fixed declarative header
-carries the identity, the unresolved count and the derived-copy sentence, with no imperative sentence in
-it. An unreviewed artifact is emitted, labelled, never refused. The header names vpt. The function is
-pure apart from `generated_at`, so the digest is meaningful and a lost copy is recoverable by re-running
-one command.
+changed since release is exit 3 `artifact_changed`. Its `provenance` is the release row's snapshot and
+its `content` the released bytes, never the recording's current transcription or review state, so a later
+re-transcription or flag resolution never relabels an older copy. `content` is text always; the schema
+has no field that can carry audio, and an identifier that resolves to a recording rather than to a
+rendering is refused listing the stages that exist. The note's frontmatter does not cross; a fixed
+declarative header carries the identity, the unresolved count and the derived-copy sentence, with no
+imperative sentence in it. An unreviewed artifact is emitted, labelled, never refused. The header names
+vpt. The function is pure apart from `generated_at`, so the digest is meaningful and a lost copy is
+recoverable by re-running one command.
 
 No configuration key and no production source line names Open Notebook's vocabulary: a test greps the
 shipped Rust and Swift sources and the shipped configuration template (documentation, tests and fixtures
