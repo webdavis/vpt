@@ -2220,11 +2220,14 @@ ______________________________________________________________________
 
 The validated table becomes typed `Settings` the application reads; roots are expanded, made absolute,
 resolved through the home's permitted symlink, and refused when they overlap in a way spec section 4.1
-forbids. The home may contain its stores.
+forbids. Resolution writes nothing: every root is computed and checked first, and only a separate, later
+call creates the approved leaves. The home may contain its stores. The protected root is the Voice Memos
+container, the parent of `recordings_dir`, so the live database beside `Recordings/` is covered by the
+overlap rule too; the configuration directory is a root of its own.
 
 **Files:**
 
-- Create: `crates/vpt-domain/src/layout.rs`
+- Create: `crates/vpt-domain/src/layout.rs`, `crates/vpt-domain/src/retention.rs`
 - Modify: `crates/vpt-domain/src/lib.rs`
 - Create: `crates/vpt-application/src/settings.rs`
 - Modify: `crates/vpt-application/src/lib.rs`
@@ -2234,29 +2237,68 @@ forbids. The home may contain its stores.
 
 **Interfaces:**
 
-- Consumes: `load::{get, ConfigError}`, `schema::STORE_KEYS`, `parse_duration`.
+- Consumes: `config::{get, ConfigError, STORE_KEYS, load_text}`, `parse_duration`.
 
 - Produces:
 
-  - `vpt_domain::layout::{StoreKey, RootName, RootConflict,`
-    `check_overlaps(roots: &[(RootName, &Path)]) -> Result<(), RootConflict>}`;
-    `StoreKey::{Audio, Transcripts, Analysis, Briefs, EngineOutputs, Drafts, Released}` with
-    `fn key_name(self) -> &'static str`, `fn default_leaf(self) -> &'static str`,
-    `fn all() -> [StoreKey; 7]`, `fn is_private(self) -> bool` (everything but `Released`).
-  - `vpt_application::settings::{Settings, StorePaths, SourceSettings, NotifySettings,`
-    `NotifyMode, RetentionSettings}` (fields listed in the code).
-  - `config::settings::from_table(table: &toml::Table, home_dir: &Path) -> Result<Settings,`
-    `ConfigError>`.
-  - `config::roots::{Roots, RootError, resolve(settings: &Settings, creation: Creation) ->`
-    `Result<Roots, RootError>}` with `Creation::{CreateLeaves, None}`;
-    `Roots { pub home, pub state_dir, pub stores: StorePaths, pub recordings_dir: PathBuf }` (all
-    resolved).
-  - `config::paths::{config_path(env: &dyn Fn(&str) -> Option<String>) -> PathBuf,`
-    `default_state_dir(env) -> String}`.
+  - `vpt_domain::layout::StoreKey::{Audio, Transcripts, Analysis, Briefs, EngineOutputs,`
+    `Drafts, Released}` with `all() -> [StoreKey; 7]`, `key_name(self) -> &'static str`,
+    `default_leaf(self) -> &'static str`, `from_key_name(name: &str) -> Option<StoreKey>`,
+    `is_private(self) -> bool` (everything but `Released`);
+    `RootName::{Home, Store(StoreKey), State, Config, VoiceMemos}` with `key_name(self) -> String`;
+    `RootConflict { pub first: RootName, pub second: RootName }`;
+    `check_overlaps(roots: &[(RootName, &Path)]) -> Result<(), RootConflict>`.
+  - `vpt_domain::retention::Hold` with `never() -> Hold`, `of_seconds(seconds: u64) -> Hold`,
+    `seconds(self) -> u64` (the expiry decision arrives in Task 31).
+  - `vpt_application::Settings { pub config_version: u32, pub home: PathBuf, pub state_dir: PathBuf,`
+    `pub symlink_target: Option<PathBuf>, pub helper_path: PathBuf, pub stores: StorePaths,`
+    `pub source: SourceSettings, pub notify: NotifySettings, pub retention: RetentionSettings }`;
+    `StorePaths { pub audio, pub transcripts, pub analysis, pub briefs, pub engine_outputs, pub drafts,`
+    `pub released: PathBuf }` with `get(&self, key: StoreKey) -> &Path` and
+    `set(&mut self, key: StoreKey, path: PathBuf)`;
+    `SourceSettings { pub recordings_dir: PathBuf, pub read_titles: bool, pub quiet_period_secs: u64,`
+    `pub deferral_page_threshold: u32, pub max_audio_bytes: u64 }`;
+    `NotifyMode::{Desktop, Command(Vec<String>), Off}`;
+    `NotifySettings { pub mode: NotifyMode, pub aggregate_after: u32 }`;
+    `RetentionSettings { pub enabled: bool, pub include_audio: bool, pub holds: Vec<(StoreKey, Hold)> }`
+    with `hold(&self, key: StoreKey) -> Hold`.
+  - `vpt_adapters::config::{DEFAULT_HOME: &str, from_table(table: &toml::Table, home_dir: &Path) ->`
+    `Result<Settings, ConfigError>}`.
+  - `vpt_adapters::config::RootError::{NotAbsolute { key: String }, ParentMissing { key: String },`
+    `NotADirectory { key: String }, Overlap { first: String, second: String },`
+    `Io { key: String, detail: String }}`;
+    `Roots { pub home: PathBuf, pub state_dir: PathBuf, pub stores: StorePaths,`
+    `pub recordings_dir: PathBuf,` `pub container: PathBuf, pub config_dir: PathBuf }` (every path
+    absolute, canonical where it exists);
+    `resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootError>` (writes nothing);
+    `Roots::create_state_dir(&self) -> Result<(), RootError>` and
+    `Roots::create_leaves(&self) -> Result<(), RootError>` (the home and every missing store leaf, mode
+    0700, only after a resolution succeeded).
+  - `vpt_adapters::config::{config_path(env: impl Fn(&str) -> Option<String>) -> PathBuf,`
+    `default_state_dir(env: impl Fn(&str) -> Option<String>) -> String}`.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-domain/src/layout.rs`, test section:
+Declare the modules first: `crates/vpt-domain/src/lib.rs` gains `pub mod layout;` and
+`pub mod retention;`; `crates/vpt-application/src/lib.rs` becomes
+
+```rust
+//! Use cases and the ports they own.
+
+mod settings;
+
+pub use settings::{NotifyMode, NotifySettings, RetentionSettings, Settings, SourceSettings, StorePaths};
+```
+
+and `crates/vpt-adapters/src/config/mod.rs` gains `mod paths; mod roots; mod settings;` with
+
+```rust
+pub use paths::{config_path, default_state_dir};
+pub use roots::{RootError, Roots, resolve};
+pub use settings::{DEFAULT_HOME, from_table};
+```
+
+Each new file starts as its test module alone. `crates/vpt-domain/src/layout.rs`:
 
 ```rust
 #[cfg(test)]
@@ -2301,89 +2343,147 @@ mod tests {
     fn the_release_destination_may_not_overlap_a_private_root() {
         let roots = [(RootName::Store(StoreKey::Released), Path::new("/c/out")), (RootName::Config, Path::new("/c"))];
         assert!(check_overlaps(&roots).is_err());
+        let roots = [(RootName::State, Path::new("/s")), (RootName::Store(StoreKey::Released), Path::new("/s/out"))];
+        assert!(check_overlaps(&roots).is_err());
     }
 }
 ```
 
-`crates/vpt-adapters/src/config/roots.rs`, test section:
+`crates/vpt-adapters/src/config/roots.rs`:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::load::load_text;
-    use crate::config::settings::from_table;
+    use crate::config::{from_table, load_text};
+    use std::os::unix::fs::PermissionsExt;
+    use vpt_application::Settings;
 
-    fn settings_in(root: &std::path::Path, extra: &str) -> vpt_application::settings::Settings {
+    /// A fixture whose Voice Memos container is `<temp>/voice-memos` and whose
+    /// writable roots all sit outside it.
+    fn fixture() -> tempfile::TempDir {
+        let temp = tempfile::tempdir().expect("temp");
+        std::fs::create_dir_all(temp.path().join("h")).expect("home");
+        std::fs::create_dir_all(temp.path().join("voice-memos/Recordings")).expect("voice memos");
+        std::fs::write(temp.path().join("voice-memos/CloudRecordings.db"), b"live").expect("live db");
+        std::fs::create_dir_all(temp.path().join("cfg")).expect("config dir");
+        temp
+    }
+
+    fn settings_in(root: &Path, extra: &str) -> Settings {
         let text = format!(
             "config_version = 1\n[home]\npath = \"{}\"\nstate_dir = \"{}\"\n[source]\nrecordings_dir = \"{}\"\n{extra}",
             root.join("h").display(),
             root.join("s").display(),
-            root.join("vm").display()
+            root.join("voice-memos/Recordings").display()
         );
         from_table(&load_text(&text).expect("loads"), root).expect("settings")
     }
 
+    fn entries(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .expect("readable")
+            .map(|entry| entry.expect("entry").file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
     #[test]
-    fn default_store_leaves_are_created_beneath_an_existing_home() {
-        let temp = tempfile::tempdir().expect("temp");
-        std::fs::create_dir_all(temp.path().join("h")).expect("home");
-        std::fs::create_dir_all(temp.path().join("vm")).expect("voice memos");
-        let roots = resolve(&settings_in(temp.path(), ""), Creation::CreateLeaves).expect("resolves");
+    fn resolution_writes_nothing_and_create_leaves_makes_the_store_leaves_0700() {
+        let temp = fixture();
+        let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("resolves");
+        assert!(!temp.path().join("h/audio").exists(), "resolve created a leaf");
+        assert!(!temp.path().join("s").exists(), "resolve created the state directory");
+        roots.create_leaves().expect("leaves");
         assert!(roots.stores.audio.is_dir());
         assert_eq!(roots.stores.audio, temp.path().join("h/audio").canonicalize().expect("canonical"));
+        assert_eq!(std::fs::metadata(&roots.stores.audio).expect("meta").permissions().mode() & 0o777, 0o700);
+        roots.create_state_dir().expect("state");
+        assert_eq!(std::fs::metadata(&roots.state_dir).expect("meta").permissions().mode() & 0o777, 0o700);
+    }
+
+    #[test]
+    fn a_missing_default_home_is_a_prospective_leaf_with_its_stores_below_it() {
+        let temp = fixture();
+        std::fs::remove_dir(temp.path().join("h")).expect("no home yet");
+        let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("resolves");
+        assert_eq!(roots.stores.drafts, temp.path().canonicalize().expect("canonical").join("h/drafts"));
+        roots.create_leaves().expect("leaves");
+        assert!(temp.path().join("h/drafts").is_dir());
     }
 
     #[test]
     fn a_store_pointed_elsewhere_needs_an_existing_parent() {
-        let temp = tempfile::tempdir().expect("temp");
-        std::fs::create_dir_all(temp.path().join("h")).expect("home");
-        std::fs::create_dir_all(temp.path().join("vm")).expect("voice memos");
+        let temp = fixture();
         let extra = format!("[stores]\naudio = \"{}\"\n", temp.path().join("missing/audio").display());
-        let error = resolve(&settings_in(temp.path(), &extra), Creation::CreateLeaves).unwrap_err();
+        let error = resolve(&settings_in(temp.path(), &extra), &temp.path().join("cfg")).unwrap_err();
         assert_eq!(error, RootError::ParentMissing { key: "stores.audio".into() });
     }
 
     #[test]
-    fn a_store_inside_the_voice_memos_container_is_refused_naming_both_keys() {
-        let temp = tempfile::tempdir().expect("temp");
-        std::fs::create_dir_all(temp.path().join("h")).expect("home");
-        std::fs::create_dir_all(temp.path().join("vm")).expect("voice memos");
-        let extra = format!("[stores]\ndrafts = \"{}\"\n", temp.path().join("vm/drafts").display());
-        let error = resolve(&settings_in(temp.path(), &extra), Creation::CreateLeaves).unwrap_err();
-        assert_eq!(error, RootError::Overlap { first: "stores.drafts".into(), second: "source.recordings_dir".into() });
+    fn a_store_inside_the_voice_memos_container_is_refused_and_the_container_is_untouched() {
+        let temp = fixture();
+        let container = temp.path().join("voice-memos");
+        let before = entries(&container);
+        let live = std::fs::metadata(container.join("CloudRecordings.db")).expect("live");
+        let extra = format!("[stores]\ndrafts = \"{}\"\n", container.join("drafts").display());
+
+        let error = resolve(&settings_in(temp.path(), &extra), &temp.path().join("cfg")).unwrap_err();
+
+        assert_eq!(error, RootError::Overlap { first: "source.recordings_dir".into(), second: "stores.drafts".into() });
+        assert_eq!(entries(&container), before);
+        assert!(!container.join("drafts").exists());
+        let after = std::fs::metadata(container.join("CloudRecordings.db")).expect("live");
+        assert_eq!((after.len(), after.modified().expect("mtime")), (live.len(), live.modified().expect("mtime")));
+        assert!(!temp.path().join("h/audio").exists(), "a refusal created a leaf elsewhere");
+    }
+
+    #[test]
+    fn the_configuration_directory_is_a_root_the_released_store_may_not_overlap() {
+        let temp = fixture();
+        let extra = format!("[stores]\nreleased = \"{}\"\n", temp.path().join("cfg/out").display());
+        let error = resolve(&settings_in(temp.path(), &extra), &temp.path().join("cfg")).unwrap_err();
+        assert_eq!(error, RootError::Overlap { first: "config".into(), second: "stores.released".into() });
     }
 
     #[test]
     fn a_relative_root_after_expansion_is_refused() {
-        let temp = tempfile::tempdir().expect("temp");
-        std::fs::create_dir_all(temp.path().join("h")).expect("home");
-        std::fs::create_dir_all(temp.path().join("vm")).expect("voice memos");
-        let error = resolve(&settings_in(temp.path(), "[stores]\nbriefs = \"briefs\"\n"), Creation::None).unwrap_err();
+        let temp = fixture();
+        let error = resolve(&settings_in(temp.path(), "[stores]\nbriefs = \"briefs\"\n"), &temp.path().join("cfg")).unwrap_err();
         assert_eq!(error, RootError::NotAbsolute { key: "stores.briefs".into() });
     }
 
     #[test]
+    fn a_file_where_a_root_belongs_is_refused() {
+        let temp = fixture();
+        std::fs::write(temp.path().join("h/audio"), b"not a directory").expect("file");
+        let error = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).unwrap_err();
+        assert_eq!(error, RootError::NotADirectory { key: "stores.audio".into() });
+    }
+
+    #[test]
     fn a_symlinked_home_is_followed_when_no_target_is_configured() {
-        let temp = tempfile::tempdir().expect("temp");
+        let temp = fixture();
+        std::fs::remove_dir(temp.path().join("h")).expect("replace the home");
         std::fs::create_dir_all(temp.path().join("real")).expect("real home");
-        std::fs::create_dir_all(temp.path().join("vm")).expect("voice memos");
         std::os::unix::fs::symlink(temp.path().join("real"), temp.path().join("h")).expect("link");
-        let roots = resolve(&settings_in(temp.path(), ""), Creation::CreateLeaves).expect("resolves");
+        let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("resolves");
         assert_eq!(roots.home, temp.path().join("real").canonicalize().expect("canonical"));
+        assert_eq!(roots.container, temp.path().join("voice-memos").canonicalize().expect("canonical"));
     }
 }
 ```
 
-`crates/vpt-adapters/src/config/settings.rs`, test section:
+`crates/vpt-adapters/src/config/settings.rs`:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::load::load_text;
+    use crate::config::load_text;
     use std::path::Path;
-    use vpt_application::settings::NotifyMode;
+    use vpt_application::NotifyMode;
     use vpt_domain::layout::StoreKey;
 
     #[test]
@@ -2396,9 +2496,11 @@ mod tests {
 
     #[test]
     fn notify_command_mode_carries_its_argv_and_off_carries_nothing() {
-        let table = load_text("config_version = 1\n[notify]\nmode = \"command\"\ncommand = [\"pns\", \"{event}\"]\n").expect("loads");
+        let table = load_text("config_version = 1\n[notify]\nmode = \"command\"\ncommand = [\"notify-command\", \"{event}\"]\n").expect("loads");
         let settings = from_table(&table, Path::new("/u")).expect("settings");
-        assert_eq!(settings.notify.mode, NotifyMode::Command(vec!["pns".into(), "{event}".into()]));
+        assert_eq!(settings.notify.mode, NotifyMode::Command(vec!["notify-command".into(), "{event}".into()]));
+        let table = load_text("config_version = 1\n[notify]\nmode = \"off\"\n").expect("loads");
+        assert_eq!(from_table(&table, Path::new("/u")).expect("settings").notify.mode, NotifyMode::Off);
     }
 
     #[test]
@@ -2425,15 +2527,46 @@ mod tests {
 }
 ```
 
+`crates/vpt-adapters/src/config/paths.rs`:
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn env_of(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> + '_ {
+        move |name| pairs.iter().find(|(key, _)| *key == name).map(|(_, value)| (*value).to_owned())
+    }
+
+    #[test]
+    fn vpt_config_wins_over_xdg_which_wins_over_home() {
+        assert_eq!(config_path(env_of(&[("VPT_CONFIG", "/c.toml"), ("XDG_CONFIG_HOME", "/x"), ("HOME", "/h")])), PathBuf::from("/c.toml"));
+        assert_eq!(config_path(env_of(&[("XDG_CONFIG_HOME", "/x"), ("HOME", "/h")])), PathBuf::from("/x/vpt/config.toml"));
+        assert_eq!(config_path(env_of(&[("HOME", "/h")])), PathBuf::from("/h/.config/vpt/config.toml"));
+    }
+
+    #[test]
+    fn the_state_dir_default_follows_xdg_state_home_when_set() {
+        assert_eq!(default_state_dir(env_of(&[("XDG_STATE_HOME", "/s")])), "/s/vpt");
+        assert_eq!(default_state_dir(env_of(&[])), "~/.local/state/vpt");
+    }
+}
+```
+
+`crates/vpt-application/src/settings.rs` and `crates/vpt-domain/src/retention.rs` start as their doc
+lines; the re-exports in `lib.rs` name items that do not exist yet, which is part of the red build.
+
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-domain layout && cargo test -p vpt-adapters config`
 
-Expected: compile errors naming `check_overlaps`, `from_table`, `resolve` and `Settings`.
+Expected: the builds fail with `cannot find` for `check_overlaps`, `RootName`, `from_table`, `resolve`,
+`config_path` and the `Settings` re-export. Every new test module is compiled and selected; a run that
+selects zero tests, or that succeeds, does not satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-`crates/vpt-domain/src/layout.rs`:
+`crates/vpt-domain/src/layout.rs`, above its test module:
 
 ```rust
 //! The store keys and the root overlap rule of spec section 4.1.
@@ -2550,8 +2683,32 @@ pub fn check_overlaps(roots: &[(RootName, &Path)]) -> Result<(), RootConflict> {
 }
 ```
 
-A released store overlapping a private store is already covered by the store-versus-store arm. Add
-`pub mod layout;` to `crates/vpt-domain/src/lib.rs`.
+A released store overlapping a private store is covered by the store-versus-store arm.
+
+`crates/vpt-domain/src/retention.rs` (the type only; Task 31 adds the decision):
+
+```rust
+//! Retention: a hold per store and the expiry decision.
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Hold {
+    seconds: u64,
+}
+
+impl Hold {
+    pub fn never() -> Hold {
+        Hold { seconds: 0 }
+    }
+
+    pub fn of_seconds(seconds: u64) -> Hold {
+        Hold { seconds }
+    }
+
+    pub fn seconds(self) -> u64 {
+        self.seconds
+    }
+}
+```
 
 `crates/vpt-application/src/settings.rs`:
 
@@ -2649,41 +2806,7 @@ impl RetentionSettings {
 }
 ```
 
-This needs `vpt_domain::retention::Hold` now. Create `crates/vpt-domain/src/retention.rs` with the type
-only (its decision function arrives in Task 31):
-
-```rust
-//! Retention: a hold per store and the expiry decision.
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Hold {
-    seconds: u64,
-}
-
-impl Hold {
-    pub fn never() -> Hold {
-        Hold { seconds: 0 }
-    }
-
-    pub fn of_seconds(seconds: u64) -> Hold {
-        Hold { seconds }
-    }
-
-    pub fn seconds(self) -> u64 {
-        self.seconds
-    }
-}
-```
-
-and `pub mod retention;` in the domain `lib.rs`. `crates/vpt-application/src/lib.rs`:
-
-```rust
-//! Use cases and the ports they own.
-
-pub mod settings;
-```
-
-`crates/vpt-adapters/src/config/settings.rs`:
+`crates/vpt-adapters/src/config/settings.rs`, above its test module:
 
 ```rust
 //! From the validated table to typed settings, with `~` and `<home>/` expanded.
@@ -2691,9 +2814,7 @@ pub mod settings;
 use super::load::{ConfigError, get};
 use std::path::{Path, PathBuf};
 use toml::{Table, Value};
-use vpt_application::settings::{
-    NotifyMode, NotifySettings, RetentionSettings, Settings, SourceSettings, StorePaths,
-};
+use vpt_application::{NotifyMode, NotifySettings, RetentionSettings, Settings, SourceSettings, StorePaths};
 use vpt_domain::duration::parse_duration;
 use vpt_domain::layout::StoreKey;
 use vpt_domain::retention::Hold;
@@ -2744,7 +2865,7 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         holds.push((key, hold(table, &format!("retention.hold.{}", key.key_name()))?));
     }
     Ok(Settings {
-        config_version: integer(table, "config_version")? as u32,
+        config_version: small(table, "config_version")?,
         home,
         state_dir: expand(&text(table, "home.state_dir")?, home_dir, None),
         symlink_target,
@@ -2753,11 +2874,11 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         source: SourceSettings {
             recordings_dir: expand(&text(table, "source.recordings_dir")?, home_dir, None),
             read_titles: boolean(table, "source.read_titles")?,
-            quiet_period_secs: integer(table, "source.quiet_period_secs")? as u64,
-            deferral_page_threshold: integer(table, "source.deferral_page_threshold")? as u32,
-            max_audio_bytes: integer(table, "source.max_audio_bytes")? as u64,
+            quiet_period_secs: u64::from(small(table, "source.quiet_period_secs")?),
+            deferral_page_threshold: small(table, "source.deferral_page_threshold")?,
+            max_audio_bytes: wide(table, "source.max_audio_bytes")?,
         },
-        notify: NotifySettings { mode, aggregate_after: integer(table, "notify.aggregate_after")? as u32 },
+        notify: NotifySettings { mode, aggregate_after: small(table, "notify.aggregate_after")? },
         retention: RetentionSettings {
             enabled: boolean(table, "retention.enabled")?,
             include_audio: boolean(table, "retention.include_audio")?,
@@ -2791,8 +2912,15 @@ fn boolean(table: &Table, path: &str) -> Result<bool, ConfigError> {
     leaf(table, path)?.as_bool().ok_or_else(|| wrong(path, "boolean"))
 }
 
-fn integer(table: &Table, path: &str) -> Result<i64, ConfigError> {
-    leaf(table, path)?.as_integer().ok_or_else(|| wrong(path, "integer"))
+/// A validated 32-bit integer; the validator already refused anything outside `u32`.
+fn small(table: &Table, path: &str) -> Result<u32, ConfigError> {
+    let value = leaf(table, path)?.as_integer().ok_or_else(|| wrong(path, "integer"))?;
+    u32::try_from(value).map_err(|_| wrong(path, "integer"))
+}
+
+fn wide(table: &Table, path: &str) -> Result<u64, ConfigError> {
+    let value = leaf(table, path)?.as_integer().ok_or_else(|| wrong(path, "integer"))?;
+    u64::try_from(value).map_err(|_| wrong(path, "integer"))
 }
 
 fn strings(table: &Table, path: &str) -> Result<Vec<String>, ConfigError> {
@@ -2815,28 +2943,25 @@ fn wrong(path: &str, expected: &str) -> ConfigError {
 }
 ```
 
-`crates/vpt-adapters/src/config/roots.rs`:
+`crates/vpt-adapters/src/config/roots.rs`, above its test module:
 
 ```rust
-//! Resolve every configured root once, at startup, and refuse the overlaps of
-//! spec section 4.1.
+//! Resolve every configured root once, at startup, without writing, and
+//! refuse the overlaps of spec section 4.1. Creation is a separate, later act.
 
+use std::fs::DirBuilder;
+use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
-use vpt_application::settings::{Settings, StorePaths};
+use vpt_application::{Settings, StorePaths};
 use vpt_domain::layout::{RootName, StoreKey, check_overlaps};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RootError {
     NotAbsolute { key: String },
     ParentMissing { key: String },
+    NotADirectory { key: String },
     Overlap { first: String, second: String },
     Io { key: String, detail: String },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Creation {
-    CreateLeaves,
-    None,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2845,65 +2970,109 @@ pub struct Roots {
     pub state_dir: PathBuf,
     pub stores: StorePaths,
     pub recordings_dir: PathBuf,
+    pub container: PathBuf,
+    pub config_dir: PathBuf,
 }
 
-pub fn resolve(settings: &Settings, creation: Creation) -> Result<Roots, RootError> {
-    let home = resolved(&settings.home, "home.path", creation)?;
-    let state_dir = resolved(&settings.state_dir, "home.state_dir", creation)?;
-    let recordings_dir = if settings.source.recordings_dir.is_absolute() {
-        settings.source.recordings_dir.canonicalize().unwrap_or_else(|_| settings.source.recordings_dir.clone())
-    } else {
-        return Err(RootError::NotAbsolute { key: "source.recordings_dir".into() });
-    };
+pub fn resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootError> {
+    let home = prospective(&settings.home, "home.path", None)?;
+    let state_dir = prospective(&settings.state_dir, "home.state_dir", None)?;
+    let recordings_dir = existing(&settings.source.recordings_dir, "source.recordings_dir")?;
+    let container = recordings_dir.parent().map(Path::to_path_buf).ok_or_else(|| RootError::NotAbsolute { key: "source.recordings_dir".into() })?;
+    let config_dir = config_dir.canonicalize().unwrap_or_else(|_| config_dir.to_path_buf());
     let mut stores = settings.stores.clone();
     for key in StoreKey::all() {
-        let path = resolved(settings.stores.get(key), &format!("stores.{}", key.key_name()), creation)?;
+        let below_home = settings.stores.get(key).strip_prefix(&settings.home).ok().map(|rest| home.join(rest));
+        let path = prospective(settings.stores.get(key), &format!("stores.{}", key.key_name()), below_home)?;
         stores.set(key, path);
     }
     let mut roots: Vec<(RootName, &Path)> = vec![
         (RootName::Home, &home),
         (RootName::State, &state_dir),
-        (RootName::VoiceMemos, &recordings_dir),
+        (RootName::Config, &config_dir),
+        (RootName::VoiceMemos, &container),
     ];
     for key in StoreKey::all() {
         roots.push((RootName::Store(key), stores.get(key)));
     }
     check_overlaps(&roots)
         .map_err(|conflict| RootError::Overlap { first: conflict.first.key_name(), second: conflict.second.key_name() })?;
-    Ok(Roots { home, state_dir, stores, recordings_dir })
+    Ok(Roots { home, state_dir, stores, recordings_dir, container, config_dir })
 }
 
-/// An absolute path, canonical where it exists. A missing leaf under an existing
-/// parent is created under `CreateLeaves`; a missing parent is a refusal.
-fn resolved(path: &Path, key: &str, creation: Creation) -> Result<PathBuf, RootError> {
+impl Roots {
+    /// The private state directory, created before the write lock is taken.
+    pub fn create_state_dir(&self) -> Result<(), RootError> {
+        private_dir(&self.state_dir, "home.state_dir")
+    }
+
+    /// The home and every missing store leaf, mode 0700, in that order.
+    pub fn create_leaves(&self) -> Result<(), RootError> {
+        private_dir(&self.home, "home.path")?;
+        for key in StoreKey::all() {
+            private_dir(self.stores.get(key), &format!("stores.{}", key.key_name()))?;
+        }
+        Ok(())
+    }
+}
+
+/// An absolute path that exists as a directory, canonical.
+fn existing(path: &Path, key: &str) -> Result<PathBuf, RootError> {
+    if !path.is_absolute() {
+        return Err(RootError::NotAbsolute { key: key.into() });
+    }
+    let canonical = path.canonicalize().map_err(|_| RootError::ParentMissing { key: key.into() })?;
+    if !canonical.is_dir() {
+        return Err(RootError::NotADirectory { key: key.into() });
+    }
+    Ok(canonical)
+}
+
+/// An absolute path, canonical where it exists. A missing leaf under an
+/// existing parent resolves to `<canonical parent>/<leaf>`; a missing parent is
+/// a refusal, unless `below_home` names where the leaf will sit once the home
+/// itself, a prospective leaf, exists.
+fn prospective(path: &Path, key: &str, below_home: Option<PathBuf>) -> Result<PathBuf, RootError> {
     if !path.is_absolute() {
         return Err(RootError::NotAbsolute { key: key.into() });
     }
     if let Ok(canonical) = path.canonicalize() {
+        if !canonical.is_dir() {
+            return Err(RootError::NotADirectory { key: key.into() });
+        }
         return Ok(canonical);
     }
     let parent = path.parent().ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
-    let parent = parent.canonicalize().map_err(|_| RootError::ParentMissing { key: key.into() })?;
     let leaf = path.file_name().ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
-    let target = parent.join(leaf);
-    if creation == Creation::CreateLeaves {
-        std::fs::create_dir(&target).map_err(|error| RootError::Io { key: key.into(), detail: error.to_string() })?;
+    match parent.canonicalize() {
+        Ok(parent) => Ok(parent.join(leaf)),
+        Err(_) => below_home.ok_or_else(|| RootError::ParentMissing { key: key.into() }),
     }
-    Ok(target)
+}
+
+fn private_dir(path: &Path, key: &str) -> Result<(), RootError> {
+    match DirBuilder::new().mode(0o700).create(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => Err(RootError::Io { key: key.into(), detail: error.kind().to_string() }),
+    }
 }
 ```
 
-A canonical form of a missing store under the home is what `check_overlaps` compares, which is why the
-home is resolved first and `CreateLeaves` creates the leaf under the canonical parent.
+`Roots.container` is what the overlap rule protects, so a store beside `Recordings/` inside Apple's group
+container is refused as well as one inside it, and the refusal names `source.recordings_dir` first
+because the container precedes every store in the list `check_overlaps` walks. The unresolved
+`settings.home` prefix is how a store under a not-yet-existing home stays prospective: its resolved form
+is the resolved home plus the remainder, and `create_leaves` creates the home first.
 
-`crates/vpt-adapters/src/config/paths.rs`:
+`crates/vpt-adapters/src/config/paths.rs`, above its test module:
 
 ```rust
 //! Where the configuration file is, from the environment alone.
 
 use std::path::PathBuf;
 
-pub fn config_path(env: &dyn Fn(&str) -> Option<String>) -> PathBuf {
+pub fn config_path(env: impl Fn(&str) -> Option<String>) -> PathBuf {
     if let Some(explicit) = env("VPT_CONFIG") {
         return PathBuf::from(explicit);
     }
@@ -2914,38 +3083,13 @@ pub fn config_path(env: &dyn Fn(&str) -> Option<String>) -> PathBuf {
 }
 
 /// The `home.state_dir` value `vpt setup` writes.
-pub fn default_state_dir(env: &dyn Fn(&str) -> Option<String>) -> String {
+pub fn default_state_dir(env: impl Fn(&str) -> Option<String>) -> String {
     match env("XDG_STATE_HOME") {
         Some(xdg) => format!("{xdg}/vpt"),
         None => "~/.local/state/vpt".into(),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn env_of(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> + '_ {
-        move |name| pairs.iter().find(|(key, _)| *key == name).map(|(_, value)| (*value).to_owned())
-    }
-
-    #[test]
-    fn vpt_config_wins_over_xdg_which_wins_over_home() {
-        assert_eq!(config_path(&env_of(&[("VPT_CONFIG", "/c.toml"), ("XDG_CONFIG_HOME", "/x"), ("HOME", "/h")])), PathBuf::from("/c.toml"));
-        assert_eq!(config_path(&env_of(&[("XDG_CONFIG_HOME", "/x"), ("HOME", "/h")])), PathBuf::from("/x/vpt/config.toml"));
-        assert_eq!(config_path(&env_of(&[("HOME", "/h")])), PathBuf::from("/h/.config/vpt/config.toml"));
-    }
-
-    #[test]
-    fn the_state_dir_default_follows_xdg_state_home_when_set() {
-        assert_eq!(default_state_dir(&env_of(&[("XDG_STATE_HOME", "/s")])), "/s/vpt");
-        assert_eq!(default_state_dir(&env_of(&[])), "~/.local/state/vpt");
-    }
-}
 ```
-
-`crates/vpt-adapters/src/config/mod.rs` now lists `load`, `paths`, `render`, `roots`, `schema`,
-`settings`, `validate`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -2957,7 +3101,7 @@ Expected: all PASS.
 
 ```bash
 git add crates
-SKIP_AI_COMMIT=1 git commit -m "feat(config): typed settings and root resolution with overlap refusals"
+SKIP_AI_COMMIT=1 git commit -m "feat(config): typed settings and root resolution without writes"
 ```
 
 ______________________________________________________________________
