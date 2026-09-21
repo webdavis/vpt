@@ -7143,60 +7143,66 @@ SKIP_AI_COMMIT=1 git commit -m "feat(ledger): the bounded advisory write lock be
 
 ______________________________________________________________________
 
-### Task 14: The publication journal and repair
+### Task 14: Publication repair and the store filesystem
 
 Every mutating command repairs unfinished publications before new work (spec section 4.4). Stage 1
-publishes no rendered artifact of its own, so its composition installs an empty renderer registry; stage
-3 registers the note renderer. The journal rows, the repair decision and the filesystem operations are
-all built and tested here.
+publishes no rendered artifact of its own, so its composition passes a rendering closure that knows no
+target; stage 3 passes the note renderer. The repair decision and the filesystem operations are built and
+tested here; the journal rows and their one-transaction commit arrived in Task 12.
 
 **Files:**
 
-- Modify: `crates/vpt-application/src/ports/ledger.rs`
-- Create: `crates/vpt-application/src/ports/artifacts.rs`, `crates/vpt-application/src/publication.rs`
+- Create: `crates/vpt-application/src/ports/stores.rs`, `crates/vpt-application/src/publication.rs`
 - Modify: `crates/vpt-application/src/ports/mod.rs`, `crates/vpt-application/src/lib.rs`
-- Create: `crates/vpt-adapters/src/ledger/sqlite/journal.rs`, `crates/vpt-adapters/src/stores.rs`
-- Modify: `crates/vpt-adapters/src/ledger/memory.rs`, `crates/vpt-adapters/src/ledger/contract.rs`,
-  `crates/vpt-adapters/src/ledger/sqlite/mod.rs`, `crates/vpt-adapters/src/lib.rs`
+- Create: `crates/vpt-adapters/src/stores.rs`
+- Modify: `crates/vpt-adapters/src/lib.rs`
 
 **Interfaces:**
 
-- Consumes: `LedgerError`, `SqliteLedger::{transaction, read}`, `MemoryLedger`.
+- Consumes: `LedgerError`, `DirtyPublication`, `PublicationJournal`;
+  `vpt_adapters::contained::{Access, ContainedError, RootDir}`.
 
 - Produces:
 
-  - `vpt_application::ports::ledger::{DirtyPublication { pub target: PathBuf,`
-    `pub expected_previous: Option<Sha256Digest>, pub intended: Sha256Digest,`
-    `pub recorded_at: UtcInstant }, trait PublicationJournal { fn record_publication(&self,`
-    `entry: &DirtyPublication) -> Result<(), LedgerError>; fn pending_publications(&self) ->`
-    `Result<Vec<DirtyPublication>, LedgerError>; fn clear_publication(&self,`
-    `target: &Path) -> Result<(), LedgerError>; }}`
-  - `vpt_application::ports::artifacts::{ArtifactError(String),`
-    `trait ArtifactFiles { fn digest_of(&self, path: &Path) -> Result<Option<Sha256Digest>,`
-    `ArtifactError>; fn publish(&self, target: &Path, bytes: &[u8]) -> Result<(),`
-    `ArtifactError>; fn sync_directory_of(&self, path: &Path) -> Result<(), ArtifactError>;`
-    `}, RenderError::NoRendererFor(PathBuf), trait ArtifactRenderer { fn render(&self,`
-    `target: &Path) -> Result<Vec<u8>, RenderError>; }, NoRenderers}` (the empty registry, implements
-    `ArtifactRenderer`).
-  - `vpt_application::publication::{repair_publications(journal: &dyn PublicationJournal,`
-    `files: &dyn ArtifactFiles, renderer: &dyn ArtifactRenderer) -> Result<RepairReport,`
-    `RepairError>, RepairReport { pub completed: Vec<PathBuf>,`
-    `pub republished: Vec<PathBuf> }, RepairError::{TargetModified(PathBuf),`
-    `Sync { path: PathBuf, detail: String }, Render(PathBuf), Ledger(LedgerError),`
-    `Files(ArtifactError)}}`.
-  - `vpt_adapters::stores::FilesystemStores` implementing `ArtifactFiles` (and, from Task 26 on,
-    `Stores`).
+  - `vpt_application::ports::{StoreError::{Escape(PathBuf), Io(String)}, Stores}` with
+    `trait Stores { fn digest_of(&self, path: &Path) -> Result<Option<Sha256Digest>, StoreError>;`
+    `fn digest_bytes(&self, bytes: &[u8]) -> Sha256Digest; fn publish(&self, target: &Path,`
+    `bytes: &[u8]) -> Result<(), StoreError>; fn sync_directory_of(&self, path: &Path) ->`
+    `Result<(), StoreError>; }` (Task 28 adds `entries`); `Escape` is a path below no store root or one
+    reached through a link, and the composition root maps it to exit 3, `path_escape`.
+  - `vpt_application::{repair_publications, RepairReport, RepairError}` with
+    `repair_publications<J: PublicationJournal, S: Stores>(journal: &J, stores: &S,`
+    `render: impl Fn(&Path) -> Option<Vec<u8>>) -> Result<RepairReport, RepairError>` (`None` from the
+    closure means no renderer knows the target), `RepairReport { pub completed: Vec<PathBuf>,`
+    `pub republished: Vec<PathBuf> }`, `RepairError::{TargetModified(PathBuf),`
+    `RenderedDigestMismatch(PathBuf), Sync { path: PathBuf, cause: StoreError }, Render(PathBuf),`
+    `Ledger(LedgerError), Stores(StoreError)}`.
+  - `vpt_adapters::stores::{FilesystemStores, digest_open(file: &mut File) ->`
+    `std::io::Result<Sha256Digest>,` `BUFFER: usize = 64 * 1024}` with
+    `FilesystemStores::open(roots: &[PathBuf]) ->` `Result<FilesystemStores, ContainedError>` (one
+    `RootDir` per store root), implementing `Stores` (and, from Task 28 on, its `entries`). A publication
+    writes a private temporary name below the target's own root, `.<name>.vpt-<pid>-<sequence>` with a
+    per-instance sequence and exclusive creation, retrying only `AlreadyExists`; a temporary name
+    abandoned by a failure is left for the owned cleanup and never reused.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-application/src/publication.rs`, test section:
+Declare the modules first: `crates/vpt-application/src/ports/mod.rs` gains `mod stores;` and
+`pub use stores::{StoreError, Stores};`; `crates/vpt-application/src/lib.rs` gains `mod publication;` and
+`pub use publication::{RepairError, RepairReport, repair_publications};`;
+`crates/vpt-adapters/src/lib.rs` gains `pub mod stores;`. The three new files start as their test
+modules.
+
+`crates/vpt-application/src/publication.rs`:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ports::DirtyPublication;
     use std::cell::RefCell;
     use std::collections::HashMap;
+    use vpt_domain::digest::Sha256Digest;
     use vpt_domain::time::UtcInstant;
 
     fn digest_of_bytes(bytes: &[u8]) -> Sha256Digest {
@@ -7209,10 +7215,6 @@ mod tests {
 
     struct FakeJournal(RefCell<Vec<DirtyPublication>>);
     impl PublicationJournal for FakeJournal {
-        fn record_publication(&self, entry: &DirtyPublication) -> Result<(), LedgerError> {
-            self.0.borrow_mut().push(entry.clone());
-            Ok(())
-        }
         fn pending_publications(&self) -> Result<Vec<DirtyPublication>, LedgerError> {
             Ok(self.0.borrow().clone())
         }
@@ -7222,32 +7224,28 @@ mod tests {
         }
     }
 
-    struct FakeFiles {
+    struct FakeStores {
         contents: RefCell<HashMap<PathBuf, Vec<u8>>>,
         synced: RefCell<Vec<PathBuf>>,
         sync_fails: bool,
     }
-    impl ArtifactFiles for FakeFiles {
-        fn digest_of(&self, path: &Path) -> Result<Option<Sha256Digest>, ArtifactError> {
+    impl Stores for FakeStores {
+        fn digest_of(&self, path: &Path) -> Result<Option<Sha256Digest>, StoreError> {
             Ok(self.contents.borrow().get(path).map(|bytes| digest_of_bytes(bytes)))
         }
-        fn publish(&self, target: &Path, bytes: &[u8]) -> Result<(), ArtifactError> {
+        fn digest_bytes(&self, bytes: &[u8]) -> Sha256Digest {
+            digest_of_bytes(bytes)
+        }
+        fn publish(&self, target: &Path, bytes: &[u8]) -> Result<(), StoreError> {
             self.contents.borrow_mut().insert(target.to_path_buf(), bytes.to_vec());
             Ok(())
         }
-        fn sync_directory_of(&self, path: &Path) -> Result<(), ArtifactError> {
+        fn sync_directory_of(&self, path: &Path) -> Result<(), StoreError> {
             if self.sync_fails {
-                return Err(ArtifactError("disk gone".into()));
+                return Err(StoreError::Io("disk gone".into()));
             }
             self.synced.borrow_mut().push(path.to_path_buf());
             Ok(())
-        }
-    }
-
-    struct FakeRenderer(Vec<u8>);
-    impl ArtifactRenderer for FakeRenderer {
-        fn render(&self, _target: &Path) -> Result<Vec<u8>, RenderError> {
-            Ok(self.0.clone())
         }
     }
 
@@ -7260,129 +7258,98 @@ mod tests {
         }
     }
 
-    fn files(contents: &[(&str, &[u8])], sync_fails: bool) -> FakeFiles {
-        FakeFiles {
+    fn journal(entries: Vec<DirtyPublication>) -> FakeJournal {
+        FakeJournal(RefCell::new(entries))
+    }
+
+    fn stores(contents: &[(&str, &[u8])], sync_fails: bool) -> FakeStores {
+        FakeStores {
             contents: RefCell::new(contents.iter().map(|(p, b)| (PathBuf::from(p), b.to_vec())).collect()),
             synced: RefCell::new(vec![]),
             sync_fails,
         }
     }
 
+    fn renders(bytes: &'static [u8]) -> impl Fn(&Path) -> Option<Vec<u8>> {
+        move |_target: &Path| Some(bytes.to_vec())
+    }
+
+    fn nothing(_target: &Path) -> Option<Vec<u8>> {
+        None
+    }
+
     #[test]
     fn a_target_already_holding_the_intended_bytes_is_completed_after_a_directory_sync() {
-        let journal = FakeJournal(RefCell::new(vec![entry("/t/a.md", Some(b"old"), b"new")]));
-        let files = files(&[("/t/a.md", b"new")], false);
-        let report = repair_publications(&journal, &files, &NoRenderers).expect("repaired");
+        let journal = journal(vec![entry("/t/a.md", Some(b"old"), b"new")]);
+        let stores = stores(&[("/t/a.md", b"new")], false);
+        let report = repair_publications(&journal, &stores, nothing).expect("repaired");
         assert_eq!(report.completed, vec![PathBuf::from("/t/a.md")]);
-        assert_eq!(files.synced.borrow().as_slice(), [PathBuf::from("/t/a.md")]);
+        assert_eq!(stores.synced.borrow().as_slice(), [PathBuf::from("/t/a.md")]);
         assert!(journal.0.borrow().is_empty());
     }
 
     #[test]
     fn a_failed_directory_sync_leaves_the_entry_pending() {
-        let journal = FakeJournal(RefCell::new(vec![entry("/t/a.md", Some(b"old"), b"new")]));
-        let files = files(&[("/t/a.md", b"new")], true);
-        let error = repair_publications(&journal, &files, &NoRenderers).unwrap_err();
+        let journal = journal(vec![entry("/t/a.md", Some(b"old"), b"new")]);
+        let stores = stores(&[("/t/a.md", b"new")], true);
+        let error = repair_publications(&journal, &stores, nothing).unwrap_err();
         assert!(matches!(error, RepairError::Sync { .. }), "{error:?}");
         assert_eq!(journal.0.borrow().len(), 1);
     }
 
     #[test]
-    fn a_target_holding_the_expected_previous_bytes_is_published_over_from_the_renderer() {
-        let journal = FakeJournal(RefCell::new(vec![entry("/t/a.md", Some(b"old"), b"new")]));
-        let files = files(&[("/t/a.md", b"old")], false);
-        let report = repair_publications(&journal, &files, &FakeRenderer(b"new".to_vec())).expect("repaired");
+    fn a_target_holding_the_expected_previous_bytes_is_published_over_from_the_rendering() {
+        let journal = journal(vec![entry("/t/a.md", Some(b"old"), b"new")]);
+        let stores = stores(&[("/t/a.md", b"old")], false);
+        let report = repair_publications(&journal, &stores, renders(b"new")).expect("repaired");
         assert_eq!(report.republished, vec![PathBuf::from("/t/a.md")]);
-        assert_eq!(files.contents.borrow()[Path::new("/t/a.md")], b"new");
+        assert_eq!(stores.contents.borrow()[Path::new("/t/a.md")], b"new");
+        assert_eq!(stores.synced.borrow().as_slice(), [PathBuf::from("/t/a.md")]);
         assert!(journal.0.borrow().is_empty());
     }
 
     #[test]
     fn an_absent_target_expected_absent_is_published() {
-        let journal = FakeJournal(RefCell::new(vec![entry("/t/b.md", None, b"fresh")]));
-        let files = files(&[], false);
-        let report = repair_publications(&journal, &files, &FakeRenderer(b"fresh".to_vec())).expect("repaired");
+        let journal = journal(vec![entry("/t/b.md", None, b"fresh")]);
+        let stores = stores(&[], false);
+        let report = repair_publications(&journal, &stores, renders(b"fresh")).expect("repaired");
         assert_eq!(report.republished, vec![PathBuf::from("/t/b.md")]);
+        assert_eq!(stores.contents.borrow()[Path::new("/t/b.md")], b"fresh");
     }
 
     #[test]
     fn any_other_bytes_are_refused_as_target_modified_and_nothing_is_overwritten() {
-        let journal = FakeJournal(RefCell::new(vec![entry("/t/a.md", Some(b"old"), b"new")]));
-        let files = files(&[("/t/a.md", b"someone else's prose")], false);
-        let error = repair_publications(&journal, &files, &FakeRenderer(b"new".to_vec())).unwrap_err();
+        let journal = journal(vec![entry("/t/a.md", Some(b"old"), b"new")]);
+        let stores = stores(&[("/t/a.md", b"someone else's prose")], false);
+        let error = repair_publications(&journal, &stores, renders(b"new")).unwrap_err();
         assert_eq!(error, RepairError::TargetModified(PathBuf::from("/t/a.md")));
-        assert_eq!(files.contents.borrow()[Path::new("/t/a.md")], b"someone else's prose");
+        assert_eq!(stores.contents.borrow()[Path::new("/t/a.md")], b"someone else's prose");
         assert_eq!(journal.0.borrow().len(), 1);
     }
 
     #[test]
     fn a_target_no_renderer_knows_is_reported_and_left_pending() {
-        let journal = FakeJournal(RefCell::new(vec![entry("/t/a.md", Some(b"old"), b"new")]));
-        let files = files(&[("/t/a.md", b"old")], false);
-        let error = repair_publications(&journal, &files, &NoRenderers).unwrap_err();
+        let journal = journal(vec![entry("/t/a.md", Some(b"old"), b"new")]);
+        let stores = stores(&[("/t/a.md", b"old")], false);
+        let error = repair_publications(&journal, &stores, nothing).unwrap_err();
         assert_eq!(error, RepairError::Render(PathBuf::from("/t/a.md")));
+        assert_eq!(journal.0.borrow().len(), 1);
+    }
+
+    #[test]
+    fn a_rendering_that_does_not_match_the_intended_digest_changes_nothing() {
+        let journal = journal(vec![entry("/t/a.md", Some(b"old"), b"new")]);
+        let stores = stores(&[("/t/a.md", b"old")], false);
+        let error = repair_publications(&journal, &stores, renders(b"not new")).unwrap_err();
+        assert_eq!(error, RepairError::RenderedDigestMismatch(PathBuf::from("/t/a.md")));
+        assert_eq!(stores.contents.borrow()[Path::new("/t/a.md")], b"old");
+        assert!(stores.synced.borrow().is_empty());
+        assert_eq!(journal.0.borrow().len(), 1);
     }
 }
 ```
 
-Contract scenarios appended to `crates/vpt-adapters/src/ledger/contract.rs`:
-
-```rust
-pub mod journal {
-    use super::*;
-
-    pub fn a_recorded_publication_is_pending_until_cleared(ledger: &dyn PublicationJournal) {
-        let entry = DirtyPublication {
-            target: PathBuf::from("/h/transcripts/a.md"),
-            expected_previous: None,
-            intended: digest(4),
-            recorded_at: UtcInstant { secs: 1 },
-        };
-        ledger.record_publication(&entry).expect("record");
-        assert_eq!(ledger.pending_publications().expect("pending"), vec![entry.clone()]);
-        ledger.clear_publication(&entry.target).expect("clear");
-        assert_eq!(ledger.pending_publications().expect("pending"), vec![]);
-    }
-
-    pub fn recording_the_same_target_twice_keeps_the_latest_entry(ledger: &dyn PublicationJournal) {
-        let mut entry = DirtyPublication {
-            target: PathBuf::from("/h/transcripts/a.md"),
-            expected_previous: Some(digest(5)),
-            intended: digest(6),
-            recorded_at: UtcInstant { secs: 1 },
-        };
-        ledger.record_publication(&entry).expect("first");
-        entry.intended = digest(7);
-        ledger.record_publication(&entry).expect("second");
-        assert_eq!(ledger.pending_publications().expect("pending"), vec![entry]);
-    }
-}
-
-macro_rules! publication_journal_contract {
-    ($make:expr) => {
-        mod publication_journal_contract {
-            use crate::ledger::contract::journal::*;
-
-            #[test]
-            fn a_recorded_publication_is_pending_until_cleared_() {
-                let (_guard, ledger) = $make();
-                a_recorded_publication_is_pending_until_cleared(&*ledger);
-            }
-            #[test]
-            fn recording_the_same_target_twice_keeps_the_latest_entry_() {
-                let (_guard, ledger) = $make();
-                recording_the_same_target_twice_keeps_the_latest_entry(&*ledger);
-            }
-        }
-    };
-}
-pub(crate) use publication_journal_contract;
-```
-
-with the invocation in both implementations' test modules, the closure boxing as
-`Box<dyn vpt_application::ports::ledger::PublicationJournal>`.
-
-`crates/vpt-adapters/src/stores.rs`, test section:
+`crates/vpt-adapters/src/stores.rs`:
 
 ```rust
 #[cfg(test)]
@@ -7390,105 +7357,108 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
-    #[test]
-    fn digest_of_reads_the_file_and_reports_absence_as_none() {
+    fn store() -> (tempfile::TempDir, PathBuf, FilesystemStores) {
         let temp = tempfile::tempdir().expect("temp");
-        let path = temp.path().join("a.md");
-        std::fs::write(&path, b"hello").expect("write");
-        let stores = FilesystemStores;
-        let digest = stores.digest_of(&path).expect("digest").expect("present");
+        let root = temp.path().canonicalize().expect("canonical");
+        let stores = FilesystemStores::open(&[root.clone()]).expect("opens");
+        (temp, root, stores)
+    }
+
+    #[test]
+    fn digest_of_reads_the_file_agrees_with_digest_bytes_and_reports_absence_as_none() {
+        let (_temp, root, stores) = store();
+        std::fs::write(root.join("a.md"), b"hello").expect("write");
+        let digest = stores.digest_of(&root.join("a.md")).expect("digest").expect("present");
         assert_eq!(digest.hex(), "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
-        assert_eq!(stores.digest_of(&temp.path().join("missing")).expect("absent"), None);
+        assert_eq!(stores.digest_bytes(b"hello"), digest);
+        assert_eq!(stores.digest_of(&root.join("missing")).expect("absent"), None);
     }
 
     #[test]
     fn publish_replaces_the_target_atomically_with_mode_0644_and_leaves_no_temporary_name() {
-        let temp = tempfile::tempdir().expect("temp");
-        let target = temp.path().join("a.md");
+        let (_temp, root, stores) = store();
+        let target = root.join("a.md");
         std::fs::write(&target, b"old").expect("old");
-        FilesystemStores.publish(&target, b"new").expect("publish");
+        stores.publish(&target, b"new").expect("publish");
         assert_eq!(std::fs::read(&target).expect("read"), b"new");
-        let names: Vec<_> = std::fs::read_dir(temp.path()).expect("dir").map(|e| e.expect("entry").file_name()).collect();
+        let names: Vec<_> = std::fs::read_dir(&root).expect("dir").map(|e| e.expect("entry").file_name()).collect();
         assert_eq!(names, vec![std::ffi::OsString::from("a.md")]);
         assert_eq!(std::fs::metadata(&target).expect("meta").permissions().mode() & 0o777, 0o644);
+        assert_eq!(stores.sync_directory_of(&target), Ok(()));
+    }
+
+    #[test]
+    fn a_leftover_temporary_name_is_skipped_never_reused() {
+        let (_temp, root, stores) = store();
+        let pid = std::process::id();
+        for sequence in 0..2 {
+            std::fs::write(root.join(format!(".a.md.vpt-{pid}-{sequence}")), b"abandoned").expect("blocker");
+        }
+        stores.publish(&root.join("a.md"), b"new").expect("publish");
+        assert_eq!(std::fs::read(root.join("a.md")).expect("read"), b"new");
+        for sequence in 0..2 {
+            assert_eq!(std::fs::read(root.join(format!(".a.md.vpt-{pid}-{sequence}"))).expect("kept"), b"abandoned");
+        }
+        assert!(!root.join(format!(".a.md.vpt-{pid}-2")).exists());
+    }
+
+    #[test]
+    fn a_path_below_no_store_root_or_reached_through_a_link_is_an_escape() {
+        let (temp, root, stores) = store();
+        let outside = temp.path().canonicalize().expect("canonical").parent().expect("parent").join("a.md");
+        assert_eq!(stores.publish(&outside, b"x"), Err(StoreError::Escape(outside.clone())));
+        assert_eq!(stores.digest_of(&outside), Err(StoreError::Escape(outside.clone())));
+        assert_eq!(stores.sync_directory_of(&outside), Err(StoreError::Escape(outside)));
+        let nested = root.join("sub/a.md");
+        assert_eq!(stores.publish(&nested, b"x"), Err(StoreError::Escape(nested)));
+        std::fs::write(root.join("real.md"), b"real").expect("real");
+        std::os::unix::fs::symlink(root.join("real.md"), root.join("link.md")).expect("link");
+        assert_eq!(stores.digest_of(&root.join("link.md")), Err(StoreError::Escape(root.join("link.md"))));
     }
 }
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p vpt-application publication && cargo test -p vpt-adapters`
+Run: `cargo test -p vpt-application publication && cargo test -p vpt-adapters stores`
 
-Expected: compile errors naming `DirtyPublication`, `PublicationJournal`, `repair_publications`,
-`FilesystemStores`.
+Expected: the first build fails with `unresolved import` for `StoreError`, `Stores`,
+`repair_publications`, `RepairReport` and `RepairError`; the second (run it after the first is green)
+with `cannot find` for `FilesystemStores`.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-Append to `crates/vpt-application/src/ports/ledger.rs`:
+`crates/vpt-application/src/ports/stores.rs`:
 
 ```rust
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DirtyPublication {
-    pub target: PathBuf,
-    pub expected_previous: Option<Sha256Digest>,
-    pub intended: Sha256Digest,
-    pub recorded_at: UtcInstant,
-}
-
-pub trait PublicationJournal {
-    fn record_publication(&self, entry: &DirtyPublication) -> Result<(), LedgerError>;
-    fn pending_publications(&self) -> Result<Vec<DirtyPublication>, LedgerError>;
-    fn clear_publication(&self, target: &Path) -> Result<(), LedgerError>;
-}
-```
-
-`crates/vpt-application/src/ports/artifacts.rs`:
-
-```rust
-//! The filesystem operations a publication needs, and the renderer registry
-//! that re-creates an artifact from committed state.
+//! The filesystem operations a publication needs, over the store roots.
 
 use std::path::{Path, PathBuf};
 use vpt_domain::digest::Sha256Digest;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ArtifactError(pub String);
+pub enum StoreError {
+    /// Below no store root, nested, or reached through a link: exit 3, `path_escape`.
+    Escape(PathBuf),
+    Io(String),
+}
 
-pub trait ArtifactFiles {
+pub trait Stores {
     /// `None` when the path is absent.
-    fn digest_of(&self, path: &Path) -> Result<Option<Sha256Digest>, ArtifactError>;
-    /// Write to a temporary name beside the target, sync, rename over the target.
-    fn publish(&self, target: &Path, bytes: &[u8]) -> Result<(), ArtifactError>;
-    fn sync_directory_of(&self, path: &Path) -> Result<(), ArtifactError>;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RenderError {
-    NoRendererFor(PathBuf),
-}
-
-pub trait ArtifactRenderer {
-    fn render(&self, target: &Path) -> Result<Vec<u8>, RenderError>;
-}
-
-/// The registry with no artifact kinds registered: stage 1 publishes no
-/// rendered artifact, so every target is unknown to it.
-pub struct NoRenderers;
-
-impl ArtifactRenderer for NoRenderers {
-    fn render(&self, target: &Path) -> Result<Vec<u8>, RenderError> {
-        Err(RenderError::NoRendererFor(target.to_path_buf()))
-    }
+    fn digest_of(&self, path: &Path) -> Result<Option<Sha256Digest>, StoreError>;
+    fn digest_bytes(&self, bytes: &[u8]) -> Sha256Digest;
+    /// Write to a private temporary name beside the target, sync, rename over the target.
+    fn publish(&self, target: &Path, bytes: &[u8]) -> Result<(), StoreError>;
+    fn sync_directory_of(&self, path: &Path) -> Result<(), StoreError>;
 }
 ```
 
-`crates/vpt-application/src/publication.rs`:
+`crates/vpt-application/src/publication.rs`, above its test module:
 
 ```rust
 //! Repair unfinished publications before new work, per spec section 4.4.
 
-use crate::ports::artifacts::{ArtifactError, ArtifactFiles, ArtifactRenderer, RenderError};
-use crate::ports::ledger::{DirtyPublication, LedgerError, PublicationJournal};
+use crate::ports::{LedgerError, PublicationJournal, StoreError, Stores};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -7500,28 +7470,34 @@ pub struct RepairReport {
 #[derive(Debug, PartialEq, Eq)]
 pub enum RepairError {
     TargetModified(PathBuf),
-    Sync { path: PathBuf, detail: String },
+    RenderedDigestMismatch(PathBuf),
+    Sync { path: PathBuf, cause: StoreError },
     Render(PathBuf),
     Ledger(LedgerError),
-    Files(ArtifactError),
+    Stores(StoreError),
 }
 
-pub fn repair_publications(
-    journal: &dyn PublicationJournal,
-    files: &dyn ArtifactFiles,
-    renderer: &dyn ArtifactRenderer,
+/// Complete or redo every pending publication; `render` re-creates a target's
+/// bytes from committed state and answers `None` for a target it does not know.
+pub fn repair_publications<J: PublicationJournal, S: Stores>(
+    journal: &J,
+    stores: &S,
+    render: impl Fn(&Path) -> Option<Vec<u8>>,
 ) -> Result<RepairReport, RepairError> {
     let mut report = RepairReport::default();
     for entry in journal.pending_publications().map_err(RepairError::Ledger)? {
-        let current = files.digest_of(&entry.target).map_err(RepairError::Files)?;
+        let current = stores.digest_of(&entry.target).map_err(RepairError::Stores)?;
         if current == Some(entry.intended) {
-            sync(files, &entry.target)?;
+            sync(stores, &entry.target)?;
             journal.clear_publication(&entry.target).map_err(RepairError::Ledger)?;
             report.completed.push(entry.target);
         } else if current == entry.expected_previous {
-            let bytes = renderer.render(&entry.target).map_err(|RenderError::NoRendererFor(path)| RepairError::Render(path))?;
-            files.publish(&entry.target, &bytes).map_err(RepairError::Files)?;
-            sync(files, &entry.target)?;
+            let bytes = render(&entry.target).ok_or_else(|| RepairError::Render(entry.target.clone()))?;
+            if stores.digest_bytes(&bytes) != entry.intended {
+                return Err(RepairError::RenderedDigestMismatch(entry.target));
+            }
+            stores.publish(&entry.target, &bytes).map_err(RepairError::Stores)?;
+            sync(stores, &entry.target)?;
             journal.clear_publication(&entry.target).map_err(RepairError::Ledger)?;
             report.republished.push(entry.target);
         } else {
@@ -7531,130 +7507,35 @@ pub fn repair_publications(
     Ok(report)
 }
 
-fn sync(files: &dyn ArtifactFiles, path: &Path) -> Result<(), RepairError> {
-    files
-        .sync_directory_of(path)
-        .map_err(|ArtifactError(detail)| RepairError::Sync { path: path.to_path_buf(), detail })
+fn sync<S: Stores>(stores: &S, path: &Path) -> Result<(), RepairError> {
+    stores.sync_directory_of(path).map_err(|cause| RepairError::Sync { path: path.to_path_buf(), cause })
 }
 ```
 
-`crates/vpt-application/src/ports/mod.rs` lists `artifacts`, `ledger`, `prompt`;
-`crates/vpt-application/src/lib.rs` adds `pub mod publication;`.
-
-`crates/vpt-adapters/src/ledger/sqlite/journal.rs`:
+`crates/vpt-adapters/src/stores.rs`, above its test module:
 
 ```rust
-//! `PublicationJournal` over SQLite: the `dirty_publications` table.
+//! Filesystem operations over the store roots, each held as a directory
+//! descriptor: digests, atomic publication, directory syncs.
 
-use super::{SqliteLedger, map};
-use rusqlite::params;
-use std::path::{Path, PathBuf};
-use vpt_application::ports::ledger::{DirtyPublication, LedgerError, PublicationJournal};
-use vpt_domain::digest::Sha256Digest;
-use vpt_domain::time::UtcInstant;
-
-impl PublicationJournal for SqliteLedger {
-    fn record_publication(&self, entry: &DirtyPublication) -> Result<(), LedgerError> {
-        self.transaction(|t| {
-            t.execute(
-                "INSERT INTO dirty_publications (target, expected_previous, intended, recorded_at) VALUES (?1, ?2, ?3, ?4) \
-                 ON CONFLICT(target) DO UPDATE SET expected_previous = excluded.expected_previous, \
-                 intended = excluded.intended, recorded_at = excluded.recorded_at",
-                params![
-                    entry.target.to_string_lossy(),
-                    entry.expected_previous.as_ref().map(Sha256Digest::hex),
-                    entry.intended.hex(),
-                    entry.recorded_at.secs,
-                ],
-            )
-            .map(|_| ())
-            .map_err(map)
-        })
-    }
-
-    fn pending_publications(&self) -> Result<Vec<DirtyPublication>, LedgerError> {
-        self.read(|c| {
-            let mut statement = c
-                .prepare("SELECT target, expected_previous, intended, recorded_at FROM dirty_publications ORDER BY recorded_at, target")
-                .map_err(map)?;
-            let rows = statement
-                .query_map([], |row| {
-                    let target: String = row.get(0)?;
-                    let previous: Option<String> = row.get(1)?;
-                    let intended: String = row.get(2)?;
-                    let recorded_at: i64 = row.get(3)?;
-                    Ok((target, previous, intended, recorded_at))
-                })
-                .map_err(map)?;
-            rows.map(|row| {
-                let (target, previous, intended, recorded_at) = row.map_err(map)?;
-                Ok(DirtyPublication {
-                    target: PathBuf::from(target),
-                    expected_previous: previous
-                        .map(|hex| Sha256Digest::from_hex(&hex).ok_or_else(|| LedgerError::Corrupt("expected digest".into())))
-                        .transpose()?,
-                    intended: Sha256Digest::from_hex(&intended).ok_or_else(|| LedgerError::Corrupt("intended digest".into()))?,
-                    recorded_at: UtcInstant { secs: recorded_at },
-                })
-            })
-            .collect()
-        })
-    }
-
-    fn clear_publication(&self, target: &Path) -> Result<(), LedgerError> {
-        self.transaction(|t| {
-            t.execute("DELETE FROM dirty_publications WHERE target = ?1", [target.to_string_lossy()])
-                .map(|_| ())
-                .map_err(map)
-        })
-    }
-}
-```
-
-Add `pub mod journal;` to the sqlite `mod.rs`. In `memory.rs`, add `publications: Vec<DirtyPublication>`
-to `State` and:
-
-```rust
-impl PublicationJournal for MemoryLedger {
-    fn record_publication(&self, entry: &DirtyPublication) -> Result<(), LedgerError> {
-        self.with(|s| {
-            s.publications.retain(|existing| existing.target != entry.target);
-            s.publications.push(entry.clone());
-        });
-        Ok(())
-    }
-
-    fn pending_publications(&self) -> Result<Vec<DirtyPublication>, LedgerError> {
-        Ok(self.with(|s| s.publications.clone()))
-    }
-
-    fn clear_publication(&self, target: &Path) -> Result<(), LedgerError> {
-        self.with(|s| s.publications.retain(|existing| existing.target != target));
-        Ok(())
-    }
-}
-```
-
-`crates/vpt-adapters/src/stores.rs`:
-
-```rust
-//! Filesystem operations over the stores: digests, atomic publication,
-//! directory syncs.
-
+use crate::contained::{Access, ContainedError, RootDir};
 use sha2::{Digest, Sha256};
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{Read, Write};
-use std::os::unix::fs::OpenOptionsExt;
-use std::path::Path;
-use vpt_application::ports::artifacts::{ArtifactError, ArtifactFiles};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use vpt_application::ports::{StoreError, Stores};
 use vpt_domain::digest::Sha256Digest;
-
-pub struct FilesystemStores;
 
 pub const BUFFER: usize = 64 * 1024;
 
-pub fn digest_file(path: &Path) -> Result<Sha256Digest, std::io::Error> {
-    let mut file = File::open(path)?;
+pub struct FilesystemStores {
+    roots: Vec<RootDir>,
+    sequence: AtomicU64,
+}
+
+/// The SHA-256 of an open file, read from its start in 64 KiB buffers.
+pub fn digest_open(file: &mut File) -> std::io::Result<Sha256Digest> {
     let mut hasher = Sha256::new();
     let mut buffer = vec![0u8; BUFFER];
     loop {
@@ -7667,50 +7548,97 @@ pub fn digest_file(path: &Path) -> Result<Sha256Digest, std::io::Error> {
     Ok(Sha256Digest(hasher.finalize().into()))
 }
 
-fn io(error: std::io::Error) -> ArtifactError {
-    ArtifactError(error.to_string())
+fn store_error(path: &Path, error: ContainedError) -> StoreError {
+    match error {
+        ContainedError::Io { kind, .. } => StoreError::Io(format!("{kind} at {}", path.display())),
+        ContainedError::Escape { .. } | ContainedError::NotRegular(_) | ContainedError::NotADirectory(_) => {
+            StoreError::Escape(path.to_path_buf())
+        }
+    }
 }
 
-impl ArtifactFiles for FilesystemStores {
-    fn digest_of(&self, path: &Path) -> Result<Option<Sha256Digest>, ArtifactError> {
-        match digest_file(path) {
-            Ok(digest) => Ok(Some(digest)),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(io(error)),
+fn io(path: &Path, error: &std::io::Error) -> StoreError {
+    StoreError::Io(format!("{} at {}", error.kind(), path.display()))
+}
+
+impl FilesystemStores {
+    pub fn open(roots: &[PathBuf]) -> Result<FilesystemStores, ContainedError> {
+        let roots = roots.iter().map(|root| RootDir::open(root)).collect::<Result<Vec<_>, _>>()?;
+        Ok(FilesystemStores { roots, sequence: AtomicU64::new(0) })
+    }
+
+    /// The root that owns `path` and the validated leaf below it.
+    fn owner(&self, path: &Path) -> Result<(&RootDir, PathBuf), StoreError> {
+        let root = self
+            .roots
+            .iter()
+            .find(|root| path.parent() == Some(root.path()))
+            .ok_or_else(|| StoreError::Escape(path.to_path_buf()))?;
+        let leaf = root.leaf(path).map_err(|error| store_error(path, error))?;
+        Ok((root, leaf))
+    }
+
+    /// A fresh private temporary name beside the target: exclusive creation,
+    /// a per-instance sequence, and only `AlreadyExists` retried.
+    fn create_temporary(&self, root: &RootDir, name: &str) -> Result<(File, PathBuf), StoreError> {
+        loop {
+            let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+            let temporary = PathBuf::from(format!(".{name}.vpt-{}-{sequence}", std::process::id()));
+            match root.create_file(&temporary, 0o644) {
+                Ok(file) => return Ok((file, temporary)),
+                Err(ContainedError::Io { kind: std::io::ErrorKind::AlreadyExists, .. }) => continue,
+                Err(error) => return Err(store_error(&root.path().join(temporary), error)),
+            }
+        }
+    }
+}
+
+impl Stores for FilesystemStores {
+    fn digest_of(&self, path: &Path) -> Result<Option<Sha256Digest>, StoreError> {
+        let (root, leaf) = self.owner(path)?;
+        match root.open_file(&leaf, Access::Read) {
+            Ok(mut file) => digest_open(&mut file).map(Some).map_err(|error| io(path, &error)),
+            Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => Ok(None),
+            Err(error) => Err(store_error(path, error)),
         }
     }
 
-    fn publish(&self, target: &Path, bytes: &[u8]) -> Result<(), ArtifactError> {
-        let directory = target.parent().ok_or_else(|| ArtifactError("target has no parent".into()))?;
-        let name = target.file_name().ok_or_else(|| ArtifactError("target has no name".into()))?;
-        let temporary = directory.join(format!(".{}.vpt-{}", name.to_string_lossy(), std::process::id()));
-        let mut file = OpenOptions::new().write(true).create_new(true).mode(0o644).open(&temporary).map_err(io)?;
-        file.write_all(bytes).map_err(io)?;
-        file.sync_all().map_err(io)?;
-        std::fs::rename(&temporary, target).map_err(io)?;
-        Ok(())
+    fn digest_bytes(&self, bytes: &[u8]) -> Sha256Digest {
+        Sha256Digest(Sha256::digest(bytes).into())
     }
 
-    fn sync_directory_of(&self, path: &Path) -> Result<(), ArtifactError> {
-        let directory = path.parent().ok_or_else(|| ArtifactError("path has no parent".into()))?;
-        File::open(directory).and_then(|dir| dir.sync_all()).map_err(io)
+    fn publish(&self, target: &Path, bytes: &[u8]) -> Result<(), StoreError> {
+        let (root, leaf) = self.owner(target)?;
+        let name = leaf.file_name().and_then(|name| name.to_str()).ok_or_else(|| StoreError::Escape(target.to_path_buf()))?;
+        let (mut file, temporary) = self.create_temporary(root, name)?;
+        file.write_all(bytes).and_then(|()| file.sync_all()).map_err(|error| io(target, &error))?;
+        drop(file);
+        root.rename_over(&temporary, &leaf).map_err(|error| store_error(target, error))?;
+        root.sync().map_err(|error| store_error(target, error))
+    }
+
+    fn sync_directory_of(&self, path: &Path) -> Result<(), StoreError> {
+        let (root, _leaf) = self.owner(path)?;
+        root.sync().map_err(|error| store_error(path, error))
     }
 }
 ```
 
-Add `pub mod stores;` to `crates/vpt-adapters/src/lib.rs`.
+A target that is a link at the leaf is refused by `digest_of` before anything is written, so repair never
+renders over a link; `rename_over` replaces the name itself, never what a link points at.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test --workspace --features dev-tools`
 
-Expected: all PASS, the two journal contract tests per implementation included.
+Expected: all PASS, the seven repair tests and the four store tests included. Run
+`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add crates
-SKIP_AI_COMMIT=1 git commit -m "feat(ledger): the publication journal and the repair before new work"
+SKIP_AI_COMMIT=1 git commit -m "feat(stores): publication repair before new work over the store descriptors"
 ```
 
 ______________________________________________________________________
