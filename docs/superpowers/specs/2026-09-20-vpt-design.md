@@ -632,27 +632,27 @@ build understands is read and never rewritten, and the mismatch is reported. `cr
 - Mentions: [Rajesh Muthukrishnan](../../contacts/Rajesh%20Muthukrishnan.md)
 <!-- vpt:links end -->
 
+<!-- vpt:content start -->
 ## Transcript
 
 [00:00] The quarterly invoice has not cleared yet.
 [00:07] I spoke to [unverified: Siobhan Kovalchuk | Shavon Kovalchik] about it.
-
-## Review
-
-> [!warning] 6 spans need review, 11 agreed spans unverified
-> - `numeric` [04:12] record: "4173-902" | checker: "4173-9002"
-> - `agreed-unverified` [00:09] "Muthakrishnan", 5 occurrences, both engines agree
+[00:09] Rajesh [unverified: Muthakrishnan] asked about the 23rd.
+<!-- vpt:content end -->
 ```
 
 The H1 matches the filename. Each segment is one paragraph prefixed with its `[mm:ss]` timecode; the
-timecode is the source reference every consumer uses. The `Review` callout is regenerated on every
-rewrite and lists surfaced flags in rank order, `agreed-unverified` under its own line stating that
-agreement is not evidence.
+timecode is the source reference every consumer uses. Transcript uncertainty appears in exactly two
+places, the inline markers and `vpt review <id>`: there is no summary block and no separate document.
 
-The managed link block is rewritten only between its markers; prose outside them is never touched. A note
-whose markers are missing, doubled or unbalanced is refused, not repaired, with the path named. Both
-directions are written: when the analysis note appears, both notes' blocks link each other. vpt never
-writes into a note it did not create; a `mentions` link points out only.
+A note has two managed regions, `vpt:links` and `vpt:content`, each between a start and an end marker.
+Generated content (the transcript or the synthesis, with its inline markers and annotations) lives in
+`vpt:content`; links live in `vpt:links`. A rewrite replaces the two regions and the frontmatter keys vpt
+owns (every `vpt` key, and `tags` merged so a tag the operator added by hand is kept) and preserves every
+other byte, so prose a person adds above, between or below the regions survives. A note whose required
+markers are missing, doubled or unbalanced is refused, not repaired, exit 3 `markers`, with the path
+named. Both directions are written: when the analysis note appears, both notes' link regions link each
+other. vpt never writes into a note it did not create; a `mentions` link points out only.
 
 ### 7.3 Tags and the auto-create switch
 
@@ -769,16 +769,21 @@ The config comment at the key says plainly that the command receives the full tr
 text leaves the machine is the operator's choice made at that line.
 
 vpt writes the analysis note from the proposal: frontmatter as in stage 3 with `vptStage: analysis`, a
-managed link block, a `Summary` section and an `Actions` section, each line ending with its
-`[mm:ss-mm:ss]` source reference, and a `Review` callout carrying the verify-note results. The summary
-layout is fixed: one bullet per proposal line, in proposal order, no headings of the agent's own. Tags
-and relations go through the stage 3 gates.
+`vpt:links` region, and a `vpt:content` region holding a `Summary` section and an `Actions` section. The
+layout is fixed: one bullet per proposal line, in proposal order, each ending with its `[mm:ss-mm:ss]`
+source reference and any verify-note annotation, and no headings of the agent's own. Tags and relations
+go through the stage 3 gates.
 
 ### 8.2 verify-note
 
-`vpt verify-note <path> --recording <id>` checks any Markdown note against the transcript and the flags,
-annotates, and never refuses. Every list item and every sentence in a paragraph is a claim line. Four
-classes, in order:
+`vpt verify-note <path> --recording <id>` checks a Markdown note against the transcript and the flags. It
+reports findings for any readable note, and it writes into a vpt-owned artifact only: a note whose
+`vptRecording` equals `--recording` and whose managed regions are intact. Any other file is left
+byte-identical and the findings go to the output alone; a file carrying a different `vptRecording` is
+refused, exit 3 `ownership`. Claims are read from the `vpt:content` region (from the whole body of a file
+vpt does not own), excluding frontmatter, headings, code fences, the links region and any earlier
+verify-note annotation. Every list item and every sentence in a paragraph is a claim line. Four classes,
+in order:
 
 1. `unsourced`: no `[mm:ss-mm:ss]` range on the line.
 1. `bad-reference`: a range that is empty, inverted, or outside the transcript's bounds.
@@ -788,8 +793,11 @@ classes, in order:
    exists to catch.
 1. `built-on-flagged-text`: the cited span carries an open `numeric`, `proper-noun` or `other` flag.
 
-Results are appended to the note's `Review` callout and merged into the recording's `open_flags` count.
-`vpt synthesize` runs `verify-note` on the analysis note it just wrote before it notifies.
+A finding is written as an annotation at the end of its claim line, inside the content region:
+`[unsourced]`, `[bad-reference]`, `[unsupported: <token>]` or `[built-on-flagged-text]`. Each invocation
+replaces the artifact's whole finding set and recomputes the recording's `open_flags`. Findings alone
+exit 0; a read or write failure exits 1. `vpt synthesize` runs `verify-note` on the analysis note it just
+wrote before it notifies.
 
 ### 8.3 Briefs
 
@@ -897,9 +905,10 @@ including one that syncs elsewhere, because sending is the point.
 The released file is assembled, not filtered. Its frontmatter carries at most `title` (from `--title`,
 else absent), `date` (when `[share] include_date`), and `source` (`[share] source_line`, default
 `redacted extract, not a verbatim record`, empty disables). None of the `vpt` keys, `tags` or the vault's
-keys cross. Sections named in `[share] deny_sections` (default `["Review"]`) and every `vpt:` marker
-block are absent. Every link target is removed; link text survives only if it survives the removal pass.
-Timecodes are removed unless `[share] keep_timecodes`.
+keys cross. The links region is discarded, the content region's markers are removed and the text inside
+it is what the pass works on; sections named in `[share] deny_sections` (default `[]`) are dropped from
+it. Every link target is removed; link text survives only if it survives the removal pass. Timecodes are
+removed unless `[share] keep_timecodes`.
 
 The removal pass is deterministic and pure: confirmed terms from `known-terms.txt` and note names and
 aliases from the index are always masked, whole-token, case-insensitive, possessives handled, no fuzz;
@@ -1040,7 +1049,7 @@ argument or subcommand prints usage to stderr and exits 2.
 | `vpt note write <id>`                                                                         | re-renders managed regions of both notes                              | the record                                                                                                         | 0, 3 markers                          |
 | `vpt path <id> --stage <stage>` / `vpt path --occasion <id> --stage brief`                    | nothing                                                               | `{"path": "<abs>"}`                                                                                                | 0, 2                                  |
 | `vpt synthesize <id> [--dry-run]`                                                             | analysis note, tags, relations                                        | the record plus `{"verify": {"<class>": n}}`                                                                       | 0, 1 command failed, 2 not configured |
-| `vpt verify-note <path> --recording <id>`                                                     | the note's Review callout                                             | `{"flags": [{"class", "line", "range"}]}`                                                                          | 0                                     |
+| `vpt verify-note <path> --recording <id>`                                                     | the owned artifact's annotations                                      | `{"flags": [{"class", "line", "range"}]}`                                                                          | 0, 1, 3                               |
 | `vpt brief <occasion> [--explain] [--dry-run]` / `--title --at ...` / `--upcoming`            | brief note, occasion row, events                                      | `vpt.brief/1`, or `{"written": [..]}` for `--upcoming`                                                             | 0, 2, 3                               |
 | `vpt occasions`                                                                               | nothing                                                               | `{"occasions": [..]}`                                                                                              | 0                                     |
 | `vpt redact <id> [--stage] [--to <dir>] [--title <t>]`                                        | released copy, draft report                                           | `{"written": "<path>", "report": "<path>", "masks": {"<class>": n}, "candidates": [..]}`                           | 0, 3 duplicate or residue             |
@@ -1153,7 +1162,7 @@ startup refusal naming it.
 | `share.source_line`                  | string         | `redacted extract, not a verbatim record`                                 | the one frontmatter line telling a recipient what they hold                                                  |
 | `share.include_date`                 | bool           | `false`                                                                   | put the capture date in the released frontmatter                                                             |
 | `share.keep_timecodes`               | bool           | `false`                                                                   | keep `[mm:ss]` references in released text                                                                   |
-| `share.deny_sections`                | string list    | `["Review"]`                                                              | sections never copied                                                                                        |
+| `share.deny_sections`                | string list    | `[]`                                                                      | sections dropped from the content region before redaction                                                    |
 | `share.redact.classes`               | string list    | `["email", "url", "phone", "number", "money"]`                            | pattern classes; terms and note names are always masked                                                      |
 | `share.redact.mask`                  | string         | `[{class} {n}]`                                                           | rendered in place of a removed value                                                                         |
 | `share.redact.flagged_spans`         | enum           | `omit`                                                                    | `omit` or `mark`                                                                                             |
@@ -1387,8 +1396,8 @@ Ships the `Engine` port, the `apple` (helper `transcribe`), `whisply` and `comma
 `vpt.engine/1`, the two slots and `checker_runs`, per-language pairs, the same-family refusal, the
 normalizer, aligner and classifier, the flag ledger, `known-terms.txt`, `vpt transcribe`, `vpt review`,
 `vpt confirm --term`, the readability pass, the `review_needed` and `transcribe_failed` events, and a
-minimal transcript note in the portable profile (frontmatter, H1, timecoded transcript, `Review` callout)
-so a transcript is readable before stage 3. Depends on stage 1.
+minimal transcript note in the portable profile (frontmatter, H1, the content region with the timecoded
+transcript and its inline markers) so a transcript is readable before stage 3. Depends on stage 1.
 
 ### Stage 3: Vault note
 
