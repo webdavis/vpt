@@ -197,16 +197,22 @@ ______________________________________________________________________
 - Create: `crates/vpt/Cargo.toml`, `crates/vpt/src/main.rs`, `crates/vpt/src/lib.rs`,
   `crates/vpt/src/cli/mod.rs`, `crates/vpt/src/cli/args.rs`, `crates/vpt/src/commands/mod.rs`,
   `crates/vpt/src/commands/version.rs`
-- Test: `crates/vpt/tests/support/mod.rs`, `crates/vpt/tests/version.rs`
+- Test: `crates/vpt/tests/support/mod.rs`, `crates/vpt/tests/version.rs`, `crates/vpt/tests/usage.rs`
 
 **Interfaces:**
 
 - Consumes: nothing.
 
-- Produces: `vpt::run() -> !`; `vpt::cli::args::{Verb, Invocation, UsageError, parse, USAGE}`;
-  `vpt::commands::version::run(helper_version: Option<String>) -> serde_json::Value`; the test harness
-  `support::Sandbox::new(name: &str) -> Sandbox` with `fn vpt(&self) -> std::process::Command` (env
-  already set) and `fn path(&self) -> &Path`; `support::run(cmd: &mut Command) -> Output`.
+- Produces: `vpt::run() -> !` (the crate's only public item; `cli` and `commands` are private modules);
+  `cli::args::{Verb, Invocation { pub verb: Verb, pub json: bool,`
+  `pub config: Option<PathBuf> }, UsageError(pub String),`
+  `parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, UsageError>,` `USAGE: &str}`;
+  `commands::version::{VERSION: &str, document(helper_version: Option<&str>) ->`
+  `serde_json::Value, human(helper_version: Option<&str>) -> String}`; the test harness
+  `support::{VPT: &str, Sandbox::new(name: &str) -> Sandbox, Sandbox::path(&self) ->`
+  `&Path, Sandbox::config_path(&self) -> PathBuf, Sandbox::vpt(&self) ->`
+  `std::process::Command, run(command: &mut Command) -> Output, stdout(output: &Output) ->`
+  `String, stderr(output: &Output) -> String}`.
 
 - [ ] **Step 1: Write the failing acceptance test**
 
@@ -306,7 +312,68 @@ fn version_without_json_prints_one_human_line() {
 }
 ```
 
-- [ ] **Step 2: Create the workspace so the test can compile, then run it to verify it fails**
+`crates/vpt/tests/usage.rs`:
+
+```rust
+mod support;
+
+use support::{Sandbox, run, stderr, stdout};
+
+#[test]
+fn an_unknown_verb_prints_usage_to_stderr_and_exits_2() {
+    let sandbox = Sandbox::new("usage-unknown");
+
+    let output = run(sandbox.vpt().arg("transcode"));
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(stdout(&output), "");
+    let err = stderr(&output);
+    assert!(err.starts_with("vpt: unknown verb transcode\n"), "{err}");
+    assert!(err.contains("usage: vpt"), "{err}");
+}
+```
+
+`crates/vpt/src/cli/args.rs` starts as its test module alone; Step 3 adds the code above it:
+
+```rust
+//! Argument decoding. Hand rolled: nine verbs and four flags do not justify a parser crate.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::OsString;
+    use std::path::PathBuf;
+
+    fn parsed(line: &str) -> Result<Invocation, UsageError> {
+        parse(std::iter::once(OsString::from("vpt")).chain(line.split(' ').map(OsString::from)))
+    }
+
+    #[test]
+    fn json_and_config_are_global_flags_in_any_position() {
+        let invocation = parsed("ingest --json --config /tmp/c.toml --dry-run").expect("parsed");
+        assert!(invocation.json);
+        assert_eq!(invocation.config, Some(PathBuf::from("/tmp/c.toml")));
+        assert_eq!(invocation.verb, Verb::Ingest { dry_run: true, once: None });
+    }
+
+    #[test]
+    fn an_unknown_verb_is_a_usage_error_naming_it() {
+        assert_eq!(parsed("transcode"), Err(UsageError("unknown verb transcode".into())));
+    }
+
+    #[test]
+    fn a_trailing_unknown_argument_is_refused() {
+        assert_eq!(parsed("doctor --loud"), Err(UsageError("unexpected argument --loud".into())));
+    }
+
+    #[test]
+    fn a_value_flag_without_a_value_is_refused() {
+        assert_eq!(parsed("ingest --once"), Err(UsageError("--once needs a value".into())));
+    }
+}
+```
+
+- [ ] **Step 2: Create the workspace so the tests can compile, then run them to verify they fail**
 
 `Cargo.toml`:
 
@@ -510,8 +577,8 @@ fn main() {
 ```rust
 //! The command crate: parse, dispatch, emit, exit. No policy lives here.
 
-pub mod cli;
-pub mod commands;
+mod cli;
+mod commands;
 
 pub fn run() -> ! {
     std::process::exit(2);
@@ -521,20 +588,33 @@ pub fn run() -> ! {
 `crates/vpt/src/cli/mod.rs`:
 
 ```rust
-pub mod args;
+pub(crate) mod args;
 ```
 
-`crates/vpt/src/cli/args.rs` and `crates/vpt/src/commands/mod.rs`, `crates/vpt/src/commands/version.rs`
-start empty (one line: `//! Filled in this task.`).
+`crates/vpt/src/commands/mod.rs`:
 
-Run: `cargo test -p vpt --test version`
+```rust
+pub(crate) mod version;
+```
 
-Expected: both tests FAIL: `assertion failed: left: Some(2), right: Some(0)` (the binary exits 2 before
-parsing anything).
+`crates/vpt/src/commands/version.rs` starts as one line, `//! \`vpt --version\`.`, and `args.rs\` is the
+test module written in Step 1. Every module is declared before the red run so the test modules are
+compiled and selected; a run that selects zero tests, or that succeeds, does not satisfy this step.
+
+Run: `cargo test -p vpt --test version --test usage`
+
+Expected: all three acceptance tests FAIL, `assertion failed: left: Some(2), right: Some(0)` for the two
+version tests (the binary exits 2 before parsing anything) and the usage test on its
+`starts_with("vpt: unknown verb transcode")` assertion.
+
+Run: `cargo test -p vpt --lib`
+
+Expected: the build of the `args::tests` module fails with `cannot find` for `parse`, `Invocation`,
+`UsageError` and `Verb`: the module is compiled and its four tests are what the code must satisfy.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-`crates/vpt/src/cli/args.rs`:
+`crates/vpt/src/cli/args.rs`, above the test module:
 
 ```rust
 //! Argument decoding. Hand rolled: nine verbs and four flags do not justify a parser crate.
@@ -642,47 +722,9 @@ fn take_positional(words: &mut Vec<String>, name: &str) -> Result<String, UsageE
     }
     Ok(words.remove(0))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn parsed(line: &str) -> Result<Invocation, UsageError> {
-        parse(std::iter::once(OsString::from("vpt")).chain(line.split(' ').map(OsString::from)))
-    }
-
-    #[test]
-    fn json_and_config_are_global_flags_in_any_position() {
-        let invocation = parsed("ingest --json --config /tmp/c.toml --dry-run").expect("parsed");
-        assert!(invocation.json);
-        assert_eq!(invocation.config, Some(PathBuf::from("/tmp/c.toml")));
-        assert_eq!(invocation.verb, Verb::Ingest { dry_run: true, once: None });
-    }
-
-    #[test]
-    fn an_unknown_verb_is_a_usage_error_naming_it() {
-        assert_eq!(parsed("transcode"), Err(UsageError("unknown verb transcode".into())));
-    }
-
-    #[test]
-    fn a_trailing_unknown_argument_is_refused() {
-        assert_eq!(parsed("doctor --loud"), Err(UsageError("unexpected argument --loud".into())));
-    }
-
-    #[test]
-    fn a_value_flag_without_a_value_is_refused() {
-        assert_eq!(parsed("ingest --once"), Err(UsageError("--once needs a value".into())));
-    }
-}
 ```
 
-`crates/vpt/src/commands/mod.rs`:
-
-```rust
-pub mod version;
-```
-
-`crates/vpt/src/commands/version.rs`:
+The test module of Step 1 stays below this code, unchanged. `crates/vpt/src/commands/version.rs`:
 
 ```rust
 //! `vpt --version`: the crate version and the helper's, when one answers.
@@ -713,8 +755,8 @@ pub fn human(helper_version: Option<&str>) -> String {
 ```rust
 //! The command crate: parse, dispatch, emit, exit. No policy lives here.
 
-pub mod cli;
-pub mod commands;
+mod cli;
+mod commands;
 
 use cli::args::{Invocation, Verb, parse};
 use std::io::Write;
@@ -856,7 +898,8 @@ jobs:
 
 Run: `cargo test -p vpt`
 
-Expected: `test result: ok.` for the unit tests in `args.rs` and for both tests in `version.rs`.
+Expected: `test result: ok.` for the four unit tests in `args.rs`, the two tests in `version.rs` and the
+one in `usage.rs`.
 
 Run: `cargo fmt --all -- --check &&`
 `cargo clippy --locked --workspace --all-targets --features dev-tools -- -D warnings`
