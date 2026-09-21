@@ -8095,29 +8095,45 @@ ______________________________________________________________________
 
 **Files:**
 
-- Create: `crates/vpt-adapters/src/voice_memos/titles.rs` (replacing the two-line stand-in)
+- Create: `crates/vpt-adapters/src/voice_memos/titles.rs`
+- Modify: `crates/vpt-adapters/src/voice_memos/mod.rs`, `crates/vpt-adapters/src/voice_memos/store.rs`,
+  `crates/vpt-application/src/ports/recorder.rs`, `crates/vpt-application/src/ports/mod.rs`
 
 **Interfaces:**
 
-- Consumes: `TitleSource`, `TitleLookup`.
+- Consumes: `RecorderStore`, `vpt_adapters::contained::{Access, ContainedError, RootDir}`.
 
-- Produces: `vpt_adapters::voice_memos::titles::TitleCopy::refresh(recordings_dir: &Path,`
-  `state_dir: &Path, enabled: bool) -> TitleCopy` (implements `TitleSource`);
-  `pub const COPY_DIRECTORY: &str = "title-copy"`.
+- Produces: `vpt_application::ports::TitleLookup::{Titled(String), Unavailable}` and, on `RecorderStore`,
+  `fn title(&self, file_name: &str) -> TitleLookup`;
+  `vpt_adapters::voice_memos::{TitleCopy, COPY_DIRECTORY}` with
+  `TitleCopy::refresh(container: &Path, state_dir: &Path) -> TitleCopy` (copies the live database and its
+  side files into `<state_dir>/title-copy`, then opens the copy),
+  `TitleCopy::existing(state_dir: &Path) -> TitleCopy` (opens a copy already there, touching nothing),
+  `fn title(&self, file_name: &str) -> TitleLookup`, `COPY_DIRECTORY: &str = "title-copy"`;
+  `VoiceMemosStore::with_titles(self, state_dir: PathBuf, refresh: bool) -> VoiceMemosStore` (the copy is
+  made or opened on the first `title` call; a store built without it answers `Unavailable`).
 
 - [ ] **Step 1: Write the failing tests**
+
+Declare first: `crates/vpt-adapters/src/voice_memos/mod.rs` gains `mod titles;` and
+`pub use titles::{COPY_DIRECTORY, TitleCopy};`; `crates/vpt-application/src/ports/mod.rs` adds
+`TitleLookup` to the recorder re-export. `crates/vpt-adapters/src/voice_memos/titles.rs` starts as its
+test module alone:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::voice_memos::VoiceMemosStore;
     use std::os::unix::fs::PermissionsExt;
-    use vpt_application::ports::recorder::TitleLookup;
+    use std::path::PathBuf;
+    use vpt_application::ports::RecorderStore;
 
-    fn apple_store(rows: &[(&str, &str)], with_columns: bool) -> tempfile::TempDir {
+    fn apple_store(rows: &[(&str, &str)], with_columns: bool) -> (tempfile::TempDir, PathBuf, rusqlite::Connection) {
         let temp = tempfile::tempdir().expect("temp");
-        std::fs::create_dir_all(temp.path().join("Recordings")).expect("recordings");
-        let database = rusqlite::Connection::open(temp.path().join("CloudRecordings.db")).expect("db");
+        let container = temp.path().canonicalize().expect("canonical");
+        std::fs::create_dir_all(container.join("Recordings")).expect("recordings");
+        let database = rusqlite::Connection::open(container.join("CloudRecordings.db")).expect("db");
         database.pragma_update(None, "journal_mode", "WAL").expect("wal");
         if with_columns {
             database
@@ -8131,22 +8147,38 @@ mod tests {
         } else {
             database.execute_batch("CREATE TABLE ZSOMETHING (Z_PK INTEGER PRIMARY KEY, ZNAME TEXT)").expect("schema");
         }
-        temp
+        (temp, container, database)
+    }
+
+    fn state() -> (tempfile::TempDir, PathBuf) {
+        let temp = tempfile::tempdir().expect("state temp");
+        let state = temp.path().canonicalize().expect("canonical").join("state");
+        std::fs::create_dir(&state).expect("state dir");
+        (temp, state)
+    }
+
+    fn names_in(directory: &Path) -> Vec<std::ffi::OsString> {
+        let mut names: Vec<_> = std::fs::read_dir(directory).expect("dir").map(|e| e.expect("entry").file_name()).collect();
+        names.sort();
+        names
     }
 
     #[test]
-    fn the_title_is_read_from_the_copy_by_file_name() {
-        let temp = apple_store(&[("20260824 144736-4F3AB19C.m4a", "Invoice call")], true);
-        let titles = TitleCopy::refresh(&temp.path().join("Recordings"), &temp.path().join("state"), true);
+    fn the_title_is_read_from_the_copy_by_file_name_including_rows_still_in_the_live_wal() {
+        let (_temp, container, _database) = apple_store(&[("20260824 144736-4F3AB19C.m4a", "Invoice call")], true);
+        let (_state_temp, state) = state();
+        let wal = std::fs::metadata(container.join("CloudRecordings.db-wal")).expect("live wal");
+        assert!(wal.len() > 0, "the fixture rows must still sit in the WAL");
+        let titles = TitleCopy::refresh(&container, &state);
         assert_eq!(titles.title("20260824 144736-4F3AB19C.m4a"), TitleLookup::Titled("Invoice call".into()));
         assert_eq!(titles.title("other.m4a"), TitleLookup::Unavailable);
     }
 
     #[test]
     fn the_copy_lives_under_the_state_directory_with_restrictive_modes() {
-        let temp = apple_store(&[("a.m4a", "A")], true);
-        let state = temp.path().join("state");
-        TitleCopy::refresh(&temp.path().join("Recordings"), &state, true);
+        let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+        let (_state_temp, state) = state();
+        TitleCopy::refresh(&container, &state);
         let copy_dir = state.join(COPY_DIRECTORY);
         assert_eq!(std::fs::metadata(&copy_dir).expect("dir").permissions().mode() & 0o777, 0o700);
         for name in ["CloudRecordings.db", "CloudRecordings.db-wal", "CloudRecordings.db-shm"] {
@@ -8157,36 +8189,81 @@ mod tests {
     }
 
     #[test]
-    fn a_changed_schema_yields_unavailable() {
-        let temp = apple_store(&[], false);
-        let titles = TitleCopy::refresh(&temp.path().join("Recordings"), &temp.path().join("state"), true);
-        assert_eq!(titles.title("a.m4a"), TitleLookup::Unavailable);
+    fn a_second_refresh_overwrites_the_copy_in_place_and_removes_nothing() {
+        let (_temp, container, database) = apple_store(&[("a.m4a", "A")], true);
+        let (_state_temp, state) = state();
+        assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Titled("A".into()));
+        database.execute("UPDATE ZCLOUDRECORDING SET ZCUSTOMLABEL = 'B'", []).expect("update");
+        std::fs::write(state.join(COPY_DIRECTORY).join("stray"), b"kept").expect("stray");
+        assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Titled("B".into()));
+        assert_eq!(std::fs::read(state.join(COPY_DIRECTORY).join("stray")).expect("kept"), b"kept");
     }
 
     #[test]
-    fn disabled_reading_copies_nothing_and_answers_unavailable() {
-        let temp = apple_store(&[("a.m4a", "A")], true);
-        let state = temp.path().join("state");
-        let titles = TitleCopy::refresh(&temp.path().join("Recordings"), &state, false);
-        assert_eq!(titles.title("a.m4a"), TitleLookup::Unavailable);
+    fn an_existing_copy_is_read_without_refreshing_and_an_absent_one_is_unavailable() {
+        let (_temp, container, database) = apple_store(&[("a.m4a", "A")], true);
+        let (_state_temp, state) = state();
+        TitleCopy::refresh(&container, &state);
+        database.execute("UPDATE ZCLOUDRECORDING SET ZCUSTOMLABEL = 'B'", []).expect("update");
+        assert_eq!(TitleCopy::existing(&state).title("a.m4a"), TitleLookup::Titled("A".into()));
+        let (_fresh_temp, fresh) = state();
+        assert_eq!(TitleCopy::existing(&fresh).title("a.m4a"), TitleLookup::Unavailable);
+        assert_eq!(names_in(&fresh), Vec::<std::ffi::OsString>::new());
+    }
+
+    #[test]
+    fn a_changed_schema_yields_unavailable() {
+        let (_temp, container, _database) = apple_store(&[], false);
+        let (_state_temp, state) = state();
+        assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Unavailable);
+    }
+
+    #[test]
+    fn a_missing_live_database_yields_unavailable_and_makes_no_copy() {
+        let temp = tempfile::tempdir().expect("temp");
+        let container = temp.path().canonicalize().expect("canonical");
+        std::fs::create_dir_all(container.join("Recordings")).expect("recordings");
+        let (_state_temp, state) = state();
+        assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Unavailable);
         assert!(!state.join(COPY_DIRECTORY).exists());
     }
 
     #[test]
-    fn a_missing_live_database_yields_unavailable() {
-        let temp = tempfile::tempdir().expect("temp");
-        std::fs::create_dir_all(temp.path().join("Recordings")).expect("recordings");
-        let titles = TitleCopy::refresh(&temp.path().join("Recordings"), &temp.path().join("state"), true);
-        assert_eq!(titles.title("a.m4a"), TitleLookup::Unavailable);
+    fn the_live_container_is_left_with_no_new_entries() {
+        let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+        let (_state_temp, state) = state();
+        let before = names_in(&container);
+        TitleCopy::refresh(&container, &state);
+        assert_eq!(names_in(&container), before);
     }
 
     #[test]
-    fn the_live_database_directory_is_left_with_no_new_entries() {
-        let temp = apple_store(&[("a.m4a", "A")], true);
-        let before: Vec<_> = std::fs::read_dir(temp.path()).expect("dir").map(|e| e.expect("entry").file_name()).collect();
-        TitleCopy::refresh(&temp.path().join("Recordings"), &temp.path().join("state"), true);
-        let after: Vec<_> = std::fs::read_dir(temp.path()).expect("dir").map(|e| e.expect("entry").file_name()).collect();
-        assert_eq!(before, after);
+    fn like_metacharacters_in_a_file_name_match_only_that_name() {
+        let rows = [
+            ("dir/axb.m4a", "x"),
+            ("dir/a_b.m4a", "underscore"),
+            ("dir/100x.m4a", "x too"),
+            ("dir/100%.m4a", "percent"),
+            ("dir/a\\b.m4a", "backslash"),
+        ];
+        let (_temp, container, _database) = apple_store(&rows, true);
+        let (_state_temp, state) = state();
+        let titles = TitleCopy::refresh(&container, &state);
+        assert_eq!(titles.title("a_b.m4a"), TitleLookup::Titled("underscore".into()));
+        assert_eq!(titles.title("100%.m4a"), TitleLookup::Titled("percent".into()));
+        assert_eq!(titles.title("a\\b.m4a"), TitleLookup::Titled("backslash".into()));
+        assert_eq!(titles.title("b.m4a"), TitleLookup::Unavailable);
+    }
+
+    #[test]
+    fn the_store_answers_through_its_port_and_unavailable_without_titles() {
+        let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+        let (_state_temp, state) = state();
+        let store = VoiceMemosStore::open(&container.join("Recordings")).expect("store");
+        assert_eq!(store.title("a.m4a"), TitleLookup::Unavailable);
+        let titled = VoiceMemosStore::open(&container.join("Recordings")).expect("store").with_titles(state.clone(), true);
+        assert_eq!(titled.title("a.m4a"), TitleLookup::Titled("A".into()));
+        assert!(state.join(COPY_DIRECTORY).join("CloudRecordings.db").exists());
     }
 }
 ```
@@ -8195,22 +8272,42 @@ mod tests {
 
 Run: `cargo test -p vpt-adapters titles`
 
-Expected: the stand-in answers `Unavailable` everywhere, so
-`the_title_is_read_from_the_copy_by_file_name` and the modes test FAIL; the others pass on the stand-in
-and stay as regressions guards.
+Expected: the build fails with `cannot find` for `TitleCopy`, `COPY_DIRECTORY` and `TitleLookup`, and
+`no method named title` on `VoiceMemosStore`.
 
 - [ ] **Step 3: Write the minimal implementation**
+
+Append to `crates/vpt-application/src/ports/recorder.rs`:
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TitleLookup {
+    Titled(String),
+    Unavailable,
+}
+```
+
+and add to `RecorderStore`:
+
+```rust
+    /// The human title from the private database copy; a copy that cannot be
+    /// made or read answers `Unavailable`.
+    fn title(&self, file_name: &str) -> TitleLookup;
+```
+
+`crates/vpt-adapters/src/voice_memos/titles.rs`, above its test module:
 
 ```rust
 //! The database is confined to one thing, the human title, and it is read
 //! from a private copy so SQLite never creates a journal inside Apple's
 //! directory. The copy is overwritten in place and never removed.
 
+use crate::contained::{Access, ContainedError, RootDir};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
-use std::fs::DirBuilder;
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+use std::fs::File;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use vpt_application::ports::recorder::{TitleLookup, TitleSource};
+use vpt_application::ports::TitleLookup;
 
 pub const COPY_DIRECTORY: &str = "title-copy";
 const DATABASE: &str = "CloudRecordings.db";
@@ -8222,64 +8319,32 @@ pub struct TitleCopy {
 }
 
 impl TitleCopy {
-    pub fn refresh(recordings_dir: &Path, state_dir: &Path, enabled: bool) -> TitleCopy {
-        if !enabled {
-            return TitleCopy { connection: None, table: None };
+    /// Copy the live database and its side files below the state root, then open the copy.
+    pub fn refresh(container: &Path, state_dir: &Path) -> TitleCopy {
+        match copy_database(container, state_dir) {
+            Ok(()) => TitleCopy::existing(state_dir),
+            Err(_) => TitleCopy { connection: None, table: None },
         }
-        let live_dir = match recordings_dir.parent() {
-            Some(parent) => parent,
-            None => return TitleCopy { connection: None, table: None },
-        };
-        if !live_dir.join(DATABASE).is_file() {
-            return TitleCopy { connection: None, table: None };
-        }
-        let copy_dir = state_dir.join(COPY_DIRECTORY);
-        if DirBuilder::new().recursive(true).mode(0o700).create(&copy_dir).is_err() {
-            return TitleCopy { connection: None, table: None };
-        }
-        for name in SIDE_FILES {
-            let source = live_dir.join(name);
-            let target = copy_dir.join(name);
-            let copied = if source.is_file() {
-                std::fs::copy(&source, &target).map(|_| ())
-            } else {
-                std::fs::write(&target, b"")
-            };
-            if copied.is_err() || std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).is_err() {
-                return TitleCopy { connection: None, table: None };
-            }
-        }
-        let connection = Connection::open_with_flags(copy_dir.join(DATABASE), OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).ok();
+    }
+
+    /// Open the copy already below the state root, creating and changing nothing.
+    pub fn existing(state_dir: &Path) -> TitleCopy {
+        let database = RootDir::open(&state_dir.join(COPY_DIRECTORY)).and_then(|copy| copy.regular(Path::new(DATABASE)));
+        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+        let connection = database.ok().and_then(|path| Connection::open_with_flags(path, flags).ok());
         let table = connection.as_ref().and_then(table_with_title_columns);
         TitleCopy { connection, table }
     }
-}
 
-/// The table holding both `ZPATH` and `ZCUSTOMLABEL`, found by inspection so a
-/// renamed table degrades to untitled rather than to a wrong guess.
-fn table_with_title_columns(connection: &Connection) -> Option<String> {
-    let mut statement = connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").ok()?;
-    let names: Vec<String> = statement.query_map([], |row| row.get(0)).ok()?.filter_map(Result::ok).collect();
-    names.into_iter().find(|name| {
-        let mut columns = match connection.prepare(&format!("PRAGMA table_info(\"{}\")", name.replace('"', "\"\""))) {
-            Ok(statement) => statement,
-            Err(_) => return false,
-        };
-        let found: Vec<String> = columns.query_map([], |row| row.get::<_, String>(1)).ok().map(|rows| rows.filter_map(Result::ok).collect()).unwrap_or_default();
-        found.iter().any(|c| c == "ZPATH") && found.iter().any(|c| c == "ZCUSTOMLABEL")
-    })
-}
-
-impl TitleSource for TitleCopy {
-    fn title(&self, file_name: &str) -> TitleLookup {
+    pub fn title(&self, file_name: &str) -> TitleLookup {
         let (Some(connection), Some(table)) = (&self.connection, &self.table) else {
             return TitleLookup::Unavailable;
         };
         let query = format!(
-            "SELECT ZCUSTOMLABEL FROM \"{}\" WHERE ZPATH = ?1 OR ZPATH LIKE ?2 LIMIT 1",
+            "SELECT ZCUSTOMLABEL FROM \"{}\" WHERE ZPATH = ?1 OR ZPATH LIKE ?2 ESCAPE '\\' LIMIT 1",
             table.replace('"', "\"\"")
         );
-        let suffix = format!("%/{}", file_name.replace('%', "\\%").replace('_', "\\_"));
+        let suffix = format!("%/{}", file_name.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
         let label: Option<Option<String>> = connection
             .query_row(&query, [file_name, suffix.as_str()], |row| row.get(0))
             .optional()
@@ -8291,21 +8356,121 @@ impl TitleSource for TitleCopy {
         }
     }
 }
+
+fn copy_database(container: &Path, state_dir: &Path) -> Result<(), ContainedError> {
+    let live = RootDir::open(container)?;
+    live.regular(Path::new(DATABASE))?;
+    let copy = RootDir::open(state_dir)?.subdirectory(COPY_DIRECTORY)?;
+    for name in SIDE_FILES {
+        let mut target = overwrite(&copy, name)?;
+        match live.open_file(Path::new(name), Access::Read) {
+            Ok(mut source) => {
+                std::io::copy(&mut source, &mut target)
+                    .map_err(|error| ContainedError::Io { path: copy.path().join(name), kind: error.kind() })?;
+            }
+            Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
+/// The copy's file at `name`: created privately, or truncated in place and
+/// repaired to 0600 when it is already there.
+fn overwrite(copy: &RootDir, name: &str) -> Result<File, ContainedError> {
+    match copy.create_file(Path::new(name), 0o600) {
+        Err(ContainedError::Io { kind: std::io::ErrorKind::AlreadyExists, .. }) => {
+            let file = copy.open_file(Path::new(name), Access::Write)?;
+            let failed = |error: std::io::Error| ContainedError::Io { path: copy.path().join(name), kind: error.kind() };
+            file.set_len(0).map_err(failed)?;
+            file.set_permissions(std::fs::Permissions::from_mode(0o600)).map_err(failed)?;
+            Ok(file)
+        }
+        outcome => outcome,
+    }
+}
+
+/// The table holding both `ZPATH` and `ZCUSTOMLABEL`, found by inspection so a
+/// renamed table degrades to untitled rather than to a wrong guess.
+fn table_with_title_columns(connection: &Connection) -> Option<String> {
+    let mut statement = connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").ok()?;
+    let names: Vec<String> = statement.query_map([], |row| row.get(0)).ok()?.filter_map(Result::ok).collect();
+    names.into_iter().find(|name| {
+        let Ok(mut columns) = connection.prepare(&format!("PRAGMA table_info(\"{}\")", name.replace('"', "\"\""))) else {
+            return false;
+        };
+        let found: Vec<String> = columns
+            .query_map([], |row| row.get::<_, String>(1))
+            .ok()
+            .map(|rows| rows.filter_map(Result::ok).collect())
+            .unwrap_or_default();
+        found.iter().any(|c| c == "ZPATH") && found.iter().any(|c| c == "ZCUSTOMLABEL")
+    })
+}
 ```
 
-The `LIKE` escape needs `ESCAPE '\'` in the query; append `ESCAPE '\\'` after `?2` in the query string.
-Add `pub mod titles;` to `voice_memos/mod.rs`.
+The `LIKE` pattern escapes the escape character itself as well as `%` and `_`, and the query names `\` as
+that character, so a file name is matched only as itself. A live side file that is absent leaves its copy
+truncated to zero length, which is what SQLite expects beside a database with no journal.
+
+In `crates/vpt-adapters/src/voice_memos/store.rs`, the store gains its titles:
+
+```rust
+use super::titles::TitleCopy;
+use std::cell::OnceCell;
+use std::path::PathBuf;
+use vpt_application::ports::TitleLookup;
+
+/// Where the private copy lives and whether this run may refresh it.
+struct Titles {
+    state_dir: PathBuf,
+    refresh: bool,
+    copy: OnceCell<TitleCopy>,
+}
+
+pub struct VoiceMemosStore {
+    recordings: RootDir,
+    titles: Option<Titles>,
+}
+```
+
+with `open` setting `titles: None`, this builder:
+
+```rust
+    /// Read titles from the private copy below `state_dir`, refreshing it on
+    /// first use when `refresh` is set; a dry run passes `false`.
+    pub fn with_titles(mut self, state_dir: PathBuf, refresh: bool) -> VoiceMemosStore {
+        self.titles = Some(Titles { state_dir, refresh, copy: OnceCell::new() });
+        self
+    }
+```
+
+and the port method in `impl RecorderStore for VoiceMemosStore`:
+
+```rust
+    fn title(&self, file_name: &str) -> TitleLookup {
+        let Some(titles) = &self.titles else {
+            return TitleLookup::Unavailable;
+        };
+        let copy = titles.copy.get_or_init(|| {
+            let container = self.recordings.path().parent().unwrap_or(self.recordings.path());
+            if titles.refresh { TitleCopy::refresh(container, &titles.state_dir) } else { TitleCopy::existing(&titles.state_dir) }
+        });
+        copy.title(file_name)
+    }
+```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters voice_memos`
 
-Expected: all PASS.
+Expected: the 8 store tests and the 9 title tests PASS. Run
+`cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/vpt-adapters
+git add crates
 SKIP_AI_COMMIT=1 git commit -m "feat(source): titles from a private copy of the Voice Memos database"
 ```
 
