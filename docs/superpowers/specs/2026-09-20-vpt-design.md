@@ -346,7 +346,9 @@ The database, `CloudRecordings.db` beside `Recordings/`, is used for exactly one
 removed at the end of the sweep including on the error path. The live database is never opened, because a
 read-only open still lets SQLite create journal files inside Apple's directory. A copy that fails, a
 schema that has changed, or a join that finds no row yields `title_source = "unavailable"` and the
-recording is ingested untitled. `[source] read_titles = false` skips the database entirely.
+recording is ingested untitled. `[source] read_titles = false` skips the database entirely. The database
+supplies the title and nothing else: duration and ingestion eligibility come from the audio container
+alone, and nothing read from the database ever defers or refuses a recording.
 
 ### 5.2 The sweep
 
@@ -366,9 +368,6 @@ For each candidate, in this order, cheapest first:
    loses it). About forty lines, no audio library.
 1. Require the file at rest: mtime at least `[source] quiet_period_secs` (default 30) in the past, and
    for an entry deferred on an earlier sweep, size unchanged since that sweep.
-1. Cross-check, when the database copy was readable: `ZLOCALDURATION` against the container's own
-   duration, and `ZDURATION` against `ZLOCALDURATION`, tolerance 0.25 s. A mismatch defers with reason
-   `duration`. This is a check, never the primary gate.
 1. Hash, derive the identity, clone into the `audio` store, set mode 0600, insert the recording row, emit
    the record on stdout.
 
@@ -1302,9 +1301,9 @@ What the tests use instead of the world:
 - **A fake recorder store.** A fixture directory built by the test: the wholeness gate is tested over
   bytes the test assembles (`ftyp`, `mdat`, `moov` with an `mvhd` creation time, and the truncated and
   `moov`-less variants); the sweep is tested over a directory holding those files, the four Apple
-  subdirectories, a `.waveform` sidecar, and a fixture `CloudRecordings.db` with the `ZCUSTOMLABEL`,
-  `ZPATH`, `ZDURATION` and `ZLOCALDURATION` columns plus a `-wal`. `SF_DATALESS` is tested through the
-  port with a fake that reports the flag, never by setting it on disk.
+  subdirectories, a `.waveform` sidecar, and a fixture `CloudRecordings.db` with the `ZCUSTOMLABEL` and
+  `ZPATH` columns plus a `-wal`. `SF_DATALESS` is tested through the port with a fake that reports the
+  flag, never by setting it on disk.
 - **A fake helper.** The same dev-tools binary answers `transcribe`, `notify` and `trash` with recorded
   documents, so `desktop` notify and retention are tested without posting or moving anything.
 - **A fixed clock**, an **in-memory ledger** that runs the same contract suite as the SQLite one, and
