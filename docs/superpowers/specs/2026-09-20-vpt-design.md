@@ -368,25 +368,38 @@ validates the note's identity and markers, reads its current bytes and renders t
 them, so operator content outside the regions is preserved and the digest of those current bytes is the
 expected previous digest. The artifact is then rendered from committed state, written to a temporary name
 in its store, synced and renamed into place, the containing directory is synced, and the dirty entry is
-cleared. The next mutating command repairs unfinished publications before new work: a target already
-carrying the intended digest is a completed publication and its entry is cleared; a target holding the
-expected previous bytes, or absent when expected absent, is published over; any other bytes are refused
-(exit 3 `target_modified`) rather than overwritten. Read-only commands never repair.
+cleared. The next mutating command repairs unfinished publications, and reconciles pending retention
+intents (section 4.5), before new work: a target already carrying the intended digest is a completed
+publication and its entry is cleared; a target holding the expected previous bytes, or absent when
+expected absent, is published over; any other bytes are refused (exit 3 `target_modified`) rather than
+overwritten. Read-only commands never repair.
 
 ### 4.5 Retention
 
 Off by default. When `[retention] enabled = true`, each store has one hold time (`[retention.hold]`, a
 duration string such as `90d`, per store key, `0` meaning never expire), measured from a file's own
-mtime. `vpt retention run` (and `vpt run`, when retention is enabled) moves every file in a store older
-than its hold to the system Trash through the helper, one call per file, and prints one line per moved
-file plus a summary; `--json` prints the list. `--dry-run` prints the same list and moves nothing.
+mtime. `vpt retention run` (and `vpt run`, when retention is enabled) moves every expired artifact in a
+store to the system Trash through the helper, one call per file, and prints one line per moved file plus
+a summary; `--json` prints the list. `--dry-run` prints the same list and moves nothing.
 
-Four rules:
+Five rules:
 
-1. A hold applies to every regular file in its store, current artifacts included: an expired transcript
-   note, analysis note or brief moves, and the ledger records `trashed_at` against that artifact and
-   keeps its pinned path. `vpt run` never recreates an artifact retention moved; `vpt note write <id>` or
+1. Retention considers only files the ledger records as vpt's own: an audio clone, an engine output, a
+   transcript or analysis note, a brief, a private report or a released copy, current artifacts included.
+   Before a move it verifies that the path still identifies that artifact (the `vptRecording` or
+   `vptOccasion` of a note or brief, the recorded digest of every other file); an untracked regular file
+   in a store and a path now occupied by another artifact are kept and reported under `kept` with the
+   reason. An expired artifact moves, and the ledger records `trashed_at` against it and keeps its pinned
+   path. `vpt run` never recreates an artifact retention moved; `vpt note write <id>` or
    `vpt brief <occasion-id>` regenerates it deliberately.
+1. Every move is journaled. Before the helper is invoked the ledger commits an intent naming the
+   artifact, its pinned path and the identity or digest expected there, and automatic regeneration of
+   that artifact is prohibited while the intent is pending; on success the same command commits
+   `trashed_at` and completes the intent. After a restart or an unknown helper outcome (a deadline, an
+   unreadable reply) the next mutating command reconciles every pending intent before new work: an absent
+   path completes the expiration, an unchanged original may be moved again, and replacement content is a
+   refusal naming the path (exit 3 `retention_target_modified`). A pending or completed intent never
+   triggers automatic regeneration.
 1. The `audio` store is excluded unless `[retention] include_audio = true`, because the clone is the only
    copy once Apple evicts the original; when included, an expired clone moves and the recording's row
    records `audio_trashed_at`.
@@ -1527,7 +1540,8 @@ Refused during a run, the recording or artifact left as it was:
 - residue after redaction (3, `residue`); a byte-identical released duplicate (3, `duplicate`).
 - a released destination inside a private store, the state directory, the config directory or the Voice
   Memos container (3, `private_destination`).
-- retention with the helper absent (3, `no_trash`).
+- retention with the helper absent (3, `no_trash`); a retention target whose content changed since its
+  intent was recorded (3, `retention_target_modified`).
 - an engine, agent or context command exceeding its deadline, exiting non-zero, or answering with a
   document of the wrong schema or major version (1 for engines and the agent; a collector failure
   degrades the brief and is reported).
