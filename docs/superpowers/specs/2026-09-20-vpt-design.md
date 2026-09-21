@@ -1187,15 +1187,17 @@ no socket, resolves no name, reads no credential and writes no file:
 permitted: `--stage transcript|analysis|brief` is refused with exit 3 unless
 `[handoff] allow_private = true`. `--stage released` selects the recording's newest release by creation
 sequence whose file still exists and verifies its digest; no release is exit 2, and a file whose bytes
-changed since release is exit 3 `artifact_changed`. Its `provenance` is the release row's snapshot and
-its `content` the released bytes, never the recording's current transcription or review state, so a later
-re-transcription or flag resolution never relabels an older copy. `content` is text always; the schema
-has no field that can carry audio, and an identifier that resolves to a recording rather than to a
-rendering is refused listing the stages that exist. The note's frontmatter does not cross; a fixed
-declarative header carries the identity, the unresolved count and the derived-copy sentence, with no
-imperative sentence in it. An unreviewed artifact is emitted, labelled, never refused. The header names
-vpt. The function is pure apart from `generated_at`, so the digest is meaningful and a lost copy is
-recoverable by re-running one command.
+changed since release is exit 3 `artifact_changed`. Its `provenance` is the release row's snapshot, and
+its `content` is rendered from the immutable released body: the released file's frontmatter is dropped,
+the fixed declarative header is prepended, and the body follows byte for byte. Neither half is
+reconstructed from the recording's current transcription or review state, so a later re-transcription or
+flag resolution never relabels an older copy. `content` is text always; the schema has no field that can
+carry audio, and an identifier that resolves to a recording rather than to a rendering is refused listing
+the stages that exist. The note's frontmatter does not cross; the fixed declarative header carries the
+identity, the unresolved count (the snapshot's `open_flags` total for a release) and the derived-copy
+sentence, with no imperative sentence in it. An unreviewed artifact is emitted, labelled, never refused.
+The header names vpt. The function is pure apart from `generated_at`, so the digest is meaningful and a
+lost copy is recoverable by re-running one command.
 
 No configuration key and no production source line names Open Notebook's vocabulary: a test greps the
 shipped Rust and Swift sources and the shipped configuration template (documentation, tests and fixtures
