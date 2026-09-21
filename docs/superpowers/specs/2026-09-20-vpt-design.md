@@ -196,7 +196,11 @@ workspace is a trait. `dyn Trait` appears only at the composition root in `vpt`.
 | 3 Vault note           | render, managed block, tag gate, relations, slug | `WriteNote`, `Path`                        | `Stores`, `Ledger`, `KnownTags`                           |
 | 4 Synthesis and extras | verify-note grounding, brief selector, redaction | `Synthesize`, `Brief`, `Redact`, `Handoff` | `AgentCommand`, `ContextSource`, `Stores`, `Ledger`       |
 
-`vpt run` composes the use cases in stage order for every recording that is new since the last run.
+`vpt run` composes the use cases in stage order. Each stage of a recording is `pending`, `succeeded`,
+`failed`, `disabled` or `expired`; success is recorded only after the stage's artifacts commit. A run
+selects every recording with an enabled stage that is `pending` or `failed` and resumes from its earliest
+such stage, so a transient failure is retried on the next run; a `disabled` stage (off in config) and an
+`expired` one (retention moved its artifact) are never retried by `run`.
 
 ### 3.4 The macOS helper
 
@@ -293,7 +297,10 @@ or trimmed in Voice Memos has different bytes and becomes a new recording beside
 follows an edit.
 
 The ledger records the capture instant in UTC as well, with its offset, so the local form is derivable
-and the UTC form is unambiguous across a daylight-saving transition.
+and the UTC form is unambiguous across a daylight-saving transition. Lookup is by content digest first: a
+sweep that derives a digest already in the ledger reuses that recording's identity and pinned paths
+whatever the machine's zone is now, so a change of time zone never mints a second identity for known
+bytes. The digest is unique in the ledger.
 
 Notes are named `{date}-{slug}-{hash8}.md`, for example `2026-08-24-invoice-call-4f3ab19c.md`: the
 capture date, a slug from the Voice Memos title, and the first eight hexadecimal characters of the
@@ -313,17 +320,30 @@ to prefers a transactional store for multi-record state.
 The repositories below, one SQLite type implementing all of them, plus an in-memory implementation that
 runs the same contract tests:
 
-| Repository             | Rows                                                                                                                                                                                             |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `seen`                 | per source path: filename, size, mtime, flags, first seen, last seen, deferral count and reason, `source_gone_at`                                                                                |
-| `recordings`           | per identity: source path, hash, captured_at (UTC with offset), duration, title, title_source, ingested_at, stage, note paths, audio path, engines, language, `open_flags`, `filed_by` per stage |
-| `flags`                | per flag: recording, identifier, shape (lexical or diagnostic), class, occurrence ranges, record text, alternative text, confidence, state, resolution text, resolved_at                         |
-| `occasions`            | per occasion: identity, source (`manual`, `dam`, `google`), at, duration, title, participants, brief path, briefed_at                                                                            |
-| `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                     |
-| `releases`             | per released copy: recording, source stage, absolute destination, content digest, source-artifact digest, creation sequence, report path                                                         |
+| Repository             | Rows                                                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seen`                 | per source path: filename, size, mtime, flags, first seen, last seen, deferral count and reason, `source_gone_at`                                                                                             |
+| `recordings`           | per identity: source path, digest (unique), captured_at (UTC with offset), duration, title, title_source, ingested_at, stage states, note paths, audio path, engines, language, `open_flags`, `diagnostics`   |
+| `transcripts`          | per recording: the accepted transcript of record, segments and word timings, with the engine that produced it                                                                                                 |
+| `proposals`            | per recording: the accepted `Proposal` (summary, actions, tags, relations) with its source digest                                                                                                             |
+| `flags`                | per flag: recording, identifier, shape (lexical or diagnostic), class, occurrence ranges, record text, alternative text, confidence, state, resolution text, resolved_at                                      |
+| `occasions`            | per occasion: identity, provider key (unique), source (`manual`, `dam`, `google`), at, duration, title, participants, tags, the assembled pack with its source identities and digests, brief path, briefed_at |
+| `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                                  |
+| `releases`             | per released copy: recording, source stage, absolute destination, content digest, source-artifact digest, creation sequence, report path                                                                      |
 
-`vpt show <id> --json` prints a recording's full record; `vpt list --json` prints the recordings table.
-Nothing is stored twice: a note carries what a reader needs and the ledger carries the rest.
+The ledger holds the render inputs: the accepted transcript, the accepted proposal and each assembled
+brief pack commit before the artifact they render is published, and they survive the retention of raw
+engine outputs, so a note can always be regenerated from the ledger. A note is a rendering of that state
+and `vpt note write` reads nothing else. `vpt show <id> --json` prints a recording's full record;
+`vpt list --json` prints the recordings table.
+
+Every mutating command takes one advisory lock on `<state_dir>/write.lock` (`flock`, close on exec),
+waiting at most five seconds and exiting 1 when it cannot; a read-only verb takes none. A mutation
+commits its authoritative rows together with a dirty entry per artifact it must publish; the artifact is
+then rendered from committed state, written to a temporary name in its store, synced and renamed into
+place, and its dirty entry cleared. The next mutating command repairs unfinished publications before new
+work, and refuses (exit 3 `target_modified`) a target whose bytes are not what the ledger last published
+rather than overwriting it. Read-only commands never repair.
 
 ### 4.5 Retention
 
@@ -862,8 +882,11 @@ vpt occasions [--json]
 An occasion has an identity, `<local date and time>-<12 hex>`, the hash over a canonical key that is
 exactly one of: provider-anchored (`dam` plus the object id, or `google` plus the calendar id and the
 event or occurrence id), or manual (the RFC 3339 start plus the sanitized title). A provider occasion
-keeps its identity when its title changes; a manual one is reproducible from what was typed. Re-running a
-brief rewrites one file rather than creating a second.
+keeps its identity when its title changes; a manual one is reproducible from what was typed. A provider
+occasion is looked up by its canonical provider key, unique in the ledger, before an identity is derived,
+so a rescheduled event keeps its identity and its file. Re-running a brief rewrites one file rather than
+creating a second. A brief's file is named `{occasion-date}-{slug}-{hash8}.md` from the occasion's own
+date, sanitized title and identity hash, pinned at first write.
 
 Selection is four exact selectors over confirmed data, capped at `[brief] max_notes` (default 12),
 ordered by selector rank then capture time newest first, the remainder counted and reported:
