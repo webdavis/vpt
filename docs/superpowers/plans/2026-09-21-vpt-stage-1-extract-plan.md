@@ -923,7 +923,7 @@ ______________________________________________________________________
 - Modify: `crates/vpt-protocol/src/lib.rs`
 - Create: `crates/vpt/src/cli/output.rs`
 - Modify: `crates/vpt/src/cli/mod.rs`, `crates/vpt/src/lib.rs`
-- Test: `crates/vpt/tests/usage.rs`
+- Test: `crates/vpt/tests/usage.rs` (gains one test)
 
 **Interfaces:**
 
@@ -931,18 +931,32 @@ ______________________________________________________________________
 
 - Produces:
   `vpt_protocol::result::document(command: &str, body: serde_json::Value) -> serde_json::Value`;
-  `vpt_protocol::error::{ErrorKind, ErrorDocument, Check}` with
-  `ErrorDocument::new(kind: ErrorKind, message: impl Into<String>) -> ErrorDocument`, builder methods
-  `.rule(&str)`, `.ids(Vec<String>)`, `.completed(Vec<String>)`, `.checks(Vec<Check>)`, and
-  `fn to_json(&self) -> serde_json::Value`; `ErrorKind::exit_code(&self) -> i32`;
-  `vpt::cli::output::{Outcome, emit}` where
-  `Outcome::Success { document: serde_json::Value, human: String }` and
-  `Outcome::Failure(ErrorDocument)`, and `emit(outcome: Outcome, json: bool) -> i32` writes stdout or
-  stderr and returns the exit code.
+  `vpt_protocol::error::ErrorKind::{Refused, Usage, Config, Engine, Helper, Command, Store, Ledger}` with
+  `ErrorKind::exit_code(self) -> i32`; `Check { pub name: String, pub ok: bool, pub detail: String }`
+  (serde `Serialize`);
+  `ErrorDocument { pub kind: ErrorKind, pub rule: Option<String>, pub message: String,`
+  `pub ids: Vec<String>, pub completed: Vec<String>, pub checks: Option<Vec<Check>> }` with
+  `ErrorDocument::new(kind: ErrorKind, message: impl Into<String>) -> ErrorDocument`, the builder methods
+  `rule(self, rule: &str) -> Self`, `ids(self, ids: Vec<String>) -> Self`,
+  `completed(self, completed: Vec<String>) -> Self`, `checks(self, checks: Vec<Check>) -> Self`, and
+  `exit_code(&self) -> i32`, `to_json(&self) -> serde_json::Value`;
+  `cli::output::Outcome::{Success { document: serde_json::Value, human: String },`
+  `Failure(ErrorDocument)}` and `emit(outcome: Outcome, json: bool) -> i32`, which writes stdout or
+  stderr and returns the exit code (a stdout that cannot be written is a `Store` failure, exit 1).
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-protocol/src/error.rs` test section (write the module skeleton with only the test first):
+`crates/vpt-protocol/src/lib.rs` declares both modules before the red run, so the test modules are
+compiled and selected:
+
+```rust
+//! The versioned JSON documents vpt reads and writes across a process boundary.
+
+pub mod error;
+pub mod result;
+```
+
+`crates/vpt-protocol/src/error.rs` starts as its test module alone (Step 3 adds the code above it):
 
 ```rust
 #[cfg(test)]
@@ -992,7 +1006,7 @@ mod tests {
 }
 ```
 
-`crates/vpt-protocol/src/result.rs` test section:
+`crates/vpt-protocol/src/result.rs`, likewise the test module alone:
 
 ```rust
 #[cfg(test)]
@@ -1008,26 +1022,10 @@ mod tests {
 }
 ```
 
-`crates/vpt/tests/usage.rs`:
+Append to `crates/vpt/tests/usage.rs`. The existing human-output test of Task 1 remains a regression
+test; this is the new red acceptance test:
 
 ```rust
-mod support;
-
-use support::{Sandbox, run, stderr, stdout};
-
-#[test]
-fn an_unknown_verb_prints_usage_to_stderr_and_exits_2() {
-    let sandbox = Sandbox::new("usage-unknown");
-
-    let output = run(sandbox.vpt().arg("transcode"));
-
-    assert_eq!(output.status.code(), Some(2));
-    assert_eq!(stdout(&output), "");
-    let err = stderr(&output);
-    assert!(err.starts_with("vpt: unknown verb transcode\n"), "{err}");
-    assert!(err.contains("usage: vpt"), "{err}");
-}
-
 #[test]
 fn an_unknown_verb_under_json_is_an_error_document_on_stderr() {
     let sandbox = Sandbox::new("usage-json");
@@ -1047,10 +1045,14 @@ fn an_unknown_verb_under_json_is_an_error_document_on_stderr() {
 
 Run: `cargo test -p vpt-protocol`
 
-Expected: compile error, `ErrorDocument`, `ErrorKind`, `Check` and `document` not found.
+Expected: the build of the two test modules fails with `cannot find` for `ErrorDocument`, `ErrorKind`,
+`Check` and `document`. The modules are compiled and selected; a run that selects zero tests, or that
+succeeds, does not satisfy this step.
 
-Run: `cargo test -p vpt --test usage` Expected:
-`an_unknown_verb_under_json_is_an_error_document_on_stderr` FAILS: stderr holds usage text, not JSON.
+Run: `cargo test -p vpt --test usage`
+
+Expected: `an_unknown_verb_under_json_is_an_error_document_on_stderr` FAILS: stderr holds usage text, not
+JSON. The regression test of Task 1 still passes.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -1188,15 +1190,6 @@ Because key order matters for the assertion, add `preserve_order` to the `serde_
 serde_json = { version = "1.0.151", features = ["preserve_order"] }
 ```
 
-`crates/vpt-protocol/src/lib.rs`:
-
-```rust
-//! The versioned JSON documents vpt reads and writes across a process boundary.
-
-pub mod error;
-pub mod result;
-```
-
 `crates/vpt/src/cli/output.rs`:
 
 ```rust
@@ -1204,7 +1197,7 @@ pub mod result;
 //! on success, one `vpt.error/1` on stderr on failure, and nothing else.
 
 use std::io::Write;
-use vpt_protocol::error::ErrorDocument;
+use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
 pub enum Outcome {
     Success { document: serde_json::Value, human: String },
@@ -1215,7 +1208,9 @@ pub fn emit(outcome: Outcome, json: bool) -> i32 {
     match outcome {
         Outcome::Success { document, human } => {
             let text = if json { format!("{document}\n") } else { human };
-            let _ = std::io::stdout().write_all(text.as_bytes());
+            if std::io::stdout().write_all(text.as_bytes()).is_err() {
+                return emit(Outcome::Failure(ErrorDocument::new(ErrorKind::Store, "standard output write failed")), json);
+            }
             0
         }
         Outcome::Failure(error) => {
@@ -1234,8 +1229,8 @@ pub fn emit(outcome: Outcome, json: bool) -> i32 {
 `crates/vpt/src/cli/mod.rs`:
 
 ```rust
-pub mod args;
-pub mod output;
+pub(crate) mod args;
+pub(crate) mod output;
 ```
 
 `crates/vpt/src/lib.rs` (replace `run` and `dispatch`):
@@ -1243,8 +1238,8 @@ pub mod output;
 ```rust
 //! The command crate: parse, dispatch, emit, exit. No policy lives here.
 
-pub mod cli;
-pub mod commands;
+mod cli;
+mod commands;
 
 use cli::args::{Invocation, USAGE, Verb, parse};
 use cli::output::{Outcome, emit};
