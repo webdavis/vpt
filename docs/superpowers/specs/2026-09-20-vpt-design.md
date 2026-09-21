@@ -392,20 +392,22 @@ Five rules:
 
 1. Retention considers only files the ledger records as vpt's own: an audio clone, an engine output, a
    transcript or analysis note, a brief, a private report or a released copy, current artifacts included.
-   Before a move it verifies that the path still identifies that artifact (the `vptRecording` or
-   `vptOccasion` of a note or brief, the recorded digest of every other file); an untracked regular file
-   in a store and a path now occupied by another artifact are kept and reported under `kept` with the
-   reason. An expired artifact moves, and the ledger records `trashed_at` against it and keeps its pinned
-   path. `vpt run` never recreates an artifact retention moved; `vpt note write <id>` or
+   Before a move it verifies that the path still identifies that artifact: for a note or brief, its
+   canonical ledger-owned path, its `vptRecording` or `vptOccasion`, its `vptStage` or `vptKind` and its
+   required markers must all identify the selected artifact, the same test `verify-note` applies (section
+   8.2); for every other file, the recorded digest must match. An untracked regular file in a store and a
+   path whose identity, stage or digest names another artifact are kept and reported under `kept` with
+   the reason. An expired artifact moves, and the ledger records `trashed_at` against it and keeps its
+   pinned path. `vpt run` never recreates an artifact retention moved; `vpt note write <id>` or
    `vpt brief <occasion-id>` regenerates it deliberately.
 1. Every move is journaled. Before the helper is invoked the ledger commits an intent naming the
-   artifact, its pinned path and the identity or digest expected there, and automatic regeneration of
-   that artifact is prohibited while the intent is pending; on success the same command commits
-   `trashed_at` and completes the intent. After a restart or an unknown helper outcome (a deadline, an
-   unreadable reply) the next mutating command reconciles every pending intent before new work: an absent
-   path completes the expiration, an unchanged original may be moved again, and replacement content is a
-   refusal naming the path (exit 3 `retention_target_modified`). A pending or completed intent never
-   triggers automatic regeneration.
+   artifact, its pinned path and the identity and stage, or the digest, the validation above found there,
+   and automatic regeneration of that artifact is prohibited while the intent is pending; on success the
+   same command commits `trashed_at` and completes the intent. After a restart or an unknown helper
+   outcome (a deadline, an unreadable reply) the next mutating command reconciles every pending intent
+   before new work: an absent path completes the expiration, an unchanged original may be moved again,
+   and replacement content is a refusal naming the path (exit 3 `retention_target_modified`). A pending
+   or completed intent never triggers automatic regeneration.
 1. The `audio` store is excluded unless `[retention] include_audio = true`, because the clone is the only
    copy once Apple evicts the original; when included, an expired clone moves and the recording's row
    records `audio_trashed_at`.
