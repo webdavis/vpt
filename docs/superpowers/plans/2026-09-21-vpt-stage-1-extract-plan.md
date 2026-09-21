@@ -8503,7 +8503,9 @@ every ingest exit before publication trashes what it owns and nothing else.
 
 - Produces, in `vpt_application::ports` (from the private file `ports/archive.rs`):
   `Staged { pub path: PathBuf, pub digest: Sha256Digest, pub size: u64, pub copy_on_write: bool }`;
-  `ArchiveError::{NoSpace, Sync(String), Escape(PathBuf), Io(String)}`;
+  `ArchiveError::{NoSpace, Sync(String), PlacedUnsynced(PathBuf), Escape(PathBuf), Io(String)}`
+  (`PlacedUnsynced` is Task 18's directory sync failing after the target was placed: no row is recorded
+  and the next sweep recovers the file);
   `StageFailure { pub cause: ArchiveError, pub owned_staging: Option<PathBuf> }` (`owned_staging` is set
   only when this invocation created the staged file; a name that was already taken is never claimed);
   `trait Archive { type Handle; fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>`
@@ -8675,6 +8677,9 @@ pub struct Staged {
 pub enum ArchiveError {
     NoSpace,
     Sync(String),
+    /// The target was placed and then its directory failed to sync: nothing is
+    /// staged any more, no row is recorded, the next sweep recovers the file.
+    PlacedUnsynced(PathBuf),
     /// Below no archive root, nested, or reached through a link: exit 3, `path_escape`.
     Escape(PathBuf),
     Io(String),
@@ -8887,7 +8892,8 @@ there is no link-and-unlink fallback, because nothing in vpt unlinks.
 
 - Produces: `vpt_application::ports::Published::{Placed(PathBuf), Exists(PathBuf)}` and, on `Archive`,
   `fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError>` (sync the
-  staged file, move it to the target without replacing one, sync the directory) and
+  staged file, move it to the target without replacing one, sync the directory; a directory sync that
+  fails after the move is `ArchiveError::PlacedUnsynced(target)`) and
   `fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError>` (an archive file and its directory,
   for duplicate recovery); in `vpt_adapters::archive::publish`,
   `exclusive(root: &RootDir, staged: &Path, target_name: &str) -> Result<Published, ArchiveError>` and
@@ -9018,7 +9024,7 @@ pub fn exclusive(root: &RootDir, staged: &Path, target_name: &str) -> Result<Pub
     if !placed {
         return Ok(Published::Exists(target));
     }
-    root.sync().map_err(|error| ArchiveError::Sync(format!("{error:?}")))?;
+    root.sync().map_err(|_| ArchiveError::PlacedUnsynced(target.clone()))?;
     Ok(Published::Placed(target))
 }
 
