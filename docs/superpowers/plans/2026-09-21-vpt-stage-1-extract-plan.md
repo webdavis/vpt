@@ -3106,6 +3106,238 @@ SKIP_AI_COMMIT=1 git commit -m "feat(config): typed settings and root resolution
 
 ______________________________________________________________________
 
+### Task 5a: Checked access below a root
+
+Spec section 4.1: below a resolved root, a path that traverses a symbolic link in any component, or that
+escapes the root, is refused when it is opened or published, exit 3 `path_escape`. Stage 1 owns that rule
+from its first file operation. Every root is canonical when Task 5 resolves it, so containment reduces to
+two checks this module makes once for every adapter: the path is exactly one normal component below the
+root, and the leaf is opened, created or inspected with no-follow semantics. The ledger, the lock, the
+title copy, the archive, publication and retention all go through it; a ledger row or a journal entry is
+validated here before anything reads, writes or hands its path to the helper.
+
+**Files:**
+
+- Create: `crates/vpt-adapters/src/contained.rs`
+- Modify: `crates/vpt-adapters/src/lib.rs`
+
+**Interfaces:**
+
+- Consumes: nothing.
+
+- Produces, in `vpt_adapters::contained`:
+  `ContainedError::{Escape { root: PathBuf, path: PathBuf }, NotRegular(PathBuf),`
+  `NotADirectory(PathBuf),` `Io { path: PathBuf, kind: String }}`;
+  `leaf_below(root: &Path, path: &Path) -> Result<PathBuf, ContainedError>` (a bare file name or
+  `<root>/<name>`, one normal component, never `.`, `..` or a nested path);
+  `open_below(root: &Path, path: &Path, options: &OpenOptions) -> Result<File, ContainedError>` (the
+  options plus `O_NOFOLLOW` and `O_CLOEXEC`; a link or a non-file at the leaf is `NotRegular`);
+  `create_below(root: &Path, path: &Path, mode: u32) -> Result<File, ContainedError>` (exclusive
+  creation, `O_NOFOLLOW`, an existing name is `Io` with kind `AlreadyExists`);
+  `directory_below(root: &Path, name: &str) -> Result<PathBuf, ContainedError>` (a mode-0700 directory,
+  created when missing; a link or a file there is `NotADirectory`);
+  `regular_below(root: &Path, path: &Path) -> Result<PathBuf, ContainedError>` (an existing regular file,
+  not a link, by `symlink_metadata`).
+
+- [ ] **Step 1: Write the failing tests**
+
+`crates/vpt-adapters/src/lib.rs` gains `pub mod contained;`. `crates/vpt-adapters/src/contained.rs`
+starts as its test module alone:
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn root() -> tempfile::TempDir {
+        let temp = tempfile::tempdir().expect("temp");
+        std::fs::write(temp.path().join("plain.m4a"), b"bytes").expect("plain");
+        std::fs::create_dir(temp.path().join("sub")).expect("sub");
+        std::os::unix::fs::symlink(temp.path().join("plain.m4a"), temp.path().join("link.m4a")).expect("link");
+        std::os::unix::fs::symlink(temp.path().join("sub"), temp.path().join("dirlink")).expect("dir link");
+        temp
+    }
+
+    #[test]
+    fn a_bare_name_or_the_root_joined_with_it_is_the_one_accepted_shape() {
+        let temp = root();
+        let expected = temp.path().join("plain.m4a");
+        assert_eq!(leaf_below(temp.path(), Path::new("plain.m4a")), Ok(expected.clone()));
+        assert_eq!(leaf_below(temp.path(), &expected), Ok(expected));
+    }
+
+    #[test]
+    fn escapes_and_nested_paths_are_refused_naming_root_and_path() {
+        let temp = root();
+        for path in ["..", "../x", "sub/x", ".", "", "/etc/passwd"] {
+            let outcome = leaf_below(temp.path(), Path::new(path));
+            assert!(matches!(outcome, Err(ContainedError::Escape { .. })), "{path}: {outcome:?}");
+        }
+        let elsewhere = temp.path().parent().expect("parent").join("plain.m4a");
+        assert!(matches!(leaf_below(temp.path(), &elsewhere), Err(ContainedError::Escape { .. })));
+    }
+
+    #[test]
+    fn open_below_refuses_a_link_and_a_directory_at_the_leaf() {
+        let temp = root();
+        let read = std::fs::OpenOptions::new().read(true).clone();
+        assert!(open_below(temp.path(), Path::new("plain.m4a"), &read).is_ok());
+        assert_eq!(open_below(temp.path(), Path::new("link.m4a"), &read), Err(ContainedError::NotRegular(temp.path().join("link.m4a"))));
+        assert_eq!(open_below(temp.path(), Path::new("sub"), &read), Err(ContainedError::NotRegular(temp.path().join("sub"))));
+    }
+
+    #[test]
+    fn create_below_is_exclusive_and_sets_the_mode() {
+        let temp = root();
+        let file = create_below(temp.path(), Path::new("new.m4a"), 0o600).expect("created");
+        assert_eq!(file.metadata().expect("meta").permissions().mode() & 0o777, 0o600);
+        let again = create_below(temp.path(), Path::new("new.m4a"), 0o600);
+        assert!(matches!(again, Err(ContainedError::Io { ref kind, .. }) if kind == "entity already exists"), "{again:?}");
+        let over_link = create_below(temp.path(), Path::new("link.m4a"), 0o600);
+        assert!(over_link.is_err());
+        assert_eq!(std::fs::read(temp.path().join("plain.m4a")).expect("untouched"), b"bytes");
+    }
+
+    #[test]
+    fn directory_below_creates_0700_once_and_refuses_a_link_or_a_file() {
+        let temp = root();
+        let made = directory_below(temp.path(), "title-copy").expect("made");
+        assert_eq!(std::fs::metadata(&made).expect("meta").permissions().mode() & 0o777, 0o700);
+        assert_eq!(directory_below(temp.path(), "title-copy"), Ok(made));
+        assert_eq!(directory_below(temp.path(), "dirlink"), Err(ContainedError::NotADirectory(temp.path().join("dirlink"))));
+        assert_eq!(directory_below(temp.path(), "plain.m4a"), Err(ContainedError::NotADirectory(temp.path().join("plain.m4a"))));
+    }
+
+    #[test]
+    fn regular_below_accepts_a_file_and_refuses_a_link_without_following_it() {
+        let temp = root();
+        assert_eq!(regular_below(temp.path(), Path::new("plain.m4a")), Ok(temp.path().join("plain.m4a")));
+        assert_eq!(regular_below(temp.path(), Path::new("link.m4a")), Err(ContainedError::NotRegular(temp.path().join("link.m4a"))));
+        assert!(matches!(regular_below(temp.path(), Path::new("absent.m4a")), Err(ContainedError::Io { .. })));
+    }
+}
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `cargo test -p vpt-adapters contained`
+
+Expected: the build of the `contained::tests` module fails with `cannot find` for `leaf_below`,
+`open_below`, `create_below`, `directory_below`, `regular_below` and `ContainedError`. The module is
+compiled and selected; a run that selects zero tests, or that succeeds, does not satisfy this step.
+
+- [ ] **Step 3: Write the minimal implementation**
+
+`crates/vpt-adapters/src/contained.rs`, above its test module:
+
+```rust
+//! Checked access below a resolved root: exactly one normal component, and a
+//! leaf that is never followed through a symbolic link.
+
+use std::fs::{DirBuilder, File, OpenOptions};
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+use std::path::{Component, Path, PathBuf};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContainedError {
+    Escape { root: PathBuf, path: PathBuf },
+    NotRegular(PathBuf),
+    NotADirectory(PathBuf),
+    Io { path: PathBuf, kind: String },
+}
+
+fn escape(root: &Path, path: &Path) -> ContainedError {
+    ContainedError::Escape { root: root.to_path_buf(), path: path.to_path_buf() }
+}
+
+fn io(path: &Path, error: &std::io::Error) -> ContainedError {
+    ContainedError::Io { path: path.to_path_buf(), kind: error.kind().to_string() }
+}
+
+/// `<root>/<name>` for a bare name, or the path itself when it already is exactly that.
+pub fn leaf_below(root: &Path, path: &Path) -> Result<PathBuf, ContainedError> {
+    let relative = if path.is_absolute() { path.strip_prefix(root).map_err(|_| escape(root, path))? } else { path };
+    let mut components = relative.components();
+    match (components.next(), components.next()) {
+        (Some(Component::Normal(name)), None) if !name.is_empty() => Ok(root.join(name)),
+        _ => Err(escape(root, path)),
+    }
+}
+
+/// Open the leaf with the caller's options plus no-follow; a link or a
+/// non-file at the leaf is refused.
+pub fn open_below(root: &Path, path: &Path, options: &OpenOptions) -> Result<File, ContainedError> {
+    let leaf = leaf_below(root, path)?;
+    let file = options
+        .clone()
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&leaf)
+        .map_err(|error| {
+            if error.raw_os_error() == Some(libc::ELOOP) { ContainedError::NotRegular(leaf.clone()) } else { io(&leaf, &error) }
+        })?;
+    let metadata = file.metadata().map_err(|error| io(&leaf, &error))?;
+    if !metadata.is_file() {
+        return Err(ContainedError::NotRegular(leaf));
+    }
+    Ok(file)
+}
+
+/// Create the leaf exclusively with the given mode; nothing is ever replaced.
+pub fn create_below(root: &Path, path: &Path, mode: u32) -> Result<File, ContainedError> {
+    let leaf = leaf_below(root, path)?;
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(mode)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(&leaf)
+        .map_err(|error| io(&leaf, &error))
+}
+
+/// A private directory at `<root>/<name>`, created when missing.
+pub fn directory_below(root: &Path, name: &str) -> Result<PathBuf, ContainedError> {
+    let leaf = leaf_below(root, Path::new(name))?;
+    match DirBuilder::new().mode(0o700).create(&leaf) {
+        Ok(()) => Ok(leaf),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let metadata = std::fs::symlink_metadata(&leaf).map_err(|error| io(&leaf, &error))?;
+            if metadata.is_dir() && !metadata.file_type().is_symlink() { Ok(leaf) } else { Err(ContainedError::NotADirectory(leaf)) }
+        }
+        Err(error) => Err(io(&leaf, &error)),
+    }
+}
+
+/// An existing regular file at the leaf, judged without following a link.
+pub fn regular_below(root: &Path, path: &Path) -> Result<PathBuf, ContainedError> {
+    let leaf = leaf_below(root, path)?;
+    let metadata = std::fs::symlink_metadata(&leaf).map_err(|error| io(&leaf, &error))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(ContainedError::NotRegular(leaf));
+    }
+    Ok(leaf)
+}
+```
+
+`O_NOFOLLOW` applies to the final component, which is the only component below a canonical root that
+`leaf_below` admits, so the two together cover every symbolic link a path below a root can traverse.
+Every later task maps a `ContainedError` to exit 3, rule `path_escape`, at the composition root.
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `cargo test -p vpt-adapters contained`
+
+Expected: 6 tests PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add crates/vpt-adapters
+SKIP_AI_COMMIT=1 git commit -m "feat(adapters): checked access below a resolved root"
+```
+
+______________________________________________________________________
+
 ### Task 6: `vpt setup`
 
 **Files:**
