@@ -1293,12 +1293,14 @@ ______________________________________________________________________
 
 One authoritative definition of every key (name, kind, default, comment, secret) drives the rendered
 template, the unknown-key refusal and the validator. The loader parses the operator's file, refuses an
-unknown key or a missing `config_version`, and merges the file over the rendered defaults, so every key
-the application reads is present.
+unknown key, an unknown table or a missing `config_version`, and merges the file over the rendered
+defaults, so every key the application reads is present. A parse failure is reported by a fixed sentence,
+never by the parser's own message, because that message can quote the rejected line.
 
 **Files:**
 
 - Create: `crates/vpt-adapters/src/config/mod.rs`, `crates/vpt-adapters/src/config/schema.rs`,
+  `crates/vpt-adapters/src/config/schema/types.rs`, `crates/vpt-adapters/src/config/schema/dynamic.rs`,
   `crates/vpt-adapters/src/config/render.rs`, `crates/vpt-adapters/src/config/load.rs`
 - Modify: `crates/vpt-adapters/src/lib.rs`
 
@@ -1306,26 +1308,61 @@ the application reads is present.
 
 - Consumes: nothing.
 
-- Produces: `config::schema::{Kind, KeySpec, KEYS, DynamicTable, DYNAMIC_TABLES, STORE_KEYS}`;
-  `config::render::template(main_engine: &str, state_dir: &str) -> String`;
-  `config::load::{ConfigError, load_text(text: &str) -> Result<toml::Table, ConfigError>,`
-  `load_file(path: &Path) -> Result<toml::Table, ConfigError>, CONFIG_VERSION}`; `config::load::leaf`
-  helpers `get<'a>(table: &'a toml::Table, path: &str) -> Option<&'a toml::Value>`.
+- Produces, re-exported from `vpt_adapters::config` (the files below `config/` are private modules):
+  `Kind::{Bool, PositiveInt, NonNegativeInt, PositiveInt64, Ratio, RatioAboveZero, Duration,`
+  `Enum(&'static [&'static str]), Text, Secret, TextList, Argv}` with
+  `Kind::expected(self) -> &'static str` (the type name a wrong-type refusal reports);
+  `KeySpec { pub path: &'static str, pub kind: Kind, pub default: &'static str,`
+  `pub comment: &'static str }`; `KEYS: &[KeySpec]`; `STORE_KEYS: &[&str]`;
+  `DynamicTable { pub prefix: &'static str, pub leaves: &'static [(&'static str, Kind)] }`;
+  `DYNAMIC_TABLES: &[DynamicTable]`; `spec_for(path: &str) -> Option<Kind>`;
+  `template(main_engine: &str, state_dir: &str) -> String`; `CONFIG_VERSION: i64`;
+  `ConfigError::{Missing(String), Unreadable { path: String, detail: String }, Unparseable(String),`
+  `MissingVersion, UnsupportedVersion(i64), UnknownKey(String), WrongType { key: String,`
+  `expected: String },` `OutOfRange { key: String, rule: String }}`;
+  `load_text(text: &str) -> Result<toml::Table, ConfigError>`;
+  `load_file(path: &Path) -> Result<toml::Table, ConfigError>`;
+  `get<'a>(table: &'a toml::Table, path: &str) -> Option<&'a toml::Value>`.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-adapters/src/config/load.rs`, test section only:
+Declare every module first so the test modules are compiled and selected by the red run.
+`crates/vpt-adapters/src/lib.rs`:
+
+```rust
+//! Concrete adapters: filesystem, SQLite, processes and configuration.
+
+pub mod config;
+```
+
+`crates/vpt-adapters/src/config/mod.rs`:
+
+```rust
+//! Configuration: one key table, the template rendered from it, the loader
+//! that refuses what the table does not name, and the validator.
+
+mod load;
+mod render;
+mod schema;
+
+pub use load::{CONFIG_VERSION, ConfigError, get, load_file, load_text};
+pub use render::template;
+pub use schema::{DYNAMIC_TABLES, DynamicTable, KEYS, KeySpec, Kind, STORE_KEYS, spec_for};
+```
+
+`crates/vpt-adapters/src/config/schema.rs` starts as its doc line, `//! The configuration key table.`,
+and `crates/vpt-adapters/src/config/load.rs` starts as its test module alone:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::render::template;
+    use crate::config::{KEYS, template};
 
     #[test]
     fn the_rendered_template_loads_and_every_key_of_the_table_is_present() {
         let table = load_text(&template("apple", "~/.local/state/vpt")).expect("template loads");
-        for key in crate::config::schema::KEYS {
+        for key in KEYS {
             assert!(get(&table, key.path).is_some(), "{} missing after load", key.path);
         }
         assert_eq!(get(&table, "engines.main").and_then(|v| v.as_str()), Some("apple"));
@@ -1342,6 +1379,18 @@ mod tests {
     fn an_unknown_key_is_refused_by_its_full_path() {
         let error = load_text("config_version = 1\n[source]\nquiet_period = 90\n").unwrap_err();
         assert_eq!(error, ConfigError::UnknownKey("source.quiet_period".into()));
+    }
+
+    #[test]
+    fn an_unknown_table_is_refused_even_when_empty() {
+        assert_eq!(load_text("config_version = 1\n[unknown]\n").unwrap_err(), ConfigError::UnknownKey("unknown".into()));
+        assert_eq!(load_text("config_version = 1\n[source.extra]\n").unwrap_err(), ConfigError::UnknownKey("source.extra".into()));
+    }
+
+    #[test]
+    fn a_table_where_a_scalar_belongs_is_a_wrong_type() {
+        let error = load_text("config_version = 1\n[source]\nquiet_period_secs = {}\n").unwrap_err();
+        assert_eq!(error, ConfigError::WrongType { key: "source.quiet_period_secs".into(), expected: "integer".into() });
     }
 
     #[test]
@@ -1377,13 +1426,22 @@ mod tests {
     }
 
     #[test]
-    fn unparseable_toml_is_refused() {
-        assert!(matches!(load_text("config_version = \n").unwrap_err(), ConfigError::Unparseable(_)));
+    fn unparseable_toml_is_refused_without_quoting_the_text() {
+        let text = "config_version = 1\n[context.google]\nclient_secret = \"canary-7Q9x-secret\n";
+        let error = load_text(text).unwrap_err();
+        assert_eq!(error, ConfigError::Unparseable("invalid TOML syntax in configuration".into()));
+        assert!(!format!("{error:?}").contains("canary"));
+    }
+
+    #[test]
+    fn a_state_path_with_a_quote_and_a_backslash_round_trips_through_the_template() {
+        let table = load_text(&template("apple", "/tmp/say \"hi\"\\now")).expect("loads");
+        assert_eq!(get(&table, "home.state_dir").and_then(|v| v.as_str()), Some("/tmp/say \"hi\"\\now"));
     }
 }
 ```
 
-`crates/vpt-adapters/src/config/render.rs`, test section only:
+`crates/vpt-adapters/src/config/render.rs`, likewise the test module alone:
 
 ```rust
 #[cfg(test)]
@@ -1419,34 +1477,16 @@ mod tests {
 
 Run: `cargo test -p vpt-adapters config`
 
-Expected: compile error: `KEYS`, `template`, `load_text`, `get` and `ConfigError` not found.
+Expected: the build of the two test modules fails with `cannot find` for `KEYS`, `template`, `load_text`,
+`get` and `ConfigError`. The modules are compiled and selected; a run that selects zero tests, or that
+succeeds, does not satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-`crates/vpt-adapters/src/config/mod.rs`:
+`crates/vpt-adapters/src/config/schema/types.rs`:
 
 ```rust
-//! Configuration: one key table, the template rendered from it, the loader
-//! that refuses what the table does not name, and the validator.
-
-pub mod load;
-pub mod render;
-pub mod schema;
-```
-
-`crates/vpt-adapters/src/lib.rs`:
-
-```rust
-//! Concrete adapters: filesystem, SQLite, processes and configuration.
-
-pub mod config;
-```
-
-`crates/vpt-adapters/src/config/schema.rs`:
-
-```rust
-//! The one authoritative definition of every configuration key. The renderer,
-//! the loader, the validator and the settings reader all read this table.
+//! The kinds a key can have, and the shape of one key's definition.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -1470,6 +1510,20 @@ pub enum Kind {
     Argv,
 }
 
+impl Kind {
+    /// The type name a wrong-type refusal reports.
+    pub fn expected(self) -> &'static str {
+        match self {
+            Kind::Bool => "boolean",
+            Kind::PositiveInt | Kind::NonNegativeInt | Kind::PositiveInt64 => "integer",
+            Kind::Ratio | Kind::RatioAboveZero => "number",
+            Kind::Duration => "duration",
+            Kind::Enum(_) | Kind::Text | Kind::Secret => "string",
+            Kind::TextList | Kind::Argv => "list of strings",
+        }
+    }
+}
+
 pub struct KeySpec {
     pub path: &'static str,
     pub kind: Kind,
@@ -1480,9 +1534,83 @@ pub struct KeySpec {
 pub const STORE_KEYS: &[&str] =
     &["audio", "transcripts", "analysis", "briefs", "engine_outputs", "drafts", "released"];
 
-const fn key(path: &'static str, kind: Kind, default: &'static str, comment: &'static str) -> KeySpec {
+pub(super) const fn key(path: &'static str, kind: Kind, default: &'static str, comment: &'static str) -> KeySpec {
     KeySpec { path, kind, default, comment }
 }
+```
+
+`crates/vpt-adapters/src/config/schema/dynamic.rs`:
+
+```rust
+//! The tables whose middle segment the operator names, and the lookup that
+//! answers what kind a dotted path has.
+
+use super::{KEYS, Kind};
+
+/// `engines.<name>.*` and `engines.by_language.<lang>.*`. The leaf must be one of `leaves`.
+pub struct DynamicTable {
+    pub prefix: &'static str,
+    pub leaves: &'static [(&'static str, Kind)],
+}
+
+pub const DYNAMIC_TABLES: &[DynamicTable] = &[
+    DynamicTable { prefix: "engines.by_language.", leaves: &[("main", Kind::Text), ("checker", Kind::Text)] },
+    DynamicTable {
+        prefix: "engines.",
+        leaves: &[
+            ("kind", Kind::Enum(&["apple", "whisply", "command"])),
+            ("command", Kind::Argv),
+            ("family", Kind::Text),
+            ("local", Kind::Bool),
+            ("device", Kind::Text),
+            ("model", Kind::Text),
+        ],
+    },
+];
+
+pub fn spec_for(path: &str) -> Option<Kind> {
+    if let Some(known) = KEYS.iter().find(|key| key.path == path) {
+        return Some(known.kind);
+    }
+    for table in DYNAMIC_TABLES {
+        if let Some(rest) = path.strip_prefix(table.prefix) {
+            let mut parts = rest.splitn(2, '.');
+            let (Some(name), Some(leaf)) = (parts.next(), parts.next()) else { continue };
+            if name.is_empty() || leaf.contains('.') {
+                continue;
+            }
+            if let Some((_, kind)) = table.leaves.iter().find(|(known, _)| *known == leaf) {
+                return Some(*kind);
+            }
+        }
+    }
+    None
+}
+
+/// Whether a table at `path` is one the schema declares: a prefix of a static
+/// key, a dynamic table's parent, or a dynamic table itself.
+pub fn table_is_declared(path: &str) -> bool {
+    let as_prefix = format!("{path}.");
+    KEYS.iter().any(|key| key.path.starts_with(&as_prefix))
+        || DYNAMIC_TABLES.iter().any(|table| {
+            table.prefix.starts_with(&as_prefix)
+                || path.strip_prefix(table.prefix).is_some_and(|name| !name.is_empty() && !name.contains('.'))
+        })
+}
+```
+
+`crates/vpt-adapters/src/config/schema.rs`:
+
+```rust
+//! The one authoritative definition of every configuration key. The renderer,
+//! the loader, the validator and the settings reader all read this table.
+
+mod dynamic;
+mod types;
+
+pub use dynamic::{DYNAMIC_TABLES, DynamicTable, spec_for, table_is_declared};
+pub use types::{KeySpec, Kind, STORE_KEYS};
+use types::key;
 
 /// Every key of spec section 10, in the order the template renders them.
 pub const KEYS: &[KeySpec] = &[
@@ -1532,16 +1660,16 @@ pub const KEYS: &[KeySpec] = &[
     key("note.obsidian.vault_root", Kind::Text, "\"\"", "the vault's root directory, required by the obsidian profile"),
     key("tags.new_tags", Kind::Enum(&["write", "hold"]), "\"hold\"", "write (automatic) or hold (suggested until confirmed)"),
     key("tags.known_tags_path", Kind::Text, "\"~/.config/vpt/known-tags.txt\"", "the confirmed-tags list"),
-    key("tags.max_per_note", Kind::PositiveInt, "5", "confirmed tags per note"),
-    key("tags.max_suggested", Kind::PositiveInt, "10", "held tags per note"),
+    key("tags.max_per_note", Kind::NonNegativeInt, "5", "confirmed tags per note"),
+    key("tags.max_suggested", Kind::NonNegativeInt, "10", "held tags per note"),
     key("relations.session_gap_minutes", Kind::NonNegativeInt, "60", "continues window"),
     key("relations.max_suggested", Kind::NonNegativeInt, "5", "agent-proposed related links kept per note"),
     key("synthesis.command", Kind::Argv, "[]", "the agent command; empty disables synthesis only"),
     key("synthesis.timeout_secs", Kind::PositiveInt, "600", "the command's deadline"),
     key("synthesis.grounding_window_secs", Kind::PositiveInt, "15", "verify-note's tolerance around a cited span"),
     key("brief.lookback_days", Kind::NonNegativeInt, "180", "how far back selection reaches"),
-    key("brief.max_notes", Kind::PositiveInt, "12", "selection cap"),
-    key("brief.max_spans_per_note", Kind::PositiveInt, "5", "quoted spans per selected note"),
+    key("brief.max_notes", Kind::NonNegativeInt, "12", "selection cap"),
+    key("brief.max_spans_per_note", Kind::NonNegativeInt, "5", "quoted spans per selected note"),
     key("brief.trigger.enabled", Kind::Bool, "false", "the calendar trigger behind --upcoming"),
     key("brief.trigger.lead_time", Kind::Duration, "\"24h\"", "how far ahead --upcoming looks"),
     key("context.type", Kind::Enum(&["none", "dam", "google"]), "\"none\"", "none, dam or google"),
@@ -1588,50 +1716,14 @@ pub const KEYS: &[KeySpec] = &[
     key("retention.hold.drafts", Kind::Duration, "0", "as above"),
     key("retention.hold.released", Kind::Duration, "0", "as above"),
 ];
-
-/// A table whose middle segment the operator names: `engines.<name>.*`,
-/// `engines.by_language.<lang>.*`. The leaf must be one of `leaves`.
-pub struct DynamicTable {
-    pub prefix: &'static str,
-    pub leaves: &'static [(&'static str, Kind)],
-}
-
-pub const DYNAMIC_TABLES: &[DynamicTable] = &[
-    DynamicTable { prefix: "engines.by_language.", leaves: &[("main", Kind::Text), ("checker", Kind::Text)] },
-    DynamicTable {
-        prefix: "engines.",
-        leaves: &[
-            ("kind", Kind::Enum(&["apple", "whisply", "command"])),
-            ("command", Kind::Argv),
-            ("family", Kind::Text),
-            ("local", Kind::Bool),
-            ("device", Kind::Text),
-            ("model", Kind::Text),
-        ],
-    },
-];
-
-pub fn spec_for(path: &str) -> Option<Kind> {
-    if let Some(known) = KEYS.iter().find(|key| key.path == path) {
-        return Some(known.kind);
-    }
-    for table in DYNAMIC_TABLES {
-        if let Some(rest) = path.strip_prefix(table.prefix) {
-            let mut parts = rest.splitn(2, '.');
-            let (Some(name), Some(leaf)) = (parts.next(), parts.next()) else { continue };
-            if name.is_empty() || leaf.contains('.') {
-                continue;
-            }
-            if let Some((_, kind)) = table.leaves.iter().find(|(known, _)| *known == leaf) {
-                return Some(*kind);
-            }
-        }
-    }
-    None
-}
 ```
 
-`crates/vpt-adapters/src/config/render.rs`:
+The four counts `tags.max_per_note`, `tags.max_suggested`, `brief.max_notes` and
+`brief.max_spans_per_note` are `NonNegativeInt`: spec section 10 makes a count non-negative, so zero is a
+valid value for each. `config/schema.rs` formats to about 470 lines with rustfmt; the two child modules
+keep it under the 500-line cap.
+
+`crates/vpt-adapters/src/config/render.rs`, above its test module:
 
 ```rust
 //! The file `vpt setup` writes: every key at its default, one comment each.
@@ -1644,18 +1736,26 @@ pub fn template(main_engine: &str, state_dir: &str) -> String {
     for key in KEYS {
         let (table, leaf) = split_table(key.path);
         if table != current_table {
-            text.push_str(&format!("\n[{table}]\n"));
+            if !table.is_empty() {
+                text.push_str(&format!("\n[{table}]\n"));
+            }
             current_table = table.to_owned();
         }
         let value = match key.path {
-            "engines.main" => format!("\"{main_engine}\""),
-            "home.state_dir" => format!("\"{state_dir}\""),
+            "engines.main" => quoted(main_engine),
+            "home.state_dir" => quoted(state_dir),
             _ => key.default.to_owned(),
         };
         let secret = if key.kind == Kind::Secret { " (secret)" } else { "" };
         text.push_str(&format!("{leaf} = {value} # {}{secret}\n", key.comment));
     }
     text
+}
+
+/// A TOML basic string. JSON string escaping is a subset of TOML's, except
+/// that TOML refuses a raw DEL character, which JSON leaves unescaped.
+fn quoted(value: &str) -> String {
+    serde_json::to_string(value).expect("strings serialize").replace('\u{7f}', "\\u007f")
 }
 
 fn split_table(path: &str) -> (&str, &str) {
@@ -1666,33 +1766,22 @@ fn split_table(path: &str) -> (&str, &str) {
 }
 ```
 
-The `config_version` line renders first with an empty table name; `template` therefore emits `\n[]\n` for
-it unless the first table is skipped. Handle it in the loop: when `table` is empty, push no header.
-Replace the `if table != current_table` block with:
+`config_version` sits in the empty table, which renders no header, so the text starts with
+`config_version = 1`.
 
-```rust
-        if table != current_table {
-            if !table.is_empty() {
-                text.push_str(&format!("\n[{table}]\n"));
-            }
-            current_table = table.to_owned();
-        }
-```
-
-and trim the leading newline so the text starts with `config_version = 1`.
-
-`crates/vpt-adapters/src/config/load.rs`:
+`crates/vpt-adapters/src/config/load.rs`, above its test module:
 
 ```rust
 //! Read the operator's file, refuse what the key table does not name, and merge
 //! it over the rendered defaults so every key is present afterwards.
 
 use super::render::template;
-use super::schema::{STORE_KEYS, spec_for};
+use super::schema::{STORE_KEYS, spec_for, table_is_declared};
 use std::path::Path;
 use toml::{Table, Value};
 
 pub const CONFIG_VERSION: i64 = 1;
+const UNPARSEABLE: &str = "invalid TOML syntax in configuration";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ConfigError {
@@ -1713,14 +1802,14 @@ pub fn load_file(path: &Path) -> Result<Table, ConfigError> {
             return Err(ConfigError::Missing(path.display().to_string()));
         }
         Err(error) => {
-            return Err(ConfigError::Unreadable { path: path.display().to_string(), detail: error.to_string() });
+            return Err(ConfigError::Unreadable { path: path.display().to_string(), detail: error.kind().to_string() });
         }
     };
     load_text(&text)
 }
 
 pub fn load_text(text: &str) -> Result<Table, ConfigError> {
-    let operator: Table = text.parse().map_err(|error: toml::de::Error| ConfigError::Unparseable(error.to_string()))?;
+    let operator: Table = text.parse().map_err(|_: toml::de::Error| ConfigError::Unparseable(UNPARSEABLE.into()))?;
     match operator.get("config_version") {
         None => return Err(ConfigError::MissingVersion),
         Some(Value::Integer(CONFIG_VERSION)) => {}
@@ -1730,7 +1819,7 @@ pub fn load_text(text: &str) -> Result<Table, ConfigError> {
     refuse_unknown_keys(&operator, "")?;
     let mut merged: Table = template("apple", "~/.local/state/vpt")
         .parse()
-        .map_err(|error: toml::de::Error| ConfigError::Unparseable(error.to_string()))?;
+        .map_err(|_: toml::de::Error| ConfigError::Unparseable(UNPARSEABLE.into()))?;
     merge_into(&mut merged, operator);
     Ok(merged)
 }
@@ -1739,10 +1828,17 @@ fn refuse_unknown_keys(table: &Table, prefix: &str) -> Result<(), ConfigError> {
     for (name, value) in table {
         let path = if prefix.is_empty() { name.clone() } else { format!("{prefix}.{name}") };
         match value {
-            Value::Table(inner) => refuse_unknown_keys(inner, &path)?,
+            Value::Table(inner) => {
+                if let Some(kind) = spec_for(&path) {
+                    return Err(ConfigError::WrongType { key: path, expected: kind.expected().into() });
+                }
+                if !table_is_declared(&path) {
+                    return Err(ConfigError::UnknownKey(path));
+                }
+                refuse_unknown_keys(inner, &path)?;
+            }
             _ => {
-                if path.starts_with("retention.hold.") {
-                    let store = &path["retention.hold.".len()..];
+                if let Some(store) = path.strip_prefix("retention.hold.") {
                     if !STORE_KEYS.contains(&store) {
                         return Err(ConfigError::UnknownKey(path));
                     }
@@ -1768,20 +1864,6 @@ fn merge_into(base: &mut Table, over: Table) {
 
 /// Read a leaf by its dotted path.
 pub fn get<'a>(table: &'a Table, path: &str) -> Option<&'a Value> {
-    let mut current: &Value = &Value::Table(table.clone());
-    let mut owned;
-    for segment in path.split('.') {
-        owned = current.get(segment)?.clone();
-        current = &owned;
-    }
-    Some(current)
-}
-```
-
-The `get` above clones on every step; replace it with the borrowing form, which is what ships:
-
-```rust
-pub fn get<'a>(table: &'a Table, path: &str) -> Option<&'a Value> {
     let mut segments = path.split('.');
     let first = segments.next()?;
     let mut current = table.get(first)?;
@@ -1792,11 +1874,14 @@ pub fn get<'a>(table: &'a Table, path: &str) -> Option<&'a Value> {
 }
 ```
 
+The unparseable message is the same fixed sentence on both parse sites, and `Unreadable` carries the
+error kind rather than the operating system's text, so no refusal quotes the configuration.
+
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters config`
 
-Expected: 12 tests PASS.
+Expected: 15 tests PASS.
 
 - [ ] **Step 5: Commit**
 
