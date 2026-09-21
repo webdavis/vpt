@@ -119,7 +119,7 @@ removal mechanism beyond the opt-in retention of G12; the operator runs applies.
 One Cargo workspace, `Cargo.lock` committed, built `--locked`:
 
 ```
-crates/vpt-domain        pure policy, no I/O, std only
+crates/vpt-domain        pure policy, no I/O
 crates/vpt-application   use cases and the ports they own
 crates/vpt-protocol      the versioned documents vpt reads and writes across a process boundary
 crates/vpt-adapters      everything concrete: filesystem, SQLite, processes, HTTP, TOML
@@ -141,7 +141,10 @@ spawning, macOS APIs, vendor APIs and terminal output. It holds: the recording i
 wholeness gate over a byte slice, the normalizer, the aligner, the flag classifier and ranking, the
 readability pass, the slug sanitizer, the note renderer and the managed-block rewriter over strings, the
 tag gate, the relation rules, the brief selector and pack, the redaction pass and residue scan, the
-retention decision, and every value type. Each is a total function of its arguments.
+retention decision, and every value type. Each is a total function of its arguments. The crate has no
+infrastructure dependency; a small crate for Unicode normalization form KC and full case folding is a
+permitted domain primitive, and one normalization policy serves alignment, terms, tags and slugs, its
+Unicode version pinned by the lockfile.
 
 `vpt-application` holds one concrete use case per verb (`Setup`, `Run`, `Ingest`, `Transcribe`,
 `WriteNote`, `Path`, `Synthesize`, `Review`, `Confirm`, `Brief`, `Redact`, `Handoff`, `Storage`,
@@ -153,28 +156,33 @@ major version: `vpt.engine/1` (an engine's transcript), `vpt.event/1` (a notific
 (an agent's synthesis), `vpt.context/1` (calendar and task context), `vpt.brief/1`, `vpt.handoff/1`, and
 the `--json` output and error documents. It is plain serde over JSON. An unknown major version is refused
 with the version named; an unknown additive field is accepted and named in diagnostics; byte, depth,
-array-length and text-length limits are enforced at this boundary (65,536 bytes per document, depth 8,
-256 items per array, 65,536 characters per text value, except `vpt.engine/1` and `vpt.proposal/1`, whose
-`segments` and `lines` arrays are bounded at 65,536 items because a 52-minute recording exceeds 256
-segments).
+array-length and text-length limits are enforced while a document is read, before it is fully allocated:
+16,777,216 bytes for `vpt.engine/1`, 1,048,576 bytes for `vpt.proposal/1` and 65,536 bytes for every
+other incoming document; depth 8; 65,536 characters per text value; engine `segments` and `words` and
+proposal `summary` and `actions` allow at most 65,536 entries, every other array 256.
+
+Application ports exchange domain values (`Transcript`, `Notification`, `Proposal`, `ContextSnapshot`,
+`Record`), never a protocol document: an adapter validates an incoming wire document and converts it into
+the domain value, and serializes an outgoing value into its protocol document, so `vpt-application` does
+not depend on `vpt-protocol`.
 
 `vpt-adapters` is organized by capability, one module each, never one broad module.
 
 ### 3.2 Ports, and the adapter behind each
 
-| Port (in vpt-application) | What a use case asks of it                                                                    | Adapters (in vpt-adapters)                                                                         |
-| ------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `RecorderStore`           | list candidate recordings with size, mtime, flags; read bytes; read a title by path           | `voice_memos` (Apple's group container plus a private copy of its database); `fixture_dir` (tests) |
-| `Archive`                 | clone bytes to the audio store with `EEXIST` semantics                                        | `clonefile` (the raw syscall, byte-copy fallback on `EXDEV`)                                       |
-| `Engine`                  | transcribe an audio path into a `vpt.engine/1` document; report its model family and locality | `apple` (the Swift helper), `whisply`, `command`                                                   |
-| `Clock`                   | now, in UTC and in the local zone                                                             | system clock; fixed clock in tests                                                                 |
-| `Ledger`                  | the seen, recordings, flags, occasions, and tags and relations repositories                   | `sqlite` (one database, write-ahead log, busy timeout); in-memory (tests)                          |
-| `Stores`                  | resolve a store path; write a file atomically; read; list; walk up for a git working tree     | `filesystem`                                                                                       |
-| `Trash`                   | move a path to the system Trash                                                               | `macos_helper` (`vpt-macos trash`)                                                                 |
-| `Notifier`                | deliver a `vpt.event/1`                                                                       | `desktop` (`vpt-macos notify`), `command` (argv tokens plus stdin), `off`                          |
-| `ContextSource`           | occasions and tasks for a window and a selection                                              | `dam` (spawns `dam ls --json --no-pull`), `google` (native HTTPS, read-only scope), `none`         |
-| `AgentCommand`            | run the configured synthesis command over a transcript and read a `vpt.proposal/1` back       | `command`                                                                                          |
-| `KnownTerms`, `KnownTags` | read and append the two confirmation lists                                                    | `filesystem`                                                                                       |
+| Port (in vpt-application) | What a use case asks of it                                                                | Adapters (in vpt-adapters)                                                                         |
+| ------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `RecorderStore`           | list candidate recordings with size, mtime, flags; read bytes; read a title by path       | `voice_memos` (Apple's group container plus a private copy of its database); `fixture_dir` (tests) |
+| `Archive`                 | clone bytes to the audio store with `EEXIST` semantics                                    | `clonefile` (the raw syscall, byte-copy fallback on `EXDEV`)                                       |
+| `Engine`                  | transcribe an audio path into a `Transcript`; report its model family and locality        | `apple` (the Swift helper), `whisply`, `command`                                                   |
+| `Clock`                   | now, in UTC and in the local zone                                                         | system clock; fixed clock in tests                                                                 |
+| `Ledger`                  | the seen, recordings, flags, occasions, and tags and relations repositories               | `sqlite` (one database, write-ahead log, busy timeout); in-memory (tests)                          |
+| `Stores`                  | resolve a store path; write a file atomically; read; list; walk up for a git working tree | `filesystem`                                                                                       |
+| `Trash`                   | move a path to the system Trash                                                           | `macos_helper` (`vpt-macos trash`)                                                                 |
+| `Notifier`                | deliver a `Notification`                                                                  | `desktop` (`vpt-macos notify`), `command` (argv tokens plus stdin), `off`                          |
+| `ContextSource`           | a `ContextSnapshot` (occasions and tasks) for a window and a selection                    | `dam` (spawns `dam ls --json --no-pull`), `google` (native HTTPS, read-only scope), `none`         |
+| `AgentCommand`            | run the configured synthesis command over a transcript and read a `Proposal` back         | `command`                                                                                          |
+| `KnownTerms`, `KnownTags` | read and append the two confirmation lists                                                | `filesystem`                                                                                       |
 
 Every port is a trait because each is an external capability with a fake in tests. Nothing else in the
 workspace is a trait. `dyn Trait` appears only at the composition root in `vpt`.
@@ -488,6 +496,12 @@ whatever a `command` engine declares in its config (`family = "..."`, required).
   `family` and `local`. Its output supplies text only: it takes part in no disagreement, confidence or
   agreed-unverified classification, and when it is the transcript of record no lexical flag is generated
   for that recording (diagnostic flags still are). The config comment says so at the key.
+
+An engine document is accepted only when its text is non-empty; every time is finite and
+`0 <= start <= end <= duration` of the recording; segments are in non-decreasing start order; each word
+range lies inside its segment; each confidence, when present, is in `[0, 1]`; and the document's engine
+name, family and locality match the adapter's configuration. A violation is an engine failure, and an
+invalid document never replaces accepted state.
 
 Engines run sequentially. Each has a wall-clock deadline, `[engines] timeout_secs` (default 1800); a
 deadline kill is an engine failure. An empty transcript (zero words) is an engine failure. A run in which
