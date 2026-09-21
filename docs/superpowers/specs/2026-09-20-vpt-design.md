@@ -303,7 +303,7 @@ same contract tests:
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `seen`                 | per source path: filename, size, mtime, flags, first seen, last seen, deferral count and reason, `source_gone_at`                                                                                |
 | `recordings`           | per identity: source path, hash, captured_at (UTC with offset), duration, title, title_source, ingested_at, stage, note paths, audio path, engines, language, `open_flags`, `filed_by` per stage |
-| `flags`                | per flag: recording, flag id (class plus time range), class, time range, record text, alternative text, confidence, state, resolution text, resolved_at                                          |
+| `flags`                | per flag: recording, identifier, shape (lexical or diagnostic), class, occurrence ranges, record text, alternative text, confidence, state, resolution text, resolved_at                         |
 | `occasions`            | per occasion: identity, source (`manual`, `dam`, `google`), at, duration, title, participants, brief path, briefed_at                                                                            |
 | `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                     |
 
@@ -477,8 +477,9 @@ whatever a `command` engine declares in its config (`family = "..."`, required).
   family `whisper`, local; with `device = "cpu"` per-word scores are read, with `mlx` they are absent.
 - `command` spawns `[engines.<name>] command` (an argv list) with the tokens `{audio}`, `{language}` and
   `{out_dir}` substituted, reads a `vpt.engine/1` document from its stdout, and carries the declared
-  `family` and `local`. It gets no uncertainty flagging beyond what its document reports; the config
-  comment says so at the key.
+  `family` and `local`. Its output supplies text only: it takes part in no disagreement, confidence or
+  agreed-unverified classification, and when it is the transcript of record no lexical flag is generated
+  for that recording (diagnostic flags still are). The config comment says so at the key.
 
 Engines run sequentially. Each has a wall-clock deadline, `[engines] timeout_secs` (default 1800); a
 deadline kill is an engine failure. An empty transcript (zero words) is an engine failure. A run in which
@@ -505,23 +506,38 @@ Alignment is a Myers-style word diff over the normalized streams. When the edit 
 `[reconcile] max_divergence_ratio` (default 0.35) of the token count, span comparison stops and one
 whole-recording `divergent` flag is raised instead of a span list.
 
-Every surviving difference, and every agreed span in a risk class, becomes one flag of exactly one class,
-decided in this order, which is also the surfaced ranking:
+Flags come in two shapes. A lexical flag covers one or more word ranges of the transcript. A diagnostic
+flag covers the whole recording and has no range: `single-engine`, `language-mismatch` and `divergent`.
+Diagnostic flags appear in `vpt review`, are counted separately (`diagnostics` in events,
+`vptDiagnostics` in frontmatter), and overlap no span, so they neither hold back the readability pass nor
+omit text from a redacted copy. `divergent` additionally marks the transcript unverified for consumers (a
+brief and a handoff report `reviewed: false`) while confidence and risk-class classification continue
+over the record engine's text.
 
-| Rank | Class               | Rule                                                                                                                        | Surfaced          |
-| ---- | ------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| 0    | `formatting`        | one side is the other plus insertions from `{the, of, a, an, and, to, at, is}`, or an ordinal suffix                        | no, recorded only |
-| 1    | `numeric`           | either side holds a digit run and the runs differ                                                                           | yes               |
-| 2    | `proper-noun`       | either side's span is capitalized in the original and not sentence-initial                                                  | yes               |
-| 3    | `low-confidence`    | agreed (or single engine) and the record's word confidence is below `[reconcile] confidence_floor` (default 0.35)           | yes               |
-| 4    | `agreed-unverified` | agreed, not low confidence, and the span is a proper noun, number, date, time or money amount, and not in `known-terms.txt` | yes, aggregated   |
-| 5    | `other`             | any other lexical disagreement                                                                                              | yes               |
+Lexical candidates are every disagreement between the two engines, every record word below
+`[reconcile] confidence_floor` (default 0.35), and every agreed or single-engine span in a risk class (a
+proper noun, number, date, time or money amount). Each candidate becomes one flag of exactly one class by
+the first matching rule below, which is also the surfaced ranking; a `command` engine's output is exempt
+as section 6.2 states:
 
-`agreed-unverified` is aggregated by surface form: one flag per distinct string with its occurrence count
-and first timecode. A term present in `known-terms.txt` (whole-token, case-insensitive) never produces an
-`agreed-unverified` flag, and still produces a `numeric` or `proper-noun` flag when the engines disagree
-about it. A flag's identifier is derived from its class and time range, so a re-run preserves existing
-resolutions by identifier and adds only new flags.
+| Rank | Class               | Rule                                                                                                 | Surfaced          |
+| ---- | ------------------- | ---------------------------------------------------------------------------------------------------- | ----------------- |
+| 0    | `formatting`        | one side is the other plus insertions from `{the, of, a, an, and, to, at, is}`, or an ordinal suffix | no, recorded only |
+| 1    | `numeric`           | either side holds a digit run and the runs differ                                                    | yes               |
+| 2    | `proper-noun`       | the engines disagree and either side's span is capitalized in the original and not sentence-initial  | yes               |
+| 3    | `low-confidence`    | no disagreement, and the record's word confidence is below the floor                                 | yes               |
+| 4    | `agreed-unverified` | agreed or single engine, not low confidence, in a risk class, and not in `known-terms.txt`           | yes, aggregated   |
+| 5    | `other`             | any other lexical disagreement                                                                       | yes               |
+
+`agreed-unverified` is aggregated by surface form for presentation: one row per distinct string with its
+occurrence count and first timecode, while the flag itself stores every occurrence range, so every
+occurrence is protected by the readability pass and omitted by redaction. A term present in
+`known-terms.txt` (whole-token, case-insensitive) never produces an `agreed-unverified` flag, and still
+produces a `numeric` or `proper-noun` flag when the engines disagree about it. A lexical flag's
+identifier is derived from the recording identity, its class, its occurrence ranges, its record text and
+its alternative text, so a resolution survives only an unchanged flag; a re-run keeps every resolution
+whose identifier still exists, adds the new flags, and recomputes the open count from the flags currently
+surfaced.
 
 ### 6.5 The readability pass
 
@@ -529,9 +545,9 @@ Off by default (`[readability] enabled = false`). When on, it rewrites the note 
 engine output in the `engine_outputs` store and never the record text on a flag: sentence-initial
 capitalization, a terminal full stop at a segment boundary that lacks one, and removal of tokens from a
 closed filler list (`um`, `uh`, `erm`, `like` only when followed by a comma). It never touches a span
-that carries a flag of any class, including `formatting`: the flagged words and their inline markers are
-copied through byte for byte. The pass is a pure function of (segments, flags, config) and the note
-records `vptReadability: true` when it ran.
+that carries a lexical flag of any class, including `formatting`: the flagged words and their inline
+markers are copied through byte for byte. The pass is a pure function of (segments, flags, config) and
+the note records `vptReadability: true` when it ran.
 
 ### 6.6 What gets written
 
@@ -578,6 +594,7 @@ vptStage: transcript
 vptCapturedAt: 2026-08-24T14:47:36-06:00
 vptDurationSecs: 612
 vptOpenFlags: 6
+vptDiagnostics: 0
 vptEngines:
   - apple:SpeechTranscriber
   - whisply:large-v3-turbo
@@ -915,7 +932,7 @@ aliases from the index are always masked, whole-token, case-insensitive, possess
 the pattern classes in `[share.redact] classes` (default `email`, `url`, `phone`, `number` of four or
 more digits, `money`) are masked; each removed value becomes a mask label from `[share.redact] mask`
 (default `[{class} {n}]`), numbered from 1 per copy so two copies cannot be joined by a recipient holding
-both. A span with an open flag is omitted and counted by default
+both. A span with an open lexical flag is omitted and counted by default
 (`[share.redact] flagged_spans = "omit"`); `"mark"` keeps it with its `[unverified]` marker, which the
 pass may not strip.
 
@@ -1014,9 +1031,9 @@ deterministic `title` is what makes the duplicate findable.
 ```
 
 Event names: `review_needed`, `transcribe_failed`, `ingest_failed`, `deferred`, `brief_written`,
-`retention`, `config_refused`. `state` is `needs_attention`, `failed` or `done`. An event carries
-identities, counts, classes and paths, and never a transcript span, an alternative, a title, a tag, a
-mask value or a brief line.
+`retention`, `config_refused`. `state` is `needs_attention`, `failed` or `done`. `counts` carries one
+entry per lexical class plus `diagnostics`. An event carries identities, counts, classes and paths, and
+never a transcript span, an alternative, a title, a tag, a mask value or a brief line.
 
 - `desktop`: `vpt-macos notify` with a title of `vpt: <event>` and the `detail` as body.
 - `command`: vpt runs `[notify] command` (an argv list) with the tokens `{event}`, `{state}`, `{id}`,
