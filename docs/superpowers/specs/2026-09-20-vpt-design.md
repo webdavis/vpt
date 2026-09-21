@@ -340,16 +340,16 @@ to prefers a transactional store for multi-record state.
 The repositories below, one SQLite type implementing all of them, plus an in-memory implementation that
 runs the same contract tests:
 
-| Repository             | Rows                                                                                                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `seen`                 | per source path: filename, size, mtime, flags, first seen, last seen, deferral count and reason, `source_gone_at`                                                                                             |
-| `recordings`           | per identity: source path, digest (unique), captured_at (UTC with offset), duration, title, title_source, ingested_at, stage states, note paths, audio path, engines, language, `open_flags`, `diagnostics`   |
-| `transcripts`          | per recording: the accepted transcript of record, segments and word timings, with the engine that produced it                                                                                                 |
-| `proposals`            | per recording: the accepted `Proposal` (summary, actions, tags, relations) with the digest of the transcript it was derived from, and per claim its source ranges and inherited uncertainty                   |
-| `flags`                | per flag: recording, identifier, shape (lexical or diagnostic), class, occurrence ranges, record text, alternative text, confidence, state, resolution text, resolved_at                                      |
-| `occasions`            | per occasion: identity, provider key (unique), source (`manual`, `dam`, `google`), at, duration, title, participants, tags, the assembled pack with its source identities and digests, brief path, briefed_at |
-| `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                                  |
-| `releases`             | per released copy: recording, source stage, absolute destination, content digest, source-artifact digest, creation sequence, report path                                                                      |
+| Repository             | Rows                                                                                                                                                                                                                                                                                                            |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seen`                 | per source path: filename, size, mtime, flags, first seen, last seen, deferral count and reason, `source_gone_at`                                                                                                                                                                                               |
+| `recordings`           | per identity: source path, digest (unique), captured_at (UTC with offset), duration, title, title_source, ingested_at, stage states, note paths, audio path, engines, language, `open_flags`, `diagnostics`                                                                                                     |
+| `transcripts`          | per recording: the accepted transcript of record, segments and word timings, with the engine that produced it                                                                                                                                                                                                   |
+| `proposals`            | per recording: the accepted `Proposal` (summary, actions, tags, relations) with the digest of the transcript it was derived from, and per claim its source ranges and inherited uncertainty                                                                                                                     |
+| `flags`                | per flag: recording, identifier, shape (lexical, diagnostic or verification), class, occurrence ranges (null for a verification finding without a source), the artifact, claim index and claim digest of a verification finding, record text, alternative text, confidence, state, resolution text, resolved_at |
+| `occasions`            | per occasion: identity, provider key (unique), source (`manual`, `dam`, `google`), at, duration, title, participants, tags, the assembled pack with its source identities and digests, brief path, briefed_at                                                                                                   |
+| `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                                                                                                                                    |
+| `releases`             | per released copy: recording, source stage, absolute destination, content digest, source-artifact digest, creation sequence, report path                                                                                                                                                                        |
 
 The ledger holds the render inputs: the accepted transcript, the accepted proposal and each assembled
 brief pack commit before the artifact they render is published, and they survive the retention of raw
@@ -601,8 +601,9 @@ Alignment is a Myers-style word diff over the normalized streams. When the edit 
 `[reconcile] max_divergence_ratio` (default 0.35) of the token count, span comparison stops and one
 whole-recording `divergent` flag is raised instead of a span list.
 
-Flags come in two shapes. A lexical flag covers one or more word ranges of the transcript. A diagnostic
-flag covers the whole recording and has no range: `single-engine`, `language-mismatch` and `divergent`.
+Flags come in three shapes. A lexical flag covers one or more word ranges of the transcript. A diagnostic
+flag covers the whole recording and has no range: `single-engine`, `language-mismatch` and `divergent`. A
+verification finding (section 8.2) belongs to one claim of one artifact and may have no source range.
 Diagnostic flags appear in `vpt review`, are counted separately (`diagnostics` in events,
 `vptDiagnostics` in frontmatter), and overlap no span, so they neither hold back the readability pass nor
 omit text from a redacted copy. `divergent` additionally marks the transcript unverified for consumers (a
@@ -631,8 +632,8 @@ occurrence is protected by the readability pass and omitted by redaction. A term
 produces a `numeric` or `proper-noun` flag when the engines disagree about it. A lexical flag's
 identifier is derived from the recording identity, its class, its occurrence ranges, its record text and
 its alternative text, so a resolution survives only an unchanged flag; a re-run keeps every resolution
-whose identifier still exists, adds the new flags, and recomputes the open count from the flags currently
-surfaced.
+whose identifier still exists, adds the new flags, and recomputes the open count from the lexical flags
+currently surfaced plus the verification findings of the recording's owned artifacts.
 
 ### 6.5 The readability pass
 
@@ -900,13 +901,15 @@ go through the stage 3 gates.
 ### 8.2 verify-note
 
 `vpt verify-note <path> --recording <id>` checks a Markdown note against the transcript and the flags. It
-reports findings for any readable note, and it writes into a vpt-owned artifact only: a note whose
-`vptRecording` equals `--recording` and whose managed regions are intact. Any other file is left
-byte-identical and the findings go to the output alone; a file carrying a different `vptRecording` is
-refused, exit 3 `ownership`. Claims are read from the `vpt:content` region (from the whole body of a file
-vpt does not own), excluding frontmatter, headings, code fences, the links region and any earlier
-verify-note annotation. Every list item and every sentence in a paragraph is a claim line. Four classes,
-in order:
+reports findings for any readable note, and it writes into a vpt-owned artifact only, which means all
+three of: the path, resolved through no symbolic link, is the artifact path the ledger registers for
+`--recording` (a path re-pinned by committed rename recovery, section 7.4, included); the note's
+`vptRecording` and `vptStage` match that artifact; and its required markers validate. Any other readable
+file is report-only: it is left byte-identical, its findings go to the output alone and no ledger state
+changes. A file carrying a different `vptRecording` is refused, exit 3 `ownership`. Claims are read from
+the `vpt:content` region (from the whole body of a file vpt does not own), excluding frontmatter,
+headings, code fences, the links region and any earlier verify-note annotation. Every list item and every
+sentence in a paragraph is a claim line. Four classes, in order:
 
 1. `unsourced`: no `[mm:ss-mm:ss]` range on the line.
 1. `bad-reference`: a range that is empty, inverted, or outside the transcript's bounds.
@@ -917,10 +920,14 @@ in order:
 1. `built-on-flagged-text`: the cited span carries an open `numeric`, `proper-noun` or `other` flag.
 
 A finding is written as an annotation at the end of its claim line, inside the content region:
-`[unsourced]`, `[bad-reference]`, `[unsupported: <token>]` or `[built-on-flagged-text]`. Each invocation
-replaces the artifact's whole finding set and recomputes the recording's `open_flags`. Findings alone
-exit 0; a read or write failure exits 1. `vpt synthesize` runs `verify-note` on the analysis note it just
-wrote before it notifies.
+`[unsourced]`, `[bad-reference]`, `[unsupported: <token>]` or `[built-on-flagged-text]`. A finding is the
+third flag shape of section 6.4, identified by the artifact, the claim's index in the region and the
+SHA-256 of the claim text with its annotations stripped, so a changed claim never inherits a resolution;
+its source range is null for `unsourced` and `bad-reference`. Each invocation replaces only the selected
+artifact's finding set, keeps a resolution only for an identifier that is unchanged, and recomputes the
+recording's `open_flags` from the current transcript flags and the findings of every artifact the ledger
+owns for that recording. Findings alone exit 0; a read or write failure exits 1. `vpt synthesize` runs
+`verify-note` on the analysis note it just wrote before it notifies.
 
 ### 8.3 Briefs
 
