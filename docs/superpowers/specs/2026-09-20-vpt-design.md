@@ -202,14 +202,18 @@ eligibility is evaluated from the current configuration on every run: a stage th
 marked `disabled` and skipped, and an incomplete stage marked `disabled` on an earlier run becomes
 `pending` when its configuration enables it, so a recording processed before synthesis was configured is
 synthesized once it is. Disabling a stage discards nothing: an earlier `succeeded` or `expired` state
-stays. Every derived stage records the digest of the accepted input it consumed (the transcript for
-synthesis, the transcript and the claim for a verification finding); when that input changes through a
-re-transcription, the enabled stage becomes `pending` again unless retention expired its output, so
-synthesis is current only while the accepted proposal's source digest equals the current digest of its
-input, and a verification finding is current only for the claim and transcript it recorded. A run selects
-every recording with an enabled stage that is `pending` or `failed` and resumes from its earliest such
-stage, so a transient failure is retried on the next run; an `expired` stage (retention moved its
-artifact) is never retried by `run`, and a released copy is immutable whatever changes upstream.
+stays. Every derived stage records the digest of the exact input it consumed: synthesis records the
+digest of the content-region bytes it wrote to the command's stdin, and a verification finding records
+the claim, the transcript and the lexical-flag state it was computed against. Before selecting work on
+every run, vpt renders the current synthesis input (a review correction and the readability pass both
+change it without touching the transcript of record) and compares its digest with the recorded one; a
+mismatch makes enabled synthesis `pending` again unless retention expired its output. A verification
+finding and the inherited uncertainty persisted with a proposal are current only while the transcript and
+the lexical-flag state they recorded are the current ones; a change to either invalidates the prior
+result and the next run recomputes it. A run selects every recording with an enabled stage that is
+`pending` or `failed` and resumes from its earliest such stage, so a transient failure is retried on the
+next run; an `expired` stage (retention moved its artifact) is never retried by `run`, and a released
+copy is immutable whatever changes upstream.
 
 ### 3.4 The macOS helper
 
@@ -347,7 +351,7 @@ runs the same contract tests:
 | `seen`                 | per source path: filename, size, mtime, flags, first seen, last seen, deferral count and reason, `source_gone_at`                                                                                                                                                                                               |
 | `recordings`           | per identity: source path, digest (unique), captured_at (UTC with offset), duration, title, title_source, ingested_at, stage states, note paths, audio path, engines, language, `open_flags`, `diagnostics`                                                                                                     |
 | `transcripts`          | per recording: the accepted transcript of record, segments and word timings, with the engine that produced it                                                                                                                                                                                                   |
-| `proposals`            | per recording: the accepted `Proposal` (summary, actions, tags, relations) with the digest of the transcript it was derived from, and per claim its source ranges and inherited uncertainty                                                                                                                     |
+| `proposals`            | per recording: the accepted `Proposal` (summary, actions, tags, relations) with the digest of the content-region bytes the command received, and per claim its source ranges and inherited uncertainty with the lexical-flag state it was computed against                                                      |
 | `flags`                | per flag: recording, identifier, shape (lexical, diagnostic or verification), class, occurrence ranges (null for a verification finding without a source), the artifact, claim index and claim digest of a verification finding, record text, alternative text, confidence, state, resolution text, resolved_at |
 | `occasions`            | per occasion: identity, provider key (unique), source (`manual`, `dam`, `google`), at, duration, title, participants, tags, the assembled pack with its source identities and digests, brief path, briefed_at                                                                                                   |
 | `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                                                                                                                                    |
@@ -690,9 +694,11 @@ vpt confirm <id> --tag <t> | --reject-tag <t> | --relation <kind>:<target>
 flag, marks it `corrected`, and appends the corrected text to `known-terms.txt` (idempotently), so a
 correction improves every future transcript and redaction; the transcript of record is never rewritten
 and the note's inline marker is re-rendered as `[corrected: <text>]`. `--dismiss` closes the flag. A
-resolved flag stays resolved across re-runs. The inline marker in the note is the exact word wrapped as
-`[unverified: <record text> | <alternative>]` for a disagreement and `[unverified: <text>]` for the other
-classes; the note's frontmatter carries `vptOpenFlags`.
+resolved flag stays resolved across re-runs. Every resolution re-renders the note, so a correction
+changes the synthesis input and makes a succeeded synthesis `pending` again (section 3.3). The inline
+marker in the note is the exact word wrapped as `[unverified: <record text> | <alternative>]` for a
+disagreement and `[unverified: <text>]` for the other classes; the note's frontmatter carries
+`vptOpenFlags`.
 
 ## 7. Stage 3: Vault note
 
@@ -880,8 +886,9 @@ directory commit them. Consequences vpt states rather than hides:
 and `vpt synthesize` refuses with exit 2. Automatic redaction is not part of that switch; it follows
 `[share] automatic` alone (section 8.5). When set, `vpt synthesize <id>` runs the command with
 `{transcript}` (the note path), `{id}` and `{language}` substituted, writes the transcript note's content
-region on the command's stdin, and reads one `vpt.proposal/1` document from its stdout within
-`[synthesis] timeout_secs` (default 600):
+region on the command's stdin, records the digest of exactly those bytes as the proposal's input digest
+(section 3.3), and reads one `vpt.proposal/1` document from its stdout within `[synthesis] timeout_secs`
+(default 600):
 
 ```json
 {
