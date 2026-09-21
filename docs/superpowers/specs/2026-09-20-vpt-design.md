@@ -320,13 +320,13 @@ file plus a summary; `--json` prints the list. `--dry-run` prints the same list 
 
 Four rules:
 
+1. A hold applies to every regular file in its store, current artifacts included: an expired transcript
+   note, analysis note or brief moves, and the ledger records `trashed_at` against that artifact and
+   keeps its pinned path. `vpt run` never recreates an artifact retention moved; `vpt note write <id>` or
+   `vpt brief <occasion-id>` regenerates it deliberately.
 1. The `audio` store is excluded unless `[retention] include_audio = true`, because the clone is the only
-   copy once Apple evicts the original. When it is included, an expired clone moves and the recording's
-   row records `audio_trashed_at`.
-1. In every other store, a file the ledger references as a current artifact (a transcript note, an
-   analysis note, a brief) is never moved whatever its age, and the exclusion is reported per file.
-   Engine outputs, draft reports and released copies are never current artifacts, so they are the files a
-   hold actually expires.
+   copy once Apple evicts the original; when included, an expired clone moves and the recording's row
+   records `audio_trashed_at`.
 1. Nothing is ever unlinked. If the helper is absent, `retention run` refuses with exit 3.
 1. What moved is reported in the run output and delivered as one `vpt.event/1` (`event = "retention"`,
    counts per store) when `[notify]` is not `off`.
@@ -342,13 +342,14 @@ leaves every entry's size, mtime and flags unchanged.
 
 The database, `CloudRecordings.db` beside `Recordings/`, is used for exactly one thing: the human title
 (`ZCUSTOMLABEL` keyed by `ZPATH`). It is read from a private copy: the database plus its `-wal` and
-`-shm` files are copied into a 0700 temporary directory, the copy is opened, read, and the directory
-removed at the end of the sweep including on the error path. The live database is never opened, because a
-read-only open still lets SQLite create journal files inside Apple's directory. A copy that fails, a
-schema that has changed, or a join that finds no row yields `title_source = "unavailable"` and the
-recording is ingested untitled. `[source] read_titles = false` skips the database entirely. The database
-supplies the title and nothing else: duration and ingestion eligibility come from the audio container
-alone, and nothing read from the database ever defers or refuses a recording.
+`-shm` files are copied over the fixed paths under `<state_dir>/title-copy/` (directory 0700, files
+0600), overwritten in place on every sweep and never removed, and that copy is what is opened and read.
+The live database is never opened, because a read-only open still lets SQLite create journal files inside
+Apple's directory. A copy that fails, a schema that has changed, or a join that finds no row yields
+`title_source = "unavailable"` and the recording is ingested untitled. `[source] read_titles = false`
+skips the database entirely. The database supplies the title and nothing else: duration and ingestion
+eligibility come from the audio container alone, and nothing read from the database ever defers or
+refuses a recording.
 
 ### 5.2 The sweep
 
@@ -1319,7 +1320,10 @@ Refused during a run, the recording or artifact left as it was:
   document of the wrong schema or major version (1 for engines and the agent; a collector failure
   degrades the brief and is reported).
 
-Nothing vpt does deletes: every removal is the opt-in retention run, and it moves to the Trash.
+Nothing vpt does deletes. The opt-in retention run moves durable artifacts to the Trash, and a failed
+archive staging (section 5.3) moves its staged file to the Trash; with the helper absent such a file
+stays where it is, mode 0600, and `doctor` reports it as `cleanup_pending`. vpt never unlinks and never
+targets a file it did not write.
 
 ## 12. Testing
 
