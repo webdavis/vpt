@@ -731,7 +731,8 @@ vptRecording: 2026-08-24T144736-4f3ab19c02de
 
 `hub` is `[note.obsidian] hub_transcripts`, `hub_analysis` and `hub_briefs`, the folder note names
 (defaults `transcripts`, `analysis`, `briefs`). On first write `status` is `active` and `startDate` is
-the capture date (the date in the filename, the way a meeting note's `startDate` is its meeting date); a
+the note's own creation date, the local date on which vpt first writes it, which is the vault's rule for
+a regular note; the capture instant stays in `vptCapturedAt` and the capture date in the filename. A
 rewrite preserves whatever `status`, `startDate` and `description` the note carries, so a value the
 operator set (`complete`, `archived`, `capture`, `needs-correction`) is never undone. Uncertainty is
 carried by `vptOpenFlags` and the inline markers, never by `status`. A wiki link in frontmatter is always
