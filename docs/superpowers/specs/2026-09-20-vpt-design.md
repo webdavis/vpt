@@ -358,11 +358,17 @@ and `vpt note write` reads nothing else. `vpt show <id> --json` prints a recordi
 
 Every mutating command takes one advisory lock on `<state_dir>/write.lock` (`flock`, close on exec),
 waiting at most five seconds and exiting 1 when it cannot; a read-only verb takes none. A mutation
-commits its authoritative rows together with a dirty entry per artifact it must publish; the artifact is
-then rendered from committed state, written to a temporary name in its store, synced and renamed into
-place, and its dirty entry cleared. The next mutating command repairs unfinished publications before new
-work, and refuses (exit 3 `target_modified`) a target whose bytes are not what the ledger last published
-rather than overwriting it. Read-only commands never repair.
+commits its authoritative rows together with a dirty entry per artifact it must publish. The entry
+records the target path, the digest of the bytes expected there before publication (or that the target is
+expected absent) and the digest of the bytes it intends to write. For an existing note the mutation first
+validates the note's identity and markers, reads its current bytes and renders the managed regions into
+them, so operator content outside the regions is preserved and the digest of those current bytes is the
+expected previous digest. The artifact is then rendered from committed state, written to a temporary name
+in its store, synced and renamed into place, the containing directory is synced, and the dirty entry is
+cleared. The next mutating command repairs unfinished publications before new work: a target already
+carrying the intended digest is a completed publication and its entry is cleared; a target holding the
+expected previous bytes, or absent when expected absent, is published over; any other bytes are refused
+(exit 3 `target_modified`) rather than overwritten. Read-only commands never repair.
 
 ### 4.5 Retention
 
