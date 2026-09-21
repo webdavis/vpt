@@ -11198,26 +11198,50 @@ ______________________________________________________________________
 
 **Files:**
 
-- Modify: `crates/vpt-application/src/ingest/mod.rs`, `crates/vpt-application/src/ingest/candidate.rs`,
-  `crates/vpt-application/src/ingest/publish.rs`
+- Modify: `crates/vpt-application/src/ingest/mod.rs`, `crates/vpt-application/src/ingest/candidate.rs`
 - Test: `crates/vpt-adapters/tests/ingest_modes.rs`
 
 **Interfaces:**
 
-- Produces: `vpt_application::ingest::Mode::{Sweep, DryRun, Once(PathBuf)}`;
-  `Ingest::run(&self, mode: Mode) -> Result<IngestReport, IngestError>` (this replaces the no-argument
-  signature; update the four earlier test files to pass `Mode::Sweep`).
+- Consumes: `Mode { dry_run, once }` from Task 19, `RecordingLedger::{seen_all, by_id}`.
+
+- Produces: `Ingest::would_ingest(&self, candidate: &Candidate, seen: Option<SeenRow>,`
+  `report: &mut IngestReport) -> Result<(), IngestFailure>` (private); the empty-store abort; the dry
+  run's rule set: every gate runs, nothing is staged, recorded, refreshed or notified, a known
+  recording's title comes from the ledger through `by_id` and a ledger failure there fails the run.
 
 - [ ] **Step 1: Write the failing tests**
+
+`crates/vpt-adapters/tests/ingest_modes.rs`:
 
 ```rust
 mod support;
 
-use support::{CAPTURED, Fixture, RecordingNotifier, RecordingTrash, clock};
-use vpt_application::ingest::{Ingest, IngestFailure, Mode};
-use vpt_application::ports::ledger::{RecordingLedger, TitleOrigin};
+use std::os::macos::fs::MetadataExt;
+use support::{CAPTURED, Fixture, Parts, clock, digest_of};
+use vpt_application::ports::{Archive, RecordingLedger, TitleOrigin};
+use vpt_application::{IngestFailure, Mode};
 use vpt_domain::fixtures::m4a;
+use vpt_domain::identity::RecordingId;
 use vpt_domain::notification::EventKind;
+use vpt_domain::time::UtcInstant;
+
+const DRY: Mode = Mode { dry_run: true, once: None };
+
+fn copy_snapshot(fixture: &Fixture) -> Vec<(String, Vec<u8>, i64, i64, u32)> {
+    let dir = fixture.state.join("title-copy");
+    let mut entries: Vec<_> = std::fs::read_dir(&dir)
+        .expect("copy dir")
+        .map(|entry| {
+            let entry = entry.expect("entry");
+            let metadata = entry.metadata().expect("metadata");
+            let bytes = std::fs::read(entry.path()).expect("bytes");
+            (entry.file_name().to_string_lossy().into_owned(), bytes, metadata.st_mtime(), metadata.st_mtime_nsec(), metadata.st_mode())
+        })
+        .collect();
+    entries.sort();
+    entries
+}
 
 #[test]
 fn a_dry_run_runs_every_gate_and_writes_nothing_durable() {
@@ -11225,176 +11249,237 @@ fn a_dry_run_runs_every_gate_and_writes_nothing_durable() {
     fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
     let whole = m4a(CAPTURED, 1, b"payload");
     fixture.add_recording("broken.m4a", &whole[..whole.len() - 12]);
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    let orphan = m4a(CAPTURED, 2, b"orphan");
+    let orphan_id = RecordingId::derive(UtcInstant { secs: CAPTURED }, clock().offset, &digest_of(&orphan)).expect("id");
+    std::fs::write(fixture.audio.join(format!("{orphan_id}.m4a")), &orphan).expect("orphan");
+    let mut parts = fixture.parts();
+    parts.store = fixture.titled_store(false);
 
-    let report = ingest.run(Mode::DryRun).expect("dry run");
+    let report = parts.ingest().run(&DRY).expect("dry run");
 
     assert_eq!(report.would_ingest.len(), 1);
+    assert_eq!(report.would_ingest[0].path, fixture.recordings.join("a.m4a"));
     assert_eq!(report.would_ingest[0].title_source, TitleOrigin::Unavailable);
     assert_eq!(report.deferred.len(), 1);
-    assert!(archive.archived().expect("archived").is_empty());
-    assert!(ledger.seen_all().expect("seen").is_empty(), "a dry run records no deferral");
-    assert!(notifier.0.borrow().is_empty());
+    assert!(report.recovered.is_empty(), "a dry run recovers nothing");
+    assert_eq!(parts.archive.archived().expect("archived").len(), 1, "the orphan is untouched");
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert!(parts.ledger.seen_all().expect("seen").is_empty(), "a dry run records no deferral");
+    assert!(parts.ledger.recordings().expect("list").is_empty());
+    assert!(parts.events().is_empty());
     assert!(!fixture.state.join("title-copy").exists());
 }
 
 #[test]
-fn once_ingests_exactly_the_named_file_with_the_gates() {
+fn a_dry_run_reports_a_known_title_from_the_ledger_and_leaves_the_title_copy_untouched() {
     let fixture = Fixture::new();
-    let a = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
-    fixture.add_recording("b.m4a", &m4a(CAPTURED + 1, 1, b"b"));
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    let source = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
+    fixture.add_title("a.m4a", "Alpha");
+    let mut parts = fixture.parts();
+    parts.store = fixture.titled_store(true);
+    parts.ingest().run(&Mode::default()).expect("a real sweep records the title");
+    fixture.add_title("b.m4a", "Beta, never copied");
+    std::fs::write(&source, m4a(CAPTURED + 30, 1, b"edited")).expect("edit");
+    fixture.set_mtime(&source, clock().now.secs - 60);
+    let before = copy_snapshot(&fixture);
+    let dry = Parts { store: fixture.titled_store(false), ..fixture.parts() };
 
-    let report = ingest.run(Mode::Once(a)).expect("once");
+    let report = dry.ingest().run(&DRY).expect("dry run");
 
-    assert_eq!(report.ingested.len(), 1);
-    assert_eq!(ledger.recordings().expect("list").len(), 1);
+    assert_eq!(report.would_ingest.len(), 1);
+    assert_eq!(report.would_ingest[0].title.as_deref(), Some("Alpha"));
+    assert_eq!(report.would_ingest[0].title_source, TitleOrigin::VoiceMemos);
+    assert_eq!(copy_snapshot(&fixture), before);
+    assert_eq!(dry.ledger.recordings().expect("list").len(), 1);
+    assert!(dry.events().is_empty());
+}
+
+#[test]
+fn a_dry_run_on_an_unreadable_source_fails_without_an_event() {
+    let fixture = Fixture::new();
+    let parts = fixture.parts();
+    std::fs::remove_dir_all(&fixture.recordings).expect("test setup only");
+
+    let error = parts.ingest().run(&DRY).unwrap_err();
+
+    assert!(matches!(error.failure, IngestFailure::StoreUnreadable(_)), "{error:?}");
+    assert!(parts.events().is_empty());
+}
+
+#[test]
+fn once_runs_the_gates_and_touches_nothing_else() {
+    let fixture = Fixture::new();
+    let whole = m4a(CAPTURED, 1, b"payload");
+    let broken = fixture.add_recording("broken.m4a", &whole[..whole.len() - 12]);
+    fixture.add_recording("other.m4a", &m4a(CAPTURED + 1, 1, b"other"));
+    let parts = fixture.parts();
+
+    let report = parts.ingest().run(&Mode { dry_run: false, once: Some(broken.clone()) }).expect("once");
+
+    assert_eq!(report.deferred.len(), 1);
+    assert!(report.ingested.is_empty());
+    assert_eq!(parts.ledger.seen_all().expect("seen").len(), 1);
+    let dry_once = parts.ingest().run(&Mode { dry_run: true, once: Some(fixture.recordings.join("other.m4a")) }).expect("dry once");
+    assert_eq!(dry_once.would_ingest.len(), 1);
+    assert!(parts.ledger.recordings().expect("list").is_empty());
 }
 
 #[test]
 fn an_unreadable_recordings_directory_aborts_with_one_event() {
     let fixture = Fixture::new();
+    let parts = fixture.parts();
     std::fs::remove_dir_all(&fixture.recordings).expect("test setup only");
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
 
-    let error = ingest.run(Mode::Sweep).unwrap_err();
+    let error = parts.ingest().run(&Mode::default()).unwrap_err();
 
     assert!(matches!(error.failure, IngestFailure::StoreUnreadable(_)));
-    assert_eq!(notifier.0.borrow().iter().map(|n| n.event).collect::<Vec<_>>(), vec![EventKind::IngestFailed]);
+    assert_eq!(parts.events(), vec![EventKind::IngestFailed]);
 }
 
 #[test]
 fn an_empty_store_that_held_recordings_before_is_the_silent_failure_and_aborts() {
     let fixture = Fixture::new();
     let a = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
-    ingest.run(Mode::Sweep).expect("first");
+    let parts = fixture.parts();
+    parts.ingest().run(&Mode::default()).expect("first");
     std::fs::remove_file(&a).expect("test setup only");
 
-    let error = ingest.run(Mode::Sweep).unwrap_err();
+    let error = parts.ingest().run(&Mode::default()).unwrap_err();
 
     assert_eq!(error.failure, IngestFailure::EmptyStore);
     assert!(error.completed.is_empty());
+    assert_eq!(parts.ledger.seen(&a).expect("seen").and_then(|row| row.source_gone_at), Some(clock().now));
+    assert_eq!(parts.events(), vec![EventKind::IngestFailed]);
 }
 
 #[test]
 fn a_fresh_empty_store_is_not_a_failure() {
     let fixture = Fixture::new();
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
-    assert!(ingest.run(Mode::Sweep).is_ok());
+    let parts = fixture.parts();
+    assert!(parts.ingest().run(&Mode::default()).is_ok());
+    assert!(parts.events().is_empty());
 }
 
 #[test]
 fn a_failure_after_an_ingestion_lists_the_completed_identities() {
     let fixture = Fixture::new();
-    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
-    let first = ingest.run(Mode::Sweep).expect("first");
-    let bytes = m4a(CAPTURED + 5, 1, b"second");
-    fixture.add_recording("b.m4a", &bytes);
-    let digest = vpt_adapters::stores::digest_file(&fixture.recordings.join("b.m4a")).expect("digest");
-    let id = vpt_domain::identity::RecordingId::derive(vpt_domain::time::UtcInstant { secs: CAPTURED + 5 }, clock().offset, &digest);
-    std::fs::write(fixture.audio.join(format!("{id}.m4a")), b"tampered").expect("collision setup");
-    std::fs::remove_file(fixture.recordings.join("a.m4a")).expect("test setup only");
-    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
+    let a = m4a(CAPTURED, 1, b"a");
+    let b = m4a(CAPTURED + 5, 1, b"b");
+    fixture.add_recording("a.m4a", &a);
+    fixture.add_recording("b.m4a", &b);
+    let b_id = RecordingId::derive(UtcInstant { secs: CAPTURED + 5 }, clock().offset, &digest_of(&b)).expect("id");
+    std::fs::write(fixture.audio.join(format!("{b_id}.m4a")), b"tampered").expect("collision setup");
+    let parts = fixture.parts();
 
-    let error = ingest.run(Mode::Sweep).unwrap_err();
+    let error = parts.ingest().run(&Mode::default()).unwrap_err();
 
     assert!(matches!(error.failure, IngestFailure::ArchiveCollision { .. }), "{error:?}");
-    assert!(error.completed.is_empty() || error.completed == vec![first.ingested[0].id.clone()]);
+    let a_id = RecordingId::derive(UtcInstant { secs: CAPTURED }, clock().offset, &digest_of(&a)).expect("id");
+    assert_eq!(error.completed, vec![a_id]);
+}
+
+#[test]
+fn a_recovery_before_a_failing_candidate_stays_in_completed() {
+    let fixture = Fixture::new();
+    let orphan = m4a(CAPTURED, 2, b"orphan");
+    let orphan_id = RecordingId::derive(UtcInstant { secs: CAPTURED }, clock().offset, &digest_of(&orphan)).expect("id");
+    std::fs::write(fixture.audio.join(format!("{orphan_id}.m4a")), &orphan).expect("orphan");
+    let b = m4a(CAPTURED + 5, 1, b"b");
+    fixture.add_recording("b.m4a", &b);
+    let b_id = RecordingId::derive(UtcInstant { secs: CAPTURED + 5 }, clock().offset, &digest_of(&b)).expect("id");
+    std::fs::write(fixture.audio.join(format!("{b_id}.m4a")), b"tampered").expect("collision setup");
+    let parts = fixture.parts();
+
+    let error = parts.ingest().run(&Mode::default()).unwrap_err();
+
+    assert!(matches!(error.failure, IngestFailure::ArchiveCollision { .. }), "{error:?}");
+    assert_eq!(error.completed, vec![orphan_id.clone()]);
+    assert!(parts.ledger.by_id(&orphan_id).expect("read").is_some());
 }
 ```
-
-The last test's `completed` assertion admits both orderings because the sweep visits candidates by name
-and `a.m4a` is already ingested; its point is that `completed` is populated from the run, not from the
-ledger. Tighten it when the executor confirms the visit order: with names sorted, `a.m4a` is skipped as
-unchanged and `completed` is empty.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-adapters --test ingest_modes`
 
-Expected: compile error, `Mode` not found.
+Expected: the first two dry-run tests FAIL (the sweep stages and records as if it were real, and
+`would_ingest` stays empty); the dry-run source test FAILS with an event delivered; the once test FAILS
+on the dry once; the empty-store test FAILS with `Ok`; the unreadable, fresh-store and both `completed`
+tests PASS already and stay as regression guards.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-In `ingest/mod.rs`:
-
-```rust
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Mode {
-    Sweep,
-    DryRun,
-    Once(PathBuf),
-}
-```
-
-`run` takes `mode: Mode` and passes `&mode` to `sweep`; `sweep` becomes:
+In `crates/vpt-application/src/ingest/mod.rs`, `sweep` becomes:
 
 ```rust
     fn sweep(&self, mode: &Mode, report: &mut IngestReport) -> Result<(), IngestFailure> {
-        if *mode != Mode::DryRun {
+        if !mode.dry_run {
             self.recover_orphans(report)?;
         }
-        let candidates = match mode {
-            Mode::Once(path) => vec![self.recorder.candidate(path).map_err(|error| IngestFailure::Recorder(format!("{error:?}")))?],
-            _ => self.recorder.candidates().map_err(|error| IngestFailure::StoreUnreadable(format!("{error:?}")))?,
+        let candidates = match &mode.once {
+            Some(path) => vec![self.recorder.candidate(path).map_err(candidate::recorder_failure)?],
+            None => self.recorder.candidates().map_err(|error| IngestFailure::StoreUnreadable(format!("{error:?}")))?,
         };
-        if candidates.is_empty() && *mode == Mode::Sweep && !self.ledger.seen_all().map_err(IngestFailure::Ledger)?.is_empty() {
+        let full_sweep = mode.once.is_none();
+        if full_sweep && candidates.is_empty() && !self.ledger.seen_all().map_err(IngestFailure::Ledger)?.is_empty() {
+            if !mode.dry_run {
+                self.mark_gone(&candidates, report)?;
+            }
             return Err(IngestFailure::EmptyStore);
         }
-        let titles = if *mode != Mode::DryRun && self.settings.read_titles { Some(self.recorder.titles()) } else { None };
         for candidate in &candidates {
-            self.process(candidate, titles.as_deref(), mode, report)?;
+            self.process(candidate, mode, report)?;
         }
-        if *mode == Mode::Sweep {
+        if full_sweep && !mode.dry_run {
             self.mark_gone(&candidates, report)?;
         }
         Ok(())
     }
 ```
 
-`process` gains `mode: &Mode` and, after the rest gate and before `stage_and_publish`:
+In `crates/vpt-application/src/ingest/candidate.rs`, `process` gains the dry-run exit between the rest
+gate and staging:
 
 ```rust
-        if *mode == Mode::DryRun {
-            let known = seen
-                .as_ref()
-                .and_then(|row| row.recording.clone())
-                .and_then(|id| self.ledger.by_id(&id).ok().flatten());
-            report.would_ingest.push(super::WouldIngest {
-                path: candidate.path.clone(),
-                title: known.as_ref().and_then(|record| record.title.clone()),
-                title_source: known.map_or(TitleOrigin::Unavailable, |record| record.title_source),
-            });
-            return Ok(());
+        if let Err(reason) = rest_gate(metadata.mtime, metadata.size, now, seen_facts.as_ref(), &limits) {
+            return self.defer(candidate, seen, reason, now, mode, report);
         }
+        if mode.dry_run {
+            return self.would_ingest(candidate, seen, report);
+        }
+        self.stage_and_publish(candidate, &handle, &metadata, seen, now, mode, report)
 ```
 
-and `defer` gains `mode: &Mode` too: under `DryRun` it appends to `report.deferred` and returns without
-`record_seen` and without the event. Every call site passes `mode` through (`process` calls `defer` five
-times; `stage_and_publish` calls it twice and therefore gains `mode: &Mode` as well). In `mod.rs` the
-`use crate::ports::ledger::TitleOrigin;` import serves `candidate.rs` through `super::`.
+and the `impl` block gains:
 
-Update the four earlier test files to call `ingest.run(Mode::Sweep)`.
+```rust
+    /// What a real sweep would ingest: the title is the ledger's when the
+    /// recording is already known, and never a fresh database read.
+    pub(super) fn would_ingest(&self, candidate: &Candidate, seen: Option<SeenRow>, report: &mut IngestReport) -> Result<(), IngestFailure> {
+        let known = match seen.as_ref().and_then(|row| row.recording.as_ref()) {
+            Some(id) => self.ledger.by_id(id).map_err(IngestFailure::Ledger)?,
+            None => None,
+        };
+        report.would_ingest.push(super::WouldIngest {
+            path: candidate.path.clone(),
+            title: known.as_ref().and_then(|record| record.title.clone()),
+            title_source: known.map_or(TitleOrigin::Unavailable, |record| record.title_source),
+        });
+        Ok(())
+    }
+```
+
+with `TitleOrigin` added to the `crate::ports` import of `candidate.rs`. `defer` and `unchanged` already
+honour `mode.dry_run` (Tasks 19 and 20), `run` already withholds the failure event on a dry run (Task
+19), and the composition root (Task 27) builds the store with `with_titles(state, false)` for a dry run,
+which is what keeps the private copy untouched.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters`
 
-Expected: all PASS, including every earlier ingest test.
+Expected: all PASS, every earlier ingest test included. Run
+`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
