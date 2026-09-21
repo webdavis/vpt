@@ -236,9 +236,13 @@ The home is one directory, default `~/.vpt`, under which every store lands by de
 Each store has its own key under `[stores]` and may point anywhere. A store path is expanded from `~`
 (and from a leading `<home>/`, which `vpt setup` emits for a derived default) and must be absolute after
 expansion. `vpt setup` creates the default store leaves beneath the home; a store pointed elsewhere needs
-an existing parent, and vpt creates its leaf and nothing above it. Two stores may not resolve to the same
-directory, and no store may resolve inside another store's directory; every store may sit under the home,
-which is not itself a store. Both are startup refusals naming the two keys.
+an existing parent, and vpt creates its leaf and nothing above it. Every configured root (the home
+through its permitted symlink, each store, the state directory, the config directory) is resolved once at
+startup, before any work. Stores are pairwise disjoint; no store, staging path or release destination may
+overlap the Voice Memos container; a release destination may not overlap a private store, the state
+directory or the config directory. An invalid root is exit 2 naming the keys. Below a resolved root, a
+path that traverses a symbolic link in any component, or that escapes the root, is refused when it is
+opened or published, exit 3 `path_escape`.
 
 vpt's own state (the ledger, section 4.4) does not live in a store. It lives in `~/.local/state/vpt/` by
 default (`[home] state_dir`), so that a home inside a git-tracked vault never commits a database or its
@@ -250,8 +254,9 @@ operator renders it there (a password manager, a template) is outside vpt.
 
 ### 4.2 The managed symlink
 
-`[home] symlink_target` is empty by default. When set, the default home path (`~/.vpt`) is a symbolic
-link to that directory, and vpt manages it:
+`[home] symlink_target` is empty by default. When set, `~/.vpt` (the default home path) is a symbolic
+link to that directory and `[home] path` must stay at its default, a startup refusal (2) otherwise, so
+the link and the home never name different places. vpt manages the link:
 
 - `vpt symlink deploy` creates the link. It refuses when the default path exists and is not a link to the
   target (naming what is there), refuses when the target's parent does not exist, and creates the target
@@ -1155,11 +1160,17 @@ overwrite an existing file without `--force`. Without a terminal it exits 2 and 
 value in this file; a key holding a secret is marked in the table. A key that is not in this table is a
 startup refusal naming it.
 
+Value rules: a ratio is a finite number in `[0, 1]`, and `max_divergence_ratio` is above zero; a timeout,
+a threshold and the slug length are positive integers; a count, a gap and a lookback are non-negative
+integers; every integer fits 32 bits except `source.max_audio_bytes`, which fits 64. A duration is `0` or
+a positive decimal integer followed by one of `s`, `m`, `h`, `d`, converted to seconds with overflow
+checked. A value outside its rule is exit 2 naming the key.
+
 | Key                                  | Type           | Default                                                                   | Meaning                                                                                                      |
 | ------------------------------------ | -------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `home.path`                          | string         | `~/.vpt`                                                                  | the home; every store defaults under it                                                                      |
 | `home.state_dir`                     | string         | `~/.local/state/vpt`                                                      | the ledger's directory                                                                                       |
-| `home.symlink_target`                | string         | `""`                                                                      | when set, `home.path` is a managed symlink to this directory                                                 |
+| `home.symlink_target`                | string         | `""`                                                                      | when set, `~/.vpt` is a managed symlink to this directory and `home.path` must stay at its default           |
 | `helper.path`                        | string         | `vpt-macos`                                                               | the macOS helper, resolved on `PATH` when relative                                                           |
 | `stores.audio`                       | string         | `<home>/audio`                                                            | archive clones                                                                                               |
 | `stores.transcripts`                 | string         | `<home>/transcripts`                                                      | transcript notes                                                                                             |
@@ -1280,7 +1291,7 @@ example, not the default:
 
 ```toml
 [home]
-path = "~/vault/vpt" # inside a git-tracked vault that ignores audio extensions
+path = "~/workspaces/Ivy/vpt" # inside the Obsidian vault, which ignores audio extensions
 
 [stores]
 engine_outputs = "~/.vpt/engine-outputs" # kept out of the vault
@@ -1289,6 +1300,10 @@ drafts = "~/.vpt/drafts"                 # the mask map never enters git
 [note]
 profile = "obsidian"
 link_style = "wiki"
+
+[note.obsidian]
+vault_root = "~/workspaces/Ivy"
+
 
 [tags]
 new_tags = "write"
@@ -1327,8 +1342,9 @@ Refused at startup, before any work, exit 2 or 3 as marked:
 - config file missing (2, with the `vpt setup` command printed; `vpt setup` and `vpt --version` are the
   two verbs that run without one), unparseable (2), unknown key (2), a value of the wrong type or outside
   its range (2).
-- a store path that is relative after expansion, whose parent does not exist, that equals another store,
-  or that nests inside another store outside the home (2, naming the keys).
+- a configured root that is relative after expansion, whose required parent does not exist, or that
+  overlaps another store, the Voice Memos container, or (for a release destination) a private store, the
+  state directory or the config directory (2, naming the keys).
 - `engines.main` naming an engine table that does not exist, an engine whose binary or helper is absent,
   or a `command` engine missing `family` or `local` (2).
 - both engine slots reporting one family without `allow_same_family` (3, `same_family`).
