@@ -570,9 +570,10 @@ vpt confirm <id> --tag <t> | --reject-tag <t> | --relation <kind>:<target>
 
 `--confirm` on a `proper-noun` or `agreed-unverified` flag appends the record's text to
 `known-terms.txt`, which is what makes the list shrink. `--correct` stores the operator's text on the
-flag and marks it `corrected`; the transcript of record is never rewritten and the note's inline marker
-is re-rendered as `[corrected: <text>]`. `--dismiss` closes the flag. A resolved flag stays resolved
-across re-runs. The inline marker in the note is the exact word wrapped as
+flag, marks it `corrected`, and appends the corrected text to `known-terms.txt` (idempotently), so a
+correction improves every future transcript and redaction; the transcript of record is never rewritten
+and the note's inline marker is re-rendered as `[corrected: <text>]`. `--dismiss` closes the flag. A
+resolved flag stays resolved across re-runs. The inline marker in the note is the exact word wrapped as
 `[unverified: <record text> | <alternative>]` for a disagreement and `[unverified: <text>]` for the other
 classes; the note's frontmatter carries `vptOpenFlags`.
 
