@@ -5415,6 +5415,14 @@ The schema created here is the whole ledger of spec section 4.4, not stage 1's s
 they add columns through a migration, never by editing version 1. Stage 1 implements repositories over
 `seen`, `recordings`, `dirty_publications` and `retention_intents` only.
 
+Two ways in. A mutating command has created the private state directory and holds its lock (Task 27), so
+it opens the ledger writable through the state root's descriptor: the database file is created
+exclusively at mode 0600 when absent, repaired to 0600 when present, refused when a link or a non-file
+stands at its name, switched to WAL and migrated. An observational command or a dry run opens read-only:
+no directory, file, mode, journal setting or schema is created or changed, and an absent state directory
+or database, or a database file with no schema yet, is reported as `None` so the composition root
+substitutes the empty memory ledger of Task 12.
+
 **Files:**
 
 - Create: `crates/vpt-application/src/ports/ledger.rs` (the error type only in this task)
@@ -5425,50 +5433,76 @@ they add columns through a migration, never by editing version 1. Stage 1 implem
 
 **Interfaces:**
 
-- Consumes: nothing.
+- Consumes: `vpt_adapters::contained::{Access, ContainedError, Kind, RootDir}`.
 
-- Produces: `vpt_application::ports::ledger::LedgerError::{Busy, UnsupportedSchema(u32),`
-  `Conflict(String), Corrupt(String), Io(String)}`; `vpt_adapters::ledger::sqlite::SqliteLedger` with
-  `pub const BUSY_TIMEOUT: Duration = Duration::from_secs(5)`,
-  `pub fn open(state_dir: &Path) -> Result<SqliteLedger, LedgerError>`,
-  `pub fn open_with_timeout(state_dir: &Path, busy: Duration) -> Result<SqliteLedger, LedgerError>`,
-  `pub fn database_path(&self) -> &Path`, `pub fn schema_version(&self) -> Result<u32, LedgerError>`,
-  `pub(crate) fn transaction<T>(&self, op: impl FnOnce(&rusqlite::Transaction) ->`
-  `Result<T, LedgerError>) -> Result<T, LedgerError>`,
+- Produces: `vpt_application::ports::LedgerError::{Busy, UnsupportedSchema(u32), Conflict(String),`
+  `Corrupt(String), Io(String)}`; `vpt_adapters::ledger::{SqliteLedger, OpenError, SCHEMA_VERSION}`
+  (`ledger/mod.rs` keeps `sqlite` private and re-exports these) with
+  `OpenError::{Contained(ContainedError), Ledger(LedgerError)}` (`From` both ways in),
+  `SqliteLedger::BUSY_TIMEOUT: Duration = Duration::from_secs(5)`,
+  `SqliteLedger::open(state: &RootDir) -> Result<SqliteLedger, OpenError>`,
+  `SqliteLedger::open_with_timeout(state: &RootDir, busy: Duration) -> Result<SqliteLedger, OpenError>`,
+  `SqliteLedger::open_read_only(state_dir: &Path) -> Result<Option<SqliteLedger>, OpenError>`,
+  `fn database_path(&self) -> &Path`, `fn schema_version(&self) -> Result<u32, LedgerError>`,
+  `pub(crate) fn transaction<T>(&self, op: impl FnOnce(&rusqlite::Transaction<'_>) ->`
+  `Result<T, LedgerError>) -> Result<T, LedgerError>` (an `Io` error on a read-only ledger),
   `pub(crate) fn read<T>(&self, op: impl FnOnce(&rusqlite::Connection) -> Result<T,`
-  `LedgerError>) -> Result<T, LedgerError>`;
-  `vpt_adapters::ledger::sqlite::migrations::VERSION: u32 = 1`;
-  `pub(crate) fn map(error: rusqlite::Error) -> LedgerError`.
+  `LedgerError>) -> Result<T, LedgerError>`; `SCHEMA_VERSION: u32 = 1`;
+  `pub(crate) fn map(error: rusqlite::Error) -> LedgerError` in `ledger::sqlite`.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-adapters/src/ledger/sqlite/mod.rs`, test section:
+Declare the modules first. `crates/vpt-application/src/ports/mod.rs` gains `mod ledger;` and
+`pub use ledger::LedgerError;`. `crates/vpt-adapters/src/lib.rs` gains `pub mod ledger;`;
+`crates/vpt-adapters/src/ledger/mod.rs` is:
+
+```rust
+//! The ledger: one SQLite type implementing every repository, and an
+//! in-memory twin that runs the same contract.
+
+mod sqlite;
+
+pub use sqlite::{OpenError, SCHEMA_VERSION, SqliteLedger};
+```
+
+`crates/vpt-adapters/src/ledger/sqlite/mod.rs` starts as `mod migrations;` plus its test module, and
+`migrations.rs` starts empty:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
-    #[test]
-    fn open_creates_a_0600_database_in_a_0700_directory_at_schema_version_1() {
+    fn state() -> (tempfile::TempDir, RootDir) {
         let temp = tempfile::tempdir().expect("temp");
-        let state = temp.path().join("state/vpt");
+        let dir = temp.path().canonicalize().expect("canonical").join("state");
+        std::fs::DirBuilder::new().mode(0o700).create(&dir).expect("state dir");
+        let root = RootDir::open(&dir).expect("root");
+        (temp, root)
+    }
 
-        let ledger = SqliteLedger::open(&state).expect("opens");
-
-        assert_eq!(std::fs::metadata(&state).expect("dir").permissions().mode() & 0o777, 0o700);
-        assert_eq!(std::fs::metadata(ledger.database_path()).expect("db").permissions().mode() & 0o777, 0o600);
-        assert_eq!(ledger.schema_version().expect("version"), 1);
-        let mode: String = ledger.read(|c| c.query_row("PRAGMA journal_mode", [], |row| row.get(0)).map_err(map)).expect("mode");
-        assert_eq!(mode, "wal");
+    fn journal_mode(ledger: &SqliteLedger) -> String {
+        ledger.read(|c| c.query_row("PRAGMA journal_mode", [], |row| row.get(0)).map_err(map)).expect("mode")
     }
 
     #[test]
-    fn opening_twice_is_idempotent_and_every_table_exists() {
-        let temp = tempfile::tempdir().expect("temp");
-        SqliteLedger::open(temp.path()).expect("first");
-        let ledger = SqliteLedger::open(temp.path()).expect("second");
+    fn open_creates_a_0600_database_at_schema_version_1_in_wal_mode() {
+        let (_temp, state) = state();
+        let ledger = SqliteLedger::open(&state).expect("opens");
+        assert_eq!(ledger.database_path(), state.path().join("vpt.db"));
+        assert_eq!(std::fs::metadata(ledger.database_path()).expect("db").permissions().mode() & 0o777, 0o600);
+        assert_eq!(ledger.schema_version().expect("version"), 1);
+        assert_eq!(journal_mode(&ledger), "wal");
+    }
+
+    #[test]
+    fn opening_twice_is_idempotent_repairs_the_mode_and_every_table_exists() {
+        let (_temp, state) = state();
+        SqliteLedger::open(&state).expect("first");
+        std::fs::set_permissions(state.path().join("vpt.db"), std::fs::Permissions::from_mode(0o644)).expect("loosen");
+        let ledger = SqliteLedger::open(&state).expect("second");
+        assert_eq!(std::fs::metadata(ledger.database_path()).expect("db").permissions().mode() & 0o777, 0o600);
         let names: Vec<String> = ledger
             .read(|c| {
                 let mut statement = c.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").map_err(map)?;
@@ -5486,16 +5520,32 @@ mod tests {
 
     #[test]
     fn a_future_schema_version_is_refused_with_its_number() {
-        let temp = tempfile::tempdir().expect("temp");
-        let ledger = SqliteLedger::open(temp.path()).expect("opens");
+        let (_temp, state) = state();
+        let ledger = SqliteLedger::open(&state).expect("opens");
         ledger.read(|c| c.pragma_update(None, "user_version", 99).map_err(map)).expect("bump");
-        assert_eq!(SqliteLedger::open(temp.path()).unwrap_err(), LedgerError::UnsupportedSchema(99));
+        assert_eq!(SqliteLedger::open(&state).unwrap_err(), OpenError::Ledger(LedgerError::UnsupportedSchema(99)));
+        assert_eq!(
+            SqliteLedger::open_read_only(state.path()).unwrap_err(),
+            OpenError::Ledger(LedgerError::UnsupportedSchema(99))
+        );
+    }
+
+    #[test]
+    fn a_link_in_place_of_the_database_is_refused_before_anything_is_opened() {
+        let (temp, state) = state();
+        let elsewhere = temp.path().join("elsewhere.db");
+        std::fs::write(&elsewhere, b"").expect("elsewhere");
+        std::os::unix::fs::symlink(&elsewhere, state.path().join("vpt.db")).expect("link");
+        let refused = ContainedError::NotRegular(state.path().join("vpt.db"));
+        assert_eq!(SqliteLedger::open(&state).unwrap_err(), OpenError::Contained(refused.clone()));
+        assert_eq!(SqliteLedger::open_read_only(state.path()).unwrap_err(), OpenError::Contained(refused));
+        assert_eq!(std::fs::metadata(&elsewhere).expect("target").len(), 0);
     }
 
     #[test]
     fn a_held_write_lock_surfaces_as_busy_after_the_bounded_wait() {
-        let temp = tempfile::tempdir().expect("temp");
-        let ledger = SqliteLedger::open_with_timeout(temp.path(), Duration::from_millis(50)).expect("opens");
+        let (_temp, state) = state();
+        let ledger = SqliteLedger::open_with_timeout(&state, Duration::from_millis(50)).expect("opens");
         let mut holder = rusqlite::Connection::open(ledger.database_path()).expect("second connection");
         let held = holder.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).expect("held");
 
@@ -5504,6 +5554,32 @@ mod tests {
         assert_eq!(outcome.unwrap_err(), LedgerError::Busy);
         drop(held);
     }
+
+    #[test]
+    fn read_only_open_reports_none_and_creates_nothing_when_state_or_database_is_absent() {
+        let temp = tempfile::tempdir().expect("temp");
+        let absent = temp.path().canonicalize().expect("canonical").join("state");
+        assert!(SqliteLedger::open_read_only(&absent).expect("absent dir").is_none());
+        assert!(!absent.exists());
+        let (_temp, state) = state();
+        assert!(SqliteLedger::open_read_only(state.path()).expect("absent db").is_none());
+        assert_eq!(state.names().expect("names"), Vec::<String>::new());
+        std::fs::write(state.path().join("vpt.db"), b"").expect("empty file");
+        assert!(SqliteLedger::open_read_only(state.path()).expect("no schema").is_none());
+        assert_eq!(std::fs::metadata(state.path().join("vpt.db")).expect("db").len(), 0);
+    }
+
+    #[test]
+    fn read_only_open_reads_an_existing_ledger_and_refuses_to_write() {
+        let (_temp, state) = state();
+        SqliteLedger::open(&state).expect("create");
+        std::fs::set_permissions(state.path().join("vpt.db"), std::fs::Permissions::from_mode(0o644)).expect("loosen");
+        let ledger = SqliteLedger::open_read_only(state.path()).expect("opens").expect("present");
+        assert_eq!(ledger.schema_version().expect("version"), 1);
+        assert_eq!(std::fs::metadata(ledger.database_path()).expect("db").permissions().mode() & 0o777, 0o644);
+        let outcome = ledger.transaction(|t| t.execute("DELETE FROM seen", []).map(|_| ()).map_err(map));
+        assert!(matches!(outcome, Err(LedgerError::Io(_))), "{outcome:?}");
+    }
 }
 ```
 
@@ -5511,7 +5587,9 @@ mod tests {
 
 Run: `cargo test -p vpt-adapters ledger`
 
-Expected: compile error, `SqliteLedger` not found.
+Expected: the build fails with `cannot find` for `SqliteLedger`, `OpenError`, `LedgerError` and `map` in
+`ledger::sqlite::tests`, and `unresolved import` for the re-exports in `ledger/mod.rs`. A run that
+selects zero tests does not satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -5530,17 +5608,6 @@ pub enum LedgerError {
 }
 ```
 
-`crates/vpt-application/src/ports/mod.rs` adds `pub mod ledger;`.
-
-`crates/vpt-adapters/src/ledger/mod.rs`:
-
-```rust
-//! The ledger: one SQLite type implementing every repository, and an
-//! in-memory twin that runs the same contract.
-
-pub mod sqlite;
-```
-
 `crates/vpt-adapters/src/ledger/sqlite/migrations.rs`:
 
 ```rust
@@ -5548,7 +5615,7 @@ pub mod sqlite;
 //! a later stage adds columns with a new version, never by editing this one.
 
 use rusqlite::{Connection, TransactionBehavior};
-use vpt_application::ports::ledger::LedgerError;
+use vpt_application::ports::LedgerError;
 
 pub const VERSION: u32 = 1;
 
@@ -5559,7 +5626,7 @@ CREATE TABLE seen (
   size INTEGER NOT NULL,
   mtime_secs INTEGER NOT NULL,
   mtime_nanos INTEGER NOT NULL,
-  dataless INTEGER NOT NULL,
+  flags INTEGER NOT NULL,
   first_seen INTEGER NOT NULL,
   last_seen INTEGER NOT NULL,
   deferral_count INTEGER NOT NULL DEFAULT 0,
@@ -5690,7 +5757,8 @@ pub fn migrate(connection: &mut Connection) -> Result<(), LedgerError> {
     transaction.commit().map_err(super::map)
 }
 
-fn current(connection: &Connection) -> Result<u32, LedgerError> {
+/// The stored version, refused when it is newer than this build understands.
+pub fn current(connection: &Connection) -> Result<u32, LedgerError> {
     let version: u32 = connection.pragma_query_value(None, "user_version", |row| row.get(0)).map_err(super::map)?;
     if version > VERSION {
         return Err(LedgerError::UnsupportedSchema(version));
@@ -5699,40 +5767,96 @@ fn current(connection: &Connection) -> Result<u32, LedgerError> {
 }
 ```
 
-`crates/vpt-adapters/src/ledger/sqlite/mod.rs`:
+`crates/vpt-adapters/src/ledger/sqlite/mod.rs`, above its test module:
 
 ```rust
 //! One SQLite database: WAL, a bounded busy timeout, restrictive modes, and
-//! versioned migrations at open.
+//! versioned migrations at open. Every file it touches is reached through
+//! the state root's descriptor.
 
-pub mod migrations;
+mod migrations;
 
+use crate::contained::{Access, ContainedError, Kind, RootDir};
 use rusqlite::{Connection, ErrorCode, OpenFlags, Transaction, TransactionBehavior};
-use std::fs::DirBuilder;
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use vpt_application::ports::ledger::LedgerError;
+use vpt_application::ports::LedgerError;
 
+pub use migrations::VERSION as SCHEMA_VERSION;
+
+const DATABASE: &str = "vpt.db";
+const SIDE_FILES: [&str; 2] = ["vpt.db-wal", "vpt.db-shm"];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpenError {
+    Contained(ContainedError),
+    Ledger(LedgerError),
+}
+
+impl From<ContainedError> for OpenError {
+    fn from(error: ContainedError) -> OpenError {
+        OpenError::Contained(error)
+    }
+}
+
+impl From<LedgerError> for OpenError {
+    fn from(error: LedgerError) -> OpenError {
+        OpenError::Ledger(error)
+    }
+}
+
+#[derive(Debug)]
 pub struct SqliteLedger {
     path: PathBuf,
     busy_timeout: Duration,
+    read_only: bool,
 }
 
 impl SqliteLedger {
     pub const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
-    pub fn open(state_dir: &Path) -> Result<SqliteLedger, LedgerError> {
-        Self::open_with_timeout(state_dir, Self::BUSY_TIMEOUT)
+    pub fn open(state: &RootDir) -> Result<SqliteLedger, OpenError> {
+        Self::open_with_timeout(state, Self::BUSY_TIMEOUT)
     }
 
-    pub fn open_with_timeout(state_dir: &Path, busy_timeout: Duration) -> Result<SqliteLedger, LedgerError> {
-        DirBuilder::new().recursive(true).mode(0o700).create(state_dir).map_err(io)?;
-        let ledger = SqliteLedger { path: state_dir.join("vpt.db"), busy_timeout };
+    /// Writable: the file is created at 0600 when absent, repaired to 0600 when
+    /// present, refused when a link or a non-file stands at its name, then
+    /// switched to WAL and migrated.
+    pub fn open_with_timeout(state: &RootDir, busy_timeout: Duration) -> Result<SqliteLedger, OpenError> {
+        let database = match state.open_file(Path::new(DATABASE), Access::ReadWrite) {
+            Ok(file) => file,
+            Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => state.create_file(Path::new(DATABASE), 0o600)?,
+            Err(error) => return Err(error.into()),
+        };
+        database.set_permissions(std::fs::Permissions::from_mode(0o600)).map_err(|error| LedgerError::Io(error.to_string()))?;
+        drop(database);
+        no_link_beside(state)?;
+        let ledger = SqliteLedger { path: state.path().join(DATABASE), busy_timeout, read_only: false };
         let mut connection = ledger.connect()?;
-        std::fs::set_permissions(&ledger.path, std::fs::Permissions::from_mode(0o600)).map_err(io)?;
         migrations::migrate(&mut connection)?;
         Ok(ledger)
+    }
+
+    /// Read-only: nothing is created, changed or migrated. `None` when the state
+    /// directory or the database is absent, or the file holds no schema yet.
+    pub fn open_read_only(state_dir: &Path) -> Result<Option<SqliteLedger>, OpenError> {
+        let state = match RootDir::open(state_dir) {
+            Ok(state) => state,
+            Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        let path = match state.regular(Path::new(DATABASE)) {
+            Ok(path) => path,
+            Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        no_link_beside(&state)?;
+        let ledger = SqliteLedger { path, busy_timeout: Self::BUSY_TIMEOUT, read_only: true };
+        match ledger.read(migrations::current)? {
+            0 => Ok(None),
+            _ => Ok(Some(ledger)),
+        }
     }
 
     pub fn database_path(&self) -> &Path {
@@ -5743,11 +5867,13 @@ impl SqliteLedger {
         self.read(|c| c.pragma_query_value(None, "user_version", |row| row.get(0)).map_err(map))
     }
 
-    pub(crate) fn connect(&self) -> Result<Connection, LedgerError> {
-        let flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_NO_MUTEX;
-        let connection = Connection::open_with_flags(&self.path, flags).map_err(map)?;
+    fn connect(&self) -> Result<Connection, LedgerError> {
+        let access = if self.read_only { OpenFlags::SQLITE_OPEN_READ_ONLY } else { OpenFlags::SQLITE_OPEN_READ_WRITE };
+        let connection = Connection::open_with_flags(&self.path, access | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(map)?;
         connection.busy_timeout(self.busy_timeout).map_err(map)?;
-        connection.pragma_update(None, "journal_mode", "WAL").map_err(map)?;
+        if !self.read_only {
+            connection.pragma_update(None, "journal_mode", "WAL").map_err(map)?;
+        }
         connection.pragma_update(None, "foreign_keys", "ON").map_err(map)?;
         Ok(connection)
     }
@@ -5766,6 +5892,19 @@ impl SqliteLedger {
     }
 }
 
+/// SQLite opens the journal and shared-memory files by name beside the
+/// database; a link standing at either name is refused first.
+fn no_link_beside(state: &RootDir) -> Result<(), ContainedError> {
+    for name in SIDE_FILES {
+        match state.stat(Path::new(name)) {
+            Ok(stat) if stat.kind != Kind::File => return Err(ContainedError::NotRegular(state.path().join(name))),
+            Ok(_) | Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn map(error: rusqlite::Error) -> LedgerError {
     match &error {
         rusqlite::Error::SqliteFailure(failure, _) if failure.code == ErrorCode::DatabaseBusy => LedgerError::Busy,
@@ -5780,25 +5919,25 @@ pub(crate) fn map(error: rusqlite::Error) -> LedgerError {
         _ => LedgerError::Io(error.to_string()),
     }
 }
-
-fn io(error: std::io::Error) -> LedgerError {
-    LedgerError::Io(error.to_string())
-}
 ```
 
-`crates/vpt-adapters/src/lib.rs` gains `pub mod ledger;`.
+A zero-length file is an empty SQLite database, so exclusive creation through the descriptor and the
+later connection are two steps with no window in which a link could be followed. The read-only path opens
+the database with `SQLITE_OPEN_READ_ONLY` and sets no journal mode; SQLite creates its own shared-memory
+file beside a WAL database on first read, which is the one file that path can add.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters ledger`
 
-Expected: 4 tests PASS. The busy test finishes in well under a second: the wait is 50 ms.
+Expected: 7 tests PASS. The busy test finishes in well under a second: the wait is 50 ms. Run
+`cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add crates
-SKIP_AI_COMMIT=1 git commit -m "feat(ledger): SQLite open with WAL, permissions and the version 1 schema"
+SKIP_AI_COMMIT=1 git commit -m "feat(ledger): SQLite open through the state root, WAL, the version 1 schema"
 ```
 
 ______________________________________________________________________
