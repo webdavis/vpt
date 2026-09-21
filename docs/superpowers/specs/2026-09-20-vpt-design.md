@@ -244,9 +244,11 @@ Every command vpt spawns (an engine, the helper, the agent command, `dam`, the n
 executed from its argv directly, never through a shell, in its own process group. Writing its stdin,
 draining its stdout and stderr concurrently, and waiting share one deadline: the configured
 `timeout_secs` for an engine or the agent command, 30 seconds for a whole context collection, five
-seconds for a notification or a `notify` or `trash` helper call. At the deadline vpt terminates the
-group, force-kills survivors after one second and reaps the child. Child output is bounded by the
-protocol limits and is never quoted raw in a log line or an error document.
+seconds for a notification and for every helper call other than `transcribe`, `--version` included. At
+the deadline, and when vpt itself is interrupted (`SIGINT`, `SIGTERM` or `SIGHUP`), vpt terminates the
+group, force-kills survivors after one second and reaps the child before it exits, so no engine
+descendant outlives the command that spawned it. Child output is bounded by the protocol limits and is
+never quoted raw in a log line or an error document.
 
 ## 4. The home and the stores
 
