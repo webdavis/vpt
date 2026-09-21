@@ -10946,87 +10946,108 @@ ______________________________________________________________________
 
 ### Task 22: Vanished sources and orphaned archives
 
+An archive file with no ledger row is recovered at the start of every sweep, its source present or not.
+Its identity is the file name's own: the hash half must equal the digest of the whole file, and the
+timestamp half, read back as a civil time, must sit within a day of the container's capture instant,
+which yields the zone the file was named in. The machine's current zone plays no part, so an archive made
+in another zone recovers with the offset it was made in.
+
 **Files:**
 
+- Create: `crates/vpt-application/src/ingest/recovery.rs`
 - Modify: `crates/vpt-application/src/ingest/mod.rs`
 - Test: `crates/vpt-adapters/tests/ingest_recovery.rs`
 
 **Interfaces:**
 
-- Consumes: `RecordingLedger::{seen_all, record_seen, commit_recovered}`,
-  `Archive::{archived, open, digest}`.
+- Consumes: `RecordingLedger::{seen_all, record_seen, by_id, commit}`,
+  `Archive::{archived, open, size, read_at, digest, sync_existing}`,
+  `vpt_domain::identity::parse_local_timestamp`, `Civil::instant`.
 
-- Produces: `Ingest::recover_orphans` and `Ingest::mark_gone` (private).
+- Produces: `Ingest::recover_orphans` and `Ingest::mark_gone` (private), and the free function
+  `recovery::archived_offset(id: &RecordingId, captured: UtcInstant) -> Option<UtcOffset>`.
 
 - [ ] **Step 1: Write the failing tests**
+
+`crates/vpt-adapters/tests/ingest_recovery.rs`:
 
 ```rust
 mod support;
 
-use support::{CAPTURED, Fixture, RecordingNotifier, RecordingTrash, clock};
-use vpt_application::ingest::Ingest;
-use vpt_application::ports::ledger::RecordingLedger;
+use support::{CAPTURED, Fixture, clock, digest_of};
+use vpt_application::Mode;
+use vpt_application::ports::{Archive, RecordingLedger};
 use vpt_domain::fixtures::m4a;
 use vpt_domain::identity::RecordingId;
-use vpt_domain::time::UtcInstant;
+use vpt_domain::time::{UtcInstant, UtcOffset};
 
 #[test]
 fn a_recording_whose_source_disappeared_is_marked_gone_and_its_clone_stays() {
     let fixture = Fixture::new();
     let source = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
-    let first = ingest.run().expect("first");
+    let parts = fixture.parts();
+    let first = parts.ingest().run(&Mode::default()).expect("first");
     std::fs::remove_file(&source).expect("the operator deleted the memo; test setup only");
 
-    ingest.run().expect("second");
+    parts.ingest().run(&Mode::default()).expect("second");
 
-    let row = ledger.seen(&source).expect("seen").expect("row");
-    assert_eq!(row.source_gone_at, Some(UtcInstant { secs: CAPTURED + 3_600 }));
+    let row = parts.ledger.seen(&source).expect("seen").expect("row");
+    assert_eq!(row.source_gone_at, Some(clock().now));
     assert!(first.ingested[0].audio_path.exists());
-    assert!(notifier.0.borrow().is_empty());
+    assert!(parts.events().is_empty());
 }
 
 #[test]
-fn an_archive_file_with_no_ledger_row_is_recovered_at_the_start_of_the_sweep_even_without_its_source() {
+fn an_archive_with_no_ledger_row_is_recovered_at_the_start_of_the_sweep_in_the_zone_it_was_named_in() {
     let fixture = Fixture::new();
     let bytes = m4a(CAPTURED, 7, b"orphan");
-    let (store, archive, settings) = (fixture.store(), fixture.archive(), fixture.settings());
-    let digest = {
-        let temp = fixture.temp.path().join("scratch.m4a");
-        std::fs::write(&temp, &bytes).expect("scratch");
-        vpt_adapters::stores::digest_file(&temp).expect("digest")
-    };
-    let id = RecordingId::derive(UtcInstant { secs: CAPTURED }, clock().offset, &digest);
+    let digest = digest_of(&bytes);
+    let elsewhere = UtcOffset { secs: 19_800 };
+    let id = RecordingId::derive(UtcInstant { secs: CAPTURED }, elsewhere, &digest).expect("id");
     std::fs::write(fixture.audio.join(format!("{id}.m4a")), &bytes).expect("orphan archive");
-    let ledger = fixture.ledger();
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    let parts = fixture.parts();
 
-    let report = ingest.run().expect("sweep");
+    let report = parts.ingest().run(&Mode::default()).expect("sweep");
 
     assert_eq!(report.recovered, vec![id.clone()]);
-    let record = ledger.by_id(&id).expect("read").expect("recovered");
+    let record = parts.ledger.by_id(&id).expect("read").expect("recovered");
     assert_eq!(record.source_path, None);
     assert_eq!(record.duration_secs, 7);
     assert_eq!(record.digest, digest);
+    assert_eq!(record.captured_at, UtcInstant { secs: CAPTURED });
+    assert_eq!(record.captured_offset, elsewhere);
+    assert_eq!(record.audio_path, fixture.audio.join(format!("{id}.m4a")));
+}
+
+#[test]
+fn an_orphan_named_in_the_local_zone_recovers_with_that_offset_too() {
+    let fixture = Fixture::new();
+    let bytes = m4a(CAPTURED, 3, b"local orphan");
+    let id = RecordingId::derive(UtcInstant { secs: CAPTURED }, clock().offset, &digest_of(&bytes)).expect("id");
+    std::fs::write(fixture.audio.join(format!("{id}.m4a")), &bytes).expect("orphan archive");
+    let parts = fixture.parts();
+
+    let report = parts.ingest().run(&Mode::default()).expect("sweep");
+
+    assert_eq!(report.recovered, vec![id.clone()]);
+    assert_eq!(parts.ledger.by_id(&id).expect("read").expect("recovered").captured_offset, UtcOffset { secs: -21_600 });
 }
 
 #[test]
 fn an_archive_file_whose_name_does_not_match_its_bytes_is_logged_and_left_alone() {
     let fixture = Fixture::new();
-    std::fs::write(fixture.audio.join("2026-08-24T144736-000000000000.m4a"), m4a(CAPTURED, 1, b"x")).expect("mismatch");
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    std::fs::write(fixture.audio.join("2026-08-24T144736-000000000000.m4a"), m4a(CAPTURED, 1, b"x")).expect("wrong hash");
+    let far = RecordingId::derive(UtcInstant { secs: CAPTURED + 200_000 }, clock().offset, &digest_of(&m4a(CAPTURED, 1, b"y"))).expect("id");
+    std::fs::write(fixture.audio.join(format!("{far}.m4a")), m4a(CAPTURED, 1, b"y")).expect("wrong timestamp");
+    let parts = fixture.parts();
 
-    let report = ingest.run().expect("sweep");
+    let report = parts.ingest().run(&Mode::default()).expect("sweep");
 
     assert!(report.recovered.is_empty());
-    assert!(report.log.iter().any(|line| line.contains("does not match")), "{:?}", report.log);
-    assert!(ledger.recordings().expect("list").is_empty());
-    assert_eq!(archive.archived().expect("archived").len(), 1);
+    assert!(report.log.iter().any(|line| line.contains("does not match its bytes")), "{:?}", report.log);
+    assert!(report.log.iter().any(|line| line.contains("capture instant")), "{:?}", report.log);
+    assert!(parts.ledger.recordings().expect("list").is_empty());
+    assert_eq!(parts.archive.archived().expect("archived").len(), 2);
 }
 ```
 
@@ -11035,49 +11056,57 @@ fn an_archive_file_whose_name_does_not_match_its_bytes_is_logged_and_left_alone(
 Run: `cargo test -p vpt-adapters --test ingest_recovery`
 
 Expected: the gone test FAILS on `source_gone_at == None`; the two orphan tests FAIL on an empty
-`recovered` and an empty log.
+`recovered`; the mismatch test FAILS on an empty log.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-In `crates/vpt-application/src/ingest/mod.rs`, `sweep` becomes:
+`crates/vpt-application/src/ingest/recovery.rs`:
 
 ```rust
-    fn sweep(&self, report: &mut IngestReport) -> Result<(), IngestFailure> {
-        self.recover_orphans(report)?;
-        let candidates = self.recorder.candidates().map_err(|error| IngestFailure::StoreUnreadable(format!("{error:?}")))?;
-        let titles = if self.settings.read_titles { Some(self.recorder.titles()) } else { None };
-        for candidate in &candidates {
-            self.process(candidate, titles.as_deref(), report)?;
-        }
-        self.mark_gone(&candidates, report)
-    }
+//! Before the candidates: recover archive files with no row, and after them:
+//! mark the sources that vanished.
 
-    fn recover_orphans(&self, report: &mut IngestReport) -> Result<(), IngestFailure> {
-        for path in self.archive.archived().map_err(|error| IngestFailure::Archive(format!("{error:?}")))? {
-            let name = path.file_stem().map(|stem| stem.to_string_lossy().into_owned()).unwrap_or_default();
-            let Ok(named) = RecordingId::parse(&name) else {
+use super::publish::archive_failure;
+use super::{Ingest, IngestFailure, IngestReport};
+use crate::ports::{Archive, Candidate, Clock, LedgerCommit, Notifier, RecorderStore, RecordingLedger, RecordingRecord, StageStates, TitleOrigin, Trash};
+use vpt_domain::identity::{RecordingId, parse_local_timestamp};
+use vpt_domain::time::{UtcInstant, UtcOffset};
+
+impl<R, A, L, C, T, N> Ingest<'_, R, A, L, C, T, N>
+where
+    R: RecorderStore,
+    A: Archive,
+    L: RecordingLedger,
+    C: Clock,
+    T: Trash,
+    N: Notifier,
+{
+    pub(super) fn recover_orphans(&self, report: &mut IngestReport) -> Result<(), IngestFailure> {
+        for path in self.archive.archived().map_err(archive_failure)? {
+            let name = path.file_stem().and_then(|stem| stem.to_str()).unwrap_or_default();
+            let Ok(named) = RecordingId::parse(name) else {
                 report.log.push(format!("{}: not an archive name, left alone", path.display()));
                 continue;
             };
             if self.ledger.by_id(&named).map_err(IngestFailure::Ledger)?.is_some() {
                 continue;
             }
-            let mut reader = self.archive.open(&path).map_err(|error| IngestFailure::Archive(format!("{error:?}")))?;
-            let container = match inspect(&mut *reader) {
+            let container = match self.inspect_archive(&path)? {
                 Ok(container) => container,
                 Err(error) => {
                     report.log.push(format!("{}: container invalid ({error:?}), left alone", path.display()));
                     continue;
                 }
             };
-            drop(reader);
-            let digest = self.archive.digest(&path).map_err(|error| IngestFailure::Archive(format!("{error:?}")))?;
-            let offset = self.clock.offset_at(container.creation_time);
-            let derived = RecordingId::derive(container.creation_time, offset, &digest);
-            if derived != named {
-                report.log.push(format!("{}: name does not match its bytes ({derived}), left alone", path.display()));
+            let digest = self.archive.digest(&path).map_err(archive_failure)?;
+            if digest.hash12() != named.hash12() {
+                report.log.push(format!("{}: name does not match its bytes, left alone", path.display()));
                 continue;
             }
+            let Some(offset) = archived_offset(&named, container.creation_time) else {
+                report.log.push(format!("{}: name does not match its capture instant, left alone", path.display()));
+                continue;
+            };
             let record = RecordingRecord {
                 id: named.clone(),
                 source_path: None,
@@ -11092,14 +11121,16 @@ In `crates/vpt-application/src/ingest/mod.rs`, `sweep` becomes:
                 stages: StageStates::fresh(),
                 audio_trashed_at: None,
             };
-            self.ledger.commit_recovered(&record).map_err(IngestFailure::Ledger)?;
+            self.archive.sync_existing(&path).map_err(archive_failure)?;
+            let batch = LedgerCommit { recordings: vec![record], ..LedgerCommit::default() };
+            self.ledger.commit(&batch).map_err(IngestFailure::Ledger)?;
             report.log.push(format!("{named}: archive recovered into the ledger"));
             report.recovered.push(named);
         }
         Ok(())
     }
 
-    fn mark_gone(&self, candidates: &[Candidate], report: &mut IngestReport) -> Result<(), IngestFailure> {
+    pub(super) fn mark_gone(&self, candidates: &[Candidate], report: &mut IngestReport) -> Result<(), IngestFailure> {
         let now = self.clock.now();
         for mut row in self.ledger.seen_all().map_err(IngestFailure::Ledger)? {
             let present = candidates.iter().any(|candidate| candidate.path == row.path);
@@ -11111,16 +11142,48 @@ In `crates/vpt-application/src/ingest/mod.rs`, `sweep` becomes:
         }
         Ok(())
     }
+}
+
+/// The zone an archive was named in: its local timestamp read as a civil
+/// time, against the container's instant, when the difference is under a day.
+pub(super) fn archived_offset(id: &RecordingId, captured: UtcInstant) -> Option<UtcOffset> {
+    let civil = parse_local_timestamp(id.local_timestamp()).ok()?;
+    let as_utc = civil.instant(UtcOffset { secs: 0 })?;
+    let offset = i32::try_from(i128::from(as_utc.secs) - i128::from(captured.secs)).ok()?;
+    (offset.unsigned_abs() < 86_400).then_some(UtcOffset { secs: offset })
+}
 ```
 
-with imports `use crate::ports::ledger::StageStates;`, `use crate::ports::recorder::Candidate;`,
-`use vpt_domain::container::inspect;`.
+In `crates/vpt-application/src/ingest/mod.rs`, add `mod recovery;` beside the other two and make `sweep`
+call both ends:
+
+```rust
+    fn sweep(&self, mode: &Mode, report: &mut IngestReport) -> Result<(), IngestFailure> {
+        if !mode.dry_run {
+            self.recover_orphans(report)?;
+        }
+        let candidates = match &mode.once {
+            Some(path) => vec![self.recorder.candidate(path).map_err(candidate::recorder_failure)?],
+            None => self.recorder.candidates().map_err(|error| IngestFailure::StoreUnreadable(format!("{error:?}")))?,
+        };
+        for candidate in &candidates {
+            self.process(candidate, mode, report)?;
+        }
+        if mode.once.is_none() && !mode.dry_run {
+            self.mark_gone(&candidates, report)?;
+        }
+        Ok(())
+    }
+```
+
+`inspect_archive` and `archive_failure` are the ones `publish.rs` already defines.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters --test 'ingest_*'`
 
-Expected: all PASS.
+Expected: all PASS. Run `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings` and
+expect no warnings.
 
 - [ ] **Step 5: Commit**
 
