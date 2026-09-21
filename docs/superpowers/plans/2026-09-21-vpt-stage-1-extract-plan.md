@@ -1903,16 +1903,19 @@ ______________________________________________________________________
 
 **Interfaces:**
 
-- Consumes: `schema::{KEYS, spec_for, Kind}`, `load::{ConfigError, get}` (Task 3).
+- Consumes: `config::{spec_for, Kind, Kind::expected, ConfigError, load_text}` (Task 3).
 
-- Produces:
-  `vpt_domain::duration::{parse_duration(text: &str) -> Result<u64, DurationError>, DurationError}`
-  (seconds); `config::validate::validate(table: &toml::Table) -> Result<(), ConfigError>`, called at the
-  end of `load_text`.
+- Produces: `vpt_domain::duration::parse_duration(text: &str) -> Result<u64, DurationError>` (seconds)
+  and `DurationError::{MissingUnit, UnknownUnit(char), NotAPositiveInteger, Overflow}`;
+  `ConfigError::key(&self) -> Option<&str>` (the key a refusal names);
+  `config::validate::validate(table: &toml::Table) -> Result<(), ConfigError>`, a private module of
+  `config` called at the end of `load_text`.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-domain/src/duration.rs`, test section:
+Declare the modules first: `crates/vpt-domain/src/lib.rs` gains `pub mod duration;` and
+`crates/vpt-adapters/src/config/mod.rs` gains `mod validate;`, so both test modules are compiled and
+selected by the red run. `crates/vpt-domain/src/duration.rs` starts as its test module alone:
 
 ```rust
 #[cfg(test)]
@@ -1951,12 +1954,12 @@ mod tests {
 }
 ```
 
-`crates/vpt-adapters/src/config/validate.rs`, test section:
+`crates/vpt-adapters/src/config/validate.rs`, likewise the test module alone:
 
 ```rust
 #[cfg(test)]
 mod tests {
-    use crate::config::load::{ConfigError, load_text};
+    use crate::config::{ConfigError, load_text};
 
     fn with(body: &str) -> Result<toml::Table, ConfigError> {
         load_text(&format!("config_version = 1\n{body}"))
@@ -1969,25 +1972,39 @@ mod tests {
     }
 
     #[test]
+    fn a_ratio_accepts_integer_endpoints_and_refuses_a_non_finite_number() {
+        assert!(with("[reconcile]\nconfidence_floor = 0\n").is_ok());
+        assert!(with("[reconcile]\nconfidence_floor = 1\n").is_ok());
+        assert!(with("[reconcile]\nmax_divergence_ratio = 1\n").is_ok());
+        assert_eq!(with("[reconcile]\nconfidence_floor = inf\n").unwrap_err().key(), Some("reconcile.confidence_floor"));
+    }
+
+    #[test]
     fn the_divergence_ratio_must_be_above_zero() {
         let error = with("[reconcile]\nmax_divergence_ratio = 0.0\n").unwrap_err();
         assert_eq!(error.key(), Some("reconcile.max_divergence_ratio"));
+        assert_eq!(with("[reconcile]\nmax_divergence_ratio = 0\n").unwrap_err().key(), Some("reconcile.max_divergence_ratio"));
     }
 
     #[test]
-    fn a_positive_integer_refuses_zero() {
+    fn a_positive_integer_refuses_zero_and_accepts_the_32_bit_maximum() {
         let error = with("[source]\nquiet_period_secs = 0\n").unwrap_err();
         assert_eq!(error, ConfigError::OutOfRange { key: "source.quiet_period_secs".into(), rule: "a positive 32-bit integer".into() });
+        assert!(with("[source]\nquiet_period_secs = 4294967295\n").is_ok());
     }
 
     #[test]
-    fn a_non_negative_integer_accepts_zero_and_refuses_minus_one() {
-        assert!(with("[relations]\nsession_gap_minutes = 0\n").is_ok());
-        assert_eq!(with("[relations]\nsession_gap_minutes = -1\n").unwrap_err().key(), Some("relations.session_gap_minutes"));
+    fn a_count_accepts_zero_and_the_32_bit_maximum_and_refuses_what_lies_outside() {
+        for key in ["tags]\nmax_per_note", "tags]\nmax_suggested", "brief]\nmax_notes", "brief]\nmax_spans_per_note", "relations]\nsession_gap_minutes"] {
+            assert!(with(&format!("[{key} = 0\n")).is_ok(), "{key} = 0");
+            assert!(with(&format!("[{key} = 4294967295\n")).is_ok(), "{key} = u32::MAX");
+            assert!(with(&format!("[{key} = -1\n")).is_err(), "{key} = -1");
+            assert!(with(&format!("[{key} = 4294967296\n")).is_err(), "{key} = u32::MAX + 1");
+        }
     }
 
     #[test]
-    fn a_32_bit_key_refuses_a_value_above_i32() {
+    fn a_32_bit_key_refuses_a_value_above_32_bits() {
         assert_eq!(with("[engines]\ntimeout_secs = 4294967296\n").unwrap_err().key(), Some("engines.timeout_secs"));
         assert!(with("[source]\nmax_audio_bytes = 4294967296\n").is_ok());
     }
@@ -2022,12 +2039,15 @@ mod tests {
 
 Run: `cargo test -p vpt-domain duration`
 
-Expected: compile error, `parse_duration` not found.
+Expected: the build of the `duration::tests` module fails with `cannot find` for `parse_duration` and
+`DurationError`. The module is compiled and selected; a run that selects zero tests, or that succeeds,
+does not satisfy this step.
 
 Run: `cargo test -p vpt-adapters validate`
 
-Expected: compile error, `ConfigError::key` not found; after adding it, every test but the two `is_ok`
-assertions FAILS because `load_text` accepts anything the table names.
+Expected: the build of the `validate::tests` module fails, `no method named key` on `ConfigError`. Once
+Step 3 adds `key` and nothing else, every test but the `is_ok` assertions FAILS because `load_text`
+accepts anything the table names; the whole of Step 3 turns them green.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -2074,15 +2094,7 @@ pub fn parse_duration(text: &str) -> Result<u64, DurationError> {
 }
 ```
 
-`crates/vpt-domain/src/lib.rs`:
-
-```rust
-//! Pure policy: identity, the wholeness gate, sweep gates, retention and value types.
-
-pub mod duration;
-```
-
-`crates/vpt-adapters/src/config/validate.rs`:
+`crates/vpt-adapters/src/config/validate.rs`, above its test module:
 
 ```rust
 //! The value rules of spec section 10, applied by kind from the key table.
@@ -2110,35 +2122,41 @@ fn walk(table: &Table, prefix: &str) -> Result<(), ConfigError> {
     Ok(())
 }
 
+/// A TOML number as f64: a float as is, an integer widened, so `0` and `1`
+/// are valid ratio endpoints.
+fn number(value: &Value) -> Option<f64> {
+    value.as_float().or_else(|| value.as_integer().map(|n| n as f64))
+}
+
 fn check(key: &str, kind: Kind, value: &Value) -> Result<(), ConfigError> {
-    let wrong = |expected: &str| ConfigError::WrongType { key: key.into(), expected: expected.into() };
+    let wrong = || ConfigError::WrongType { key: key.into(), expected: kind.expected().into() };
     let range = |rule: &str| ConfigError::OutOfRange { key: key.into(), rule: rule.into() };
     match kind {
-        Kind::Bool => value.as_bool().map(|_| ()).ok_or_else(|| wrong("boolean")),
+        Kind::Bool => value.as_bool().map(|_| ()).ok_or_else(wrong),
         Kind::PositiveInt => match value.as_integer() {
-            Some(n) if n >= 1 && n <= i64::from(i32::MAX) => Ok(()),
+            Some(n) if n >= 1 && n <= i64::from(u32::MAX) => Ok(()),
             Some(_) => Err(range("a positive 32-bit integer")),
-            None => Err(wrong("integer")),
+            None => Err(wrong()),
         },
         Kind::NonNegativeInt => match value.as_integer() {
-            Some(n) if n >= 0 && n <= i64::from(i32::MAX) => Ok(()),
+            Some(n) if n >= 0 && n <= i64::from(u32::MAX) => Ok(()),
             Some(_) => Err(range("a non-negative 32-bit integer")),
-            None => Err(wrong("integer")),
+            None => Err(wrong()),
         },
         Kind::PositiveInt64 => match value.as_integer() {
             Some(n) if n >= 1 => Ok(()),
             Some(_) => Err(range("a positive 64-bit integer")),
-            None => Err(wrong("integer")),
+            None => Err(wrong()),
         },
-        Kind::Ratio => match value.as_float() {
+        Kind::Ratio => match number(value) {
             Some(f) if f.is_finite() && (0.0..=1.0).contains(&f) => Ok(()),
             Some(_) => Err(range("a ratio in [0, 1]")),
-            None => Err(wrong("number")),
+            None => Err(wrong()),
         },
-        Kind::RatioAboveZero => match value.as_float() {
+        Kind::RatioAboveZero => match number(value) {
             Some(f) if f.is_finite() && f > 0.0 && f <= 1.0 => Ok(()),
             Some(_) => Err(range("a ratio in (0, 1]")),
-            None => Err(wrong("number")),
+            None => Err(wrong()),
         },
         Kind::Duration => match value {
             Value::Integer(0) => Ok(()),
@@ -2148,12 +2166,12 @@ fn check(key: &str, kind: Kind, value: &Value) -> Result<(), ConfigError> {
         Kind::Enum(options) => match value.as_str() {
             Some(text) if options.contains(&text) => Ok(()),
             Some(_) => Err(range(&format!("one of {}", options.join(", ")))),
-            None => Err(wrong("string")),
+            None => Err(wrong()),
         },
-        Kind::Text | Kind::Secret => value.as_str().map(|_| ()).ok_or_else(|| wrong("string")),
+        Kind::Text | Kind::Secret => value.as_str().map(|_| ()).ok_or_else(wrong),
         Kind::TextList | Kind::Argv => match value.as_array() {
             Some(items) if items.iter().all(Value::is_str) => Ok(()),
-            _ => Err(wrong("list of strings")),
+            _ => Err(wrong()),
         },
     }
 }
@@ -2181,13 +2199,13 @@ and in `load_text`, replace `Ok(merged)` with:
     Ok(merged)
 ```
 
-`crates/vpt-adapters/src/config/mod.rs` gains `pub mod validate;`.
+`validate` stays a private module of `config`: nothing outside the loader calls it.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-domain -p vpt-adapters`
 
-Expected: all PASS, including Task 3's tests.
+Expected: all PASS, Task 3's fifteen tests included.
 
 - [ ] **Step 5: Commit**
 
