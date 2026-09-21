@@ -9074,9 +9074,11 @@ ______________________________________________________________________
 
 ### Task 19: The ingest use case, happy path
 
-The sweep runs over real adapters in these tests (a fixture directory, the clone archive and the SQLite
+The sweep runs over real adapters in these tests (a fixture container, the clone archive and the SQLite
 ledger in a temporary directory) with three small fakes for the clock, the Trash and the notifier, so the
-tests exercise the code that ships. They live as integration tests of the adapters crate.
+tests exercise the code that ships. They live as integration tests of the adapters crate. The use case is
+generic over its six ports; nothing in it names a handle type, and the wholeness gate reads through the
+recorder's and the archive's `read_at`.
 
 **Files:**
 
@@ -9090,8 +9092,8 @@ tests exercise the code that ships. They live as integration tests of the adapte
 
 **Interfaces:**
 
-- Consumes: every port so far, `RecordingLedger` (with `seen_all` and `commit_recovered`), the domain
-  gates and `inspect`.
+- Consumes: every port so far, `RecordingLedger::{seen, record_seen, commit}`, the domain gates and
+  `inspect`.
 
 - Produces:
 
@@ -9105,33 +9107,49 @@ tests exercise the code that ships. They live as integration tests of the adapte
     `Notification::attention(event, recording: Option<RecordingId>, detail: String,`
     `paths: Vec<(String, PathBuf)>, at: UtcInstant)`,
     `Notification::done(event, detail: String, counts: Vec<(String, u64)>, at: UtcInstant)`.
-  - `vpt_application::ports::clock::Clock { fn now(&self) -> UtcInstant; fn offset_at(&self,`
-    `at: UtcInstant) -> UtcOffset; }`;
-    `ports::trash::{TrashError::{HelperAbsent, Failed(String), Unknown(String)},`
-    `Trash { fn trash(&self, path: &Path) -> Result<PathBuf, TrashError>; }}`;
-    `ports::notifier::{DeliveryOutcome::{Delivered, Suppressed, Failed(String)},`
-    `Notifier { fn deliver(&self, notification: &Notification) -> DeliveryOutcome; }}`.
-  - `vpt_application::ingest::{Ingest<'a> { pub recorder: &'a dyn RecorderStore,`
-    `pub archive: &'a dyn Archive, pub ledger: &'a dyn RecordingLedger,`
-    `pub clock: &'a dyn Clock, pub trash: &'a dyn Trash, pub notifier: &'a dyn Notifier,`
-    `pub settings: &'a SourceSettings }, IngestReport { pub ingested: Vec<RecordingRecord>,`
-    `pub already_ingested: Vec<RecordingId>, pub recovered: Vec<RecordingId>,`
-    `pub deferred: Vec<Deferred>, pub skipped: u64, pub would_ingest: Vec<WouldIngest>,`
-    `pub log: Vec<String> }, Deferred { pub path: PathBuf, pub reason: DeferralReason },`
-    `WouldIngest { pub path: PathBuf, pub title: Option<String>,`
-    `pub title_source: TitleOrigin }, IngestFailure,`
-    `IngestError { pub failure: IngestFailure, pub completed: Vec<RecordingId> }}` and
-    `Ingest::run(&self) -> Result<IngestReport, IngestError>` (Task 23 changes the signature to take a
-    `Mode`).
-  - Test support: `support::Fixture::new() -> Fixture` with fields `temp`, `recordings`, `audio`, `state`
-    and methods `add_recording(&self, name: &str, bytes: &[u8]) -> PathBuf` (mtime set 60 s in the past),
-    `store(&self) -> VoiceMemosStore`, `archive(&self) -> ClonefileArchive`,
-    `ledger(&self) -> SqliteLedger`, `settings(&self) -> SourceSettings`,
-    `entries(&self) -> Vec<(String, u64, i64, u32)>` (name, size, mtime, flags of every entry in the
-    recordings directory); `support::FixedClock { pub now: UtcInstant, pub offset: UtcOffset }`;
-    `support::RecordingTrash::new(dir: PathBuf) -> RecordingTrash` with
-    `pub moved: RefCell<Vec<PathBuf>>` and `pub absent: Cell<bool>`;
-    `support::RecordingNotifier(pub RefCell<Vec<Notification>>)`; `support::CAPTURED: i64`.
+  - `vpt_application::ports::{Clock, Trash, TrashError, Notifier, DeliveryOutcome}`:
+    `trait Clock { fn now(&self) -> UtcInstant; fn offset_at(&self, at: UtcInstant) -> UtcOffset; }`;
+    `TrashError::{HelperAbsent, Failed(String), Unknown(String)}`,
+    `trait Trash { fn trash(&self, path: &Path) -> Result<PathBuf, TrashError>; }`;
+    `DeliveryOutcome::{Delivered, Suppressed, Failed(String)}`,
+    `trait Notifier { fn deliver(&self, notification: &Notification) -> DeliveryOutcome; }`.
+  - `vpt_application::{Ingest, Mode, IngestReport, Deferred, WouldIngest, IngestFailure, IngestError}`
+    (the file `ingest/` stays private, `lib.rs` re-exports these):
+    `Ingest<'a, R, A, L, C, T, N> { pub recorder: &'a R, pub archive: &'a A, pub ledger: &'a L,`
+    `pub clock: &'a C, pub trash: &'a T, pub notifier: &'a N, pub settings: &'a SourceSettings }` with
+    `R: RecorderStore, A: Archive, L: RecordingLedger, C: Clock, T: Trash, N: Notifier`;
+    `Mode { pub dry_run: bool, pub once: Option<PathBuf> }` (`Default` is the full sweep);
+    `IngestReport { pub ingested: Vec<RecordingRecord>, pub already_ingested: Vec<RecordingId>,`
+    `pub recovered: Vec<RecordingId>, pub deferred: Vec<Deferred>, pub skipped: u64,`
+    `pub would_ingest: Vec<WouldIngest>, pub log: Vec<String> }`;
+    `Deferred { pub path: PathBuf, pub reason: DeferralReason }`;
+    `WouldIngest { pub path: PathBuf, pub title: Option<String>, pub title_source: TitleOrigin }`;
+    `IngestFailure::{StoreUnreadable(String), EmptyStore, NoSpace, Sync(String),`
+    `ArchiveCollision { target: PathBuf, staged: Sha256Digest, existing: Sha256Digest },`
+    `PathEscape(PathBuf), Ledger(LedgerError), Archive(String), Recorder(String)}` with
+    `fn message(&self) -> String`; `IngestError { pub failure: IngestFailure,`
+    `pub completed: Vec<RecordingId>, pub log: Vec<String> }` (`completed` holds every identity the run
+    recovered or ingested, deduplicated; `log` is the run's log up to the failure);
+    `Ingest::run(&self, mode: &Mode) -> Result<IngestReport, IngestError>`. This task supports the full
+    sweep and `once`; Task 20 adds the gates, Task 21 the duplicates, Task 22 recovery, Task 23 the dry
+    run and the aborts.
+  - Test support in `crates/vpt-adapters/tests/support/mod.rs`: `Fixture::new() -> Fixture` with the
+    public fields `temp`, `container` (a canonical `voice-memos` directory holding `Recordings/`, the
+    four Apple subdirectories each with one inner file, and a live `CloudRecordings.db` in WAL mode whose
+    connection the fixture keeps open), `recordings`, `audio`, `state`; methods
+    `add_recording(&self, name: &str, bytes: &[u8]) -> PathBuf` (mtime 60 s before the fixed clock),
+    `set_mtime(&self, path: &Path, secs: i64)`, `add_title(&self, path: &str, label: &str)`,
+    `store(&self) -> VoiceMemosStore`, `titled_store(&self, refresh: bool) -> VoiceMemosStore`,
+    `archive(&self) -> ClonefileArchive`, `ledger(&self) -> SqliteLedger`,
+    `settings(&self) -> SourceSettings`, `parts(&self) -> Parts`, `entries(&self) -> Vec<Entry>` (every
+    entry below the container, recursively: relative path, size, mtime seconds and nanoseconds, flags);
+    `Parts { store, archive, ledger, clock, trash, notifier, settings }` with
+    `fn ingest(&self) -> RealIngest<'_>` and `fn events(&self) -> Vec<EventKind>`;
+    `FixedClock { pub now: UtcInstant, pub offset: UtcOffset }` (`Copy`) and `clock() -> FixedClock` (an
+    August 2026 instant an hour after `CAPTURED`, offset `-21_600`); `RecordingTrash::new(dir: PathBuf)`
+    with `pub moved: RefCell<Vec<PathBuf>>` and `pub absent: Cell<bool>`;
+    `RecordingNotifier(pub RefCell<Vec<Notification>>)`; `CAPTURED: i64 = 1_787_604_456`;
+    `digest_of(bytes: &[u8]) -> Sha256Digest`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -9143,58 +9161,94 @@ tests exercise the code that ships. They live as integration tests of the adapte
 
 #![allow(dead_code)]
 
+use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
+use std::os::macos::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, UNIX_EPOCH};
 use vpt_adapters::archive::ClonefileArchive;
-use vpt_adapters::ledger::sqlite::SqliteLedger;
-use vpt_adapters::voice_memos::store::VoiceMemosStore;
-use vpt_application::ports::clock::Clock;
-use vpt_application::ports::notifier::{DeliveryOutcome, Notifier};
-use vpt_application::ports::trash::{Trash, TrashError};
-use vpt_application::settings::SourceSettings;
-use vpt_domain::notification::Notification;
+use vpt_adapters::contained::RootDir;
+use vpt_adapters::ledger::SqliteLedger;
+use vpt_adapters::voice_memos::{APPLE_SUBDIRECTORIES, VoiceMemosStore};
+use vpt_application::ports::{Clock, DeliveryOutcome, Notifier, Trash, TrashError};
+use vpt_application::{Ingest, SourceSettings};
+use vpt_domain::digest::Sha256Digest;
+use vpt_domain::notification::{EventKind, Notification};
 use vpt_domain::time::{UtcInstant, UtcOffset};
 
-pub const CAPTURED: i64 = 1_787_690_856;
+pub const CAPTURED: i64 = 1_787_604_456;
+
+/// Relative path, size, mtime seconds, mtime nanoseconds, flags.
+pub type Entry = (PathBuf, u64, i64, i64, u32);
+
+pub type RealIngest<'a> = Ingest<'a, VoiceMemosStore, ClonefileArchive, SqliteLedger, FixedClock, RecordingTrash, RecordingNotifier>;
 
 pub struct Fixture {
     pub temp: tempfile::TempDir,
+    pub container: PathBuf,
     pub recordings: PathBuf,
     pub audio: PathBuf,
     pub state: PathBuf,
+    live_database: rusqlite::Connection,
 }
 
 impl Fixture {
     pub fn new() -> Fixture {
         let temp = tempfile::tempdir().expect("temp");
-        let recordings = temp.path().join("Recordings");
-        let audio = temp.path().join("home/audio");
-        let state = temp.path().join("state");
+        let base = temp.path().canonicalize().expect("canonical");
+        let container = base.join("voice-memos");
+        let recordings = container.join("Recordings");
+        let audio = base.join("home/audio");
+        let state = base.join("state/vpt");
         for dir in [&recordings, &audio, &state] {
             std::fs::create_dir_all(dir).expect("fixture dir");
         }
-        Fixture { temp, recordings, audio, state }
+        for name in APPLE_SUBDIRECTORIES {
+            std::fs::create_dir(recordings.join(name)).expect("apple subdirectory");
+            std::fs::write(recordings.join(name).join("inner.m4a"), b"never listed").expect("inner");
+        }
+        let live_database = rusqlite::Connection::open(container.join("CloudRecordings.db")).expect("live db");
+        live_database.pragma_update(None, "journal_mode", "WAL").expect("wal");
+        live_database
+            .execute_batch("CREATE TABLE ZCLOUDRECORDING (Z_PK INTEGER PRIMARY KEY, ZPATH TEXT, ZCUSTOMLABEL TEXT)")
+            .expect("schema");
+        Fixture { temp, container, recordings, audio, state, live_database }
     }
 
+    /// A source file whose mtime sits 60 s before the fixed clock.
     pub fn add_recording(&self, name: &str, bytes: &[u8]) -> PathBuf {
         let path = self.recordings.join(name);
         std::fs::write(&path, bytes).expect("recording");
-        let file = std::fs::File::options().write(true).open(&path).expect("open for times");
-        file.set_times(std::fs::FileTimes::new().set_modified(SystemTime::now() - Duration::from_secs(60))).expect("mtime");
+        self.set_mtime(&path, clock().now.secs - 60);
         path
     }
 
+    pub fn set_mtime(&self, path: &Path, secs: i64) {
+        let at = UNIX_EPOCH + Duration::from_secs(u64::try_from(secs).expect("fixture epoch"));
+        let file = std::fs::File::options().write(true).open(path).expect("open for times");
+        file.set_times(std::fs::FileTimes::new().set_modified(at)).expect("mtime");
+    }
+
+    pub fn add_title(&self, path: &str, label: &str) {
+        self.live_database
+            .execute("INSERT INTO ZCLOUDRECORDING (ZPATH, ZCUSTOMLABEL) VALUES (?1, ?2)", [path, label])
+            .expect("title row");
+    }
+
     pub fn store(&self) -> VoiceMemosStore {
-        VoiceMemosStore::new(self.recordings.clone(), self.state.clone(), false)
+        VoiceMemosStore::open(&self.recordings).expect("store")
+    }
+
+    pub fn titled_store(&self, refresh: bool) -> VoiceMemosStore {
+        self.store().with_titles(self.state.clone(), refresh)
     }
 
     pub fn archive(&self) -> ClonefileArchive {
-        ClonefileArchive::new(self.audio.clone())
+        ClonefileArchive::open(&self.audio).expect("archive")
     }
 
     pub fn ledger(&self) -> SqliteLedger {
-        SqliteLedger::open(&self.state).expect("ledger")
+        SqliteLedger::open(&RootDir::open(&self.state).expect("state root")).expect("ledger")
     }
 
     pub fn settings(&self) -> SourceSettings {
@@ -9207,21 +9261,73 @@ impl Fixture {
         }
     }
 
-    pub fn entries(&self) -> Vec<(String, u64, i64, u32)> {
-        use std::os::macos::fs::MetadataExt;
-        let mut entries: Vec<_> = std::fs::read_dir(&self.recordings)
-            .expect("dir")
-            .map(|entry| {
-                let entry = entry.expect("entry");
-                let metadata = entry.metadata().expect("metadata");
-                (entry.file_name().to_string_lossy().into_owned(), metadata.len(), metadata.st_mtime(), metadata.st_flags())
-            })
-            .collect();
+    pub fn parts(&self) -> Parts {
+        Parts {
+            store: self.store(),
+            archive: self.archive(),
+            ledger: self.ledger(),
+            clock: clock(),
+            trash: RecordingTrash::new(self.temp.path().join("trash")),
+            notifier: RecordingNotifier::default(),
+            settings: self.settings(),
+        }
+    }
+
+    /// Every entry below the container, recursively, in sorted order.
+    pub fn entries(&self) -> Vec<Entry> {
+        let mut entries = Vec::new();
+        walk(&self.container, &self.container, &mut entries);
         entries.sort();
         entries
     }
 }
 
+fn walk(root: &Path, directory: &Path, out: &mut Vec<Entry>) {
+    for entry in std::fs::read_dir(directory).expect("dir") {
+        let entry = entry.expect("entry");
+        let metadata = entry.metadata().expect("metadata");
+        let path = entry.path();
+        let relative = path.strip_prefix(root).expect("below the container").to_path_buf();
+        out.push((relative, metadata.len(), metadata.st_mtime(), metadata.st_mtime_nsec(), metadata.st_flags()));
+        if metadata.is_dir() {
+            walk(root, &path, out);
+        }
+    }
+}
+
+pub fn digest_of(bytes: &[u8]) -> Sha256Digest {
+    Sha256Digest(Sha256::digest(bytes).into())
+}
+
+pub struct Parts {
+    pub store: VoiceMemosStore,
+    pub archive: ClonefileArchive,
+    pub ledger: SqliteLedger,
+    pub clock: FixedClock,
+    pub trash: RecordingTrash,
+    pub notifier: RecordingNotifier,
+    pub settings: SourceSettings,
+}
+
+impl Parts {
+    pub fn ingest(&self) -> RealIngest<'_> {
+        Ingest {
+            recorder: &self.store,
+            archive: &self.archive,
+            ledger: &self.ledger,
+            clock: &self.clock,
+            trash: &self.trash,
+            notifier: &self.notifier,
+            settings: &self.settings,
+        }
+    }
+
+    pub fn events(&self) -> Vec<EventKind> {
+        self.notifier.0.borrow().iter().map(|notification| notification.event).collect()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct FixedClock {
     pub now: UtcInstant,
     pub offset: UtcOffset,
@@ -9260,7 +9366,7 @@ impl Trash for RecordingTrash {
             return Err(TrashError::HelperAbsent);
         }
         let target = self.dir.join(path.file_name().expect("name"));
-        std::fs::rename(path, &target).map_err(|error| TrashError::Failed(error.to_string()))?;
+        std::fs::rename(path, &target).map_err(|error| TrashError::Failed(error.kind().to_string()))?;
         self.moved.borrow_mut().push(path.to_path_buf());
         Ok(target)
     }
@@ -9283,77 +9389,104 @@ impl Notifier for RecordingNotifier {
 mod support;
 
 use std::os::unix::fs::PermissionsExt;
-use support::{CAPTURED, Fixture, RecordingNotifier, RecordingTrash, clock};
-use vpt_application::ingest::Ingest;
-use vpt_application::ports::ledger::{RecordingLedger, StageStates, TitleOrigin};
+use support::{CAPTURED, Fixture, FixedClock, Parts, clock};
+use vpt_application::Mode;
+use vpt_application::ports::{Archive, RecordingLedger, StageStates, TitleOrigin};
 use vpt_domain::fixtures::m4a;
+use vpt_domain::time::UtcInstant;
 
 #[test]
 fn a_whole_recording_is_archived_under_its_identity_and_recorded_in_the_ledger() {
     let fixture = Fixture::new();
     let source = fixture.add_recording("20260824 144736-4F3AB19C.m4a", &m4a(CAPTURED, 612, b"audio bytes"));
-    let (store, archive, ledger) = (fixture.store(), fixture.archive(), fixture.ledger());
-    let (trash, notifier, settings) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default(), fixture.settings());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    let parts = fixture.parts();
 
-    let report = ingest.run().expect("sweep");
+    let report = parts.ingest().run(&Mode::default()).expect("sweep");
 
     assert_eq!(report.ingested.len(), 1);
     let record = &report.ingested[0];
     assert!(record.id.as_str().starts_with("2026-08-24T144736-"), "{}", record.id);
     assert_eq!(record.source_path.as_deref(), Some(source.as_path()));
     assert_eq!(record.duration_secs, 612);
+    assert_eq!(record.captured_at, UtcInstant { secs: CAPTURED });
+    assert_eq!(record.captured_offset, clock().offset);
     assert_eq!(record.title, None);
     assert_eq!(record.title_source, TitleOrigin::Unavailable);
     assert_eq!(record.stages, StageStates::fresh());
     assert_eq!(record.audio_path, fixture.audio.join(format!("{}.m4a", record.id)));
     assert_eq!(std::fs::read(&record.audio_path).expect("archive"), m4a(CAPTURED, 612, b"audio bytes"));
     assert_eq!(std::fs::metadata(&record.audio_path).expect("meta").permissions().mode() & 0o777, 0o600);
-    assert_eq!(ledger.by_id(&record.id).expect("read"), Some(record.clone()));
-    assert_eq!(ledger.seen(&source).expect("seen").and_then(|row| row.recording), Some(record.id.clone()));
-    assert!(archive.staged_leftovers().expect("leftovers").is_empty());
-    assert!(notifier.0.borrow().is_empty());
+    assert_eq!(parts.ledger.by_id(&record.id).expect("read"), Some(record.clone()));
+    let row = parts.ledger.seen(&source).expect("seen").expect("row");
+    assert_eq!(row.recording, Some(record.id.clone()));
+    assert_eq!((row.deferral_count, row.deferral_reason, row.source_gone_at), (0, None, None));
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert!(parts.events().is_empty());
+    assert!(parts.trash.moved.borrow().is_empty());
 }
 
 #[test]
-fn a_full_sweep_leaves_every_source_entry_with_its_size_mtime_and_flags() {
+fn a_full_sweep_with_titles_leaves_every_container_entry_with_its_size_mtime_and_flags() {
     let fixture = Fixture::new();
     fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
     fixture.add_recording("b.m4a", &m4a(CAPTURED + 60, 2, b"bb"));
     std::fs::write(fixture.recordings.join("a.waveform"), b"w").expect("sidecar");
+    fixture.add_title("a.m4a", "Alpha");
     let before = fixture.entries();
-    let (store, archive, ledger) = (fixture.store(), fixture.archive(), fixture.ledger());
-    let (trash, notifier, settings) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default(), fixture.settings());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    let mut parts = fixture.parts();
+    parts.store = fixture.titled_store(true);
 
-    let report = ingest.run().expect("sweep");
+    let report = parts.ingest().run(&Mode::default()).expect("sweep");
 
     assert_eq!(report.ingested.len(), 2);
+    assert_eq!(report.ingested[0].title.as_deref(), Some("Alpha"));
+    assert_eq!(report.ingested[0].title_source, TitleOrigin::VoiceMemos);
+    assert_eq!(report.ingested[1].title, None);
     assert_eq!(fixture.entries(), before);
+    assert!(fixture.state.join("title-copy").join("CloudRecordings.db").exists());
 }
 
 #[test]
-fn a_second_sweep_skips_the_unchanged_entries() {
+fn a_second_sweep_skips_the_unchanged_entries_and_refreshes_last_seen() {
     let fixture = Fixture::new();
-    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
-    let (store, archive, ledger) = (fixture.store(), fixture.archive(), fixture.ledger());
-    let (trash, notifier, settings) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default(), fixture.settings());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
-    ingest.run().expect("first");
+    let source = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
+    let parts = fixture.parts();
+    parts.ingest().run(&Mode::default()).expect("first");
+    let later = Parts { clock: FixedClock { now: UtcInstant { secs: CAPTURED + 7_200 }, ..clock() }, ..fixture.parts() };
 
-    let report = ingest.run().expect("second");
+    let report = later.ingest().run(&Mode::default()).expect("second");
 
     assert!(report.ingested.is_empty());
     assert_eq!(report.skipped, 1);
-    assert_eq!(ledger.recordings().expect("list").len(), 1);
+    assert_eq!(later.ledger.recordings().expect("list").len(), 1);
+    let row = later.ledger.seen(&source).expect("seen").expect("row");
+    assert_eq!(row.last_seen, UtcInstant { secs: CAPTURED + 7_200 });
+    assert_eq!(row.first_seen, UtcInstant { secs: CAPTURED + 3_600 });
+}
+
+#[test]
+fn once_ingests_exactly_the_named_file() {
+    let fixture = Fixture::new();
+    let a = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
+    fixture.add_recording("b.m4a", &m4a(CAPTURED + 1, 1, b"b"));
+    let parts = fixture.parts();
+
+    let report = parts.ingest().run(&Mode { dry_run: false, once: Some(a.clone()) }).expect("once");
+
+    assert_eq!(report.ingested.len(), 1);
+    assert_eq!(report.ingested[0].source_path.as_deref(), Some(a.as_path()));
+    assert_eq!(parts.ledger.recordings().expect("list").len(), 1);
 }
 ```
+
+`Parts` is a plain struct, so the third test rebuilds it around a later clock with struct update syntax
+over a fresh `fixture.parts()`.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-adapters --test ingest_sweep`
 
-Expected: compile error, `vpt_application::ingest` not found.
+Expected: the build fails with `unresolved import` for `vpt_application::Ingest` and the three new ports.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -9495,8 +9628,10 @@ pub trait Notifier {
 }
 ```
 
-`crates/vpt-application/src/ports/mod.rs` lists `archive`, `artifacts`, `clock`, `ledger`, `notifier`,
-`prompt`, `recorder`, `trash`.
+`crates/vpt-application/src/ports/mod.rs` gains `mod clock;`, `mod notifier;`, `mod trash;` and
+`pub use clock::Clock; pub use notifier::{DeliveryOutcome, Notifier};`
+`pub use trash::{Trash, TrashError};`. `crates/vpt-application/src/lib.rs` gains `mod ingest;` and
+`pub use ingest::{Deferred, Ingest, IngestError, IngestFailure, IngestReport, Mode, WouldIngest};`.
 
 `crates/vpt-application/src/ingest/mod.rs`:
 
@@ -9506,12 +9641,7 @@ pub trait Notifier {
 mod candidate;
 mod publish;
 
-use crate::ports::archive::Archive;
-use crate::ports::clock::Clock;
-use crate::ports::ledger::{LedgerError, RecordingLedger, RecordingRecord, TitleOrigin};
-use crate::ports::notifier::Notifier;
-use crate::ports::recorder::RecorderStore;
-use crate::ports::trash::Trash;
+use crate::ports::{Archive, Clock, LedgerError, Notifier, RecorderStore, RecordingLedger, RecordingRecord, TitleOrigin, Trash};
 use crate::settings::SourceSettings;
 use std::path::PathBuf;
 use vpt_domain::digest::Sha256Digest;
@@ -9519,14 +9649,21 @@ use vpt_domain::identity::RecordingId;
 use vpt_domain::notification::{EventKind, Notification};
 use vpt_domain::sweep::DeferralReason;
 
-pub struct Ingest<'a> {
-    pub recorder: &'a dyn RecorderStore,
-    pub archive: &'a dyn Archive,
-    pub ledger: &'a dyn RecordingLedger,
-    pub clock: &'a dyn Clock,
-    pub trash: &'a dyn Trash,
-    pub notifier: &'a dyn Notifier,
+pub struct Ingest<'a, R, A, L, C, T, N> {
+    pub recorder: &'a R,
+    pub archive: &'a A,
+    pub ledger: &'a L,
+    pub clock: &'a C,
+    pub trash: &'a T,
+    pub notifier: &'a N,
     pub settings: &'a SourceSettings,
+}
+
+/// A dry run stages, writes and notifies nothing; `once` names the one file to ingest.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Mode {
+    pub dry_run: bool,
+    pub once: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9553,6 +9690,19 @@ pub struct IngestReport {
     pub log: Vec<String>,
 }
 
+impl IngestReport {
+    /// Every identity this run made durable, recovered first, without repeats.
+    pub fn completed(&self) -> Vec<RecordingId> {
+        let mut ids = self.recovered.clone();
+        for record in &self.ingested {
+            if !ids.contains(&record.id) {
+                ids.push(record.id.clone());
+            }
+        }
+        ids
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IngestFailure {
     StoreUnreadable(String),
@@ -9560,6 +9710,8 @@ pub enum IngestFailure {
     NoSpace,
     Sync(String),
     ArchiveCollision { target: PathBuf, staged: Sha256Digest, existing: Sha256Digest },
+    /// A source or archive path outside its root or through a link: exit 3, `path_escape`.
+    PathEscape(PathBuf),
     Ledger(LedgerError),
     Archive(String),
     Recorder(String),
@@ -9575,6 +9727,7 @@ impl IngestFailure {
             IngestFailure::ArchiveCollision { target, .. } => {
                 format!("{} exists with different content (archive_collision)", target.display())
             }
+            IngestFailure::PathEscape(path) => format!("{} escapes its root (path_escape)", path.display()),
             IngestFailure::Ledger(error) => format!("ledger failure: {error:?}"),
             IngestFailure::Archive(detail) => format!("archive failure: {detail}"),
             IngestFailure::Recorder(detail) => format!("source failure: {detail}"),
@@ -9586,26 +9739,39 @@ impl IngestFailure {
 pub struct IngestError {
     pub failure: IngestFailure,
     pub completed: Vec<RecordingId>,
+    pub log: Vec<String>,
 }
 
-impl Ingest<'_> {
-    pub fn run(&self) -> Result<IngestReport, IngestError> {
+impl<R, A, L, C, T, N> Ingest<'_, R, A, L, C, T, N>
+where
+    R: RecorderStore,
+    A: Archive,
+    L: RecordingLedger,
+    C: Clock,
+    T: Trash,
+    N: Notifier,
+{
+    pub fn run(&self, mode: &Mode) -> Result<IngestReport, IngestError> {
         let mut report = IngestReport::default();
-        match self.sweep(&mut report) {
+        match self.sweep(mode, &mut report) {
             Ok(()) => Ok(report),
             Err(failure) => {
-                let at = self.clock.now();
-                self.notifier.deliver(&Notification::failed(EventKind::IngestFailed, failure.message(), at));
-                Err(IngestError { failure, completed: report.ingested.iter().map(|record| record.id.clone()).collect() })
+                if !mode.dry_run {
+                    let at = self.clock.now();
+                    self.notifier.deliver(&Notification::failed(EventKind::IngestFailed, failure.message(), at));
+                }
+                Err(IngestError { failure, completed: report.completed(), log: report.log })
             }
         }
     }
 
-    fn sweep(&self, report: &mut IngestReport) -> Result<(), IngestFailure> {
-        let candidates = self.recorder.candidates().map_err(|error| IngestFailure::StoreUnreadable(format!("{error:?}")))?;
-        let titles = if self.settings.read_titles { Some(self.recorder.titles()) } else { None };
+    fn sweep(&self, mode: &Mode, report: &mut IngestReport) -> Result<(), IngestFailure> {
+        let candidates = match &mode.once {
+            Some(path) => vec![self.recorder.candidate(path).map_err(candidate::recorder_failure)?],
+            None => self.recorder.candidates().map_err(|error| IngestFailure::StoreUnreadable(format!("{error:?}")))?,
+        };
         for candidate in &candidates {
-            self.process(candidate, titles.as_deref(), report)?;
+            self.process(candidate, mode, report)?;
         }
         Ok(())
     }
@@ -9617,35 +9783,60 @@ impl Ingest<'_> {
 ```rust
 //! One candidate: the pre-open decision, the descriptor, then staging.
 
-use super::{Ingest, IngestFailure, IngestReport};
-use crate::ports::ledger::{LedgerError, SeenRow};
-use crate::ports::recorder::{Candidate, TitleSource};
+use super::{Ingest, IngestFailure, IngestReport, Mode};
+use crate::ports::{Archive, Candidate, Clock, LedgerError, Notifier, RecorderError, RecorderStore, RecordingLedger, SeenRow, Trash};
 use vpt_domain::sweep::{CandidateFacts, PreOpen, SeenFacts, pre_open};
 use vpt_domain::time::UtcInstant;
 
-impl Ingest<'_> {
-    pub(super) fn process(
-        &self,
-        candidate: &Candidate,
-        titles: Option<&dyn TitleSource>,
-        report: &mut IngestReport,
-    ) -> Result<(), IngestFailure> {
+impl<R, A, L, C, T, N> Ingest<'_, R, A, L, C, T, N>
+where
+    R: RecorderStore,
+    A: Archive,
+    L: RecordingLedger,
+    C: Clock,
+    T: Trash,
+    N: Notifier,
+{
+    pub(super) fn process(&self, candidate: &Candidate, mode: &Mode, report: &mut IngestReport) -> Result<(), IngestFailure> {
         let now = self.clock.now();
         let seen = self.ledger.seen(&candidate.path).map_err(IngestFailure::Ledger)?;
-        let facts = CandidateFacts { size: candidate.size, mtime: candidate.mtime, dataless: candidate.dataless };
+        let facts = CandidateFacts { size: candidate.size, mtime: candidate.mtime, flags: candidate.flags };
         let seen_facts = seen.as_ref().map(|row| SeenFacts {
             size: row.size,
             mtime: row.mtime,
-            ingested: row.recording.is_some(),
+            ingested: row.recording.is_some() && row.deferral_reason.is_none(),
             deferred_size: row.deferred_size,
         });
-        if pre_open(&facts, seen_facts.as_ref()) == PreOpen::Unchanged {
-            report.skipped += 1;
+        let seen = match pre_open(&facts, seen_facts.as_ref()) {
+            PreOpen::Unchanged => match seen {
+                Some(row) => return self.unchanged(row, now, mode, report),
+                None => None,
+            },
+            PreOpen::Dataless | PreOpen::Open => seen,
+        };
+        let handle = self.recorder.open(&candidate.path).map_err(recorder_failure)?;
+        let metadata = self.recorder.metadata(&handle).map_err(recorder_failure)?;
+        self.stage_and_publish(candidate, &handle, &metadata, seen, now, mode, report)
+    }
+
+    /// An ingested entry whose triple did not move: only its liveness is refreshed.
+    pub(super) fn unchanged(&self, mut row: SeenRow, now: UtcInstant, mode: &Mode, report: &mut IngestReport) -> Result<(), IngestFailure> {
+        report.skipped += 1;
+        if mode.dry_run {
             return Ok(());
         }
-        let mut handle = self.recorder.open(&candidate.path).map_err(|error| IngestFailure::Recorder(format!("{error:?}")))?;
-        let metadata = handle.metadata().map_err(|error| IngestFailure::Recorder(format!("{error:?}")))?;
-        self.stage_and_publish(candidate, &mut *handle, &metadata, seen, titles, now, report)
+        row.last_seen = now;
+        row.source_gone_at = None;
+        self.ledger.record_seen(&row).map_err(IngestFailure::Ledger)
+    }
+}
+
+pub(super) fn recorder_failure(error: RecorderError) -> IngestFailure {
+    match error {
+        RecorderError::Escape(path) | RecorderError::NotRegular(path) => IngestFailure::PathEscape(path),
+        RecorderError::Unreadable(detail) => IngestFailure::StoreUnreadable(detail),
+        RecorderError::NotFound(path) => IngestFailure::Recorder(format!("{} is not a recording", path.display())),
+        RecorderError::Io(detail) => IngestFailure::Recorder(detail),
     }
 }
 
@@ -9655,7 +9846,7 @@ pub(super) fn fresh_seen(candidate: &Candidate, now: UtcInstant) -> SeenRow {
         file_name: candidate.file_name.clone(),
         size: candidate.size,
         mtime: candidate.mtime,
-        dataless: candidate.dataless,
+        flags: candidate.flags,
         first_seen: now,
         last_seen: now,
         deferral_count: 0,
@@ -9674,47 +9865,68 @@ pub(super) fn ledger_failure(error: LedgerError) -> IngestFailure {
 `crates/vpt-application/src/ingest/publish.rs`:
 
 ```rust
-//! Stage, verify, hash, publish, commit.
+//! Stage, verify, hash, publish, commit; and the owned cleanup on every
+//! exit before publication.
 
-use super::candidate::{fresh_seen, ledger_failure};
-use super::{Ingest, IngestFailure, IngestReport};
-use crate::ports::archive::{ArchiveError, Published};
-use crate::ports::ledger::{RecordingRecord, SeenRow, StageStates, TitleOrigin};
-use crate::ports::recorder::{Candidate, SourceHandle, SourceMetadata, TitleLookup, TitleSource};
+use super::candidate::{fresh_seen, ledger_failure, recorder_failure};
+use super::{Ingest, IngestFailure, IngestReport, Mode};
+use crate::ports::{
+    Archive, ArchiveError, Candidate, Clock, LedgerCommit, Notifier, Published, RecorderStore, RecordingLedger, RecordingRecord,
+    SeenRow, SourceMetadata, StageStates, TitleLookup, TitleOrigin, Trash, TrashError,
+};
 use std::path::Path;
-use vpt_domain::container::inspect;
+use vpt_domain::container::{Container, ContainerError, inspect};
 use vpt_domain::identity::RecordingId;
 use vpt_domain::time::UtcInstant;
 
-impl Ingest<'_> {
+impl<R, A, L, C, T, N> Ingest<'_, R, A, L, C, T, N>
+where
+    R: RecorderStore,
+    A: Archive,
+    L: RecordingLedger,
+    C: Clock,
+    T: Trash,
+    N: Notifier,
+{
     #[allow(clippy::too_many_arguments)]
     pub(super) fn stage_and_publish(
         &self,
         candidate: &Candidate,
-        handle: &mut dyn SourceHandle,
+        handle: &R::Handle,
         metadata: &SourceMetadata,
         seen: Option<SeenRow>,
-        titles: Option<&dyn TitleSource>,
         now: UtcInstant,
+        mode: &Mode,
         report: &mut IngestReport,
     ) -> Result<(), IngestFailure> {
-        let staged = self.archive.stage(&*handle).map_err(archive_failure)?;
-        let after = handle.metadata().map_err(|error| IngestFailure::Recorder(format!("{error:?}")))?;
+        let staged = match self.archive.stage(|directory, name| self.recorder.clone_into(handle, directory, name)) {
+            Ok(staged) => staged,
+            Err(failure) => return Err(self.abandon(failure.owned_staging.as_deref(), archive_failure(failure.cause), report)),
+        };
+        let after = self.owned(&staged.path, self.recorder.metadata(handle).map_err(recorder_failure), report)?;
         if after != *metadata {
             self.discard(&staged.path, report);
             return Err(IngestFailure::Recorder("the source changed while it was staged".into()));
         }
-        let mut reader = self.archive.open(&staged.path).map_err(archive_failure)?;
-        let container = inspect(&mut *reader).map_err(|error| IngestFailure::Archive(format!("staged container invalid: {error:?}")))?;
-        drop(reader);
+        let container = match self.owned(&staged.path, self.inspect_archive(&staged.path), report)? {
+            Ok(container) => container,
+            Err(error) => {
+                self.discard(&staged.path, report);
+                return Err(IngestFailure::Archive(format!("staged container invalid: {error:?}")));
+            }
+        };
         let offset = self.clock.offset_at(container.creation_time);
-        let id = RecordingId::derive(container.creation_time, offset, &staged.digest);
+        let Ok(id) = RecordingId::derive(container.creation_time, offset, &staged.digest) else {
+            self.discard(&staged.path, report);
+            return Err(IngestFailure::Archive("capture instant unrepresentable".into()));
+        };
         if !staged.copy_on_write {
             report.log.push(format!("{}: the archive is not copy-on-write", candidate.file_name));
         }
-        match self.archive.publish(&staged.path, &format!("{id}.m4a")).map_err(archive_failure)? {
-            Published::Placed(audio_path) => {
-                let (title, title_source) = lookup_title(titles, &candidate.file_name);
+        let _ = mode;
+        match self.archive.publish(&staged.path, &format!("{id}.m4a")) {
+            Ok(Published::Placed(audio_path)) => {
+                let (title, title_source) = lookup_title(self.recorder.title(&candidate.file_name));
                 let record = RecordingRecord {
                     id,
                     source_path: Some(candidate.path.clone()),
@@ -9729,21 +9941,54 @@ impl Ingest<'_> {
                     stages: StageStates::fresh(),
                     audio_trashed_at: None,
                 };
-                let row = ingested_seen(candidate, seen, &record.id, now);
-                self.ledger.commit_ingest(&record, &row).map_err(ledger_failure)?;
+                let batch = LedgerCommit {
+                    seen: vec![ingested_seen(candidate, seen, &record.id, now)],
+                    recordings: vec![record.clone()],
+                    publications: vec![],
+                };
+                self.ledger.commit(&batch).map_err(ledger_failure)?;
                 report.ingested.push(record);
                 Ok(())
             }
-            Published::Exists(audio_path) => {
+            Ok(Published::Exists(audio_path)) => {
                 self.discard(&staged.path, report);
                 Err(IngestFailure::Archive(format!("{} exists", audio_path.display())))
             }
+            Err(ArchiveError::PlacedUnsynced(target)) => Err(IngestFailure::Sync(format!("{} placed, directory not synced", target.display()))),
+            Err(error) => Err(self.abandon(Some(&staged.path), archive_failure(error), report)),
         }
     }
 
+    /// The wholeness gate over an archive file through the archive's own reads.
+    pub(super) fn inspect_archive(&self, path: &Path) -> Result<Result<Container, ContainerError>, IngestFailure> {
+        let handle = self.archive.open(path).map_err(archive_failure)?;
+        let len = self.archive.size(&handle).map_err(archive_failure)?;
+        Ok(inspect(len, |offset, buf| self.archive.read_at(&handle, offset, buf)))
+    }
+
+    /// A step after staging: on failure the staged file is this run's to clean up.
+    pub(super) fn owned<V>(&self, staged: &Path, outcome: Result<V, IngestFailure>, report: &mut IngestReport) -> Result<V, IngestFailure> {
+        outcome.map_err(|failure| self.abandon(Some(staged), failure, report))
+    }
+
+    /// Trash what this run owns, then hand back the failure that ended it.
+    pub(super) fn abandon(&self, owned: Option<&Path>, failure: IngestFailure, report: &mut IngestReport) -> IngestFailure {
+        if let Some(path) = owned {
+            self.discard(path, report);
+        }
+        failure
+    }
+
+    /// Move a staged file to the Trash; when that cannot happen the file
+    /// stays at mode 0600 and the log says cleanup is pending.
     pub(super) fn discard(&self, staged: &Path, report: &mut IngestReport) {
         if let Err(error) = self.trash.trash(staged) {
-            report.log.push(format!("{}: staged file kept ({error:?})", staged.display()));
+            let reason = match error {
+                TrashError::HelperAbsent => "helper absent",
+                TrashError::Failed(_) => "trash failed",
+                TrashError::Unknown(_) => "trash reply unknown",
+            };
+            report.log.push(format!("{}: staged file kept at mode 0600, cleanup pending ({reason})", staged.display()));
         }
     }
 }
@@ -9752,14 +9997,16 @@ pub(super) fn archive_failure(error: ArchiveError) -> IngestFailure {
     match error {
         ArchiveError::NoSpace => IngestFailure::NoSpace,
         ArchiveError::Sync(detail) => IngestFailure::Sync(detail),
+        ArchiveError::PlacedUnsynced(target) => IngestFailure::Sync(format!("{} placed, directory not synced", target.display())),
+        ArchiveError::Escape(path) => IngestFailure::PathEscape(path),
         ArchiveError::Io(detail) => IngestFailure::Archive(detail),
     }
 }
 
-pub(super) fn lookup_title(titles: Option<&dyn TitleSource>, file_name: &str) -> (Option<String>, TitleOrigin) {
-    match titles.map(|source| source.title(file_name)) {
-        Some(TitleLookup::Titled(title)) => (Some(title), TitleOrigin::VoiceMemos),
-        _ => (None, TitleOrigin::Unavailable),
+pub(super) fn lookup_title(lookup: TitleLookup) -> (Option<String>, TitleOrigin) {
+    match lookup {
+        TitleLookup::Titled(title) => (Some(title), TitleOrigin::VoiceMemos),
+        TitleLookup::Unavailable => (None, TitleOrigin::Unavailable),
     }
 }
 
@@ -9767,7 +10014,7 @@ pub(super) fn ingested_seen(candidate: &Candidate, seen: Option<SeenRow>, id: &R
     let mut row = seen.unwrap_or_else(|| fresh_seen(candidate, now));
     row.size = candidate.size;
     row.mtime = candidate.mtime;
-    row.dataless = candidate.dataless;
+    row.flags = candidate.flags;
     row.last_seen = now;
     row.deferral_count = 0;
     row.deferral_reason = None;
@@ -9778,13 +10025,16 @@ pub(super) fn ingested_seen(candidate: &Candidate, seen: Option<SeenRow>, id: &R
 }
 ```
 
-`crates/vpt-application/src/lib.rs` adds `pub mod ingest;`.
+The `let _ = mode;` line holds the parameter until Task 20 turns the two staged gates into deferrals that
+honour the mode; it is deleted there. A ledger failure after `Placed` leaves the archive file at its
+final name, where the next sweep's recovery (Task 22) finds it, so nothing is trashed on that path.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters --test ingest_sweep`
 
-Expected: 3 tests PASS.
+Expected: 4 tests PASS. Run `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`
+and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
