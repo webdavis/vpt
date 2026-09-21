@@ -370,9 +370,11 @@ expected previous digest. The artifact is then rendered from committed state, wr
 in its store, synced and renamed into place, the containing directory is synced, and the dirty entry is
 cleared. The next mutating command repairs unfinished publications, and reconciles pending retention
 intents (section 4.5), before new work: a target already carrying the intended digest is a completed
-publication and its entry is cleared; a target holding the expected previous bytes, or absent when
+publication, and its entry is cleared only after its containing directory is synced, the same sync the
+normal path performs before clearing; a target holding the expected previous bytes, or absent when
 expected absent, is published over; any other bytes are refused (exit 3 `target_modified`) rather than
-overwritten. Read-only commands never repair.
+overwritten. A sync that fails on either path is exit 1 and leaves the entry pending. Read-only commands
+never repair.
 
 ### 4.5 Retention
 
