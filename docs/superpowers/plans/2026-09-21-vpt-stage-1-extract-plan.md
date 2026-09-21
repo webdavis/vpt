@@ -3152,7 +3152,10 @@ writes or hands its path to the helper.
   `fn rename_exclusive(&self, from: &Path, to: &Path) -> Result<bool, ContainedError>` (`false` when the
   target exists, nothing moved), `fn sync(&self) -> Result<(), ContainedError>` (the directory itself),
   `fn names(&self) -> Result<Vec<String>, ContainedError>` (every entry name in sorted order; a name that
-  is not UTF-8 is skipped, and every name is judged through `stat` or `open_file` before use).
+  is not UTF-8 is skipped, and every name is judged through `stat` or `open_file` before use),
+  `fn c_name(&self, path: &Path) -> Result<CString, ContainedError>` (the validated leaf's file name as a
+  C string); `RootDir` implements `std::os::fd::AsFd`, so a caller that clones into the root with
+  `fclonefileat` names it by descriptor.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3276,6 +3279,8 @@ mod tests {
         let (_temp, root) = root();
         assert_eq!(root.names().expect("names"), vec!["dirlink", "link.m4a", "plain.m4a", "sub"]);
         assert_eq!(root.sync(), Ok(()));
+        assert_eq!(root.c_name(Path::new("plain.m4a")).expect("name").as_bytes(), b"plain.m4a");
+        assert!(matches!(root.c_name(Path::new("sub/x")), Err(ContainedError::Escape { .. })));
     }
 }
 ```
@@ -3299,7 +3304,7 @@ selects zero tests, or that succeeds, does not satisfy this step.
 
 use std::ffi::CString;
 use std::fs::File;
-use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
@@ -3408,6 +3413,11 @@ impl RootDir {
 
     pub fn leaf(&self, path: &Path) -> Result<PathBuf, ContainedError> {
         leaf_below(&self.path, path)
+    }
+
+    /// The validated leaf's file name, as the C string `openat` and friends take.
+    pub fn c_name(&self, path: &Path) -> Result<CString, ContainedError> {
+        c_name(&self.leaf(path)?)
     }
 
     /// `openat` relative to the root; ELOOP at the leaf is a link and is refused.
@@ -3554,6 +3564,12 @@ impl RootDir {
         }
         names.sort();
         Ok(names)
+    }
+}
+
+impl AsFd for RootDir {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.fd.as_fd()
     }
 }
 ```
