@@ -4319,15 +4319,24 @@ ______________________________________________________________________
 
 **Interfaces:**
 
-- Consumes: `time::{UtcInstant, UtcOffset}`, `digest::Sha256Digest`.
+- Consumes: `time::{Civil, UtcInstant, UtcOffset}`, `digest::Sha256Digest`.
 
-- Produces: `vpt_domain::identity::{RecordingId, IdentityError,`
-  `local_timestamp(captured: UtcInstant, offset: UtcOffset) -> String}`;
-  `RecordingId::derive(captured: UtcInstant, offset: UtcOffset, digest: &Sha256Digest) -> RecordingId`,
-  `RecordingId::parse(text: &str) -> Result<RecordingId, IdentityError>`, `fn as_str(&self) -> &str`,
-  `fn capture_date(&self) -> &str`, `fn hash12(&self) -> &str`.
+- Produces: `vpt_domain::identity::{RecordingId, IdentityError::{Malformed, Unrepresentable},`
+  `local_timestamp(captured: UtcInstant, offset: UtcOffset) -> String,`
+  `parse_local_timestamp(text: &str) -> Result<Civil, IdentityError>}` (the `YYYY-MM-DDThhmmss` form,
+  refused unless the civil time exists on the calendar);
+  `RecordingId::derive(captured: UtcInstant, offset: UtcOffset, digest: &Sha256Digest) ->`
+  `Result<RecordingId, IdentityError>` (`Unrepresentable` when the local year has no four-digit form),
+  `RecordingId::parse(text: &str) -> Result<RecordingId, IdentityError>` (the shape, then the Gregorian
+  month, day and leap-year rules and the hour, minute and second bounds), `fn as_str(&self)`,
+  `fn local_timestamp(&self) -> &str`, `fn capture_date(&self) -> &str`, `fn hash12(&self) -> &str`.
+  Every call site uses the fallible `derive`; ingest maps an unrepresentable capture instant to the
+  `invalid_container` deferral.
 
 - [ ] **Step 1: Write the failing tests**
+
+`crates/vpt-domain/src/lib.rs` gains `pub mod identity;`. `crates/vpt-domain/src/identity.rs` starts as
+its test module alone:
 
 ```rust
 #[cfg(test)]
@@ -4342,8 +4351,10 @@ mod tests {
 
     #[test]
     fn the_identity_is_the_local_capture_time_and_twelve_hex_characters() {
-        let id = RecordingId::derive(UtcInstant { secs: 1_787_690_856 }, UtcOffset { secs: -21_600 }, &digest());
+        let id = RecordingId::derive(UtcInstant { secs: 1_787_604_456 }, UtcOffset { secs: -21_600 }, &digest())
+            .expect("representable");
         assert_eq!(id.as_str(), "2026-08-24T144736-4f3ab19c02de");
+        assert_eq!(id.local_timestamp(), "2026-08-24T144736");
         assert_eq!(id.capture_date(), "2026-08-24");
         assert_eq!(id.hash12(), "4f3ab19c02de");
     }
@@ -4358,7 +4369,48 @@ mod tests {
         assert!(RecordingId::parse("2026-08-24T144736-4f3ab19c02de").is_ok());
         assert_eq!(RecordingId::parse("2026-08-24-4f3ab19c02de"), Err(IdentityError::Malformed));
         assert_eq!(RecordingId::parse("2026-08-24T144736-4f3ab19c02dg"), Err(IdentityError::Malformed));
+        assert_eq!(RecordingId::parse("2026-08-24T144736-4F3AB19C02DE"), Err(IdentityError::Malformed));
         assert_eq!(RecordingId::parse("../2026-08-24T144736-4f3ab19c02de"), Err(IdentityError::Malformed));
+    }
+
+    #[test]
+    fn an_impossible_date_or_time_is_refused_in_the_right_shape() {
+        assert_eq!(RecordingId::parse("2023-02-29T144736-4f3ab19c02de"), Err(IdentityError::Malformed));
+        assert!(RecordingId::parse("2024-02-29T144736-4f3ab19c02de").is_ok());
+        assert_eq!(RecordingId::parse("2026-13-01T000000-4f3ab19c02de"), Err(IdentityError::Malformed));
+        assert_eq!(RecordingId::parse("2026-04-31T000000-4f3ab19c02de"), Err(IdentityError::Malformed));
+        assert_eq!(RecordingId::parse("2026-08-24T240000-4f3ab19c02de"), Err(IdentityError::Malformed));
+        assert_eq!(RecordingId::parse("2026-08-24T146000-4f3ab19c02de"), Err(IdentityError::Malformed));
+        assert_eq!(RecordingId::parse("2026-08-24T144760-4f3ab19c02de"), Err(IdentityError::Malformed));
+    }
+
+    #[test]
+    fn the_local_timestamp_parses_back_to_its_civil_time() {
+        let civil = parse_local_timestamp("2026-08-24T144736").expect("civil");
+        assert_eq!((civil.year, civil.month, civil.day), (2026, 8, 24));
+        assert_eq!((civil.hour, civil.minute, civil.second), (14, 47, 36));
+        assert_eq!(civil.instant(UtcOffset { secs: -21_600 }), Some(UtcInstant { secs: 1_787_604_456 }));
+        assert_eq!(parse_local_timestamp("2026-08-24T14:47:36"), Err(IdentityError::Malformed));
+        assert_eq!(parse_local_timestamp("2026-08-24T144736-4f3ab19c02de"), Err(IdentityError::Malformed));
+    }
+
+    #[test]
+    fn a_capture_outside_the_four_digit_years_is_unrepresentable() {
+        let year_ten_thousand = UtcInstant { secs: 253_402_300_800 };
+        assert_eq!(
+            RecordingId::derive(year_ten_thousand, UtcOffset { secs: 0 }, &digest()),
+            Err(IdentityError::Unrepresentable)
+        );
+        assert!(RecordingId::derive(year_ten_thousand, UtcOffset { secs: -3_600 }, &digest()).is_ok());
+        let before_year_zero = UtcInstant { secs: -62_167_219_201 };
+        assert_eq!(
+            RecordingId::derive(before_year_zero, UtcOffset { secs: 0 }, &digest()),
+            Err(IdentityError::Unrepresentable)
+        );
+        assert_eq!(
+            RecordingId::derive(UtcInstant { secs: i64::MAX }, UtcOffset { secs: 0 }, &digest()),
+            Err(IdentityError::Unrepresentable)
+        );
     }
 }
 ```
@@ -4367,15 +4419,21 @@ mod tests {
 
 Run: `cargo test -p vpt-domain identity`
 
-Expected: compile error, `RecordingId` not found.
+Expected: the build fails with `cannot find` for `RecordingId`, `IdentityError`, `local_timestamp` and
+`parse_local_timestamp`.
 
 - [ ] **Step 3: Write the minimal implementation**
+
+`crates/vpt-domain/src/identity.rs`, above its test module:
 
 ```rust
 //! `<local-capture-timestamp>-<hash12>`: both halves come from the file.
 
 use crate::digest::Sha256Digest;
-use crate::time::{UtcInstant, UtcOffset};
+use crate::time::{Civil, UtcInstant, UtcOffset};
+
+const TIMESTAMP_LEN: usize = 17;
+const IDENTITY_LEN: usize = 30;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RecordingId(String);
@@ -4383,6 +4441,7 @@ pub struct RecordingId(String);
 #[derive(Debug, PartialEq, Eq)]
 pub enum IdentityError {
     Malformed,
+    Unrepresentable,
 }
 
 pub fn local_timestamp(captured: UtcInstant, offset: UtcOffset) -> String {
@@ -4390,25 +4449,55 @@ pub fn local_timestamp(captured: UtcInstant, offset: UtcOffset) -> String {
     format!("{:04}-{:02}-{:02}T{:02}{:02}{:02}", c.year, c.month, c.day, c.hour, c.minute, c.second)
 }
 
+/// `YYYY-MM-DDThhmmss` back to a civil time that exists on the calendar.
+pub fn parse_local_timestamp(text: &str) -> Result<Civil, IdentityError> {
+    let bytes = text.as_bytes();
+    let shape_ok = bytes.len() == TIMESTAMP_LEN
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes[10] == b'T'
+        && bytes[..4].iter().chain(&bytes[5..7]).chain(&bytes[8..10]).chain(&bytes[11..]).all(u8::is_ascii_digit);
+    if !shape_ok {
+        return Err(IdentityError::Malformed);
+    }
+    let field = |range: std::ops::Range<usize>| text[range].parse::<u32>().map_err(|_| IdentityError::Malformed);
+    let civil = Civil {
+        year: i64::from(field(0..4)?),
+        month: field(5..7)?,
+        day: field(8..10)?,
+        hour: field(11..13)?,
+        minute: field(13..15)?,
+        second: field(15..17)?,
+    };
+    if civil.is_valid() { Ok(civil) } else { Err(IdentityError::Malformed) }
+}
+
 impl RecordingId {
-    pub fn derive(captured: UtcInstant, offset: UtcOffset, digest: &Sha256Digest) -> RecordingId {
-        RecordingId(format!("{}-{}", local_timestamp(captured, offset), digest.hash12()))
+    /// The identity of a capture at `captured` read in `offset`; a local year
+    /// outside `0000` to `9999` has no identity.
+    pub fn derive(captured: UtcInstant, offset: UtcOffset, digest: &Sha256Digest) -> Result<RecordingId, IdentityError> {
+        RecordingId::parse(&format!("{}-{}", local_timestamp(captured, offset), digest.hash12()))
+            .map_err(|_| IdentityError::Unrepresentable)
     }
 
     pub fn parse(text: &str) -> Result<RecordingId, IdentityError> {
         let bytes = text.as_bytes();
-        let shape_ok = bytes.len() == 30
-            && bytes[4] == b'-'
-            && bytes[7] == b'-'
-            && bytes[10] == b'T'
-            && bytes[17] == b'-'
-            && bytes[..4].iter().chain(&bytes[5..7]).chain(&bytes[8..10]).chain(&bytes[11..17]).all(u8::is_ascii_digit)
-            && bytes[18..].iter().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b));
-        if shape_ok { Ok(RecordingId(text.to_owned())) } else { Err(IdentityError::Malformed) }
+        let shape_ok = bytes.len() == IDENTITY_LEN
+            && bytes[TIMESTAMP_LEN] == b'-'
+            && bytes[TIMESTAMP_LEN + 1..].iter().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b));
+        if !shape_ok {
+            return Err(IdentityError::Malformed);
+        }
+        parse_local_timestamp(&text[..TIMESTAMP_LEN])?;
+        Ok(RecordingId(text.to_owned()))
     }
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    pub fn local_timestamp(&self) -> &str {
+        &self.0[..TIMESTAMP_LEN]
     }
 
     pub fn capture_date(&self) -> &str {
@@ -4416,7 +4505,7 @@ impl RecordingId {
     }
 
     pub fn hash12(&self) -> &str {
-        &self.0[18..]
+        &self.0[TIMESTAMP_LEN + 1..]
     }
 }
 
@@ -4427,13 +4516,15 @@ impl std::fmt::Display for RecordingId {
 }
 ```
 
-Add `pub mod identity;` to `lib.rs`.
+The byte at index 17 is checked to be the ASCII hyphen before the text is sliced there, so the slice
+never lands inside a multi-byte character.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-domain identity`
 
-Expected: 3 tests PASS.
+Expected: 6 tests PASS. Run `cargo clippy -p vpt-domain --all-targets -- -D warnings` and expect no
+warnings.
 
 - [ ] **Step 5: Commit**
 
