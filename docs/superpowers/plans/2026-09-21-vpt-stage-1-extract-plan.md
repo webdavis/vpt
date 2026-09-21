@@ -8482,6 +8482,12 @@ ______________________________________________________________________
 
 ### Task 17: The archive: staging clones and digests
 
+The archive holds the `audio` store as a root descriptor. Staging is the archive's operation: it chooses
+a private name below its root and hands the root's path and that name to a clone closure the use case
+builds from the recorder port, so the archive port never names the recorder's handle type and neither
+port names a file type. A staging failure says whether this invocation created the staged file, because
+every ingest exit before publication trashes what it owns and nothing else.
+
 **Files:**
 
 - Create: `crates/vpt-application/src/ports/archive.rs`
@@ -8491,85 +8497,148 @@ ______________________________________________________________________
 
 **Interfaces:**
 
-- Consumes: `SourceHandle`, `CloneKind`, `CloneError`, `BoxReader`, `stores::{digest_file, BUFFER}`.
+- Consumes: `CloneKind`, `CloneError`, `vpt_domain::container::ReadFailure`,
+  `vpt_adapters::stores::digest_open`,
+  `vpt_adapters::contained::{Access, ContainedError, Kind, RootDir}`.
 
-- Produces, in `vpt_application::ports::archive`:
+- Produces, in `vpt_application::ports` (from the private file `ports/archive.rs`):
   `Staged { pub path: PathBuf, pub digest: Sha256Digest, pub size: u64, pub copy_on_write: bool }`;
-  `Published::{Placed(PathBuf), Exists(PathBuf)}`; `ArchiveError::{NoSpace, Sync(String), Io(String)}`;
-  `trait Archive { fn stage(&self, source: &dyn SourceHandle) -> Result<Staged,`
-  `ArchiveError>; fn open(&self, path: &Path) -> Result<Box<dyn BoxReader>, ArchiveError>;`
-  `fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError>; fn publish(&self,`
-  `staged: &Path, target_name: &str) -> Result<Published, ArchiveError>;`
-  `fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError>; fn target(&self,`
-  `name: &str) -> PathBuf; fn archived(&self) -> Result<Vec<PathBuf>, ArchiveError>;`
-  `fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError>; }`;
-  `vpt_adapters::archive::ClonefileArchive::new(audio_store: PathBuf) -> ClonefileArchive`;
-  `pub const STAGING_PREFIX: &str = ".vpt-staging-"`.
+  `ArchiveError::{NoSpace, Sync(String), Escape(PathBuf), Io(String)}`;
+  `StageFailure { pub cause: ArchiveError, pub owned_staging: Option<PathBuf> }` (`owned_staging` is set
+  only when this invocation created the staged file; a name that was already taken is never claimed);
+  `trait Archive { type Handle; fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>`
+  `where C: FnOnce(&Path, &str) -> Result<CloneKind, CloneError>;`
+  `fn open(&self, path: &Path) -> Result<Self::Handle, ArchiveError>;`
+  `fn size(&self, handle: &Self::Handle) -> Result<u64, ArchiveError>;`
+  `fn read_at(&self, handle: &Self::Handle, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure>;`
+  `fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError>; fn target(&self, name: &str)`
+  `-> PathBuf; fn archived(&self) -> Result<Vec<PathBuf>, ArchiveError>;`
+  `fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError>; }` (Task 18 adds `publish` and
+  `sync_existing`); `vpt_adapters::archive::{ClonefileArchive, STAGING_PREFIX}` with
+  `ClonefileArchive::open(audio_store: &Path) -> Result<ClonefileArchive, ContainedError>`,
+  `type Handle = std::fs::File`, `STAGING_PREFIX: &str = ".vpt-staging-"`.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-adapters/src/archive/mod.rs`, test section:
+Declare first: `crates/vpt-application/src/ports/mod.rs` gains `mod archive;` and
+`pub use archive::{Archive, ArchiveError, StageFailure, Staged};`; `crates/vpt-adapters/src/lib.rs` gains
+`pub mod archive;`. `crates/vpt-adapters/src/archive/mod.rs` starts as its test module alone:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::voice_memos::store::VoiceMemosStore;
+    use crate::voice_memos::VoiceMemosStore;
     use std::os::unix::fs::PermissionsExt;
-    use vpt_application::ports::recorder::RecorderStore;
+    use std::path::PathBuf;
+    use vpt_application::ports::{CloneError, RecorderStore};
     use vpt_domain::container::inspect;
     use vpt_domain::fixtures::m4a;
 
-    fn source(bytes: &[u8]) -> (tempfile::TempDir, Box<dyn vpt_application::ports::recorder::SourceHandle>) {
+    fn source(bytes: &[u8]) -> (tempfile::TempDir, PathBuf, VoiceMemosStore, File) {
         let temp = tempfile::tempdir().expect("temp");
-        std::fs::create_dir_all(temp.path().join("Recordings")).expect("recordings");
-        std::fs::write(temp.path().join("Recordings/a.m4a"), bytes).expect("fixture");
-        let store = VoiceMemosStore::new(temp.path().join("Recordings"), temp.path().join("state"), false);
-        let handle = store.open(&temp.path().join("Recordings/a.m4a")).expect("open");
-        (temp, handle)
+        let base = temp.path().canonicalize().expect("canonical");
+        std::fs::create_dir_all(base.join("Recordings")).expect("recordings");
+        std::fs::create_dir_all(base.join("audio")).expect("audio");
+        std::fs::write(base.join("Recordings/a.m4a"), bytes).expect("fixture");
+        let store = VoiceMemosStore::open(&base.join("Recordings")).expect("store");
+        let handle = store.open(&base.join("Recordings/a.m4a")).expect("open");
+        (temp, base.join("audio"), store, handle)
     }
 
     #[test]
     fn staging_produces_a_0600_private_copy_with_the_bytes_digest_and_size() {
-        let bytes = m4a(1_787_690_856, 5, b"payload");
-        let (temp, handle) = source(&bytes);
-        let audio = temp.path().join("audio");
-        std::fs::create_dir_all(&audio).expect("audio");
-        let archive = ClonefileArchive::new(audio.clone());
+        let bytes = m4a(1_787_604_456, 5, b"payload");
+        let (_temp, audio, store, handle) = source(&bytes);
+        let archive = ClonefileArchive::open(&audio).expect("archive");
 
-        let staged = archive.stage(&*handle).expect("staged");
+        let staged = archive.stage(|directory, name| store.clone_into(&handle, directory, name)).expect("staged");
 
-        assert!(staged.path.starts_with(&audio));
+        assert_eq!(staged.path.parent(), Some(audio.as_path()));
         assert!(staged.path.file_name().expect("name").to_string_lossy().starts_with(STAGING_PREFIX));
         assert_eq!(std::fs::read(&staged.path).expect("read"), bytes);
         assert_eq!(std::fs::metadata(&staged.path).expect("meta").permissions().mode() & 0o777, 0o600);
         assert_eq!(staged.size, bytes.len() as u64);
-        assert_eq!(staged.digest, crate::stores::digest_file(&staged.path).expect("digest"));
+        assert_eq!(archive.digest(&staged.path).expect("digest"), staged.digest);
         assert!(staged.copy_on_write);
     }
 
     #[test]
     fn a_staged_file_can_be_opened_for_the_wholeness_gate() {
-        let (temp, handle) = source(&m4a(1_787_690_856, 5, b"payload"));
-        let archive = ClonefileArchive::new(temp.path().join("audio"));
-        std::fs::create_dir_all(temp.path().join("audio")).expect("audio");
-        let staged = archive.stage(&*handle).expect("staged");
-        let container = inspect(&mut *archive.open(&staged.path).expect("open")).expect("whole");
+        let (_temp, audio, store, handle) = source(&m4a(1_787_604_456, 5, b"payload"));
+        let archive = ClonefileArchive::open(&audio).expect("archive");
+        let staged = archive.stage(|directory, name| store.clone_into(&handle, directory, name)).expect("staged");
+        let opened = archive.open(&staged.path).expect("open");
+        let len = archive.size(&opened).expect("size");
+        let container = inspect(len, |offset, buf: &mut [u8]| archive.read_at(&opened, offset, buf)).expect("whole");
         assert_eq!(container.duration_secs, 5);
     }
 
     #[test]
-    fn archived_lists_only_m4a_names_and_leftovers_only_staging_names() {
-        let temp = tempfile::tempdir().expect("temp");
-        let audio = temp.path().join("audio");
-        std::fs::create_dir_all(&audio).expect("audio");
+    fn a_clone_that_created_nothing_owns_no_staging_name() {
+        let (_temp, audio, _store, _handle) = source(b"x");
+        let archive = ClonefileArchive::open(&audio).expect("archive");
+        let failure = archive.stage(|_directory, _name| Err(CloneError::Io("boom".into()))).unwrap_err();
+        assert_eq!(failure.cause, ArchiveError::Io("boom".into()));
+        assert_eq!(failure.owned_staging, None);
+        assert!(archive.staged_leftovers().expect("list").is_empty());
+    }
+
+    #[test]
+    fn a_failure_after_the_file_was_created_owns_it_at_mode_0600() {
+        let (_temp, audio, _store, _handle) = source(b"x");
+        let archive = ClonefileArchive::open(&audio).expect("archive");
+        let failure = archive
+            .stage(|directory, name| {
+                std::fs::write(directory.join(name), b"partial").expect("partial");
+                Err(CloneError::NoSpace)
+            })
+            .unwrap_err();
+        assert_eq!(failure.cause, ArchiveError::NoSpace);
+        let owned = failure.owned_staging.expect("owned");
+        assert_eq!(owned.parent(), Some(audio.as_path()));
+        assert_eq!(std::fs::metadata(&owned).expect("kept").permissions().mode() & 0o777, 0o600);
+        assert_eq!(archive.staged_leftovers().expect("list"), vec![owned]);
+    }
+
+    #[test]
+    fn a_name_that_was_already_taken_is_never_claimed() {
+        let (_temp, audio, _store, _handle) = source(b"x");
+        let archive = ClonefileArchive::open(&audio).expect("archive");
+        let failure = archive
+            .stage(|directory, name| {
+                std::fs::write(directory.join(name), b"someone else's").expect("collision");
+                Err(CloneError::Exists)
+            })
+            .unwrap_err();
+        assert_eq!(failure.owned_staging, None);
+        assert!(matches!(failure.cause, ArchiveError::Io(_)), "{:?}", failure.cause);
+    }
+
+    #[test]
+    fn archived_lists_only_m4a_files_and_leftovers_only_staging_names() {
+        let (_temp, audio, _store, _handle) = source(b"x");
         std::fs::write(audio.join("2026-08-24T144736-4f3ab19c02de.m4a"), b"x").expect("archived");
         std::fs::write(audio.join(format!("{STAGING_PREFIX}123.m4a")), b"y").expect("leftover");
         std::fs::write(audio.join("notes.txt"), b"z").expect("other");
-        let archive = ClonefileArchive::new(audio.clone());
+        std::os::unix::fs::symlink(audio.join("notes.txt"), audio.join("link.m4a")).expect("link");
+        let archive = ClonefileArchive::open(&audio).expect("archive");
         assert_eq!(archive.archived().expect("list"), vec![audio.join("2026-08-24T144736-4f3ab19c02de.m4a")]);
         assert_eq!(archive.staged_leftovers().expect("list"), vec![audio.join(format!("{STAGING_PREFIX}123.m4a"))]);
         assert_eq!(archive.target("abc.m4a"), audio.join("abc.m4a"));
+    }
+
+    #[test]
+    fn open_and_digest_refuse_a_link_and_a_path_outside_the_store() {
+        let (temp, audio, _store, _handle) = source(b"x");
+        std::fs::write(audio.join("real.m4a"), b"x").expect("real");
+        std::os::unix::fs::symlink(audio.join("real.m4a"), audio.join("link.m4a")).expect("link");
+        let archive = ClonefileArchive::open(&audio).expect("archive");
+        assert_eq!(archive.open(&audio.join("link.m4a")).err(), Some(ArchiveError::Escape(audio.join("link.m4a"))));
+        let outside = temp.path().canonicalize().expect("canonical").join("Recordings/a.m4a");
+        assert_eq!(archive.digest(&outside), Err(ArchiveError::Escape(outside)));
+        let absent = archive.open(&audio.join("absent.m4a"));
+        assert!(matches!(absent, Err(ArchiveError::Io(_))), "{absent:?}");
     }
 }
 ```
@@ -8578,18 +8647,20 @@ mod tests {
 
 Run: `cargo test -p vpt-adapters archive`
 
-Expected: compile error, `ClonefileArchive` not found.
+Expected: the build fails with `unresolved import` for the archive names in `ports/mod.rs` and
+`cannot find` for `ClonefileArchive` and `STAGING_PREFIX`.
 
 - [ ] **Step 3: Write the minimal implementation**
 
 `crates/vpt-application/src/ports/archive.rs`:
 
 ```rust
-//! The audio archive: staging from a descriptor, exclusive publication, digests.
+//! The audio archive: staging below its root, bounded reads, digests, and
+//! (from Task 18) exclusive publication.
 
-use crate::ports::recorder::SourceHandle;
+use super::recorder::{CloneError, CloneKind};
 use std::path::{Path, PathBuf};
-use vpt_domain::container::BoxReader;
+use vpt_domain::container::ReadFailure;
 use vpt_domain::digest::Sha256Digest;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8601,132 +8672,167 @@ pub struct Staged {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Published {
-    Placed(PathBuf),
-    Exists(PathBuf),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArchiveError {
     NoSpace,
     Sync(String),
+    /// Below no archive root, nested, or reached through a link: exit 3, `path_escape`.
+    Escape(PathBuf),
     Io(String),
 }
 
+/// A staging failure, with the staged name when this invocation created it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StageFailure {
+    pub cause: ArchiveError,
+    pub owned_staging: Option<PathBuf>,
+}
+
 pub trait Archive {
-    fn stage(&self, source: &dyn SourceHandle) -> Result<Staged, ArchiveError>;
-    fn open(&self, path: &Path) -> Result<Box<dyn BoxReader>, ArchiveError>;
+    /// The open read-only descriptor of one archive file.
+    type Handle;
+
+    /// Stage into a private name below the root: `clone` receives the root's
+    /// path and the name and clones the source there.
+    fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>
+    where
+        C: FnOnce(&Path, &str) -> Result<CloneKind, CloneError>;
+    fn open(&self, path: &Path) -> Result<Self::Handle, ArchiveError>;
+    fn size(&self, handle: &Self::Handle) -> Result<u64, ArchiveError>;
+    /// Fill `buf` from `offset`, or fail; the wholeness gate's read callback.
+    fn read_at(&self, handle: &Self::Handle, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure>;
     fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError>;
-    /// Sync the staged file, move it to `target_name` without replacing an
-    /// existing target, sync the directory.
-    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError>;
-    /// Sync an archive file and its directory (duplicate recovery).
-    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError>;
     fn target(&self, name: &str) -> PathBuf;
     fn archived(&self) -> Result<Vec<PathBuf>, ArchiveError>;
     fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError>;
 }
 ```
 
-`crates/vpt-adapters/src/archive/mod.rs`:
+`crates/vpt-adapters/src/archive/mod.rs`, above its test module:
 
 ```rust
-//! The archive on disk: copy-on-write staging from the source descriptor,
-//! digests in 64 KiB buffers, the exclusive publish of `publish.rs`.
+//! The archive on disk: staging from the source descriptor into a private
+//! name below the `audio` root, digests in 64 KiB buffers.
 
-pub mod publish;
-
+use crate::contained::{Access, ContainedError, Kind, RootDir};
+use crate::stores::digest_open;
 use std::fs::File;
+use std::os::unix::fs::{FileExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use vpt_application::ports::archive::*;
-use vpt_application::ports::recorder::{CloneError, SourceHandle};
-use vpt_domain::container::{BoxReader, ReadFailure};
+use vpt_application::ports::{Archive, ArchiveError, CloneError, CloneKind, StageFailure, Staged};
+use vpt_domain::container::ReadFailure;
 use vpt_domain::digest::Sha256Digest;
 
 pub const STAGING_PREFIX: &str = ".vpt-staging-";
 
-static STAGING_COUNTER: AtomicU64 = AtomicU64::new(0);
-
 pub struct ClonefileArchive {
-    audio_store: PathBuf,
+    root: RootDir,
+    sequence: AtomicU64,
+}
+
+pub(crate) fn io(error: &std::io::Error) -> ArchiveError {
+    if error.kind() == std::io::ErrorKind::StorageFull { ArchiveError::NoSpace } else { ArchiveError::Io(error.kind().to_string()) }
+}
+
+pub(crate) fn archive_error(path: &Path, error: ContainedError) -> ArchiveError {
+    match error {
+        ContainedError::Io { kind: std::io::ErrorKind::StorageFull, .. } => ArchiveError::NoSpace,
+        ContainedError::Io { kind, .. } => ArchiveError::Io(kind.to_string()),
+        ContainedError::Escape { .. } | ContainedError::NotRegular(_) | ContainedError::NotADirectory(_) => {
+            ArchiveError::Escape(path.to_path_buf())
+        }
+    }
+}
+
+fn clone_error(error: CloneError) -> ArchiveError {
+    match error {
+        CloneError::NoSpace => ArchiveError::NoSpace,
+        CloneError::Exists => ArchiveError::Io("staging name already exists".into()),
+        CloneError::Io(detail) => ArchiveError::Io(detail),
+    }
 }
 
 impl ClonefileArchive {
-    pub fn new(audio_store: PathBuf) -> ClonefileArchive {
-        ClonefileArchive { audio_store }
+    pub fn open(audio_store: &Path) -> Result<ClonefileArchive, ContainedError> {
+        Ok(ClonefileArchive { root: RootDir::open(audio_store)?, sequence: AtomicU64::new(0) })
     }
 
-    fn staging_name(&self) -> PathBuf {
-        let counter = STAGING_COUNTER.fetch_add(1, Ordering::Relaxed);
-        self.audio_store.join(format!("{STAGING_PREFIX}{}-{counter}.m4a", std::process::id()))
+    fn staging_name(&self) -> String {
+        format!("{STAGING_PREFIX}{}-{}.m4a", std::process::id(), self.sequence.fetch_add(1, Ordering::Relaxed))
+    }
+
+    /// Mode 0600, digest and size of a file this invocation just staged.
+    fn finish(&self, name: &str, kind: CloneKind) -> Result<Staged, ArchiveError> {
+        let path = self.root.path().join(name);
+        let mut file = self.root.open_file(Path::new(name), Access::Read).map_err(|error| archive_error(&path, error))?;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600)).map_err(|error| io(&error))?;
+        let digest = digest_open(&mut file).map_err(|error| io(&error))?;
+        let size = file.metadata().map_err(|error| io(&error))?.len();
+        Ok(Staged { path, digest, size, copy_on_write: kind == CloneKind::CopyOnWrite })
+    }
+
+    /// A staged file this invocation created and cannot use: keep it private
+    /// for the owned cleanup and report it.
+    fn owned_failure(&self, name: &str, cause: ArchiveError) -> StageFailure {
+        if let Ok(file) = self.root.open_file(Path::new(name), Access::Read) {
+            let _ = file.set_permissions(std::fs::Permissions::from_mode(0o600));
+        }
+        StageFailure { cause, owned_staging: Some(self.root.path().join(name)) }
     }
 
     fn list(&self, keep: impl Fn(&str) -> bool) -> Result<Vec<PathBuf>, ArchiveError> {
-        let entries = std::fs::read_dir(&self.audio_store).map_err(io)?;
+        let names = self.root.names().map_err(|error| archive_error(self.root.path(), error))?;
         let mut paths = Vec::new();
-        for entry in entries {
-            let entry = entry.map_err(io)?;
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if keep(&name) && entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
-                paths.push(entry.path());
+        for name in names.into_iter().filter(|name| keep(name)) {
+            if matches!(self.root.stat(Path::new(&name)), Ok(stat) if stat.kind == Kind::File) {
+                paths.push(self.root.path().join(name));
             }
         }
-        paths.sort();
         Ok(paths)
     }
 }
 
-pub(crate) fn io(error: std::io::Error) -> ArchiveError {
-    if error.raw_os_error() == Some(libc::ENOSPC) { ArchiveError::NoSpace } else { ArchiveError::Io(error.to_string()) }
-}
-
-struct ArchivedFile {
-    file: File,
-}
-
-impl BoxReader for ArchivedFile {
-    fn len(&self) -> u64 {
-        self.file.metadata().map(|m| m.len()).unwrap_or(0)
-    }
-
-    fn read_exact_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
-        use std::os::unix::fs::FileExt;
-        self.file.read_exact_at(buf, offset).map_err(|_| ReadFailure)
-    }
-}
-
 impl Archive for ClonefileArchive {
-    fn stage(&self, source: &dyn SourceHandle) -> Result<Staged, ArchiveError> {
-        let path = self.staging_name();
-        let kind = source.clone_into(&path).map_err(|error| match error {
-            CloneError::NoSpace => ArchiveError::NoSpace,
-            CloneError::Io(detail) => ArchiveError::Io(detail),
-        })?;
-        std::fs::set_permissions(&path, std::os::unix::fs::PermissionsExt::from_mode(0o600)).map_err(io)?;
-        let digest = crate::stores::digest_file(&path).map_err(io)?;
-        let size = std::fs::metadata(&path).map_err(io)?.len();
-        Ok(Staged { path, digest, size, copy_on_write: kind == vpt_application::ports::recorder::CloneKind::CopyOnWrite })
+    type Handle = File;
+
+    fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>
+    where
+        C: FnOnce(&Path, &str) -> Result<CloneKind, CloneError>,
+    {
+        let name = self.staging_name();
+        match clone(self.root.path(), &name) {
+            Ok(kind) => self.finish(&name, kind).map_err(|cause| self.owned_failure(&name, cause)),
+            Err(CloneError::Exists) => Err(StageFailure { cause: clone_error(CloneError::Exists), owned_staging: None }),
+            Err(error) => {
+                let created = matches!(self.root.stat(Path::new(&name)), Ok(stat) if stat.kind == Kind::File);
+                if created {
+                    Err(self.owned_failure(&name, clone_error(error)))
+                } else {
+                    Err(StageFailure { cause: clone_error(error), owned_staging: None })
+                }
+            }
+        }
     }
 
-    fn open(&self, path: &Path) -> Result<Box<dyn BoxReader>, ArchiveError> {
-        Ok(Box::new(ArchivedFile { file: File::open(path).map_err(io)? }))
+    fn open(&self, path: &Path) -> Result<File, ArchiveError> {
+        self.root.open_file(path, Access::Read).map_err(|error| archive_error(path, error))
+    }
+
+    fn size(&self, handle: &File) -> Result<u64, ArchiveError> {
+        handle.metadata().map(|metadata| metadata.len()).map_err(|error| io(&error))
+    }
+
+    fn read_at(&self, handle: &File, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
+        handle.read_exact_at(buf, offset).map_err(|_| ReadFailure)
     }
 
     fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError> {
-        crate::stores::digest_file(path).map_err(io)
-    }
-
-    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError> {
-        publish::exclusive(staged, &self.target(target_name))
-    }
-
-    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError> {
-        publish::sync_file_and_directory(path)
+        let mut file = self.open(path)?;
+        digest_open(&mut file).map_err(|error| io(&error))
     }
 
     fn target(&self, name: &str) -> PathBuf {
-        self.audio_store.join(name)
+        self.root.path().join(name)
     }
 
     fn archived(&self) -> Result<Vec<PathBuf>, ArchiveError> {
@@ -8739,21 +8845,23 @@ impl Archive for ClonefileArchive {
 }
 ```
 
-`publish.rs` arrives in the next task; for this task's tests to compile, create it with the two
-signatures and bodies that return `Err(ArchiveError::Io("not built yet".into()))`, then replace them in
-Task 18. Add `pub mod archive;` to `lib.rs` and `pub mod archive;` to `ports/mod.rs`.
+A clone that reports `Exists` found the name taken, so the file there is someone else's and is never
+owned. Any other clone failure owns the name exactly when a regular file now stands there, which is the
+byte copy that ran out of space part way; the digest, mode and size steps after a successful clone own it
+unconditionally. Nothing here removes a file.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters archive`
 
-Expected: 3 tests PASS.
+Expected: 7 tests PASS. Run `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no
+warnings.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add crates
-SKIP_AI_COMMIT=1 git commit -m "feat(archive): copy-on-write staging with a private name and a digest"
+SKIP_AI_COMMIT=1 git commit -m "feat(archive): staging below the audio root with an owned-cleanup contract"
 ```
 
 ______________________________________________________________________
