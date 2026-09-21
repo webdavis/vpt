@@ -1109,12 +1109,13 @@ it. An unreviewed artifact is emitted, labelled, never refused. The header names
 pure apart from `generated_at`, so the digest is meaningful and a lost copy is recoverable by re-running
 one command.
 
-No configuration key, no source line and no test names Open Notebook's vocabulary; a grep test over the
-tree for `open.notebook`, `notebook_id`, `5055`, `8502` and `surreal` finds nothing. The mapping from
-`vpt.handoff/1` to the notebook's own source-creation call, the credential holder, the transport recipe,
-the return path for a note authored there, and a remote identifier that would let a re-handoff replace
-rather than duplicate, all wait until that service is deployed; a re-handoff today duplicates, and the
-deterministic `title` is what makes the duplicate findable.
+No configuration key and no production source line names Open Notebook's vocabulary: a test greps the
+shipped Rust and Swift sources and the shipped configuration template (documentation, tests and fixtures
+excluded) for `open.notebook`, `notebook_id`, `5055`, `8502` and `surreal` and finds nothing. The mapping
+from `vpt.handoff/1` to the notebook's own source-creation call, the credential holder, the transport
+recipe, the return path for a note authored there, and a remote identifier that would let a re-handoff
+replace rather than duplicate, all wait until that service is deployed; a re-handoff today duplicates,
+and the deterministic `title` is what makes the duplicate findable.
 
 ### 8.7 Notifications through the producer API
 
@@ -1504,12 +1505,13 @@ outside the markers (stage 3); the released file contains no removed value, no `
 slug, a byte-identical duplicate is refused, `vpt handoff` writes no file and succeeds with name
 resolution failing, and the grep for notebook vocabulary finds nothing (stage 4).
 
-The Swift helper has its own `swift test` suite in `helper/vpt-macos/Tests`: `transcribe` against a clip
-the test synthesizes with the system `say` command into a temporary directory (no audio fixture is
-committed), asserting the document's schema, that every word carries a confidence in `[0, 1]` and a
-non-inverted time range, and that the words of a short known script appear in order; `notify` and `trash`
-against a temporary file and a stubbed poster, asserting the printed document and that the file is gone
-from its path and present in the Trash.
+The Swift helper has its own `swift test` suite in `helper/vpt-macos/Tests`, and it reaches no real
+destination: speech results are injected through a protocol the transcriber implements, the notification
+poster is a stub, and the Trash is a temporary-directory adapter. The tests cover the conversion of
+speech results into `vpt.engine/1` (schema, confidence in `[0, 1]`, non-inverted and contained ranges,
+segment order), argument handling and exit codes, and the printed documents of `notify` and `trash`. A
+real `SpeechAnalyzer` run and a real move to the Trash are operator-run smoke checks (`just smoke`),
+never part of the automated suite.
 
 CI runs on a macOS runner: `cargo fmt --all -- --check`,
 `cargo clippy --workspace --all-targets -- -D warnings`,
