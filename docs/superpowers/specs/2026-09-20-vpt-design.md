@@ -1590,13 +1590,16 @@ What the tests use instead of the world:
   test reaches the network except the loopback listener.
 
 Behaviors that pin the constraints most likely to erode, written first in each stage: the source
-container's every entry has the same size, mtime and flags after a full sweep (stage 1); two engines of
+container's every entry has the same size, mtime and flags after a full sweep, a dry run leaves the title
+copy untouched, a publication interrupted after its rename and before its dirty entry clears is repaired
+without a refusal, and an untracked file in a store survives a retention run (stage 1); two engines of
 one family refuse before any spawn, and an agreed proper noun not in `known-terms.txt` produces exactly
 one aggregated flag (stage 2); the portable profile emits none of the vault's keys and a full run against
 a store with no `.obsidian` directory produces no vault syntax, and a rewrite preserves every byte
 outside the markers (stage 3); the released file contains no removed value, no `vpt` key and no source
-slug, a byte-identical duplicate is refused, `vpt handoff` writes no file and succeeds with name
-resolution failing, and the grep for notebook vocabulary finds nothing (stage 4).
+slug, a byte-identical duplicate is refused, `verify-note` leaves a note the ledger does not own
+byte-identical, a proposal line holding a managed delimiter renders as text, `vpt handoff` writes no file
+and succeeds with name resolution failing, and the grep for notebook vocabulary finds nothing (stage 4).
 
 The Swift helper has its own `swift test` suite in `helper/vpt-macos/Tests`, and it reaches no real
 destination: speech results are injected through a protocol the transcriber implements, the notification
@@ -1652,11 +1655,12 @@ complete, tested and documented, and `main` is installable after every merge.
 
 Ships the workspace skeleton (five crates, `Cargo.lock`, CI, `justfile`, the file-size check), the config
 loader and `vpt setup`, the home, stores and `stores` refusals, the managed symlink and `vpt symlink`,
-the SQLite ledger with its in-memory twin, migrations, the write lock and the dirty-artifact publication
-protocol, `vpt ingest` with the wholeness gate, the title copy, staging and publication, `vpt show`,
-`vpt list`, `vpt storage`, `vpt doctor` (config, stores, helper presence, recordings directory
-readability, symlink, git trees, subdirectory counts), the `vpt-macos` helper package with `notify` and
-`trash`, `[notify]` with all three modes and `vpt.event/1`, and `vpt retention run`. Depends on nothing.
+the SQLite ledger with its in-memory twin, migrations, the write lock, the dirty-artifact publication
+protocol and the retention intents, `vpt ingest` with the wholeness gate, the title copy, staging and
+publication, `vpt show`, `vpt list`, `vpt storage`, `vpt doctor` (config, stores, helper presence,
+recordings directory readability, symlink, git trees, subdirectory counts), the `vpt-macos` helper
+package with `notify` and `trash`, `[notify]` with all three modes and `vpt.event/1`, and
+`vpt retention run`. Depends on nothing.
 
 ### Stage 2: Transcribe
 
