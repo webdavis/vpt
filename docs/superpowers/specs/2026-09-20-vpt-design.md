@@ -173,7 +173,7 @@ not depend on `vpt-protocol`.
 | Port (in vpt-application) | What a use case asks of it                                                                | Adapters (in vpt-adapters)                                                                         |
 | ------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `RecorderStore`           | list candidate recordings with size, mtime, flags; read bytes; read a title by path       | `voice_memos` (Apple's group container plus a private copy of its database); `fixture_dir` (tests) |
-| `Archive`                 | clone bytes to the audio store with `EEXIST` semantics                                    | `clonefile` (the raw syscall, byte-copy fallback on `EXDEV`)                                       |
+| `Archive`                 | clone bytes to the audio store, never replacing an existing target                        | `clonefile` (the raw syscall, byte-copy fallback on `EXDEV`)                                       |
 | `Engine`                  | transcribe an audio path into a `Transcript`; report its model family and locality        | `apple` (the Swift helper), `whisply`, `command`                                                   |
 | `Clock`                   | now, in UTC and in the local zone                                                         | system clock; fixed clock in tests                                                                 |
 | `Ledger`                  | the repositories of section 4.4                                                           | `sqlite` (one database, write-ahead log, busy timeout); in-memory (tests)                          |
@@ -430,13 +430,14 @@ ingested: the clone is the first durable act and happens only after every gate p
 
 ### 5.3 Cloning and duplicates
 
-Publication is an atomic no-replace rename of the staged file (`renamex_np` with `RENAME_EXCL`), which
-fails with `EEXIST` when `<id>.m4a` exists; that failure is the duplicate guard between two racing sweeps
-and needs no lock beyond the one every mutating command holds. On `EEXIST` vpt verifies the existing
-archive: its full digest must equal the staged digest and its container must validate. It then recovers
-any missing recording or seen row in one transaction, moves the staged duplicate to the Trash, and
-reports `already ingested`. A digest mismatch is exit 3 `archive_collision`, and nothing is replaced. The
-staging clone is `clonefile(2)` through `libc`; `EXDEV` (the store on another volume) falls back to a
+Publication moves the staged file to `<id>.m4a` in one step and never replaces an existing target: an
+existing `<id>.m4a` is a refusal naming the path, and that refusal is the duplicate guard between two
+racing sweeps, which needs no lock beyond the one every mutating command holds. The plan verifies the
+exclusive-rename primitive available on the platform before choosing it. On that refusal vpt verifies the
+existing archive: its full digest must equal the staged digest and its container must validate. It then
+recovers any missing recording or seen row in one transaction, moves the staged duplicate to the Trash,
+and reports `already ingested`. A digest mismatch is exit 3 `archive_collision`, and nothing is replaced.
+The staging clone is `clonefile(2)` through `libc`; `EXDEV` (the store on another volume) falls back to a
 byte copy into a unique mode-0600 temporary file, synced before the same no-replace publish, with one log
 line saying the archive is not copy-on-write. `ENOSPC` aborts the sweep. At the start of every sweep, an
 archive file with no ledger row is recovered by validating and digesting it, even when its source is
