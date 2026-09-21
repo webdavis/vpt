@@ -4941,7 +4941,11 @@ ______________________________________________________________________
 - Consumes: `time::{FileTime, UtcInstant}`.
 
 - Produces: `vpt_domain::sweep::{DeferralReason, CandidateFacts, SeenFacts, SweepLimits, PreOpen,`
-  `pre_open, size_gate, rest_gate}`;
+  `pre_open, size_gate, rest_gate, SF_DATALESS}`;
+  `CandidateFacts { pub size: u64, pub mtime: FileTime, pub flags: u32 }` (the source's whole `st_flags`
+  word; `SF_DATALESS` is `0x4000_0000`, the bit macOS sets on a file whose bytes are still in iCloud);
+  `SeenFacts { pub size: u64, pub mtime: FileTime, pub ingested: bool, pub deferred_size: Option<u64> }`;
+  `SweepLimits { pub max_audio_bytes: u64, pub quiet_period_secs: u64 }`;
   `DeferralReason::{Dataless, AudioTooLarge, InvalidContainer, NotAtRest, ChangedDuringRead}` with
   `fn as_str(self) -> &'static str` and `fn parse(text: &str) -> Option<DeferralReason>`;
   `PreOpen::{Dataless, Unchanged, Open}`;
@@ -4952,29 +4956,36 @@ ______________________________________________________________________
 
 - [ ] **Step 1: Write the failing tests**
 
+`crates/vpt-domain/src/lib.rs` gains `pub mod sweep;`. `crates/vpt-domain/src/sweep.rs` starts as its
+test module alone:
+
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const LIMITS: SweepLimits = SweepLimits { max_audio_bytes: 2_147_483_648, quiet_period_secs: 30 };
+    const UF_HIDDEN: u32 = 0x0000_8000;
 
-    fn candidate(size: u64, secs: i64, dataless: bool) -> CandidateFacts {
-        CandidateFacts { size, mtime: FileTime { secs, nanos: 0 }, dataless }
+    fn candidate(size: u64, secs: i64, flags: u32) -> CandidateFacts {
+        CandidateFacts { size, mtime: FileTime { secs, nanos: 0 }, flags }
     }
 
     #[test]
-    fn a_dataless_entry_is_never_opened() {
-        assert_eq!(pre_open(&candidate(10, 0, true), None), PreOpen::Dataless);
+    fn a_dataless_entry_is_never_opened_whatever_else_is_set() {
+        assert_eq!(pre_open(&candidate(10, 0, SF_DATALESS), None), PreOpen::Dataless);
+        assert_eq!(pre_open(&candidate(10, 0, SF_DATALESS | UF_HIDDEN), None), PreOpen::Dataless);
+        assert_eq!(pre_open(&candidate(10, 0, UF_HIDDEN), None), PreOpen::Open);
     }
 
     #[test]
     fn an_unchanged_ingested_triple_is_skipped_and_a_changed_one_is_opened() {
         let seen = SeenFacts { size: 10, mtime: FileTime { secs: 5, nanos: 0 }, ingested: true, deferred_size: None };
-        assert_eq!(pre_open(&candidate(10, 5, false), Some(&seen)), PreOpen::Unchanged);
-        assert_eq!(pre_open(&candidate(11, 5, false), Some(&seen)), PreOpen::Open);
+        assert_eq!(pre_open(&candidate(10, 5, 0), Some(&seen)), PreOpen::Unchanged);
+        assert_eq!(pre_open(&candidate(11, 5, 0), Some(&seen)), PreOpen::Open);
+        assert_eq!(pre_open(&candidate(10, 6, 0), Some(&seen)), PreOpen::Open);
         let deferred = SeenFacts { ingested: false, ..seen };
-        assert_eq!(pre_open(&candidate(10, 5, false), Some(&deferred)), PreOpen::Open);
+        assert_eq!(pre_open(&candidate(10, 5, 0), Some(&deferred)), PreOpen::Open);
     }
 
     #[test]
@@ -4984,10 +4995,13 @@ mod tests {
     }
 
     #[test]
-    fn the_rest_gate_needs_the_whole_quiet_period() {
+    fn the_rest_gate_needs_the_whole_quiet_period_to_the_nanosecond() {
         let now = UtcInstant { secs: 1_000 };
         assert_eq!(rest_gate(FileTime { secs: 971, nanos: 0 }, 10, now, None, &LIMITS), Err(DeferralReason::NotAtRest));
+        assert_eq!(rest_gate(FileTime { secs: 970, nanos: 1 }, 10, now, None, &LIMITS), Err(DeferralReason::NotAtRest));
         assert_eq!(rest_gate(FileTime { secs: 970, nanos: 0 }, 10, now, None, &LIMITS), Ok(()));
+        let unbounded = SweepLimits { max_audio_bytes: 1, quiet_period_secs: u64::MAX };
+        assert_eq!(rest_gate(FileTime { secs: 0, nanos: 0 }, 10, now, None, &unbounded), Err(DeferralReason::NotAtRest));
     }
 
     #[test]
@@ -5018,14 +5032,20 @@ mod tests {
 
 Run: `cargo test -p vpt-domain sweep`
 
-Expected: compile error, `pre_open` and friends not found.
+Expected: the build fails with `cannot find` for `pre_open`, `size_gate`, `rest_gate`, `CandidateFacts`,
+`SeenFacts`, `SweepLimits`, `PreOpen`, `DeferralReason` and `SF_DATALESS`.
 
 - [ ] **Step 3: Write the minimal implementation**
+
+`crates/vpt-domain/src/sweep.rs`, above its test module:
 
 ```rust
 //! The sweep gates of spec section 5.2, cheapest first, as pure decisions.
 
 use crate::time::{FileTime, UtcInstant};
+
+/// The `st_flags` bit macOS sets on a file whose bytes are still in iCloud.
+pub const SF_DATALESS: u32 = 0x4000_0000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeferralReason {
@@ -5063,7 +5083,13 @@ impl DeferralReason {
 pub struct CandidateFacts {
     pub size: u64,
     pub mtime: FileTime,
-    pub dataless: bool,
+    pub flags: u32,
+}
+
+impl CandidateFacts {
+    pub fn dataless(&self) -> bool {
+        self.flags & SF_DATALESS != 0
+    }
 }
 
 pub struct SeenFacts {
@@ -5086,7 +5112,7 @@ pub enum PreOpen {
 }
 
 pub fn pre_open(candidate: &CandidateFacts, seen: Option<&SeenFacts>) -> PreOpen {
-    if candidate.dataless {
+    if candidate.dataless() {
         return PreOpen::Dataless;
     }
     match seen {
@@ -5118,13 +5144,15 @@ pub fn rest_gate(
 }
 ```
 
-Add `pub mod sweep;` to `lib.rs`.
+`FileTime::age_secs` counts the nanoseconds (Task 7), so a file touched 29.999999999 seconds ago is not
+at rest under a 30 second quiet period.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-domain sweep`
 
-Expected: 6 tests PASS.
+Expected: 6 tests PASS. Run `cargo clippy -p vpt-domain --all-targets -- -D warnings` and expect no
+warnings.
 
 - [ ] **Step 5: Commit**
 
