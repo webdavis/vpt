@@ -1261,6 +1261,7 @@ The error document:
 
 ```json
 {
+  "schema": "vpt.error/1",
   "error": {
     "kind": "refused",
     "rule": "same_family",
