@@ -197,10 +197,19 @@ workspace is a trait. `dyn Trait` appears only at the composition root in `vpt`.
 | 4 Synthesis and extras | verify-note grounding, brief selector, redaction | `Synthesize`, `Brief`, `Redact`, `Handoff` | `AgentCommand`, `ContextSource`, `Stores`, `Ledger`       |
 
 `vpt run` composes the use cases in stage order. Each stage of a recording is `pending`, `succeeded`,
-`failed`, `disabled` or `expired`; success is recorded only after the stage's artifacts commit. A run
-selects every recording with an enabled stage that is `pending` or `failed` and resumes from its earliest
-such stage, so a transient failure is retried on the next run; a `disabled` stage (off in config) and an
-`expired` one (retention moved its artifact) are never retried by `run`.
+`failed`, `disabled` or `expired`; success is recorded only after the stage's artifacts commit. Stage
+eligibility is evaluated from the current configuration on every run: a stage that is off in config is
+marked `disabled` and skipped, and an incomplete stage marked `disabled` on an earlier run becomes
+`pending` when its configuration enables it, so a recording processed before synthesis was configured is
+synthesized once it is. Disabling a stage discards nothing: an earlier `succeeded` or `expired` state
+stays. Every derived stage records the digest of the accepted input it consumed (the transcript for
+synthesis, the transcript and the claim for a verification finding); when that input changes through a
+re-transcription, the enabled stage becomes `pending` again unless retention expired its output, so
+synthesis is current only while the accepted proposal's source digest equals the current digest of its
+input, and a verification finding is current only for the claim and transcript it recorded. A run selects
+every recording with an enabled stage that is `pending` or `failed` and resumes from its earliest such
+stage, so a transient failure is retried on the next run; an `expired` stage (retention moved its
+artifact) is never retried by `run`, and a released copy is immutable whatever changes upstream.
 
 ### 3.4 The macOS helper
 
@@ -335,7 +344,7 @@ runs the same contract tests:
 | `seen`                 | per source path: filename, size, mtime, flags, first seen, last seen, deferral count and reason, `source_gone_at`                                                                                             |
 | `recordings`           | per identity: source path, digest (unique), captured_at (UTC with offset), duration, title, title_source, ingested_at, stage states, note paths, audio path, engines, language, `open_flags`, `diagnostics`   |
 | `transcripts`          | per recording: the accepted transcript of record, segments and word timings, with the engine that produced it                                                                                                 |
-| `proposals`            | per recording: the accepted `Proposal` (summary, actions, tags, relations) with its source digest                                                                                                             |
+| `proposals`            | per recording: the accepted `Proposal` (summary, actions, tags, relations) with the digest of the transcript it was derived from, and per claim its source ranges and inherited uncertainty                   |
 | `flags`                | per flag: recording, identifier, shape (lexical or diagnostic), class, occurrence ranges, record text, alternative text, confidence, state, resolution text, resolved_at                                      |
 | `occasions`            | per occasion: identity, provider key (unique), source (`manual`, `dam`, `google`), at, duration, title, participants, tags, the assembled pack with its source identities and digests, brief path, briefed_at |
 | `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                                  |
