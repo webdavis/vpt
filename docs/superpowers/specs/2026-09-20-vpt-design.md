@@ -1377,12 +1377,13 @@ the node number is the tree's.
 
 ### 10.2 An example profile: a home inside an Obsidian vault
 
-The operator's own configuration differs from the shipped defaults in these keys and no others; it is an
-example, not the default:
+A configuration for a home inside an Obsidian vault differs from the shipped defaults in these keys and
+no others; it is an example, not the default. The operator's own values are rendered by their dotfiles
+into `~/.config/vpt/config.toml`.
 
 ```toml
 [home]
-path = "~/workspaces/Ivy/vpt" # inside the Obsidian vault, which ignores audio extensions
+path = "~/notes/vpt" # inside the Obsidian vault, which ignores audio extensions
 
 [stores]
 engine_outputs = "~/.vpt/engine-outputs" # kept out of the vault
@@ -1393,7 +1394,7 @@ profile = "obsidian"
 link_style = "wiki"
 
 [note.obsidian]
-vault_root = "~/workspaces/Ivy"
+vault_root = "~/notes"
 
 
 [tags]
