@@ -1318,7 +1318,10 @@ and the state directory with mode 0700 and the default store leaves beneath the 
 overwrite an existing file without `--force`. Without a terminal it exits 2 and writes nothing; with
 `--json` the prompt still uses the terminal and stdout carries only the result document. A secret is a
 value in this file; a key holding a secret is marked in the table. A key that is not in this table is a
-startup refusal naming it.
+startup refusal naming it. The file's first key is `config_version = 1`, an integer `vpt setup` emits: a
+missing or unsupported version is a configuration error, exit 2, which `doctor` reports as a failed
+check, and a supported older version, once one exists, is read only through an explicit, tested
+migration.
 
 Value rules: a ratio is a finite number in `[0, 1]`, and `max_divergence_ratio` is above zero; a timeout,
 a threshold and the slug length are positive integers; a count, a gap and a lookback are non-negative
@@ -1334,6 +1337,7 @@ canary-secret test.
 
 | Key                                  | Type           | Default                                                                   | Meaning                                                                                                      |
 | ------------------------------------ | -------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `config_version`                     | int            | `1`                                                                       | the configuration schema version; missing or unsupported refuses                                             |
 | `home.path`                          | string         | `~/.vpt`                                                                  | the home; every store defaults under it                                                                      |
 | `home.state_dir`                     | string         | `~/.local/state/vpt`                                                      | the ledger's directory                                                                                       |
 | `home.symlink_target`                | string         | `""`                                                                      | when set, `~/.vpt` is a managed symlink to this directory and `home.path` must stay at its default           |
@@ -1508,8 +1512,8 @@ never a silent fallthrough.
 Refused at startup, before any work, exit 2 or 3 as marked:
 
 - config file missing (2, with the `vpt setup` command printed; `vpt setup` and `vpt --version` are the
-  two verbs that run without one), unparseable (2), unknown key (2), a value of the wrong type or outside
-  its range (2).
+  two verbs that run without one), unparseable (2), a missing or unsupported `config_version` (2),
+  unknown key (2), a value of the wrong type or outside its range (2).
 - a configured root that is relative after expansion or whose required parent does not exist; a store
   overlapping another store (the home may contain its stores); a writable store, staging path, state
   directory or release destination overlapping the Voice Memos container; a release destination
