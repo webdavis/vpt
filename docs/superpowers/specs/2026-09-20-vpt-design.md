@@ -917,7 +917,10 @@ sentence in a paragraph is a claim line. Four classes, in order:
    the cited span or within `[synthesis] grounding_window_secs` (default 15) of it. Paraphrase is not
    checked; that needs a model, and a model checking a model's summary reintroduces the error class this
    exists to catch.
-1. `built-on-flagged-text`: the cited span carries an open `numeric`, `proper-noun` or `other` flag.
+1. `built-on-flagged-text`: an open surfaced lexical flag of any class (`numeric`, `proper-noun`,
+   `low-confidence`, `agreed-unverified` or `other`) intersects a cited source range. The claim inherits
+   that uncertainty, and its source ranges and inherited uncertainty are persisted with the accepted
+   proposal (section 4.4), which is what analysis redaction reads (section 8.5).
 
 A finding is written as an annotation at the end of its claim line, inside the content region:
 `[unsourced]`, `[bad-reference]`, `[unsupported: <token>]` or `[built-on-flagged-text]`. A finding is the
@@ -1064,7 +1067,10 @@ more digits, `money`) are masked; each removed value becomes a mask label from `
 The filenames and the surviving content still let a recipient holding two copies of one recording relate
 them, and vpt claims nothing else. A span with an open lexical flag is omitted and counted by default
 (`[share.redact] flagged_spans = "omit"`); `"mark"` keeps it with its `[unverified]` marker, which the
-pass may not strip.
+pass may not strip. In an analysis copy the unit is the claim: `flagged_spans` applies to every claim
+carrying `built-on-flagged-text` (section 8.2), `omit` removing and counting the whole claim and `mark`
+keeping it with its `[unverified]` annotation, and a transcript word offset is never applied to
+synthesized text.
 
 The pass runs over parsed Markdown: character references are decoded first; HTML, comments, reference
 definitions and every link destination are discarded; retained text is re-escaped on render. Candidate
