@@ -618,8 +618,8 @@ reference: "[[2026-08-24T144736-4f3ab19c02de.m4a]]"
 hub: "[[transcripts]]"
 tags:
   - invoice
-status: needs-correction
-description: Voice memo recorded 2026-08-24, 6 spans awaiting review
+status: active
+description: Voice memo recorded 2026-08-24
 startDate: 2026-08-24
 vptSchema: 1
 vptRecording: 2026-08-24T144736-4f3ab19c02de
@@ -628,12 +628,14 @@ vptRecording: 2026-08-24T144736-4f3ab19c02de
 ```
 
 `hub` is `[note.obsidian] hub_transcripts`, `hub_analysis` and `hub_briefs`, the folder note names
-(defaults `transcripts`, `analysis`, `briefs`). `status` is `needs-correction` while `vptOpenFlags` is
-above zero, `active` otherwise, and a note already carrying `status: complete` keeps it across a rewrite.
-A wiki link in frontmatter is always quoted, because the unquoted form parses as a nested sequence.
-`vptSchema` is an integer and the only compatibility signal: a note whose `vptSchema` is higher than the
-build understands is read and never rewritten, and the mismatch is reported. `createdDate` and
-`createdTime` are never written.
+(defaults `transcripts`, `analysis`, `briefs`). On first write `status` is `active` and `startDate` is
+the capture date (the date in the filename, the way a meeting note's `startDate` is its meeting date); a
+rewrite preserves whatever `status`, `startDate` and `description` the note carries, so a value the
+operator set (`complete`, `archived`, `capture`, `needs-correction`) is never undone. Uncertainty is
+carried by `vptOpenFlags` and the inline markers, never by `status`. A wiki link in frontmatter is always
+quoted, because the unquoted form parses as a nested sequence. `vptSchema` is an integer and the only
+compatibility signal: a note whose `vptSchema` is higher than the build understands is read and never
+rewritten, and the mismatch is reported. `createdDate` and `createdTime` are never written.
 
 `[note] link_style` is `markdown` (default; `[Name](relative/path.md)`, destination URL-encoded) or
 `wiki` (`[[Name]]`). The `obsidian` profile does not force `wiki`; the operator sets both.
@@ -674,19 +676,25 @@ other. vpt never writes into a note it did not create; a `mentions` link points 
 
 ### 7.3 Tags and the auto-create switch
 
-Tags arrive from a `vpt.proposal/1` document (stage 4) or from `vpt confirm`. Every proposed tag passes
-four checks in order, and a failure is a log line naming the check, never a page:
+Tags arrive from a `vpt.proposal/1` document (stage 4) or from `vpt confirm`. Every proposed tag is
+processed in this order, and a rejection is a log line naming the step, never a page:
 
-1. Syntax: letters, digits, `_`, `-`, `/`; at least one non-numeric character; no leading `#`; no
-   whitespace.
-1. Count: at most `[tags] max_per_note` (default 5) confirmed tags and `max_suggested` (default 10) held
-   ones; excess dropped in proposal order and recorded.
-1. Vocabulary: a tag already in the output tree's vocabulary (the index of every `tags` value under the
-   transcripts, analysis and briefs stores, rebuilt each run) or in `known-tags.txt` is written to `tags`
-   as `confirmed`. Any other tag follows `[tags] new_tags`.
-1. Shape: a new multi-word tag is normalized to kebab-case; an existing tag is never reshaped, and a
-   proposal differing from an existing tag only by case or separator is folded onto the existing
-   spelling.
+1. Normalize: a multi-word proposal is joined into kebab-case, and a proposal that differs from a
+   vocabulary tag only by case or separator is folded onto that tag's existing spelling. An existing tag
+   is never reshaped.
+1. Syntax: letters, digits, `_`, `-`, `/`; at least one non-numeric character; no leading `#`. A tag that
+   still fails after normalization is rejected.
+1. Classify: a tag in the vocabulary or in `known-tags.txt` is `confirmed`; any other tag follows
+   `[tags] new_tags`.
+1. Deduplicate, then cap: at most `[tags] max_per_note` (default 5) confirmed tags and `max_suggested`
+   (default 10) held ones, excess dropped in proposal order and recorded.
+
+The vocabulary and the note index are rebuilt each run and read only. In the `obsidian` profile they
+cover the `tags` values, note names and aliases of every Markdown note under `[note.obsidian] vault_root`
+(a required, existing, absolute directory; symbolic links are not followed), which is what makes an
+established vault tag `confirmed` under `hold` and what `mentions` resolves against. In the `portable`
+profile they cover the transcripts, analysis and briefs stores. Both add their confirmation lists.
+Indexing grants no write authority: vpt still writes into no note it did not create.
 
 `[tags] new_tags` is the auto-create switch:
 
@@ -701,10 +709,10 @@ Relations and links are always written, in both settings. The switch governs tag
 
 Four relation kinds, a closed set: `continues` (derived: the previous recording's capture ended within
 `[relations] session_gap_minutes`, default 60), `mentions` (derived: a confirmed known term matches a
-note name or alias in the output tree exactly, whole-token, case-insensitive, never fuzzy; two matches
-write no link and record the ambiguity), `related` (proposed by the agent command, written with its
-provenance shown in the link block), `supersedes` (recorded only by `vpt confirm --relation`). A fifth
-kind is a schema change.
+note name or alias in the index of section 7.3 exactly, whole-token, case-insensitive, never fuzzy; two
+matches write no link and record the ambiguity), `related` (proposed by the agent command, written with
+its provenance shown in the link block), `supersedes` (recorded only by `vpt confirm --relation`). A
+fifth kind is a schema change.
 
 Filing is by store: the transcript note goes to `transcripts`, the analysis note to `analysis`, the brief
 to `briefs`, flat, named by the template above. That gives the five properties the ledger asks of
@@ -1155,6 +1163,7 @@ startup refusal naming it.
 | `note.obsidian.hub_transcripts`      | string         | `transcripts`                                                             | folder note name for `hub`                                                                                   |
 | `note.obsidian.hub_analysis`         | string         | `analysis`                                                                | folder note name for `hub`                                                                                   |
 | `note.obsidian.hub_briefs`           | string         | `briefs`                                                                  | folder note name for `hub`                                                                                   |
+| `note.obsidian.vault_root`           | string         | `""`                                                                      | the vault's root directory, required by the `obsidian` profile; the tag vocabulary and note index cover it   |
 | `tags.new_tags`                      | enum           | `hold`                                                                    | `write` (automatic) or `hold` (suggested until confirmed)                                                    |
 | `tags.known_tags_path`               | string         | `~/.config/vpt/known-tags.txt`                                            | the confirmed-tags list                                                                                      |
 | `tags.max_per_note`                  | int            | `5`                                                                       | confirmed tags per note                                                                                      |
@@ -1289,6 +1298,8 @@ Refused at startup, before any work, exit 2 or 3 as marked:
 - both engine slots reporting one family without `allow_same_family` (3, `same_family`).
 - `context.type` set with the needed selection list empty, when a verb asks for that half (2).
 - `notify.mode = "command"` with an empty command (2).
+- the `obsidian` profile with `note.obsidian.vault_root` empty, relative or not an existing directory
+  (2).
 - the helper present with a different major version (3, `helper_version`).
 - `brief --upcoming` with the trigger disabled (2); `synthesize` with no command (2); `handoff --stage`
   private without `allow_private` (3, `private_handoff`).
