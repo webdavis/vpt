@@ -10542,109 +10542,281 @@ ______________________________________________________________________
 **Files:**
 
 - Modify: `crates/vpt-application/src/ingest/publish.rs`
-- Test: `crates/vpt-adapters/tests/ingest_duplicates.rs`
+- Test: `crates/vpt-adapters/tests/support/fakes.rs`, `crates/vpt-adapters/tests/ingest_duplicates.rs`
 
 **Interfaces:**
 
-- Consumes: `Archive::{digest, sync_existing}`, `RecordingLedger::{by_digest, set_source_path}`.
+- Consumes: `Archive::{digest, sync_existing}`, `RecordingLedger::{by_digest, by_id, commit,`
+  `set_source_path}`.
 
-- Produces: `Ingest::known_bytes` and `Ingest::resolve_existing` (private to the module).
+- Produces: `Ingest::known_bytes` and `Ingest::resolve_existing` (private to the module). Test support in
+  `support/fakes.rs`: `FaultyArchive<'a>::new(inner: &'a ClonefileArchive) -> FaultyArchive` implementing
+  `Archive` over the real archive with `pub fault: Cell<ArchiveFault>`,
+  `ArchiveFault::{None, NoSpaceAfterCreate, FileSync, DirectorySync}`.
 
 - [ ] **Step 1: Write the failing tests**
+
+Append to `crates/vpt-adapters/tests/support/fakes.rs`:
+
+```rust
+use vpt_adapters::archive::{ClonefileArchive, STAGING_PREFIX};
+use vpt_application::ports::{Archive, ArchiveError, Published, StageFailure, Staged};
+use vpt_domain::digest::Sha256Digest;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArchiveFault {
+    None,
+    NoSpaceAfterCreate,
+    FileSync,
+    DirectorySync,
+}
+
+pub struct FaultyArchive<'a> {
+    inner: &'a ClonefileArchive,
+    pub fault: Cell<ArchiveFault>,
+}
+
+impl<'a> FaultyArchive<'a> {
+    pub fn new(inner: &'a ClonefileArchive) -> FaultyArchive<'a> {
+        FaultyArchive { inner, fault: Cell::new(ArchiveFault::None) }
+    }
+}
+
+impl Archive for FaultyArchive<'_> {
+    type Handle = File;
+
+    fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>
+    where
+        C: FnOnce(&Path, &str) -> Result<CloneKind, CloneError>,
+    {
+        if self.fault.get() != ArchiveFault::NoSpaceAfterCreate {
+            return self.inner.stage(clone);
+        }
+        let path = self.inner.target(&format!("{STAGING_PREFIX}{}-fault.m4a", std::process::id()));
+        let mut partial = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&path).expect("partial staging");
+        partial.write_all(b"partial").expect("partial bytes");
+        Err(StageFailure { cause: ArchiveError::NoSpace, owned_staging: Some(path) })
+    }
+
+    fn open(&self, path: &Path) -> Result<File, ArchiveError> {
+        self.inner.open(path)
+    }
+
+    fn size(&self, handle: &File) -> Result<u64, ArchiveError> {
+        self.inner.size(handle)
+    }
+
+    fn read_at(&self, handle: &File, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
+        self.inner.read_at(handle, offset, buf)
+    }
+
+    fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError> {
+        self.inner.digest(path)
+    }
+
+    fn target(&self, name: &str) -> std::path::PathBuf {
+        self.inner.target(name)
+    }
+
+    fn archived(&self) -> Result<Vec<std::path::PathBuf>, ArchiveError> {
+        self.inner.archived()
+    }
+
+    fn staged_leftovers(&self) -> Result<Vec<std::path::PathBuf>, ArchiveError> {
+        self.inner.staged_leftovers()
+    }
+
+    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError> {
+        match self.fault.get() {
+            ArchiveFault::FileSync => Err(ArchiveError::Sync("staged file".into())),
+            ArchiveFault::DirectorySync => {
+                self.inner.publish(staged, target_name)?;
+                Err(ArchiveError::PlacedUnsynced(self.inner.target(target_name)))
+            }
+            ArchiveFault::None | ArchiveFault::NoSpaceAfterCreate => self.inner.publish(staged, target_name),
+        }
+    }
+
+    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError> {
+        self.inner.sync_existing(path)
+    }
+}
+```
+
+`crates/vpt-adapters/tests/ingest_duplicates.rs`:
 
 ```rust
 mod support;
 
-use support::{CAPTURED, Fixture, RecordingNotifier, RecordingTrash, clock};
-use vpt_application::ingest::{Ingest, IngestFailure};
-use vpt_application::ports::archive::Archive;
-use vpt_application::ports::ledger::RecordingLedger;
+use std::os::unix::fs::PermissionsExt;
+use support::fakes::{ArchiveFault, CloneBehaviour, FaultyArchive, ProbeStore};
+use support::{CAPTURED, Fixture, Parts};
+use vpt_application::ports::{Archive, RecordingLedger};
+use vpt_application::{Ingest, IngestError, IngestFailure, IngestReport, Mode};
 use vpt_domain::fixtures::m4a;
 use vpt_domain::notification::EventKind;
 
-fn parts(fixture: &Fixture) -> (vpt_adapters::voice_memos::store::VoiceMemosStore, vpt_adapters::archive::ClonefileArchive, vpt_adapters::ledger::sqlite::SqliteLedger, RecordingTrash, RecordingNotifier, vpt_application::settings::SourceSettings) {
-    (
-        fixture.store(),
-        fixture.archive(),
-        fixture.ledger(),
-        RecordingTrash::new(fixture.temp.path().join("trash")),
-        RecordingNotifier::default(),
-        fixture.settings(),
-    )
+fn lose_the_ledger(fixture: &Fixture) {
+    for name in ["vpt.db", "vpt.db-wal", "vpt.db-shm"] {
+        let _ = std::fs::remove_file(fixture.state.join(name));
+    }
+}
+
+fn with_archive(parts: &Parts, archive: &FaultyArchive<'_>) -> Result<IngestReport, IngestError> {
+    let ingest = Ingest {
+        recorder: &parts.store,
+        archive,
+        ledger: &parts.ledger,
+        clock: &parts.clock,
+        trash: &parts.trash,
+        notifier: &parts.notifier,
+        settings: &parts.settings,
+    };
+    ingest.run(&Mode::default())
 }
 
 #[test]
 fn the_same_bytes_at_a_second_path_are_one_recording_whose_source_path_moves() {
     let fixture = Fixture::new();
-    let bytes = m4a(CAPTURED, 1, b"same");
-    fixture.add_recording("first.m4a", &bytes);
-    let (store, archive, ledger, trash, notifier, settings) = parts(&fixture);
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
-    ingest.run().expect("first");
+    fixture.add_recording("first.m4a", &m4a(CAPTURED, 1, b"same"));
+    let parts = fixture.parts();
+    parts.ingest().run(&Mode::default()).expect("first");
     std::fs::rename(fixture.recordings.join("first.m4a"), fixture.recordings.join("renamed.m4a")).expect("rename");
 
-    let report = ingest.run().expect("second");
+    let report = parts.ingest().run(&Mode::default()).expect("second");
 
     assert_eq!(report.already_ingested.len(), 1);
     assert!(report.ingested.is_empty());
-    let record = ledger.recordings().expect("list").remove(0);
+    let record = parts.ledger.recordings().expect("list").remove(0);
     assert_eq!(record.source_path, Some(fixture.recordings.join("renamed.m4a")));
-    assert_eq!(archive.archived().expect("archived").len(), 1);
-    assert!(archive.staged_leftovers().expect("leftovers").is_empty());
-    assert_eq!(trash.moved.borrow().len(), 1, "the staged duplicate went to the Trash");
+    assert_eq!(parts.archive.archived().expect("archived").len(), 1);
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert_eq!(parts.trash.moved.borrow().len(), 1, "the staged duplicate went to the Trash");
+    assert!(parts.events().is_empty());
 }
 
 #[test]
 fn an_archive_without_a_ledger_row_is_recovered_on_publish_and_reported_as_already_ingested() {
     let fixture = Fixture::new();
-    let bytes = m4a(CAPTURED, 1, b"orphan");
-    fixture.add_recording("a.m4a", &bytes);
-    let (store, archive, ledger, trash, notifier, settings) = parts(&fixture);
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
-    let first = ingest.run().expect("first");
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"orphan"));
+    let first = fixture.parts().ingest().run(&Mode::default()).expect("first");
     let id = first.ingested[0].id.clone();
-    drop(ledger);
-    std::fs::remove_file(fixture.state.join("vpt.db")).expect("lose the ledger in the test only");
-    let _ = std::fs::remove_file(fixture.state.join("vpt.db-wal"));
-    let _ = std::fs::remove_file(fixture.state.join("vpt.db-shm"));
-    let ledger = fixture.ledger();
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    lose_the_ledger(&fixture);
+    let parts = fixture.parts();
 
-    let report = ingest.run().expect("second");
+    let report = parts.ingest().run(&Mode::default()).expect("second");
 
     assert!(report.already_ingested.contains(&id) || report.recovered.contains(&id), "{report:?}");
-    assert!(ledger.by_id(&id).expect("read").is_some());
-    assert_eq!(archive.archived().expect("archived").len(), 1);
+    assert!(parts.ledger.by_id(&id).expect("read").is_some());
+    assert_eq!(parts.archive.archived().expect("archived").len(), 1);
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
 }
 
 #[test]
 fn a_target_with_different_bytes_is_an_archive_collision_and_nothing_is_replaced() {
     let fixture = Fixture::new();
-    let bytes = m4a(CAPTURED, 1, b"real");
-    fixture.add_recording("a.m4a", &bytes);
-    let (store, archive, ledger, trash, notifier, settings) = parts(&fixture);
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
-    let first = ingest.run().expect("first");
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"real"));
+    let first = fixture.parts().ingest().run(&Mode::default()).expect("first");
     let record = first.ingested[0].clone();
     std::fs::write(&record.audio_path, b"tampered").expect("tamper the archive in the test only");
-    drop(ledger);
-    std::fs::remove_file(fixture.state.join("vpt.db")).expect("lose the ledger in the test only");
-    let _ = std::fs::remove_file(fixture.state.join("vpt.db-wal"));
-    let _ = std::fs::remove_file(fixture.state.join("vpt.db-shm"));
-    let ledger = fixture.ledger();
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    lose_the_ledger(&fixture);
+    let parts = fixture.parts();
 
-    let error = ingest.run().unwrap_err();
+    let error = parts.ingest().run(&Mode::default()).unwrap_err();
 
     assert!(matches!(error.failure, IngestFailure::ArchiveCollision { .. }), "{error:?}");
     assert_eq!(std::fs::read(&record.audio_path).expect("read"), b"tampered");
-    assert!(archive.staged_leftovers().expect("leftovers").is_empty());
-    assert_eq!(notifier.0.borrow().last().map(|n| n.event), Some(EventKind::IngestFailed));
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert_eq!(parts.trash.moved.borrow().len(), 1);
+    assert!(parts.ledger.recordings().expect("list").is_empty());
+    assert_eq!(parts.events(), vec![EventKind::IngestFailed]);
+}
+
+#[test]
+fn exdev_uses_bounded_copy() {
+    let fixture = Fixture::new();
+    let bytes = m4a(CAPTURED, 1, b"other volume");
+    fixture.add_recording("a.m4a", &bytes);
+    let parts = fixture.parts();
+    let probe = ProbeStore::new(&parts.store);
+    probe.clone.set(CloneBehaviour::ByteCopy);
+    let ingest = Ingest {
+        recorder: &probe,
+        archive: &parts.archive,
+        ledger: &parts.ledger,
+        clock: &parts.clock,
+        trash: &parts.trash,
+        notifier: &parts.notifier,
+        settings: &parts.settings,
+    };
+
+    let report = ingest.run(&Mode::default()).expect("sweep");
+
+    assert_eq!(report.ingested.len(), 1);
+    let record = &report.ingested[0];
+    assert_eq!(std::fs::read(&record.audio_path).expect("archive"), bytes);
+    assert_eq!(std::fs::metadata(&record.audio_path).expect("meta").permissions().mode() & 0o777, 0o600);
+    assert!(report.log.iter().any(|line| line.contains("not copy-on-write")), "{:?}", report.log);
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert!(parts.events().is_empty());
+}
+
+#[test]
+fn enospc_aborts_without_row() {
+    let fixture = Fixture::new();
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
+    let parts = fixture.parts();
+    let archive = FaultyArchive::new(&parts.archive);
+    archive.fault.set(ArchiveFault::NoSpaceAfterCreate);
+
+    let error = with_archive(&parts, &archive).unwrap_err();
+
+    assert_eq!(error.failure, IngestFailure::NoSpace);
+    assert!(parts.ledger.recordings().expect("list").is_empty());
+    assert_eq!(parts.trash.moved.borrow().len(), 1, "the partial staging this run created was trashed");
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert_eq!(parts.events(), vec![EventKind::IngestFailed]);
+}
+
+#[test]
+fn stage_sync_failure_commits_no_row() {
+    let fixture = Fixture::new();
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
+    let parts = fixture.parts();
+    let archive = FaultyArchive::new(&parts.archive);
+    archive.fault.set(ArchiveFault::FileSync);
+
+    let error = with_archive(&parts, &archive).unwrap_err();
+
+    assert_eq!(error.failure, IngestFailure::Sync("staged file".into()));
+    assert!(parts.ledger.recordings().expect("list").is_empty());
+    assert!(parts.archive.archived().expect("archived").is_empty());
+    assert_eq!(parts.trash.moved.borrow().len(), 1);
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert_eq!(parts.events(), vec![EventKind::IngestFailed]);
+}
+
+#[test]
+fn directory_sync_failure_commits_no_row() {
+    let fixture = Fixture::new();
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
+    let parts = fixture.parts();
+    let archive = FaultyArchive::new(&parts.archive);
+    archive.fault.set(ArchiveFault::DirectorySync);
+
+    let error = with_archive(&parts, &archive).unwrap_err();
+
+    assert!(matches!(error.failure, IngestFailure::Sync(_)), "{error:?}");
+    assert!(parts.ledger.recordings().expect("list").is_empty());
+    assert_eq!(parts.archive.archived().expect("archived").len(), 1, "the placed file stays for recovery");
+    assert!(parts.trash.moved.borrow().is_empty());
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert_eq!(parts.events(), vec![EventKind::IngestFailed]);
 }
 ```
 
-The recovery test deletes a database file, which the spec forbids vpt itself from doing; the test harness
-may, because it is simulating a lost ledger inside a temporary directory the test owns.
+The recovery and collision tests delete database files, which the spec forbids vpt itself from doing; the
+test harness may, because it is simulating a lost ledger inside a temporary directory the test owns.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -10652,14 +10824,17 @@ Run: `cargo test -p vpt-adapters --test ingest_duplicates`
 
 Expected: the rename test FAILS (the sweep reports `Archive("... exists")` because the same bytes derive
 the same identity); the recovery test FAILS the same way; the collision test FAILS because the failure is
-`Archive`, not `ArchiveCollision`.
+`Archive`, not `ArchiveCollision`; the four fault tests PASS already on the Task 19 cleanup contract and
+stay as regression guards.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-In `crates/vpt-application/src/ingest/publish.rs`, after deriving `id` and before publishing:
+In `crates/vpt-application/src/ingest/publish.rs`, after the copy-on-write log line and before
+publishing:
 
 ```rust
-        if let Some(existing) = self.ledger.by_digest(&staged.digest).map_err(ledger_failure)? {
+        let existing = self.owned(&staged.path, self.ledger.by_digest(&staged.digest).map_err(ledger_failure), report)?;
+        if let Some(existing) = existing {
             return self.known_bytes(candidate, existing, &staged, seen, now, report);
         }
 ```
@@ -10667,14 +10842,16 @@ In `crates/vpt-application/src/ingest/publish.rs`, after deriving `id` and befor
 Replace the `Published::Exists` arm:
 
 ```rust
-            Published::Exists(audio_path) => {
-                self.resolve_existing(candidate, id, container, offset, &staged, audio_path, seen, titles, now, report)
+            Ok(Published::Exists(audio_path)) => {
+                self.resolve_existing(candidate, id, container, offset, &staged, audio_path, seen, now, report)
             }
 ```
 
-and add the two methods to the `impl Ingest<'_>` block:
+and add the two methods to the `impl` block:
 
 ```rust
+    /// Known bytes at a new path: the recording keeps its identity, its
+    /// source path follows, the staged duplicate goes to the Trash.
     fn known_bytes(
         &self,
         candidate: &Candidate,
@@ -10685,15 +10862,19 @@ and add the two methods to the `impl Ingest<'_>` block:
         report: &mut IngestReport,
     ) -> Result<(), IngestFailure> {
         if existing.source_path.as_deref() != Some(candidate.path.as_path()) {
-            self.ledger.set_source_path(&existing.id, &candidate.path).map_err(ledger_failure)?;
+            let moved = self.ledger.set_source_path(&existing.id, &candidate.path).map_err(ledger_failure);
+            self.owned(&staged.path, moved, report)?;
             report.log.push(format!("{}: known bytes at a new path, source path updated", existing.id));
         }
-        self.ledger.record_seen(&ingested_seen(candidate, seen, &existing.id, now)).map_err(ledger_failure)?;
+        let row = ingested_seen(candidate, seen, &existing.id, now);
+        self.owned(&staged.path, self.ledger.record_seen(&row).map_err(ledger_failure), report)?;
         self.discard(&staged.path, report);
         report.already_ingested.push(existing.id);
         Ok(())
     }
 
+    /// `<id>.m4a` already exists: verify it byte for byte, sync it, recover
+    /// any missing rows, trash the staged duplicate.
     #[allow(clippy::too_many_arguments)]
     fn resolve_existing(
         &self,
@@ -10704,21 +10885,20 @@ and add the two methods to the `impl Ingest<'_>` block:
         staged: &Staged,
         audio_path: PathBuf,
         seen: Option<SeenRow>,
-        titles: Option<&dyn TitleSource>,
         now: UtcInstant,
         report: &mut IngestReport,
     ) -> Result<(), IngestFailure> {
-        let existing = self.archive.digest(&audio_path).map_err(archive_failure)?;
-        let mut reader = self.archive.open(&audio_path).map_err(archive_failure)?;
-        let valid = inspect(&mut *reader).is_ok();
-        drop(reader);
+        let existing = self.owned(&staged.path, self.archive.digest(&audio_path).map_err(archive_failure), report)?;
+        let valid = self.owned(&staged.path, self.inspect_archive(&audio_path), report)?.is_ok();
         if existing != staged.digest || !valid {
             self.discard(&staged.path, report);
             return Err(IngestFailure::ArchiveCollision { target: audio_path, staged: staged.digest, existing });
         }
-        self.archive.sync_existing(&audio_path).map_err(archive_failure)?;
-        if self.ledger.by_id(&id).map_err(ledger_failure)?.is_none() {
-            let (title, title_source) = lookup_title(titles, &candidate.file_name);
+        self.owned(&staged.path, self.archive.sync_existing(&audio_path).map_err(archive_failure), report)?;
+        let known = self.owned(&staged.path, self.ledger.by_id(&id).map_err(ledger_failure), report)?;
+        let row = ingested_seen(candidate, seen, &id, now);
+        if known.is_none() {
+            let (title, title_source) = lookup_title(self.recorder.title(&candidate.file_name));
             let record = RecordingRecord {
                 id: id.clone(),
                 source_path: Some(candidate.path.clone()),
@@ -10733,10 +10913,11 @@ and add the two methods to the `impl Ingest<'_>` block:
                 stages: StageStates::fresh(),
                 audio_trashed_at: None,
             };
-            self.ledger.commit_ingest(&record, &ingested_seen(candidate, seen, &id, now)).map_err(ledger_failure)?;
+            let batch = LedgerCommit { recordings: vec![record], seen: vec![row], publications: vec![] };
+            self.owned(&staged.path, self.ledger.commit(&batch).map_err(ledger_failure), report)?;
             report.recovered.push(id.clone());
         } else {
-            self.ledger.record_seen(&ingested_seen(candidate, seen, &id, now)).map_err(ledger_failure)?;
+            self.owned(&staged.path, self.ledger.record_seen(&row).map_err(ledger_failure), report)?;
         }
         self.discard(&staged.path, report);
         report.already_ingested.push(id);
@@ -10744,14 +10925,15 @@ and add the two methods to the `impl Ingest<'_>` block:
     }
 ```
 
-with these imports added: `use crate::ports::archive::Staged;`, `use std::path::PathBuf;`,
-`use vpt_domain::container::Container;`, `use vpt_domain::time::UtcOffset;`.
+with these imports added to `publish.rs`: `Staged` in the `crate::ports` list, `use std::path::PathBuf;`
+(beside `Path`), and `use vpt_domain::time::UtcOffset;` beside `UtcInstant`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters --test ingest_duplicates`
 
-Expected: 3 tests PASS.
+Expected: 7 tests PASS. Run `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`
+and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
