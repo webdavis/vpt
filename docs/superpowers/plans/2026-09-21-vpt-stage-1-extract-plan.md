@@ -8868,77 +8868,103 @@ ______________________________________________________________________
 
 ### Task 18: Exclusive publication, verified on the platform first
 
-The spec leaves the primitive to the plan and asks that the plan verify it before choosing it. The red
-test of Step 1 is that verification: it exercises `renamex_np` with `RENAME_EXCL` on the test volume and
-proves that an existing target is refused with `EEXIST` and that an absent one is placed. If that probe
-fails on the executor's volume (a non-APFS filesystem), the fallback that the same tests must then pass
-is `link(2)` of the staged name onto the target, which is exclusive on every POSIX filesystem, followed
-by `unlink` of the staged name; record the choice in the commit message.
+The spec leaves the primitive to the plan and asks that the plan verify it before choosing it. The
+primitive is `renameatx_np` with `RENAME_EXCL` relative to the archive root's descriptor, which Task 5a
+wrapped as `RootDir::rename_exclusive` and whose test proves on the executor's volume that an existing
+target is kept untouched and an absent one is placed. If the filesystem refuses that flag, publication
+returns the typed archive failure and the staged file stays where it is for the normal owned cleanup:
+there is no link-and-unlink fallback, because nothing in vpt unlinks.
 
 **Files:**
 
-- Create: `crates/vpt-adapters/src/archive/publish.rs` (replacing the stand-in)
+- Create: `crates/vpt-adapters/src/archive/publish.rs`
+- Modify: `crates/vpt-adapters/src/archive/mod.rs`, `crates/vpt-application/src/ports/archive.rs`,
+  `crates/vpt-application/src/ports/mod.rs`
 
 **Interfaces:**
 
-- Consumes: `ArchiveError`, `Published`.
+- Consumes: `ArchiveError`, `RootDir::{open_file, rename_exclusive, sync}`.
 
-- Produces: `vpt_adapters::archive::publish::{exclusive(staged: &Path, target: &Path) ->`
-  `Result<Published, ArchiveError>, sync_file_and_directory(path: &Path) -> Result<(),` `ArchiveError>}`.
+- Produces: `vpt_application::ports::Published::{Placed(PathBuf), Exists(PathBuf)}` and, on `Archive`,
+  `fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError>` (sync the
+  staged file, move it to the target without replacing one, sync the directory) and
+  `fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError>` (an archive file and its directory,
+  for duplicate recovery); in `vpt_adapters::archive::publish`,
+  `exclusive(root: &RootDir, staged: &Path, target_name: &str) -> Result<Published, ArchiveError>` and
+  `sync_file_and_directory(root: &RootDir, path: &Path) -> Result<(), ArchiveError>`.
 
 - [ ] **Step 1: Write the failing tests**
+
+Declare first: `crates/vpt-adapters/src/archive/mod.rs` gains `mod publish;` and
+`crates/vpt-application/src/ports/mod.rs` adds `Published` to the archive re-export.
+`crates/vpt-adapters/src/archive/publish.rs` starts as its test module alone:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::ClonefileArchive;
+    use std::path::PathBuf;
+    use vpt_application::ports::Archive;
 
-    #[test]
-    fn the_platform_primitive_refuses_an_existing_target_with_eexist() {
+    fn audio() -> (tempfile::TempDir, PathBuf, RootDir) {
         let temp = tempfile::tempdir().expect("temp");
-        let from = temp.path().join("from");
-        let to = temp.path().join("to");
-        std::fs::write(&from, b"new").expect("from");
-        std::fs::write(&to, b"old").expect("to");
-        let from_c = std::ffi::CString::new(from.as_os_str().as_encoded_bytes()).expect("path");
-        let to_c = std::ffi::CString::new(to.as_os_str().as_encoded_bytes()).expect("path");
-        // SAFETY: both strings are NUL-terminated and outlive the call.
-        let outcome = unsafe { libc::renamex_np(from_c.as_ptr(), to_c.as_ptr(), libc::RENAME_EXCL) };
-        assert_eq!(outcome, -1);
-        assert_eq!(std::io::Error::last_os_error().raw_os_error(), Some(libc::EEXIST));
-        assert_eq!(std::fs::read(&to).expect("untouched"), b"old");
+        let audio = temp.path().canonicalize().expect("canonical").join("audio");
+        std::fs::create_dir(&audio).expect("audio");
+        let root = RootDir::open(&audio).expect("root");
+        (temp, audio, root)
     }
 
     #[test]
     fn publish_places_an_absent_target_and_removes_the_staged_name() {
-        let temp = tempfile::tempdir().expect("temp");
-        let staged = temp.path().join(".vpt-staging-1.m4a");
+        let (_temp, audio, root) = audio();
+        let staged = audio.join(".vpt-staging-1.m4a");
         std::fs::write(&staged, b"bytes").expect("staged");
-        let target = temp.path().join("id.m4a");
-        assert_eq!(exclusive(&staged, &target).expect("published"), Published::Placed(target.clone()));
-        assert_eq!(std::fs::read(&target).expect("read"), b"bytes");
+        assert_eq!(exclusive(&root, &staged, "id.m4a"), Ok(Published::Placed(audio.join("id.m4a"))));
+        assert_eq!(std::fs::read(audio.join("id.m4a")).expect("read"), b"bytes");
         assert!(!staged.exists());
     }
 
     #[test]
     fn publish_never_replaces_an_existing_target_and_names_it() {
-        let temp = tempfile::tempdir().expect("temp");
-        let staged = temp.path().join(".vpt-staging-2.m4a");
+        let (_temp, audio, root) = audio();
+        let staged = audio.join(".vpt-staging-2.m4a");
         std::fs::write(&staged, b"new").expect("staged");
-        let target = temp.path().join("id.m4a");
-        std::fs::write(&target, b"old").expect("existing");
-        assert_eq!(exclusive(&staged, &target).expect("refused softly"), Published::Exists(target.clone()));
-        assert_eq!(std::fs::read(&target).expect("read"), b"old");
+        std::fs::write(audio.join("id.m4a"), b"old").expect("existing");
+        assert_eq!(exclusive(&root, &staged, "id.m4a"), Ok(Published::Exists(audio.join("id.m4a"))));
+        assert_eq!(std::fs::read(audio.join("id.m4a")).expect("read"), b"old");
         assert!(staged.exists(), "the staged duplicate stays for the caller to trash");
     }
 
     #[test]
-    fn syncing_a_missing_file_is_an_error_and_an_existing_one_succeeds() {
-        let temp = tempfile::tempdir().expect("temp");
-        assert!(matches!(sync_file_and_directory(&temp.path().join("missing")), Err(ArchiveError::Sync(_))));
-        let present = temp.path().join("present");
-        std::fs::write(&present, b"x").expect("present");
-        assert_eq!(sync_file_and_directory(&present), Ok(()));
+    fn a_staged_name_outside_the_root_or_a_nested_target_is_an_escape() {
+        let (temp, audio, root) = audio();
+        let outside = temp.path().canonicalize().expect("canonical").join("elsewhere.m4a");
+        std::fs::write(&outside, b"x").expect("outside");
+        assert_eq!(exclusive(&root, &outside, "id.m4a"), Err(ArchiveError::Escape(outside)));
+        let staged = audio.join(".vpt-staging-3.m4a");
+        std::fs::write(&staged, b"x").expect("staged");
+        assert_eq!(exclusive(&root, &staged, "sub/id.m4a"), Err(ArchiveError::Escape(audio.join("sub/id.m4a"))));
+        assert!(staged.exists());
+    }
+
+    #[test]
+    fn syncing_a_missing_file_is_a_sync_error_and_an_existing_one_succeeds() {
+        let (_temp, audio, root) = audio();
+        let missing = sync_file_and_directory(&root, &audio.join("missing.m4a"));
+        assert!(matches!(missing, Err(ArchiveError::Sync(_))), "{missing:?}");
+        std::fs::write(audio.join("present.m4a"), b"x").expect("present");
+        assert_eq!(sync_file_and_directory(&root, &audio.join("present.m4a")), Ok(()));
+    }
+
+    #[test]
+    fn the_archive_publishes_and_syncs_through_its_port() {
+        let (_temp, audio, _root) = audio();
+        let archive = ClonefileArchive::open(&audio).expect("archive");
+        std::fs::write(audio.join(".vpt-staging-4.m4a"), b"bytes").expect("staged");
+        assert_eq!(archive.publish(&audio.join(".vpt-staging-4.m4a"), "id.m4a"), Ok(Published::Placed(audio.join("id.m4a"))));
+        assert_eq!(archive.sync_existing(&audio.join("id.m4a")), Ok(()));
+        assert_eq!(archive.archived().expect("list"), vec![audio.join("id.m4a")]);
     }
 }
 ```
@@ -8947,67 +8973,94 @@ mod tests {
 
 Run: `cargo test -p vpt-adapters publish`
 
-Expected: the probe PASSES on APFS (it is the verification and asserts on the platform, not on vpt);
-`publish_places_an_absent_target_and_removes_the_staged_name`,
-`publish_never_replaces_an_existing_target_and_names_it` and the sync test FAIL on the stand-in's
-`Io("not built yet")`.
+Expected: the build fails with `cannot find` for `exclusive`, `sync_file_and_directory` and `Published`,
+and `no method named publish` on the archive.
 
 - [ ] **Step 3: Write the minimal implementation**
 
+Append to `crates/vpt-application/src/ports/archive.rs`:
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Published {
+    Placed(PathBuf),
+    Exists(PathBuf),
+}
+```
+
+and add to `Archive`:
+
+```rust
+    /// Sync the staged file, move it to `target_name` without replacing an
+    /// existing target, sync the directory.
+    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError>;
+    /// Sync an archive file and its directory (duplicate recovery).
+    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError>;
+```
+
+`crates/vpt-adapters/src/archive/publish.rs`, above its test module:
+
 ```rust
 //! Publication never replaces an existing target. On this platform that is one
-//! rename with the exclusive flag, verified by the probe test below; the file
+//! rename with the exclusive flag, relative to the root's descriptor; the file
 //! is synced before and the directory after, so a committed row always has
 //! its archive on disk.
 
-use std::fs::File;
+use super::archive_error;
+use crate::contained::{Access, RootDir};
 use std::path::Path;
-use vpt_application::ports::archive::{ArchiveError, Published};
+use vpt_application::ports::{ArchiveError, Published};
 
-pub fn exclusive(staged: &Path, target: &Path) -> Result<Published, ArchiveError> {
-    File::open(staged).and_then(|file| file.sync_all()).map_err(|error| ArchiveError::Sync(error.to_string()))?;
-    let from = c_path(staged)?;
-    let to = c_path(target)?;
-    // SAFETY: both strings are NUL-terminated and outlive the call; RENAME_EXCL
-    // makes the kernel refuse an existing destination atomically.
-    let outcome = unsafe { libc::renamex_np(from.as_ptr(), to.as_ptr(), libc::RENAME_EXCL) };
-    if outcome != 0 {
-        let error = std::io::Error::last_os_error();
-        return match error.raw_os_error() {
-            Some(libc::EEXIST) => Ok(Published::Exists(target.to_path_buf())),
-            Some(libc::ENOSPC) => Err(ArchiveError::NoSpace),
-            _ => Err(ArchiveError::Io(error.to_string())),
-        };
+pub fn exclusive(root: &RootDir, staged: &Path, target_name: &str) -> Result<Published, ArchiveError> {
+    let target = root.leaf(Path::new(target_name)).map_err(|error| archive_error(&root.path().join(target_name), error))?;
+    sync_file(root, staged)?;
+    let placed = root.rename_exclusive(staged, &target).map_err(|error| archive_error(&target, error))?;
+    if !placed {
+        return Ok(Published::Exists(target));
     }
-    sync_directory_of(target)?;
-    Ok(Published::Placed(target.to_path_buf()))
+    root.sync().map_err(|error| ArchiveError::Sync(format!("{error:?}")))?;
+    Ok(Published::Placed(target))
 }
 
-pub fn sync_file_and_directory(path: &Path) -> Result<(), ArchiveError> {
-    File::open(path).and_then(|file| file.sync_all()).map_err(|error| ArchiveError::Sync(error.to_string()))?;
-    sync_directory_of(path)
+pub fn sync_file_and_directory(root: &RootDir, path: &Path) -> Result<(), ArchiveError> {
+    sync_file(root, path)?;
+    root.sync().map_err(|error| ArchiveError::Sync(format!("{error:?}")))
 }
 
-fn sync_directory_of(path: &Path) -> Result<(), ArchiveError> {
-    let directory = path.parent().ok_or_else(|| ArchiveError::Sync("no parent directory".into()))?;
-    File::open(directory).and_then(|dir| dir.sync_all()).map_err(|error| ArchiveError::Sync(error.to_string()))
-}
-
-fn c_path(path: &Path) -> Result<std::ffi::CString, ArchiveError> {
-    std::ffi::CString::new(path.as_os_str().as_encoded_bytes()).map_err(|_| ArchiveError::Io("path holds a NUL byte".into()))
+fn sync_file(root: &RootDir, path: &Path) -> Result<(), ArchiveError> {
+    let file = root.open_file(path, Access::Read).map_err(|error| match error {
+        crate::contained::ContainedError::Io { kind, .. } => ArchiveError::Sync(kind.to_string()),
+        other => archive_error(path, other),
+    })?;
+    file.sync_all().map_err(|error| ArchiveError::Sync(error.kind().to_string()))
 }
 ```
+
+and in `impl Archive for ClonefileArchive` (`archive/mod.rs`):
+
+```rust
+    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError> {
+        publish::exclusive(&self.root, staged, target_name)
+    }
+
+    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError> {
+        publish::sync_file_and_directory(&self.root, path)
+    }
+```
+
+with `Published` added to that file's `vpt_application::ports` import.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters archive`
 
-Expected: all PASS.
+Expected: the 7 staging tests and the 5 publication tests PASS. Run
+`cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/vpt-adapters
+git add crates
 SKIP_AI_COMMIT=1 git commit -m "feat(archive): exclusive publication with the file and directory synced"
 ```
 
