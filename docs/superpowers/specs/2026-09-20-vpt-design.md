@@ -223,15 +223,15 @@ version differs from the one it was built against.
 
 The home is one directory, default `~/.vpt`, under which every store lands by default:
 
-| Store            | Default path under the home | Holds                                                                      | Sensitivity                               |
-| ---------------- | --------------------------- | -------------------------------------------------------------------------- | ----------------------------------------- |
-| `audio`          | `audio/`                    | the archive clone of each recording, `<id>.m4a`, mode 0600                 | the recording itself                      |
-| `transcripts`    | `transcripts/`              | the transcript note per recording                                          | searchable text of the recording          |
-| `analysis`       | `analysis/`                 | the synthesis note per recording                                           | derived text                              |
-| `briefs`         | `briefs/`                   | one brief per occasion                                                     | names the people in a room                |
-| `engine_outputs` | `engine-outputs/`           | each engine's raw `vpt.engine/1` document, `<id>.<engine>.json`, mode 0600 | full transcripts with timings             |
-| `drafts`         | `drafts/`                   | each redacted copy's private report, `<id>.<stage>.report.json`, mode 0600 | the map from every mask to its real value |
-| `released`       | `released/`                 | the shared folder: redacted copies ready to send                           | intended to leave the machine             |
+| Store            | Default path under the home | Holds                                                                                       | Sensitivity                               |
+| ---------------- | --------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `audio`          | `audio/`                    | the archive clone of each recording, `<id>.m4a`, mode 0600                                  | the recording itself                      |
+| `transcripts`    | `transcripts/`              | the transcript note per recording                                                           | searchable text of the recording          |
+| `analysis`       | `analysis/`                 | the synthesis note per recording                                                            | derived text                              |
+| `briefs`         | `briefs/`                   | one brief per occasion                                                                      | names the people in a room                |
+| `engine_outputs` | `engine-outputs/`           | each engine's raw `vpt.engine/1` document, `<id>.<engine>.json`, mode 0600                  | full transcripts with timings             |
+| `drafts`         | `drafts/`                   | each redacted copy's private report, `<id>.<stage>.<content-sha256>.report.json`, mode 0600 | the map from every mask to its real value |
+| `released`       | `released/`                 | the shared folder: redacted copies ready to send                                            | intended to leave the machine             |
 
 Each store has its own key under `[stores]` and may point anywhere. A store path is expanded from `~`,
 must be absolute after expansion, and its parent must exist; vpt creates the leaf directory and nothing
@@ -296,8 +296,8 @@ tree is a cache rebuilt per run. SQLite rather than a file per record because tw
 scheduled `vpt run` and a manual command in a terminal) and because the clean-code standard vpt is built
 to prefers a transactional store for multi-record state.
 
-Five repositories, one SQLite type implementing all five, plus an in-memory implementation that runs the
-same contract tests:
+The repositories below, one SQLite type implementing all of them, plus an in-memory implementation that
+runs the same contract tests:
 
 | Repository             | Rows                                                                                                                                                                                             |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -306,6 +306,7 @@ same contract tests:
 | `flags`                | per flag: recording, identifier, shape (lexical or diagnostic), class, occurrence ranges, record text, alternative text, confidence, state, resolution text, resolved_at                         |
 | `occasions`            | per occasion: identity, source (`manual`, `dam`, `google`), at, duration, title, participants, brief path, briefed_at                                                                            |
 | `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                     |
+| `releases`             | per released copy: recording, source stage, absolute destination, content digest, source-artifact digest, creation sequence, report path                                                         |
 
 `vpt show <id> --json` prints a recording's full record; `vpt list --json` prints the recordings table.
 Nothing is stored twice: a note carries what a reader needs and the ledger carries the rest.
@@ -941,25 +942,41 @@ The removal pass is deterministic and pure: confirmed terms from `known-terms.tx
 aliases from the index are always masked, whole-token, case-insensitive, possessives handled, no fuzz;
 the pattern classes in `[share.redact] classes` (default `email`, `url`, `phone`, `number` of four or
 more digits, `money`) are masked; each removed value becomes a mask label from `[share.redact] mask`
-(default `[{class} {n}]`), numbered from 1 per copy so two copies cannot be joined by a recipient holding
-both. A span with an open lexical flag is omitted and counted by default
+(default `[{class} {n}]`), numbered from 1 in every copy with no mapping kept from one copy to the next.
+The filenames and the surviving content still let a recipient holding two copies of one recording relate
+them, and vpt claims nothing else. A span with an open lexical flag is omitted and counted by default
 (`[share.redact] flagged_spans = "omit"`); `"mark"` keeps it with its `[unverified]` marker, which the
 pass may not strip.
 
+The pass runs over parsed Markdown: character references are decoded first; HTML, comments, reference
+definitions and every link destination are discarded; retained text is re-escaped on render. Candidate
+matches are resolved longest first, ties in the order confirmed term, note name, `email`, `url`, `phone`,
+`money`, `number`. `email` is a whitespace-delimited token containing `@`; `url` a token beginning with a
+scheme and `://` or with `www.`; `phone` a run of at least seven digits separated only by spaces,
+parentheses, plus signs, periods or hyphens; `number` at least four consecutive digits; `money` a
+currency symbol adjacent to a digit run. The residue scan runs over the same decoded representation.
+
 The residue scan runs on the assembled bytes: no real value the pass removed, no confirmed term and no
 note name may appear as a whole token. Residue is a refusal, exit 3, naming the mask label and never the
-value; the copy is not written. The private report, `drafts/<id>.<stage>.report.json` (mode 0600), maps
-every mask label to its real value and every released line to its source span, and a candidate report
-lists every capitalized non-sentence-initial token that survived, as a review prompt the operator reads
-with `--json` or in the run output. Confirming one of those tokens with `vpt confirm --term` masks it in
-every future copy.
+value; the copy is not written. The private report (mode 0600, named above) maps every mask label to its
+real value and every released line to its source span, and a candidate report lists every capitalized
+non-sentence-initial token that survived, as a review prompt the operator reads with `--json` or in the
+run output. Confirming one of those tokens with `vpt confirm --term` masks it in every future copy.
 
-Names in the released store are standardized: `<date>-<stage>-<hash8>.md`, never the slug, because a
-title survives a perfect body redaction by riding in the filename. Before writing, vpt compares the bytes
-it would write with a file of the same name in the destination: byte-identical means refuse with exit 3
-(`duplicate`); different content means write `<date>-<stage>-<hash8>-<YYYYMMDDThhmmss>.md` instead, the
-timestamp being the moment of writing in local time, and report the collision. The source note is
+Names in the destination are standardized: `<date>-<stage>-<hash8>.md`, never the slug, because a title
+survives a perfect body redaction by riding in the filename. Before writing, vpt digests every regular
+file directly in the destination and compares each with the bytes it would write, whatever its name: any
+identical file is a refusal, exit 3 `duplicate`, naming that file. When the standard name exists with
+different content, vpt writes `<date>-<stage>-<hash8>-<YYYYMMDDThhmmss>.md` instead (the moment of
+writing, local time) and reports the collision; a further collision on that name appends `-2`, `-3` and
+so on, the smallest unused suffix. A released file is never overwritten. The comparison and the write
+happen under the write lock of section 4.4, so two concurrent runs cannot both write. The source note is
 byte-identical before and after.
+
+Every release is an immutable row in the ledger's `releases` repository: recording, source stage,
+absolute destination, content digest, source-artifact digest, creation sequence and report path. The
+private report is named `drafts/<id>.<stage>.<content-sha256>.report.json`, so a second release never
+overwrites the first release's mask map.
 
 Audio is never a redaction source. A brief is not a redaction source in this version. The released file
 does not name vpt.
@@ -1000,12 +1017,15 @@ no socket, resolves no name, reads no credential and writes no file:
 
 `kind` has four values and a fifth is a compile-time impossibility. By default only `released` is
 permitted: `--stage transcript|analysis|brief` is refused with exit 3 unless
-`[handoff] allow_private = true`. `content` is text always; the schema has no field that can carry audio,
-and an identifier that resolves to a recording rather than to a rendering is refused listing the stages
-that exist. The note's frontmatter does not cross; a fixed declarative header carries the identity, the
-unresolved count and the derived-copy sentence, with no imperative sentence in it. An unreviewed artifact
-is emitted, labelled, never refused. The header names vpt. The function is pure apart from
-`generated_at`, so the digest is meaningful and a lost copy is recoverable by re-running one command.
+`[handoff] allow_private = true`. `--stage released` selects the recording's newest release by creation
+sequence whose file still exists and verifies its digest; no release is exit 2, and a file whose bytes
+changed since release is exit 3 `artifact_changed`. `content` is text always; the schema has no field
+that can carry audio, and an identifier that resolves to a recording rather than to a rendering is
+refused listing the stages that exist. The note's frontmatter does not cross; a fixed declarative header
+carries the identity, the unresolved count and the derived-copy sentence, with no imperative sentence in
+it. An unreviewed artifact is emitted, labelled, never refused. The header names vpt. The function is
+pure apart from `generated_at`, so the digest is meaningful and a lost copy is recoverable by re-running
+one command.
 
 No configuration key, no source line and no test names Open Notebook's vocabulary; a grep test over the
 tree for `open.notebook`, `notebook_id`, `5055`, `8502` and `surreal` finds nothing. The mapping from
