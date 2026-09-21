@@ -777,6 +777,13 @@ markers are missing, doubled or unbalanced is refused, not repaired, exit 3 `mar
 named. Both directions are written: when the analysis note appears, both notes' link regions link each
 other. vpt never writes into a note it did not create; a `mentions` link points out only.
 
+Every external string is data when it is rendered into a note. A frontmatter scalar (a title, an alias, a
+tag) is YAML-encoded; body text and a link label are Markdown-escaped, and an embedded newline stays
+inside the paragraph or bullet that carries it; only the renderer constructs the managed delimiters, the
+uncertainty annotations and the links. Engine text, proposal text, a Voice Memos title, an indexed note
+name and a review correction can therefore never introduce a marker, an annotation, a link or a
+frontmatter key.
+
 ### 7.3 Tags and the auto-create switch
 
 Tags arrive from a `vpt.proposal/1` document (stage 4) or from `vpt confirm`. Every proposed tag is
@@ -898,7 +905,8 @@ region on the command's stdin, and reads one `vpt.proposal/1` document from its 
 ```
 
 The config comment at the key says plainly that the command receives the full transcript, so whether that
-text leaves the machine is the operator's choice made at that line.
+text leaves the machine is the operator's choice made at that line. Every string in the proposal is
+rendered as data under the escaping rule of section 7.2.
 
 vpt writes the analysis note from the proposal: frontmatter as in stage 3 with `vptStage: analysis`, a
 `vpt:links` region, and a `vpt:content` region holding a `Summary` section and an `Actions` section. The
