@@ -853,10 +853,12 @@ directory commit them. Consequences vpt states rather than hides:
 
 ### 8.1 The agent command
 
-`[synthesis] command` is an argv list, empty by default, which means stage 4 is off and `vpt run` skips
-it. When set, `vpt synthesize <id>` runs the command with `{transcript}` (the note path), `{id}` and
-`{language}` substituted, writes the transcript note's content region on the command's stdin, and reads
-one `vpt.proposal/1` document from its stdout within `[synthesis] timeout_secs` (default 600):
+`[synthesis] command` is an argv list, empty by default, which means synthesis is off: `vpt run` skips it
+and `vpt synthesize` refuses with exit 2. Automatic redaction is not part of that switch; it follows
+`[share] automatic` alone (section 8.5). When set, `vpt synthesize <id>` runs the command with
+`{transcript}` (the note path), `{id}` and `{language}` substituted, writes the transcript note's content
+region on the command's stdin, and reads one `vpt.proposal/1` document from its stdout within
+`[synthesis] timeout_secs` (default 600):
 
 ```json
 {
@@ -1049,12 +1051,12 @@ vpt redact <id> [--stage transcript|analysis] [--to <dir>] [--title <t>] [--json
 ```
 
 Two ways to produce a copy: `[share] automatic = true` makes `vpt run` redact every recording's
-transcript note (and analysis note when one exists) as soon as the note is written; `vpt redact` does it
-on demand for one recording. Both write into `[stores] released`, and `--to <dir>` names a different
-destination for that run. The destination may not resolve inside a private store (`audio`, `transcripts`,
-`analysis`, `briefs`, `engine_outputs`, `drafts`), the state directory, the config directory or the Voice
-Memos container (a refusal naming which); any other directory is allowed, including one that syncs
-elsewhere, because sending is the point.
+transcript note as soon as it is written, with synthesis configured or not, and its analysis note as soon
+as that artifact exists; `vpt redact` does it on demand for one recording. Both write into
+`[stores] released`, and `--to <dir>` names a different destination for that run. The destination may not
+resolve inside a private store (`audio`, `transcripts`, `analysis`, `briefs`, `engine_outputs`,
+`drafts`), the state directory, the config directory or the Voice Memos container (a refusal naming
+which); any other directory is allowed, including one that syncs elsewhere, because sending is the point.
 
 The released file is assembled, not filtered. Its frontmatter carries at most `title` (from `--title`,
 else absent), `date` (when `[share] include_date`), and `source` (`[share] source_line`, default
@@ -1359,7 +1361,7 @@ canary-secret test.
 | `tags.max_suggested`                 | int            | `10`                                                                      | held tags per note                                                                                           |
 | `relations.session_gap_minutes`      | int            | `60`                                                                      | `continues` window                                                                                           |
 | `relations.max_suggested`            | int            | `5`                                                                       | agent-proposed `related` links kept per note                                                                 |
-| `synthesis.command`                  | string list    | `[]`                                                                      | the agent command; empty disables stage 4                                                                    |
+| `synthesis.command`                  | string list    | `[]`                                                                      | the agent command; empty disables synthesis only (automatic redaction is `share.automatic`)                  |
 | `synthesis.timeout_secs`             | int            | `600`                                                                     | the command's deadline                                                                                       |
 | `synthesis.grounding_window_secs`    | int            | `15`                                                                      | verify-note's tolerance around a cited span                                                                  |
 | `brief.lookback_days`                | int            | `180`                                                                     | how far back selection reaches                                                                               |
