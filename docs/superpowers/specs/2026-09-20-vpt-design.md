@@ -229,6 +229,16 @@ Trash there is no removal). `vpt doctor` reports the helper's presence and versi
 `{"schema": "vpt.helper/1", "version": "<semver>"}` for `--version`, and vpt refuses a helper whose major
 version differs from the one it was built against.
 
+### 3.5 Spawned commands
+
+Every command vpt spawns (an engine, the helper, the agent command, `dam`, the notify command) is
+executed from its argv directly, never through a shell, in its own process group. Writing its stdin,
+draining its stdout and stderr concurrently, and waiting share one deadline: the configured
+`timeout_secs` for an engine or the agent command, 30 seconds for a whole context collection, five
+seconds for a notification or a `notify` or `trash` helper call. At the deadline vpt terminates the
+group, force-kills survivors after one second and reaps the child. Child output is bounded by the
+protocol limits and is never quoted raw in a log line or an error document.
+
 ## 4. The home and the stores
 
 ### 4.1 One home, per-store overrides
@@ -1141,9 +1151,10 @@ never a transcript span, an alternative, a title, a tag, a mask value or a brief
 - `command`: vpt runs `[notify] command` (an argv list) with the tokens `{event}`, `{state}`, `{id}`,
   `{detail}`, `{count}` and `{path}` substituted into the argument list, and writes the event document on
   the command's stdin, both, on every invocation, with no sub-mode key. The command's exit code is
-  load-bearing: non-zero means vpt raises its own desktop notice as a fallback and logs the exit code.
-  The config comment at the key states that the command receives vpt's JSON (not any downstream tool's),
-  and that a wrapper must pass through its final delivery's exit code.
+  load-bearing: non-zero means vpt attempts its desktop notice once as a fallback, logs the exit code,
+  and keeps the work's own exit status. The config comment at the key states that the command receives
+  vpt's JSON (not any downstream tool's), and that a wrapper must pass through its final delivery's exit
+  code.
 - `off`: nothing is raised.
 
 A notification failure never fails the work it reports on: the note, the flags and the clone are already
@@ -1231,6 +1242,12 @@ a threshold and the slug length are positive integers; a count, a gap and a look
 integers; every integer fits 32 bits except `source.max_audio_bytes`, which fits 64. A duration is `0` or
 a positive decimal integer followed by one of `s`, `m`, `h`, `d`, converted to seconds with overflow
 checked. A value outside its rule is exit 2 naming the key.
+
+A secret value has a redacted `Debug` and `Display` form. No log line, error document, notification,
+trace or test failure ever contains a secret value, an authorization header, a token body, the full
+configuration text or raw child output; a diagnostic names the key, the operation, the exit status and a
+structural location, never the rejected value. Each failure path that handles a secret is covered by a
+canary-secret test.
 
 | Key                                  | Type           | Default                                                                   | Meaning                                                                                                      |
 | ------------------------------------ | -------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
