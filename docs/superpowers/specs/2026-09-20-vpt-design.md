@@ -811,11 +811,12 @@ Relations and links are always written, in both settings. The switch governs tag
 ### 7.4 Relations and filing
 
 Four relation kinds, a closed set: `continues` (derived: the previous recording's capture ended within
-`[relations] session_gap_minutes`, default 60), `mentions` (derived: a confirmed known term matches a
-note name or alias in the index of section 7.3 exactly, whole-token, case-insensitive, never fuzzy; two
-matches write no link and record the ambiguity), `related` (proposed by the agent command, written with
-its provenance shown in the link block), `supersedes` (recorded only by `vpt confirm --relation`). A
-fifth kind is a schema change.
+`[relations] session_gap_minutes`, default 60), `mentions` (derived: a confirmed known term occurs in the
+recording's accepted transcript as a whole-token, case-insensitive match and resolves to exactly one note
+name or alias in the index of section 7.3, exactly, never fuzzy; the matched transcript ranges are
+recorded on the relation; two index matches write no link and record the ambiguity), `related` (proposed
+by the agent command, written with its provenance shown in the link block), `supersedes` (recorded only
+by `vpt confirm --relation`). A fifth kind is a schema change.
 
 Filing is by store: the transcript note goes to `transcripts`, the analysis note to `analysis`, the brief
 to `briefs`, flat, named by the template above. That gives the five properties the ledger asks of
