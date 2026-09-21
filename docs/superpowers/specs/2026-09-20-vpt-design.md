@@ -233,11 +233,12 @@ The home is one directory, default `~/.vpt`, under which every store lands by de
 | `drafts`         | `drafts/`                   | each redacted copy's private report, `<id>.<stage>.<content-sha256>.report.json`, mode 0600 | the map from every mask to its real value |
 | `released`       | `released/`                 | the shared folder: redacted copies ready to send                                            | intended to leave the machine             |
 
-Each store has its own key under `[stores]` and may point anywhere. A store path is expanded from `~`,
-must be absolute after expansion, and its parent must exist; vpt creates the leaf directory and nothing
-above it. Two stores may not resolve to the same directory, and no store may resolve inside another
-store's directory; every store may sit under the home, which is not itself a store. Both are startup
-refusals naming the two keys.
+Each store has its own key under `[stores]` and may point anywhere. A store path is expanded from `~`
+(and from a leading `<home>/`, which `vpt setup` emits for a derived default) and must be absolute after
+expansion. `vpt setup` creates the default store leaves beneath the home; a store pointed elsewhere needs
+an existing parent, and vpt creates its leaf and nothing above it. Two stores may not resolve to the same
+directory, and no store may resolve inside another store's directory; every store may sit under the home,
+which is not itself a store. Both are startup refusals naming the two keys.
 
 vpt's own state (the ledger, section 4.4) does not live in a store. It lives in `~/.local/state/vpt/` by
 default (`[home] state_dir`), so that a home inside a git-tracked vault never commits a database or its
@@ -1079,33 +1080,37 @@ written when the event is raised. vpt's source contains no name of any notificat
 
 ## 9. The command-line surface
 
-Every verb accepts `--json`, prints one document on stdout on success, and on failure prints one error
-document on stderr and nothing on stdout. Without `--json`, success prints human lines and failure prints
-`vpt: <message>`. `--config <file>` overrides the config path; `VPT_CONFIG` does the same. An unknown
-argument or subcommand prints usage to stderr and exits 2.
+Every verb accepts `--json`. Machine-readable output is withheld until the final status is known: on
+success one document goes to stdout; on failure one error document goes to stderr, stdout stays empty,
+and the error carries a `completed` field listing the work already committed (for example the recordings
+a sweep ingested before it aborted). A result with no schema of its own carries `schema: "vpt.result/1"`
+and `command: "<verb>"`; an error carries `schema: "vpt.error/1"`. Without `--json`, success prints human
+lines and failure prints `vpt: <message>`. `--config <file>` overrides the config path; `VPT_CONFIG` does
+the same. An unknown argument or subcommand prints usage to stderr and exits 2, as an error document
+under `--json`.
 
-| Verb                                                                                          | Writes                                                                | `--json` shape                                                                                                     | Exit codes                            |
-| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
-| `vpt setup [--force]`                                                                         | `config.toml` with every key at its default, local engine preselected | `{"written": "<path>"}`                                                                                            | 0, 2 exists                           |
-| `vpt doctor`                                                                                  | nothing                                                               | `{"checks": [{"name", "ok", "detail"}]}`                                                                           | 0 all ok, 3 any failed                |
-| `vpt run [--dry-run]`                                                                         | everything a stage writes, for new work                               | `{"ingested": [..], "transcribed": [..], "notes": [..], "synthesized": [..], "redacted": [..], "retention": {..}}` | 0, 1 any stage failed                 |
-| `vpt ingest [--dry-run] [--once <path>]`                                                      | clones, ledger rows                                                   | `{"ingested": [record...], "deferred": [{"path", "reason"}], "skipped": n}`                                        | 0, 1 aborted                          |
-| `vpt transcribe <id> [--language <tag>] [--dry-run]`                                          | engine outputs, flags, transcript note                                | the record plus `{"flags": {"<class>": n}}`                                                                        | 0, 1 engines failed, 3 refused        |
-| `vpt review <id> [--resolve <flag> --confirm\|--correct <t>\|--dismiss]`                      | flag state, note rewrite, known-terms                                 | `{"flags": [{"id", "class", "at", "record", "alternative", "state"}]}`                                             | 0, 2 no such flag                     |
-| `vpt confirm --term <t>` / `vpt confirm <id> --tag <t>\|--reject-tag <t>\|--relation <k>:<t>` | the two lists, ledger, note rewrite                                   | `{"confirmed": {...}}`                                                                                             | 0, 2                                  |
-| `vpt note write <id>`                                                                         | re-renders managed regions of both notes                              | the record                                                                                                         | 0, 3 markers                          |
-| `vpt path <id> --stage <stage>` / `vpt path --occasion <id> --stage brief`                    | nothing                                                               | `{"path": "<abs>"}`                                                                                                | 0, 2                                  |
-| `vpt synthesize <id> [--dry-run]`                                                             | analysis note, tags, relations                                        | the record plus `{"verify": {"<class>": n}}`                                                                       | 0, 1 command failed, 2 not configured |
-| `vpt verify-note <path> --recording <id>`                                                     | the owned artifact's annotations                                      | `{"flags": [{"class", "line", "range"}]}`                                                                          | 0, 1, 3                               |
-| `vpt brief <occasion> [--explain] [--dry-run]` / `--title --at ...` / `--upcoming`            | brief note, occasion row, events                                      | `vpt.brief/1`, or `{"written": [..]}` for `--upcoming`                                                             | 0, 2, 3                               |
-| `vpt occasions`                                                                               | nothing                                                               | `{"occasions": [..]}`                                                                                              | 0                                     |
-| `vpt redact <id> [--stage] [--to <dir>] [--title <t>]`                                        | released copy, draft report                                           | `{"written": "<path>", "report": "<path>", "masks": {"<class>": n}, "candidates": [..]}`                           | 0, 3 duplicate or residue             |
-| `vpt handoff <id> --stage <kind>`                                                             | nothing                                                               | `vpt.handoff/1`                                                                                                    | 0, 2, 3 private refused               |
-| `vpt show <id>` / `vpt list [--stage <s>]`                                                    | nothing                                                               | the record / `{"recordings": [..]}`                                                                                | 0, 2                                  |
-| `vpt storage`                                                                                 | nothing                                                               | `{"stores": {"<key>": {"files", "bytes", "oldest", "newest"}}}`                                                    | 0                                     |
-| `vpt retention run [--dry-run]`                                                               | moves to Trash                                                        | `{"moved": [{"store", "path"}], "kept": [{"path", "reason"}]}`                                                     | 0, 3 helper absent                    |
-| `vpt symlink deploy` / `vpt symlink verify`                                                   | the link / nothing                                                    | `{"link", "target", "ok"}`                                                                                         | 0, 3                                  |
-| `vpt --version`                                                                               | nothing                                                               | `{"version", "helper_version"}`                                                                                    | 0                                     |
+| Verb                                                                                          | Writes                                                                                                                                | `--json` shape                                                                                                     | Exit codes                            |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| `vpt setup [--force]`                                                                         | `config.toml` (the main engine prompted for, every other key at its default), the home, the state directory, the default store leaves | `{"written": "<path>", "main_engine": "<name>"}`                                                                   | 0, 2 exists or no terminal            |
+| `vpt doctor`                                                                                  | nothing                                                                                                                               | `{"checks": [{"name", "ok", "detail"}]}`                                                                           | 0 all ok, 3 any failed                |
+| `vpt run [--dry-run]`                                                                         | everything a stage writes, for new work                                                                                               | `{"ingested": [..], "transcribed": [..], "notes": [..], "synthesized": [..], "redacted": [..], "retention": {..}}` | 0, 1 any stage failed                 |
+| `vpt ingest [--dry-run] [--once <path>]`                                                      | clones, ledger rows                                                                                                                   | `{"ingested": [record...], "deferred": [{"path", "reason"}], "skipped": n}`                                        | 0, 1 aborted                          |
+| `vpt transcribe <id> [--language <tag>] [--dry-run]`                                          | engine outputs, flags, transcript note                                                                                                | the record plus `{"flags": {"<class>": n}}`                                                                        | 0, 1 engines failed, 3 refused        |
+| `vpt review <id> [--resolve <flag> --confirm\|--correct <t>\|--dismiss]`                      | flag state, note rewrite, known-terms                                                                                                 | `{"flags": [{"id", "class", "at", "record", "alternative", "state"}]}`                                             | 0, 2 no such flag                     |
+| `vpt confirm --term <t>` / `vpt confirm <id> --tag <t>\|--reject-tag <t>\|--relation <k>:<t>` | the two lists, ledger, note rewrite                                                                                                   | `{"confirmed": {...}}`                                                                                             | 0, 2                                  |
+| `vpt note write <id>`                                                                         | re-renders managed regions of both notes                                                                                              | the record                                                                                                         | 0, 3 markers                          |
+| `vpt path <id> --stage <stage>` / `vpt path --occasion <id> --stage brief`                    | nothing                                                                                                                               | `{"path": "<abs>"}`                                                                                                | 0, 2                                  |
+| `vpt synthesize <id> [--dry-run]`                                                             | analysis note, tags, relations                                                                                                        | the record plus `{"verify": {"<class>": n}}`                                                                       | 0, 1 command failed, 2 not configured |
+| `vpt verify-note <path> --recording <id>`                                                     | the owned artifact's annotations                                                                                                      | `{"flags": [{"class", "line", "range"}]}`                                                                          | 0, 1, 3                               |
+| `vpt brief <occasion> [--explain] [--dry-run]` / `--title --at ...` / `--upcoming`            | brief note, occasion row, events                                                                                                      | `vpt.brief/1`, or `{"written": [..]}` for `--upcoming`                                                             | 0, 2, 3                               |
+| `vpt occasions`                                                                               | nothing                                                                                                                               | `{"occasions": [..]}`                                                                                              | 0                                     |
+| `vpt redact <id> [--stage] [--to <dir>] [--title <t>]`                                        | released copy, draft report                                                                                                           | `{"written": "<path>", "report": "<path>", "masks": {"<class>": n}, "candidates": [..]}`                           | 0, 3 duplicate or residue             |
+| `vpt handoff <id> --stage <kind>`                                                             | nothing                                                                                                                               | `vpt.handoff/1`                                                                                                    | 0, 2, 3 private refused               |
+| `vpt show <id>` / `vpt list [--stage <s>]`                                                    | nothing                                                                                                                               | the record / `{"recordings": [..]}`                                                                                | 0, 2                                  |
+| `vpt storage`                                                                                 | nothing                                                                                                                               | `{"stores": {"<key>": {"files", "bytes", "oldest", "newest"}}}`                                                    | 0                                     |
+| `vpt retention run [--dry-run]`                                                               | moves to Trash                                                                                                                        | `{"moved": [{"store", "path"}], "kept": [{"path", "reason"}]}`                                                     | 0, 3 helper absent                    |
+| `vpt symlink deploy` / `vpt symlink verify`                                                   | the link / nothing                                                                                                                    | `{"link", "target", "ok"}`                                                                                         | 0, 3                                  |
+| `vpt --version`                                                                               | nothing                                                                                                                               | `{"version", "helper_version"}`                                                                                    | 0                                     |
 
 Exit codes, one mapping for every verb:
 
@@ -1133,10 +1138,20 @@ The error document:
 names the rule for `refused` and is null otherwise; `ids` lists the identities the message names, in
 order. Every rule vpt keeps reports code 3 and nothing else does.
 
+`--dry-run`, wherever a verb offers it, opens existing state read-only and performs no migration,
+directory creation, ledger write, artifact write, notification or Trash move. `run`, `transcribe` and
+`synthesize` spawn no engine and no agent command under it and report the operations they would perform;
+`brief --dry-run` may collect configured read-only context and prints the pack it would write;
+`ingest --dry-run` may refresh the title copy and creates no durable state.
+
 ## 10. Configuration
 
-One file, `~/.config/vpt/config.toml`. `vpt setup` writes it with every key present and set to its
-default, uncommented, one concise comment per key, so the file shows the real posture. A secret is a
+One file, `~/.config/vpt/config.toml`. `vpt setup` needs a controlling terminal: it prompts for the main
+engine with `apple` (the local option) preselected, writes that selection, writes every other key
+uncommented at its default with one concise comment so the file shows the real posture, creates the home
+and the state directory with mode 0700 and the default store leaves beneath the home, and refuses to
+overwrite an existing file without `--force`. Without a terminal it exits 2 and writes nothing; with
+`--json` the prompt still uses the terminal and stdout carries only the result document. A secret is a
 value in this file; a key holding a secret is marked in the table. A key that is not in this table is a
 startup refusal naming it.
 
@@ -1324,6 +1339,11 @@ Refused at startup, before any work, exit 2 or 3 as marked:
 - the helper present with a different major version (3, `helper_version`).
 - `brief --upcoming` with the trigger disabled (2); `synthesize` with no command (2); `handoff --stage`
   private without `allow_private` (3, `private_handoff`).
+
+`vpt doctor` never refuses at startup: it runs every check, prints the whole result and exits 3 when any
+failed, so a machine that cannot start still gets a diagnosis. Every other verb validates only what it
+needs: `vpt symlink deploy` validates its target and nothing else, `vpt storage` needs the stores and no
+engine, and only a verb that will spawn an engine resolves one.
 
 Refused during a run, the recording or artifact left as it was:
 
