@@ -138,9 +138,9 @@ package a person would guess. Its binary is `vpt`. `main.rs` is under 150 lines 
 
 `vpt-domain` excludes filesystem access, SQLite, TOML, JSON, HTTP, environment variables, process
 spawning, macOS APIs, vendor APIs and terminal output. It holds: the recording identity, the MPEG-4
-wholeness gate over a byte slice, the normalizer, the aligner, the flag classifier and ranking, the
-readability pass, the slug sanitizer, the note renderer and the managed-block rewriter over strings, the
-tag gate, the relation rules, the brief selector and pack, the redaction pass and residue scan, the
+wholeness gate over bounded box headers, the normalizer, the aligner, the flag classifier and ranking,
+the readability pass, the slug sanitizer, the note renderer and the managed-block rewriter over strings,
+the tag gate, the relation rules, the brief selector and pack, the redaction pass and residue scan, the
 retention decision, and every value type. Each is a total function of its arguments. The crate has no
 infrastructure dependency; a small crate for Unicode normalization form KC and full case folding is a
 permitted domain primitive, and one normalization policy serves alignment, terms, tags and slugs, its
@@ -399,24 +399,38 @@ For each candidate, in this order, cheapest first:
    deferred with reason `dataless`. Opening one triggers a silent iCloud download.
 1. Skip an entry whose `(filename, size, mtime)` triple is unchanged in `seen` and already ingested. This
    is an optimization only; deleting the ledger costs one full rehash and changes no outcome.
-1. Run the wholeness gate: walk the top-level MPEG-4 boxes; the sum of box lengths must equal the file
-   size exactly and a `moov` box must be present (Voice Memos writes `moov` last, so a truncated download
-   loses it). About forty lines, no audio library.
+1. Defer with `audio_too_large` an entry larger than `[source] max_audio_bytes` (default 2,147,483,648)
+   before reading any content.
+1. Run the wholeness gate: walk the top-level MPEG-4 boxes reading bounded headers with checked offsets,
+   never the whole file; the sum of box lengths must equal the file size exactly and a `moov` box must be
+   present (Voice Memos writes `moov` last, so a truncated download loses it). An invalid length, an
+   overflow, a box extending past the file or a missing `mvhd` defers with `invalid_container`. About
+   forty lines, no audio library.
 1. Require the file at rest: mtime at least `[source] quiet_period_secs` (default 30) in the past, and
    for an entry deferred on an earlier sweep, size unchanged since that sweep.
-1. Hash, derive the identity, clone into the `audio` store, set mode 0600, insert the recording row, emit
-   the record on stdout.
+1. Stage, verify, hash, publish: open the source through one read-only descriptor (a regular file, never
+   a symbolic link) and record its device, inode, size and nanosecond mtime; clone it to a private
+   staging name inside the `audio` store; read the descriptor's metadata again and defer with
+   `changed_during_read` if anything moved; hash the staged bytes in 64 KiB buffers and derive the
+   identity from them; set mode 0600; publish the staged file at `<id>.m4a` (section 5.3); and insert the
+   recording and seen rows in one transaction. The record is part of the run's result document.
 
 A candidate that fails any gate is deferred with its reason and retried next sweep. It is never partially
 ingested: the clone is the first durable act and happens only after every gate passes.
 
 ### 5.3 Cloning and duplicates
 
-The clone is `clonefile(2)` through `libc`, which fails with `EEXIST` when the destination exists; that
-failure is the duplicate guard and the mutual exclusion between two racing sweeps, so no lock file
-exists. `EEXIST` is the normal idempotent path and is reported as `already ingested`. `EXDEV` (the store
-on another volume) falls back to a byte copy written to a temporary name and renamed into place, with one
-log line saying the clone was not copy-on-write. `ENOSPC` aborts the sweep.
+Publication is an atomic no-replace rename of the staged file (`renamex_np` with `RENAME_EXCL`), which
+fails with `EEXIST` when `<id>.m4a` exists; that failure is the duplicate guard between two racing sweeps
+and needs no lock beyond the one every mutating command holds. On `EEXIST` vpt verifies the existing
+archive: its full digest must equal the staged digest and its container must validate. It then recovers
+any missing recording or seen row in one transaction, moves the staged duplicate to the Trash, and
+reports `already ingested`. A digest mismatch is exit 3 `archive_collision`, and nothing is replaced. The
+staging clone is `clonefile(2)` through `libc`; `EXDEV` (the store on another volume) falls back to a
+byte copy into a unique mode-0600 temporary file, synced before the same no-replace publish, with one log
+line saying the archive is not copy-on-write. `ENOSPC` aborts the sweep. At the start of every sweep, an
+archive file with no ledger row is recovered by validating and digesting it, even when its source is
+gone.
 
 ### 5.4 Deleted, edited and moved recordings
 
@@ -428,16 +442,19 @@ path and takes nothing.
 
 ### 5.5 Failure modes and pages
 
-| Condition                                              | Sweep behavior                  | Event                                                                                       |
-| ------------------------------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------- |
-| `recordings_dir` unreadable                            | abort, exit 1, nothing ingested | `ingest_failed`, once per run                                                               |
-| readable, zero `.m4a`, store previously seen non-empty | abort, exit 1                   | `ingest_failed` (an empty store is the silent failure)                                      |
-| database copy or read fails                            | continue, untitled              | none, recorded per recording                                                                |
-| a gate fails                                           | defer, retry next sweep         | `deferred` after `[source] deferral_page_threshold` (default 4) consecutive deferrals, once |
-| `SF_DATALESS`                                          | defer, never open               | as above                                                                                    |
-| `EEXIST`                                               | already ingested, skip          | none                                                                                        |
-| `ENOSPC`                                               | abort, exit 1                   | `ingest_failed`                                                                             |
-| audio store parent missing                             | refuse at startup, exit 2       | `config_refused`                                                                            |
+| Condition                                              | Sweep behavior                                | Event                                                                                       |
+| ------------------------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `recordings_dir` unreadable                            | abort, exit 1, nothing ingested               | `ingest_failed`, once per run                                                               |
+| readable, zero `.m4a`, store previously seen non-empty | abort, exit 1                                 | `ingest_failed` (an empty store is the silent failure)                                      |
+| database copy or read fails                            | continue, untitled                            | none, recorded per recording                                                                |
+| a gate fails                                           | defer, retry next sweep                       | `deferred` after `[source] deferral_page_threshold` (default 4) consecutive deferrals, once |
+| `SF_DATALESS`                                          | defer, never open                             | as above                                                                                    |
+| entry larger than `max_audio_bytes`                    | defer, never read                             | as a gate                                                                                   |
+| source changed while staged                            | defer with `changed_during_read`              | as a gate                                                                                   |
+| publish finds `<id>.m4a` with the same digest          | recover missing rows, report already ingested | none                                                                                        |
+| publish finds `<id>.m4a` with a different digest       | refuse, exit 3 `archive_collision`            | `ingest_failed`                                                                             |
+| `ENOSPC`                                               | abort, exit 1                                 | `ingest_failed`                                                                             |
+| audio store parent missing                             | refuse at startup, exit 2                     | `config_refused`                                                                            |
 
 `vpt ingest --dry-run` runs every gate and writes nothing: no clone, no row, no event. `--once <path>`
 ingests exactly one file by path, gates included.
@@ -1220,6 +1237,7 @@ checked. A value outside its rule is exit 2 naming the key.
 | `source.read_titles`                 | bool           | `true`                                                                    | read titles from a private copy of the database                                                              |
 | `source.quiet_period_secs`           | int            | `30`                                                                      | seconds a file must be unchanged before it is at rest                                                        |
 | `source.deferral_page_threshold`     | int            | `4`                                                                       | consecutive deferrals of one recording before one event                                                      |
+| `source.max_audio_bytes`             | int            | `2147483648`                                                              | a larger source file defers with `audio_too_large` before any content is read                                |
 | `recording.language`                 | string         | `en-US`                                                                   | the language engines are asked for                                                                           |
 | `engines.main`                       | string         | `apple`                                                                   | the transcript of record                                                                                     |
 | `engines.checker`                    | string         | `""`                                                                      | the second slot; empty runs one engine                                                                       |
