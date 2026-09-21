@@ -905,19 +905,23 @@ so a rescheduled event keeps its identity and its file. Re-running a brief rewri
 creating a second. A brief's file is named `{occasion-date}-{slug}-{hash8}.md` from the occasion's own
 date, sanitized title and identity hash, pinned at first write.
 
-Selection is four exact selectors over confirmed data, capped at `[brief] max_notes` (default 12),
-ordered by selector rank then capture time newest first, the remainder counted and reported:
+Candidates are recordings that have a transcript artifact, deduplicated by identity. Selection is four
+exact selectors over confirmed data, capped at `[brief] max_notes` (default 12), ordered by selector rank
+then capture time newest first, the remainder counted and reported:
 
-| Selector      | Matches a note when                                                                                                                                            |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `participant` | a confirmed known term for a participant name matches a note name or alias exactly                                                                             |
-| `term`        | a confirmed known term appearing in the occasion title matches a note name or alias exactly                                                                    |
-| `tag`         | the note carries a confirmed tag that a `--tag` argument or the occasion's provider labels also carry                                                          |
-| `recent`      | the note's recording was captured inside `[brief] lookback_days` (default 180) and shares a `continues` chain or a confirmed tag with an already-selected note |
+| Selector      | Matches a note when                                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `participant` | a confirmed known term for the participant's name resolves to exactly one indexed note, and the recording carries a `mentions` relation to that note         |
+| `term`        | a confirmed known term in the occasion title resolves to exactly one indexed note, and the recording carries a `mentions` relation to that note              |
+| `tag`         | the recording carries a confirmed tag that `occasion.tags` also carries (the `--tag` values or the provider's labels, persisted on the occasion)             |
+| `recent`      | the recording was captured inside `[brief] lookback_days` (default 180) and shares a `continues` chain or a confirmed tag with an already selected recording |
 
-A participant with no confirmed term selects nothing and appears in a `Not selected` section with the
-`vpt confirm --term` command that would fix it. `--explain` prints every candidate, its selector and the
-matched value, rejected ones included, and writes nothing.
+Quoted spans come from the accepted transcript: for `participant` and `term`, the segments containing the
+term, in start-time order; for `tag` and `recent`, segments in start-time order. `max_spans_per_note` is
+applied after deduplication and the omitted segments are counted. A participant with no confirmed term
+selects nothing and appears in a `Not selected` section with the `vpt confirm --term` command that would
+fix it. `--explain` prints every candidate, its selector and the matched value, rejected ones included,
+and writes nothing.
 
 The brief's Markdown carries `vptKind: brief`, `vptOccasion`, `vptOccasionAt`, `vptSource`, `vptNotes`,
 `vptUnresolved`, `vptContext`, a managed `vpt:brief` block with `Occasion`, `Unresolved`,
@@ -930,8 +934,9 @@ sentence. An empty section says so; it is never omitted.
 with `matched_note` and `term` state), `unresolved` (flags, notes_with_flags, reviewed), `items` (each
 with `text`, `certainty` of exactly `confirmed` or `unverified`, `sources` of recording, `at_secs` and
 note, and `selector`; an item without `certainty` and `sources` fails to serialize), `not_selected`,
-`context` (`calendar` and `tasks` each `absent` or `present`), and `generated_at`. This is the consumer
-contract for an assistant reading vpt.
+`context` (`calendar` and `tasks`, each
+`{status: present|absent, reason: null|disabled|unsupported|failed, detail}`), and `generated_at`. This
+is the consumer contract for an assistant reading vpt.
 
 A requested brief notifies nothing. The calendar trigger is `[brief.trigger] enabled` (default false)
 with `lead_time` (default `24h`): `vpt brief --upcoming` asks the context source for occasions starting
@@ -950,8 +955,8 @@ source, project, id, content, due, completed, priority) before anything reads it
 
 Selection is the only scope that exists, because no provider offers a per-calendar or per-project
 credential: `[context] calendars` and `[context] projects` are lists, an empty list refuses at startup
-naming the key whenever that half is asked for, and the selection is in the request, never a filter
-afterwards.
+naming the key whenever the selected provider supports that half and the verb asks for it, and the
+selection is in the request, never a filter afterwards.
 
 - `dam`: vpt spawns `[context.dam] command` (default `["dam"]`) as
   `dam ls "kind:event & path:<calendar> & start:<YYYY-MM-DD>" --json --no-pull` once per configured
@@ -962,17 +967,24 @@ afterwards.
   `organizer` supplies a name when present, `subject` is the title, `start` and `end` give `at` and
   `duration_secs`. `--no-pull` is always passed so a brief never triggers a remote pull. A non-zero exit
   or an error document on stderr is a collector failure.
-- `google`: a native reader over the Google Calendar events list endpoint with `singleEvents=true`,
-  `timeMin` and `timeMax` from the window, one request per configured calendar id, authenticated with
-  `[context.google] client_id`, `client_secret` and `refresh_token` (values in the config file) exchanged
-  for an access token bearing only the `calendar.events.readonly` scope; a token reply that grants any
-  other scope is refused. It answers no tasks. TLS through `rustls`, no system OpenSSL.
-- `none`: both halves absent.
+- `google`: a native reader over the Google Calendar events list endpoint with `singleEvents=true` and
+  `timeMin` and `timeMax` bracketing the window, per configured calendar id, following `nextPageToken`
+  until exhausted within the same scope; because `timeMin` filters on end time, vpt applies the trigger
+  predicate `now <= start < now + lead_time` itself to the returned occurrences, and a collection that
+  exceeds its deadline or a page limit is reported incomplete and marks no occasion briefed. It is
+  authenticated with `[context.google] client_id`, `client_secret` and `refresh_token` (values in the
+  config file) exchanged for an access token bearing only the `calendar.events.readonly` scope; a token
+  reply that grants any other scope is refused. It answers no tasks. TLS through `rustls`, no system
+  OpenSSL.
+- `none`: both halves absent with reason `disabled`.
 
-A collector failure (binary missing, non-zero exit, network error, malformed answer) leaves that half
-absent, the brief is still written, and the reason appears in the `Occasion` section and in `context`.
-Fetched text is untrusted: titles go through the slug sanitizer before any path use, and every fetched
-string is rendered as quoted data with its source named.
+Each half of the context is `present` or `absent` with a reason: `disabled` (`type = "none"`, or the half
+not requested), `unsupported` (Google supplies no tasks), or `failed` with a bounded detail (binary
+missing, non-zero exit, network error, malformed answer, deadline). A manual brief survives a collector
+failure: the brief is still written and the status appears in the `Occasion` section and in `context`.
+`brief --upcoming` exits 1 when occasion discovery fails, because it has nothing to brief. Fetched text
+is untrusted: titles go through the slug sanitizer before any path use, and every fetched string is
+rendered as quoted data with its source named.
 
 ### 8.5 Redaction and sharing
 
