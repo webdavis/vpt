@@ -269,11 +269,12 @@ Each store has its own key under `[stores]` and may point anywhere. A store path
 expansion. `vpt setup` creates the default store leaves beneath the home; a store pointed elsewhere needs
 an existing parent, and vpt creates its leaf and nothing above it. Every configured root (the home
 through its permitted symlink, each store, the state directory, the config directory) is resolved once at
-startup, before any work. Stores are pairwise disjoint; no store, staging path or release destination may
-overlap the Voice Memos container; a release destination may not overlap a private store, the state
-directory or the config directory. An invalid root is exit 2 naming the keys. Below a resolved root, a
-path that traverses a symbolic link in any component, or that escapes the root, is refused when it is
-opened or published, exit 3 `path_escape`.
+startup, before any work. Stores are pairwise disjoint, and the home may contain its stores, which is
+what the defaults do; no writable store, staging path, state directory or release destination may overlap
+the Voice Memos container; a release destination may not overlap a private store, the state directory or
+the config directory. An invalid root is exit 2 naming the keys. Below a resolved root, a path that
+traverses a symbolic link in any component, or that escapes the root, is refused when it is opened or
+published, exit 3 `path_escape`.
 
 vpt's own state (the ledger, section 4.4) does not live in a store. It lives in `~/.local/state/vpt/` by
 default (`[home] state_dir`), so that a home inside a git-tracked vault never commits a database or its
@@ -1459,9 +1460,10 @@ Refused at startup, before any work, exit 2 or 3 as marked:
 - config file missing (2, with the `vpt setup` command printed; `vpt setup` and `vpt --version` are the
   two verbs that run without one), unparseable (2), unknown key (2), a value of the wrong type or outside
   its range (2).
-- a configured root that is relative after expansion, whose required parent does not exist, or that
-  overlaps another store, the Voice Memos container, or (for a release destination) a private store, the
-  state directory or the config directory (2, naming the keys).
+- a configured root that is relative after expansion or whose required parent does not exist; a store
+  overlapping another store (the home may contain its stores); a writable store, staging path, state
+  directory or release destination overlapping the Voice Memos container; a release destination
+  overlapping a private store, the state directory or the config directory (2, naming the keys).
 - `engines.main` naming an engine table that does not exist, an engine whose binary or helper is absent,
   or a `command` engine missing `family` or `local` (2).
 - both engine slots reporting one family without `allow_same_family` (3, `same_family`).
