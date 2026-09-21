@@ -4539,7 +4539,9 @@ ______________________________________________________________________
 
 The gate walks the top-level boxes reading bounded headers with checked offsets, never the whole file;
 the sum of box lengths must equal the file size exactly and a `moov` box with an `mvhd` must be present.
-The `mvhd` supplies the capture time (seconds since 1904-01-01 UTC) and the duration.
+The `mvhd` supplies the capture time (seconds since 1904-01-01 UTC) and the duration. The domain owns no
+I/O: the gate takes the file's length and a bounded read callback, and the adapter that holds the
+descriptor supplies both.
 
 **Files:**
 
@@ -4550,143 +4552,45 @@ The `mvhd` supplies the capture time (seconds since 1904-01-01 UTC) and the dura
 
 - Consumes: `time::UtcInstant`.
 
-- Produces: `vpt_domain::container::{BoxReader, ReadFailure,`
+- Produces: `vpt_domain::container::{ReadFailure,`
   `Container { pub creation_time: UtcInstant, pub duration_secs: u64 }, ContainerError,`
-  `inspect(reader: &mut dyn BoxReader) -> Result<Container, ContainerError>}`;
-  `BoxReader { fn len(&self) -> u64; fn read_exact_at(&mut self, offset: u64,`
-  `buf: &mut [u8]) -> Result<(), ReadFailure>; }`;
-  `ContainerError::{PastEnd { offset: u64 }, InvalidLength { offset: u64 }, Overflow,`
+  `inspect(len: u64, read: impl FnMut(u64, &mut [u8]) -> Result<(), ReadFailure>) ->`
+  `Result<Container, ContainerError>}` where the callback fills the whole buffer from the given offset or
+  fails; `ContainerError::{PastEnd { offset: u64 }, InvalidLength { offset: u64 }, Overflow,`
   `MissingMoov, MissingMvhd, InvalidMvhd, Unreadable}`;
   `vpt_domain::fixtures::{m4a(creation_unix: i64, duration_secs: u32, payload: &[u8]) ->`
   `Vec<u8>, box_of(kind: &[u8; 4], body: &[u8]) -> Vec<u8>, mvhd(creation_unix: i64,`
-  `duration_secs: u32) -> Vec<u8>, mvhd_v1(creation_unix: i64, duration_secs: u64) ->` `Vec<u8>, Bytes}`
-  behind the `fixtures` feature, where `Bytes(pub Vec<u8>)` implements `BoxReader`.
+  `duration_secs: u32) -> Vec<u8>, mvhd_v1(creation_unix: i64, duration_secs: u64) -> Vec<u8>,`
+  `reader(bytes: &[u8]) -> impl FnMut(u64, &mut [u8]) -> Result<(), ReadFailure> + '_,`
+  `inspect_bytes(bytes: &[u8]) -> Result<Container, ContainerError>}` behind the `fixtures` feature.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-domain/src/container.rs`, test section:
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::fixtures::{Bytes, box_of, m4a, mvhd, mvhd_v1};
-
-    const CAPTURED: i64 = 1_787_690_856;
-
-    #[test]
-    fn a_whole_file_yields_its_capture_time_and_duration() {
-        let container = inspect(&mut Bytes(m4a(CAPTURED, 612, b"audio"))).expect("whole");
-        assert_eq!(container.creation_time, UtcInstant { secs: CAPTURED });
-        assert_eq!(container.duration_secs, 612);
-    }
-
-    #[test]
-    fn a_truncated_download_loses_moov_and_is_refused_past_the_end() {
-        let mut bytes = m4a(CAPTURED, 612, b"audio");
-        bytes.truncate(bytes.len() - 10);
-        assert!(matches!(inspect(&mut Bytes(bytes)), Err(ContainerError::PastEnd { .. })));
-    }
-
-    #[test]
-    fn a_file_without_moov_is_refused() {
-        let mut bytes = box_of(b"ftyp", b"M4A ");
-        bytes.extend(box_of(b"mdat", b"audio"));
-        assert_eq!(inspect(&mut Bytes(bytes)), Err(ContainerError::MissingMoov));
-    }
-
-    #[test]
-    fn a_moov_without_mvhd_is_refused() {
-        let mut bytes = box_of(b"ftyp", b"M4A ");
-        bytes.extend(box_of(b"moov", &box_of(b"udta", b"")));
-        assert_eq!(inspect(&mut Bytes(bytes)), Err(ContainerError::MissingMvhd));
-    }
-
-    #[test]
-    fn a_box_length_below_its_header_is_invalid() {
-        let mut bytes = vec![0, 0, 0, 4];
-        bytes.extend(b"ftyp");
-        assert_eq!(inspect(&mut Bytes(bytes)), Err(ContainerError::InvalidLength { offset: 0 }));
-    }
-
-    #[test]
-    fn a_largesize_that_overflows_is_refused_not_wrapped() {
-        let mut bytes = vec![0, 0, 0, 1];
-        bytes.extend(b"mdat");
-        bytes.extend(u64::MAX.to_be_bytes());
-        bytes.extend([0u8; 8]);
-        assert_eq!(inspect(&mut Bytes(bytes)), Err(ContainerError::Overflow));
-    }
-
-    #[test]
-    fn a_version_one_mvhd_is_read_with_its_64_bit_fields() {
-        let mut bytes = box_of(b"ftyp", b"M4A ");
-        bytes.extend(box_of(b"moov", &mvhd_v1(CAPTURED, 7_200)));
-        let container = inspect(&mut Bytes(bytes)).expect("v1");
-        assert_eq!(container.creation_time.secs, CAPTURED);
-        assert_eq!(container.duration_secs, 7_200);
-    }
-
-    #[test]
-    fn a_zero_timescale_is_an_invalid_mvhd() {
-        let mut body = mvhd(CAPTURED, 1);
-        body[8 + 12..8 + 16].copy_from_slice(&[0, 0, 0, 0]);
-        let mut bytes = box_of(b"ftyp", b"M4A ");
-        bytes.extend(box_of(b"moov", &body));
-        assert_eq!(inspect(&mut Bytes(bytes)), Err(ContainerError::InvalidMvhd));
-    }
-
-    #[test]
-    fn only_bounded_headers_are_read_never_the_payload() {
-        struct Counting(Bytes, u64);
-        impl BoxReader for Counting {
-            fn len(&self) -> u64 {
-                self.0.len()
-            }
-            fn read_exact_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
-                self.1 += buf.len() as u64;
-                self.0.read_exact_at(offset, buf)
-            }
-        }
-        let mut reader = Counting(Bytes(m4a(CAPTURED, 1, &[0u8; 100_000])), 0);
-        inspect(&mut reader).expect("whole");
-        assert!(reader.1 < 1_000, "read {} bytes", reader.1);
-    }
-}
-```
-
-- [ ] **Step 2: Run the tests to verify they fail**
-
-Run: `cargo test -p vpt-domain --features fixtures container`
-
-Expected: compile error, `inspect` and the fixtures not found.
-
-- [ ] **Step 3: Write the minimal implementation**
-
-`crates/vpt-domain/src/fixtures.rs`:
+Declare the modules first: `crates/vpt-domain/src/lib.rs` gains `pub mod container;` and, under
+`#[cfg(any(test, feature = "fixtures"))]`, `pub mod fixtures;`. The fixtures are test support, so
+`crates/vpt-domain/src/fixtures.rs` is written whole now:
 
 ```rust
 //! Assembled MPEG-4 bytes for tests. Behind the `fixtures` feature so other
 //! crates' tests can build the same files.
 
-use crate::container::{BoxReader, ReadFailure};
+use crate::container::{Container, ContainerError, ReadFailure, inspect};
 
 const MAC_EPOCH_OFFSET: i64 = 2_082_844_800;
 
-pub struct Bytes(pub Vec<u8>);
-
-impl BoxReader for Bytes {
-    fn len(&self) -> u64 {
-        self.0.len() as u64
-    }
-
-    fn read_exact_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
+/// A bounded read over a byte slice, the shape `inspect` takes.
+pub fn reader(bytes: &[u8]) -> impl FnMut(u64, &mut [u8]) -> Result<(), ReadFailure> + '_ {
+    move |offset, buf| {
         let start = usize::try_from(offset).map_err(|_| ReadFailure)?;
         let end = start.checked_add(buf.len()).ok_or(ReadFailure)?;
-        let slice = self.0.get(start..end).ok_or(ReadFailure)?;
-        buf.copy_from_slice(slice);
+        buf.copy_from_slice(bytes.get(start..end).ok_or(ReadFailure)?);
         Ok(())
     }
+}
+
+/// The gate over a whole byte slice.
+pub fn inspect_bytes(bytes: &[u8]) -> Result<Container, ContainerError> {
+    inspect(bytes.len() as u64, reader(bytes))
 }
 
 pub fn box_of(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
@@ -4729,7 +4633,128 @@ pub fn m4a(creation_unix: i64, duration_secs: u32, payload: &[u8]) -> Vec<u8> {
 }
 ```
 
-`crates/vpt-domain/src/container.rs`:
+`crates/vpt-domain/src/container.rs` starts as its test module alone:
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fixtures::{box_of, inspect_bytes, m4a, mvhd, mvhd_v1, reader};
+
+    const CAPTURED: i64 = 1_787_604_456;
+
+    #[test]
+    fn a_whole_file_yields_its_capture_time_and_duration() {
+        let container = inspect_bytes(&m4a(CAPTURED, 612, b"audio")).expect("whole");
+        assert_eq!(container.creation_time, UtcInstant { secs: CAPTURED });
+        assert_eq!(container.duration_secs, 612);
+    }
+
+    #[test]
+    fn a_truncated_download_loses_moov_and_is_refused_past_the_end() {
+        let mut bytes = m4a(CAPTURED, 612, b"audio");
+        bytes.truncate(bytes.len() - 10);
+        assert!(matches!(inspect_bytes(&bytes), Err(ContainerError::PastEnd { .. })));
+    }
+
+    #[test]
+    fn a_file_without_moov_is_refused() {
+        let mut bytes = box_of(b"ftyp", b"M4A ");
+        bytes.extend(box_of(b"mdat", b"audio"));
+        assert_eq!(inspect_bytes(&bytes), Err(ContainerError::MissingMoov));
+    }
+
+    #[test]
+    fn a_moov_without_mvhd_is_refused() {
+        let mut bytes = box_of(b"ftyp", b"M4A ");
+        bytes.extend(box_of(b"moov", &box_of(b"udta", b"")));
+        assert_eq!(inspect_bytes(&bytes), Err(ContainerError::MissingMvhd));
+    }
+
+    #[test]
+    fn a_box_length_below_its_header_is_invalid() {
+        let mut bytes = vec![0, 0, 0, 4];
+        bytes.extend(b"ftyp");
+        assert_eq!(inspect_bytes(&bytes), Err(ContainerError::InvalidLength { offset: 0 }));
+    }
+
+    #[test]
+    fn a_largesize_that_overflows_is_refused_not_wrapped() {
+        let mut bytes = box_of(b"free", b"");
+        bytes.extend([0, 0, 0, 1]);
+        bytes.extend(b"mdat");
+        bytes.extend(u64::MAX.to_be_bytes());
+        bytes.extend([0u8; 8]);
+        assert_eq!(inspect_bytes(&bytes), Err(ContainerError::Overflow));
+    }
+
+    #[test]
+    fn an_extended_header_that_runs_past_the_end_is_past_end_not_unreadable() {
+        let mut bytes = vec![0, 0, 0, 1];
+        bytes.extend(b"mdat");
+        bytes.extend([0u8; 4]);
+        assert_eq!(inspect_bytes(&bytes), Err(ContainerError::PastEnd { offset: 0 }));
+    }
+
+    #[test]
+    fn a_version_one_mvhd_is_read_with_its_64_bit_fields() {
+        let mut bytes = box_of(b"ftyp", b"M4A ");
+        bytes.extend(box_of(b"moov", &mvhd_v1(CAPTURED, 7_200)));
+        let container = inspect_bytes(&bytes).expect("v1");
+        assert_eq!(container.creation_time.secs, CAPTURED);
+        assert_eq!(container.duration_secs, 7_200);
+    }
+
+    #[test]
+    fn a_zero_timescale_is_an_invalid_mvhd() {
+        let mut body = mvhd(CAPTURED, 1);
+        body[8 + 12..8 + 16].copy_from_slice(&[0, 0, 0, 0]);
+        let mut bytes = box_of(b"ftyp", b"M4A ");
+        bytes.extend(box_of(b"moov", &body));
+        assert_eq!(inspect_bytes(&bytes), Err(ContainerError::InvalidMvhd));
+    }
+
+    #[test]
+    fn a_creation_time_beyond_i64_is_an_invalid_mvhd() {
+        let mut body = mvhd_v1(CAPTURED, 1);
+        body[8 + 4..8 + 12].copy_from_slice(&u64::MAX.to_be_bytes());
+        let mut bytes = box_of(b"ftyp", b"M4A ");
+        bytes.extend(box_of(b"moov", &body));
+        assert_eq!(inspect_bytes(&bytes), Err(ContainerError::InvalidMvhd));
+    }
+
+    #[test]
+    fn a_failed_read_is_unreadable() {
+        let bytes = m4a(CAPTURED, 1, b"audio");
+        let outcome = inspect(bytes.len() as u64, |_offset, _buf: &mut [u8]| Err(ReadFailure));
+        assert_eq!(outcome, Err(ContainerError::Unreadable));
+    }
+
+    #[test]
+    fn only_bounded_headers_are_read_never_the_payload() {
+        let bytes = m4a(CAPTURED, 1, &[0u8; 100_000]);
+        let mut source = reader(&bytes);
+        let mut read = 0u64;
+        let container = inspect(bytes.len() as u64, |offset, buf: &mut [u8]| {
+            read += buf.len() as u64;
+            source(offset, buf)
+        });
+        container.expect("whole");
+        assert!(read < 1_000, "read {read} bytes");
+    }
+}
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `cargo test -p vpt-domain --features fixtures container`
+
+Expected: the build fails with `cannot find` for `inspect`, `Container`, `ContainerError` and
+`ReadFailure`, reported from both `fixtures.rs` and the test module.
+
+- [ ] **Step 3: Write the minimal implementation**
+
+`crates/vpt-domain/src/container.rs`, above its test module:
 
 ```rust
 //! The wholeness gate: bounded box headers with checked offsets, the sum of
@@ -4741,11 +4766,6 @@ const MAC_EPOCH_OFFSET: i64 = 2_082_844_800;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ReadFailure;
-
-pub trait BoxReader {
-    fn len(&self) -> u64;
-    fn read_exact_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure>;
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Container {
@@ -4770,12 +4790,16 @@ struct Header {
     header_len: u64,
 }
 
-pub fn inspect(reader: &mut dyn BoxReader) -> Result<Container, ContainerError> {
-    let size = reader.len();
+/// Walk the boxes of a file `len` bytes long through `read`, which fills a
+/// buffer from an offset or fails.
+pub fn inspect(
+    len: u64,
+    mut read: impl FnMut(u64, &mut [u8]) -> Result<(), ReadFailure>,
+) -> Result<Container, ContainerError> {
     let mut offset = 0;
     let mut moov = None;
-    while offset < size {
-        let header = read_header(reader, offset, size)?;
+    while offset < len {
+        let header = read_header(&mut read, offset, len)?;
         if &header.kind == b"moov" {
             moov = Some((offset + header.header_len, offset + header.length));
         }
@@ -4784,31 +4808,35 @@ pub fn inspect(reader: &mut dyn BoxReader) -> Result<Container, ContainerError> 
     let (start, end) = moov.ok_or(ContainerError::MissingMoov)?;
     let mut child = start;
     while child < end {
-        let header = read_header(reader, child, end)?;
+        let header = read_header(&mut read, child, end)?;
         if &header.kind == b"mvhd" {
-            return read_mvhd(reader, child + header.header_len, header.length - header.header_len);
+            return read_mvhd(&mut read, child + header.header_len, header.length - header.header_len);
         }
         child = child.checked_add(header.length).ok_or(ContainerError::Overflow)?;
     }
     Err(ContainerError::MissingMvhd)
 }
 
-fn read_header(reader: &mut dyn BoxReader, offset: u64, end: u64) -> Result<Header, ContainerError> {
+fn read_header(
+    read: &mut impl FnMut(u64, &mut [u8]) -> Result<(), ReadFailure>,
+    offset: u64,
+    end: u64,
+) -> Result<Header, ContainerError> {
     if offset.checked_add(8).ok_or(ContainerError::Overflow)? > end {
         return Err(ContainerError::PastEnd { offset });
     }
     let mut head = [0u8; 8];
-    reader.read_exact_at(offset, &mut head).map_err(|_| ContainerError::Unreadable)?;
+    read(offset, &mut head).map_err(|_| ContainerError::Unreadable)?;
     let size32 = u32::from_be_bytes([head[0], head[1], head[2], head[3]]);
     let kind = [head[4], head[5], head[6], head[7]];
     let (length, header_len) = match size32 {
         0 => (end - offset, 8),
         1 => {
-            if offset + 16 > end {
+            if offset.checked_add(16).ok_or(ContainerError::Overflow)? > end {
                 return Err(ContainerError::PastEnd { offset });
             }
             let mut large = [0u8; 8];
-            reader.read_exact_at(offset + 8, &mut large).map_err(|_| ContainerError::Unreadable)?;
+            read(offset + 8, &mut large).map_err(|_| ContainerError::Unreadable)?;
             (u64::from_be_bytes(large), 16)
         }
         n => (u64::from(n), 8),
@@ -4823,19 +4851,23 @@ fn read_header(reader: &mut dyn BoxReader, offset: u64, end: u64) -> Result<Head
     Ok(Header { kind, length, header_len })
 }
 
-fn read_mvhd(reader: &mut dyn BoxReader, body: u64, body_len: u64) -> Result<Container, ContainerError> {
+fn read_mvhd(
+    read: &mut impl FnMut(u64, &mut [u8]) -> Result<(), ReadFailure>,
+    body: u64,
+    body_len: u64,
+) -> Result<Container, ContainerError> {
     let mut version = [0u8; 1];
     if body_len < 1 {
         return Err(ContainerError::InvalidMvhd);
     }
-    reader.read_exact_at(body, &mut version).map_err(|_| ContainerError::Unreadable)?;
+    read(body, &mut version).map_err(|_| ContainerError::Unreadable)?;
     let (creation, timescale, duration) = match version[0] {
         0 => {
             if body_len < 20 {
                 return Err(ContainerError::InvalidMvhd);
             }
             let mut fields = [0u8; 16];
-            reader.read_exact_at(body + 4, &mut fields).map_err(|_| ContainerError::Unreadable)?;
+            read(body + 4, &mut fields).map_err(|_| ContainerError::Unreadable)?;
             (
                 u64::from(u32::from_be_bytes(fields[0..4].try_into().map_err(|_| ContainerError::InvalidMvhd)?)),
                 u32::from_be_bytes(fields[8..12].try_into().map_err(|_| ContainerError::InvalidMvhd)?),
@@ -4847,7 +4879,7 @@ fn read_mvhd(reader: &mut dyn BoxReader, body: u64, body_len: u64) -> Result<Con
                 return Err(ContainerError::InvalidMvhd);
             }
             let mut fields = [0u8; 28];
-            reader.read_exact_at(body + 4, &mut fields).map_err(|_| ContainerError::Unreadable)?;
+            read(body + 4, &mut fields).map_err(|_| ContainerError::Unreadable)?;
             (
                 u64::from_be_bytes(fields[0..8].try_into().map_err(|_| ContainerError::InvalidMvhd)?),
                 u32::from_be_bytes(fields[16..20].try_into().map_err(|_| ContainerError::InvalidMvhd)?),
@@ -4864,7 +4896,8 @@ fn read_mvhd(reader: &mut dyn BoxReader, body: u64, body_len: u64) -> Result<Con
 }
 ```
 
-`crates/vpt-domain/src/lib.rs`:
+`body + 4` and `offset + 8` follow a check that the box holds those bytes, so neither can overflow.
+`crates/vpt-domain/src/lib.rs` now reads:
 
 ```rust
 //! Pure policy: identity, the wholeness gate, sweep gates, retention and value types.
@@ -4884,8 +4917,8 @@ pub mod time;
 
 Run: `cargo test -p vpt-domain --features fixtures container`
 
-Expected: 9 tests PASS. Run `cargo clippy -p vpt-domain --all-targets --features fixtures -- -D warnings`
-and expect no warnings.
+Expected: 12 tests PASS. Run
+`cargo clippy -p vpt-domain --all-targets --features fixtures -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
