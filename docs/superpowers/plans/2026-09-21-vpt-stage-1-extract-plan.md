@@ -6989,40 +6989,56 @@ ______________________________________________________________________
 
 **Interfaces:**
 
-- Consumes: nothing.
+- Consumes: `vpt_adapters::contained::{Access, ContainedError, RootDir}`.
 
-- Produces: `vpt_adapters::lock::{WriteLock, LockError::{Busy, Io(String)}}` with
-  `WriteLock::acquire(state_dir: &Path, wait: Duration) -> Result<WriteLock, LockError>`; dropping the
-  value releases the lock.
+- Produces: `vpt_adapters::lock::{WriteLock, LockError::{Busy, Contained(ContainedError), Io(String)}}`
+  with `WriteLock::acquire(state: &RootDir, wait: Duration) -> Result<WriteLock, LockError>`; the lock
+  file is `write.lock` below the state root, created at mode 0600 and opened without following a link;
+  dropping the value releases the lock.
 
 - [ ] **Step 1: Write the failing tests**
+
+`crates/vpt-adapters/src/lib.rs` gains `pub mod lock;`. `crates/vpt-adapters/src/lock.rs` starts as its
+test module alone:
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, Instant};
+    use std::os::unix::fs::PermissionsExt;
+
+    fn state() -> (tempfile::TempDir, RootDir) {
+        let temp = tempfile::tempdir().expect("temp");
+        let root = RootDir::open(&temp.path().canonicalize().expect("canonical")).expect("root");
+        (temp, root)
+    }
 
     #[test]
-    fn a_second_acquisition_waits_the_bounded_time_then_reports_busy() {
-        let temp = tempfile::tempdir().expect("temp");
-        let held = WriteLock::acquire(temp.path(), Duration::from_millis(50)).expect("first");
-
-        let started = Instant::now();
-        let outcome = WriteLock::acquire(temp.path(), Duration::from_millis(100));
-
-        assert_eq!(outcome.err(), Some(LockError::Busy));
-        assert!(started.elapsed() >= Duration::from_millis(100));
-        assert!(started.elapsed() < Duration::from_millis(900));
+    fn a_held_lock_makes_a_second_acquisition_busy_after_its_wait() {
+        let (_temp, state) = state();
+        let held = WriteLock::acquire(&state, Duration::ZERO).expect("first");
+        assert_eq!(WriteLock::acquire(&state, Duration::ZERO).err(), Some(LockError::Busy));
+        assert_eq!(WriteLock::acquire(&state, Duration::from_millis(30)).err(), Some(LockError::Busy));
         drop(held);
     }
 
     #[test]
     fn dropping_the_lock_lets_the_next_acquisition_through() {
-        let temp = tempfile::tempdir().expect("temp");
-        drop(WriteLock::acquire(temp.path(), Duration::from_millis(50)).expect("first"));
-        assert!(WriteLock::acquire(temp.path(), Duration::from_millis(50)).is_ok());
-        assert!(temp.path().join("write.lock").exists());
+        let (_temp, state) = state();
+        drop(WriteLock::acquire(&state, Duration::ZERO).expect("first"));
+        assert!(WriteLock::acquire(&state, Duration::ZERO).is_ok());
+        let mode = std::fs::metadata(state.path().join("write.lock")).expect("lock file").permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+
+    #[test]
+    fn a_link_at_the_lock_name_is_refused() {
+        let (temp, state) = state();
+        let elsewhere = temp.path().join("elsewhere");
+        std::fs::write(&elsewhere, b"").expect("elsewhere");
+        std::os::unix::fs::symlink(&elsewhere, state.path().join("write.lock")).expect("link");
+        let refused = ContainedError::NotRegular(state.path().join("write.lock"));
+        assert_eq!(WriteLock::acquire(&state, Duration::ZERO).err(), Some(LockError::Contained(refused)));
     }
 }
 ```
@@ -7031,22 +7047,29 @@ mod tests {
 
 Run: `cargo test -p vpt-adapters lock`
 
-Expected: compile error, `WriteLock` not found.
+Expected: the build fails with `cannot find` for `WriteLock` and `LockError`.
 
 - [ ] **Step 3: Write the minimal implementation**
+
+`crates/vpt-adapters/src/lock.rs`, above its test module:
 
 ```rust
 //! The advisory write lock every mutating command holds: `flock` on
 //! `<state_dir>/write.lock`, close-on-exec, a bounded wait.
 
-use std::fs::{File, OpenOptions};
+use crate::contained::{Access, ContainedError, RootDir};
+use std::fs::File;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+const LOCK_FILE: &str = "write.lock";
+const POLL: Duration = Duration::from_millis(25);
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum LockError {
     Busy,
+    Contained(ContainedError),
     Io(String),
 }
 
@@ -7055,14 +7078,8 @@ pub struct WriteLock {
 }
 
 impl WriteLock {
-    pub fn acquire(state_dir: &Path, wait: Duration) -> Result<WriteLock, LockError> {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(state_dir.join("write.lock"))
-            .map_err(|error| LockError::Io(error.to_string()))?;
+    pub fn acquire(state: &RootDir, wait: Duration) -> Result<WriteLock, LockError> {
+        let file = open_lock_file(state).map_err(LockError::Contained)?;
         let deadline = Instant::now() + wait;
         loop {
             // SAFETY: the descriptor is open for the lifetime of `file`; flock takes
@@ -7078,8 +7095,20 @@ impl WriteLock {
             if Instant::now() >= deadline {
                 return Err(LockError::Busy);
             }
-            std::thread::sleep(Duration::from_millis(25));
+            std::thread::sleep(POLL.min(deadline.saturating_duration_since(Instant::now())));
         }
+    }
+}
+
+/// Open the lock file below the state root, creating it privately when absent.
+fn open_lock_file(state: &RootDir) -> Result<File, ContainedError> {
+    let name = Path::new(LOCK_FILE);
+    match state.open_file(name, Access::ReadWrite) {
+        Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => match state.create_file(name, 0o600) {
+            Err(ContainedError::Io { kind: std::io::ErrorKind::AlreadyExists, .. }) => state.open_file(name, Access::ReadWrite),
+            created => created,
+        },
+        opened => opened,
     }
 }
 
@@ -7094,20 +7123,22 @@ impl Drop for WriteLock {
 }
 ```
 
-Add `pub mod lock;` to `lib.rs`. Rust opens files with `O_CLOEXEC`, which is the close-on-exec the spec
-asks for.
+Rust opens files with `O_CLOEXEC`, and so does `RootDir`, which is the close-on-exec the spec asks for. A
+second process that created the file between the failed open and the exclusive creation is handled by
+opening what it created.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters lock`
 
-Expected: 2 tests PASS, each in under 200 ms.
+Expected: 3 tests PASS, none waiting longer than the 30 ms it asks for. Run
+`cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add crates/vpt-adapters
-SKIP_AI_COMMIT=1 git commit -m "feat(ledger): the bounded advisory write lock"
+SKIP_AI_COMMIT=1 git commit -m "feat(ledger): the bounded advisory write lock below the state root"
 ```
 
 ______________________________________________________________________
