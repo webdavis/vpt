@@ -10051,150 +10051,350 @@ ______________________________________________________________________
 
 - Modify: `crates/vpt-application/src/ingest/candidate.rs`,
   `crates/vpt-application/src/ingest/publish.rs`
-- Test: `crates/vpt-adapters/tests/ingest_gates.rs`
+- Test: `crates/vpt-adapters/tests/support/fakes.rs`, `crates/vpt-adapters/tests/support/mod.rs`,
+  `crates/vpt-adapters/tests/ingest_gates.rs`
 
 **Interfaces:**
 
-- Consumes: `vpt_domain::sweep::{size_gate, rest_gate, SweepLimits, DeferralReason}`, `inspect`.
+- Consumes: `vpt_domain::sweep::{size_gate, rest_gate, SweepLimits, DeferralReason}`, `inspect`,
+  `RecorderStore::read_at`.
 
 - Produces: `Ingest::defer(&self, candidate: &Candidate, seen: Option<SeenRow>,`
-  `reason: DeferralReason, now: UtcInstant, report: &mut IngestReport) -> Result<(),` `IngestFailure>`
-  (records the deferral, raises the `deferred` event at the threshold, appends to `report.deferred`).
+  `reason: DeferralReason, now: UtcInstant, mode: &Mode, report: &mut IngestReport) -> Result<(),`
+  `IngestFailure>` (appends to `report.deferred`; outside a dry run records the deferral with a
+  saturating count and raises the `deferred` event exactly when the count crosses the threshold). Test
+  support in `support/fakes.rs`: `ProbeStore<'a>::new(inner: &'a VoiceMemosStore) -> ProbeStore`
+  implementing `RecorderStore` over the real store with `pub dataless: RefCell<Vec<String>>` (names
+  reported with `SF_DATALESS` set, and a panic if one is opened), `pub reads: Cell<u64>` (calls to
+  `read_at`), `pub grow_after_open: Cell<bool>` (the second `metadata` call reports one more byte),
+  `pub clone: Cell<CloneBehaviour>` with `CloneBehaviour::{Real, ByteCopy, Truncated, Exists}`.
 
 - [ ] **Step 1: Write the failing tests**
 
+`crates/vpt-adapters/tests/support/mod.rs` gains `pub mod fakes;` beside its `#![allow(dead_code)]`.
+`crates/vpt-adapters/tests/support/fakes.rs`:
+
 ```rust
-mod support;
+//! Recorder and archive doubles that delegate to the real adapters and inject
+//! one named failure or observation each.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::fs::File;
+use std::io::Write;
+use std::os::unix::fs::{FileExt, OpenOptionsExt};
 use std::path::Path;
-use support::{CAPTURED, Fixture, RecordingNotifier, RecordingTrash, clock};
-use vpt_application::ingest::Ingest;
-use vpt_application::ports::ledger::RecordingLedger;
-use vpt_application::ports::recorder::*;
-use vpt_domain::fixtures::m4a;
-use vpt_domain::notification::EventKind;
-use vpt_domain::sweep::DeferralReason;
+use vpt_adapters::voice_memos::VoiceMemosStore;
+use vpt_application::ports::{Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata, TitleLookup};
+use vpt_domain::container::ReadFailure;
+use vpt_domain::sweep::SF_DATALESS;
 
-/// A recorder that reports what a real store would, with one flag forced.
-struct DatalessStore<'a> {
-    inner: &'a dyn RecorderStore,
-    dataless: RefCell<Vec<String>>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CloneBehaviour {
+    Real,
+    ByteCopy,
+    Truncated,
+    Exists,
 }
 
-impl RecorderStore for DatalessStore<'_> {
+pub struct ProbeStore<'a> {
+    inner: &'a VoiceMemosStore,
+    pub dataless: RefCell<Vec<String>>,
+    pub reads: Cell<u64>,
+    pub grow_after_open: Cell<bool>,
+    pub metadata_calls: Cell<u32>,
+    pub clone: Cell<CloneBehaviour>,
+}
+
+impl<'a> ProbeStore<'a> {
+    pub fn new(inner: &'a VoiceMemosStore) -> ProbeStore<'a> {
+        ProbeStore {
+            inner,
+            dataless: RefCell::new(vec![]),
+            reads: Cell::new(0),
+            grow_after_open: Cell::new(false),
+            metadata_calls: Cell::new(0),
+            clone: Cell::new(CloneBehaviour::Real),
+        }
+    }
+
+    fn forced_dataless(&self, path: &Path) -> bool {
+        self.dataless.borrow().iter().any(|name| path.ends_with(name))
+    }
+}
+
+/// The whole source through the descriptor, shortened by `drop` bytes at the end.
+fn copy_bytes(source: &File, directory: &Path, name: &str, drop: usize) -> Result<(), CloneError> {
+    let size = usize::try_from(source.metadata().map_err(|e| CloneError::Io(e.to_string()))?.len()).expect("size");
+    let mut bytes = vec![0u8; size];
+    source.read_exact_at(&mut bytes, 0).map_err(|e| CloneError::Io(e.to_string()))?;
+    bytes.truncate(size.saturating_sub(drop));
+    let mut out = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(directory.join(name))
+        .map_err(|e| CloneError::Io(e.to_string()))?;
+    out.write_all(&bytes).map_err(|e| CloneError::Io(e.to_string()))
+}
+
+impl RecorderStore for ProbeStore<'_> {
+    type Handle = File;
+
     fn candidates(&self) -> Result<Vec<Candidate>, RecorderError> {
         let mut candidates = self.inner.candidates()?;
         for candidate in &mut candidates {
-            candidate.dataless = self.dataless.borrow().contains(&candidate.file_name);
+            if self.forced_dataless(&candidate.path) {
+                candidate.flags |= SF_DATALESS;
+            }
         }
         Ok(candidates)
     }
+
     fn candidate(&self, path: &Path) -> Result<Candidate, RecorderError> {
         self.inner.candidate(path)
     }
-    fn open(&self, path: &Path) -> Result<Box<dyn SourceHandle>, RecorderError> {
-        if self.dataless.borrow().iter().any(|name| path.ends_with(name)) {
-            panic!("a dataless entry was opened");
-        }
+
+    fn open(&self, path: &Path) -> Result<File, RecorderError> {
+        assert!(!self.forced_dataless(path), "a dataless entry was opened: {}", path.display());
         self.inner.open(path)
     }
-    fn titles(&self) -> Box<dyn TitleSource> {
-        self.inner.titles()
+
+    fn metadata(&self, handle: &File) -> Result<SourceMetadata, RecorderError> {
+        let mut metadata = self.inner.metadata(handle)?;
+        self.metadata_calls.set(self.metadata_calls.get() + 1);
+        if self.grow_after_open.get() && self.metadata_calls.get() >= 2 {
+            metadata.size += 1;
+        }
+        Ok(metadata)
     }
+
+    fn read_at(&self, handle: &File, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
+        self.reads.set(self.reads.get() + 1);
+        self.inner.read_at(handle, offset, buf)
+    }
+
+    fn clone_into(&self, handle: &File, directory: &Path, name: &str) -> Result<CloneKind, CloneError> {
+        match self.clone.get() {
+            CloneBehaviour::Real => self.inner.clone_into(handle, directory, name),
+            CloneBehaviour::ByteCopy => copy_bytes(handle, directory, name, 0).map(|()| CloneKind::ByteCopy),
+            CloneBehaviour::Truncated => copy_bytes(handle, directory, name, 12).map(|()| CloneKind::CopyOnWrite),
+            CloneBehaviour::Exists => Err(CloneError::Exists),
+        }
+    }
+
+    fn title(&self, file_name: &str) -> TitleLookup {
+        self.inner.title(file_name)
+    }
+
     fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)> {
         self.inner.subdirectory_counts()
     }
 }
+```
 
-#[test]
-fn a_dataless_entry_is_deferred_without_being_opened() {
-    let fixture = Fixture::new();
-    let source = fixture.add_recording("cloud.m4a", &m4a(CAPTURED, 1, b"x"));
-    let real = fixture.store();
-    let store = DatalessStore { inner: &real, dataless: RefCell::new(vec!["cloud.m4a".into()]) };
-    let (archive, ledger, settings) = (fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+`crates/vpt-adapters/tests/ingest_gates.rs`:
 
-    let report = ingest.run().expect("sweep");
+```rust
+mod support;
 
-    assert_eq!(report.deferred.len(), 1);
-    assert_eq!(report.deferred[0].reason, DeferralReason::Dataless);
-    assert_eq!(ledger.seen(&source).expect("seen").map(|row| (row.deferral_count, row.deferral_reason)), Some((1, Some(DeferralReason::Dataless))));
-    assert!(report.ingested.is_empty());
+use std::os::unix::fs::PermissionsExt;
+use support::fakes::{CloneBehaviour, ProbeStore};
+use support::{CAPTURED, Fixture, FixedClock, Parts, clock};
+use vpt_application::ports::{Archive, RecordingLedger};
+use vpt_application::{Ingest, Mode};
+use vpt_domain::fixtures::{box_of, m4a, mvhd_v1};
+use vpt_domain::notification::EventKind;
+use vpt_domain::sweep::DeferralReason;
+use vpt_domain::time::UtcInstant;
+
+fn probed(parts: &Parts, probe: &ProbeStore<'_>) -> vpt_application::IngestReport {
+    let ingest = Ingest {
+        recorder: probe,
+        archive: &parts.archive,
+        ledger: &parts.ledger,
+        clock: &parts.clock,
+        trash: &parts.trash,
+        notifier: &parts.notifier,
+        settings: &parts.settings,
+    };
+    ingest.run(&Mode::default()).expect("sweep")
 }
 
 #[test]
-fn a_truncated_download_is_deferred_as_an_invalid_container_and_retried_when_whole() {
+fn dataless_never_opens() {
+    let fixture = Fixture::new();
+    let source = fixture.add_recording("cloud.m4a", &m4a(CAPTURED, 1, b"x"));
+    let parts = fixture.parts();
+    let probe = ProbeStore::new(&parts.store);
+    probe.dataless.borrow_mut().push("cloud.m4a".into());
+
+    let report = probed(&parts, &probe);
+
+    assert_eq!(report.deferred, vec![vpt_application::Deferred { path: source.clone(), reason: DeferralReason::Dataless }]);
+    let row = parts.ledger.seen(&source).expect("seen").expect("row");
+    assert_eq!((row.deferral_count, row.deferral_reason), (1, Some(DeferralReason::Dataless)));
+    assert!(report.ingested.is_empty());
+    assert!(parts.archive.archived().expect("archived").is_empty());
+    assert!(parts.events().is_empty());
+}
+
+#[test]
+fn oversize_never_reads() {
+    let fixture = Fixture::new();
+    fixture.add_recording("big.m4a", &m4a(CAPTURED, 1, &[0u8; 4_096]));
+    let mut parts = fixture.parts();
+    parts.settings.max_audio_bytes = 1_000;
+    let probe = ProbeStore::new(&parts.store);
+
+    let report = probed(&parts, &probe);
+
+    assert_eq!(report.deferred[0].reason, DeferralReason::AudioTooLarge);
+    assert_eq!(probe.reads.get(), 0);
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+}
+
+#[test]
+fn a_truncated_download_is_deferred_then_not_at_rest_after_growing_then_ingested_when_still() {
     let fixture = Fixture::new();
     let whole = m4a(CAPTURED, 1, b"payload");
     let source = fixture.add_recording("a.m4a", &whole[..whole.len() - 12]);
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    let parts = fixture.parts();
 
-    let first = ingest.run().expect("first");
+    let first = parts.ingest().run(&Mode::default()).expect("first");
     assert_eq!(first.deferred[0].reason, DeferralReason::InvalidContainer);
-    assert!(archive.archived().expect("archived").is_empty(), "nothing is cloned before every gate passes");
+    assert!(parts.archive.archived().expect("archived").is_empty(), "nothing is cloned before every gate passes");
 
     fixture.add_recording("a.m4a", &whole);
-    let second = ingest.run().expect("second");
-    assert_eq!(second.ingested.len(), 1);
-    assert_eq!(ledger.seen(&source).expect("seen").map(|row| row.deferral_count), Some(0));
+    let second = parts.ingest().run(&Mode::default()).expect("second");
+    assert_eq!(second.deferred[0].reason, DeferralReason::NotAtRest, "the size moved since the last deferral");
+    assert!(second.ingested.is_empty());
+    assert_eq!(parts.ledger.seen(&source).expect("seen").map(|row| row.deferral_count), Some(2));
+
+    let third = parts.ingest().run(&Mode::default()).expect("third");
+    assert_eq!(third.ingested.len(), 1);
+    assert_eq!(parts.ledger.seen(&source).expect("seen").map(|row| (row.deferral_count, row.deferred_size)), Some((0, None)));
 }
 
 #[test]
 fn a_file_younger_than_the_quiet_period_is_not_at_rest() {
     let fixture = Fixture::new();
     let path = fixture.add_recording("fresh.m4a", &m4a(CAPTURED, 1, b"x"));
-    let now = std::time::SystemTime::now();
-    std::fs::File::options().write(true).open(&path).expect("open").set_times(std::fs::FileTimes::new().set_modified(now)).expect("mtime");
-    let (store, archive, ledger, settings) = (fixture.store(), fixture.archive(), fixture.ledger(), fixture.settings());
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let wall = support::FixedClock {
-        now: vpt_domain::time::UtcInstant { secs: now.duration_since(std::time::UNIX_EPOCH).expect("epoch").as_secs() as i64 },
-        offset: vpt_domain::time::UtcOffset { secs: 0 },
-    };
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &wall, trash: &trash, notifier: &notifier, settings: &settings };
+    fixture.set_mtime(&path, clock().now.secs - 10);
+    let parts = fixture.parts();
 
-    let report = ingest.run().expect("sweep");
+    let report = parts.ingest().run(&Mode::default()).expect("sweep");
 
     assert_eq!(report.deferred[0].reason, DeferralReason::NotAtRest);
+    assert!(report.ingested.is_empty());
 }
 
 #[test]
-fn an_oversized_entry_is_deferred_before_any_content_is_read() {
-    let fixture = Fixture::new();
-    fixture.add_recording("big.m4a", &m4a(CAPTURED, 1, &[0u8; 4_096]));
-    let (store, archive, ledger) = (fixture.store(), fixture.archive(), fixture.ledger());
-    let mut settings = fixture.settings();
-    settings.max_audio_bytes = 1_000;
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
-
-    let report = ingest.run().expect("sweep");
-
-    assert_eq!(report.deferred[0].reason, DeferralReason::AudioTooLarge);
-}
-
-#[test]
-fn the_deferred_event_is_raised_once_at_the_threshold() {
+fn the_deferred_event_is_raised_once_when_the_count_crosses_the_threshold() {
     let fixture = Fixture::new();
     let whole = m4a(CAPTURED, 1, b"payload");
-    fixture.add_recording("a.m4a", &whole[..whole.len() - 12]);
-    let (store, archive, ledger) = (fixture.store(), fixture.archive(), fixture.ledger());
-    let mut settings = fixture.settings();
-    settings.deferral_page_threshold = 2;
-    let (trash, notifier) = (RecordingTrash::new(fixture.temp.path().join("trash")), RecordingNotifier::default());
-    let ingest = Ingest { recorder: &store, archive: &archive, ledger: &ledger, clock: &clock(), trash: &trash, notifier: &notifier, settings: &settings };
+    let source = fixture.add_recording("a.m4a", &whole[..whole.len() - 12]);
+    let mut parts = fixture.parts();
+    parts.settings.deferral_page_threshold = 2;
 
     for _ in 0..3 {
-        ingest.run().expect("sweep");
+        parts.ingest().run(&Mode::default()).expect("sweep");
     }
 
-    let events: Vec<_> = notifier.0.borrow().iter().map(|n| n.event).collect();
-    assert_eq!(events, vec![EventKind::Deferred]);
+    assert_eq!(parts.events(), vec![EventKind::Deferred]);
+    assert_eq!(parts.ledger.seen(&source).expect("seen").map(|row| row.deferral_count), Some(3));
+}
+
+#[test]
+fn an_edited_recording_is_deferred_while_fresh_then_ingested_as_a_second_recording() {
+    let fixture = Fixture::new();
+    let source = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"first take"));
+    let parts = fixture.parts();
+    let first = parts.ingest().run(&Mode::default()).expect("first");
+    let original = first.ingested[0].id.clone();
+    std::fs::write(&source, m4a(CAPTURED + 30, 2, b"second take")).expect("edit");
+    fixture.set_mtime(&source, clock().now.secs - 5);
+
+    let second = parts.ingest().run(&Mode::default()).expect("second");
+    assert_eq!(second.deferred[0].reason, DeferralReason::NotAtRest);
+    assert_eq!(parts.ledger.recordings().expect("list").len(), 1);
+
+    let later = Parts { clock: FixedClock { now: UtcInstant { secs: clock().now.secs + 60 }, ..clock() }, ..fixture.parts() };
+    let third = later.ingest().run(&Mode::default()).expect("third");
+    assert_eq!(third.ingested.len(), 1);
+    assert_ne!(third.ingested[0].id, original);
+    assert_eq!(later.ledger.recordings().expect("list").len(), 2);
+    assert_eq!(later.ledger.seen(&source).expect("seen").and_then(|row| row.recording), Some(third.ingested[0].id.clone()));
+}
+
+#[test]
+fn source_change_discards_stage() {
+    let fixture = Fixture::new();
+    let source = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"moving"));
+    let parts = fixture.parts();
+    let probe = ProbeStore::new(&parts.store);
+    probe.grow_after_open.set(true);
+
+    let report = probed(&parts, &probe);
+
+    assert_eq!(report.deferred[0].reason, DeferralReason::ChangedDuringRead);
+    assert_eq!(parts.trash.moved.borrow().len(), 1, "the staged clone went to the Trash");
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert!(parts.archive.archived().expect("archived").is_empty());
+    assert_eq!(parts.ledger.seen(&source).expect("seen").and_then(|row| row.recording), None);
+    assert!(parts.events().is_empty());
+}
+
+#[test]
+fn invalid_stage_is_trashed() {
+    let fixture = Fixture::new();
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"whole at the source"));
+    let parts = fixture.parts();
+    let probe = ProbeStore::new(&parts.store);
+    probe.clone.set(CloneBehaviour::Truncated);
+
+    let report = probed(&parts, &probe);
+
+    assert_eq!(report.deferred[0].reason, DeferralReason::InvalidContainer);
+    assert_eq!(parts.trash.moved.borrow().len(), 1);
+    assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
+    assert!(parts.ledger.recordings().expect("list").is_empty());
+    assert!(parts.events().is_empty());
+}
+
+#[test]
+fn absent_trash_preserves_private_stage() {
+    let fixture = Fixture::new();
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"whole at the source"));
+    let parts = fixture.parts();
+    parts.trash.absent.set(true);
+    let probe = ProbeStore::new(&parts.store);
+    probe.clone.set(CloneBehaviour::Truncated);
+
+    let report = probed(&parts, &probe);
+
+    assert_eq!(report.deferred[0].reason, DeferralReason::InvalidContainer);
+    let leftovers = parts.archive.staged_leftovers().expect("leftovers");
+    assert_eq!(leftovers.len(), 1);
+    assert_eq!(std::fs::metadata(&leftovers[0]).expect("meta").permissions().mode() & 0o777, 0o600);
+    assert!(report.log.iter().any(|line| line.contains("cleanup pending")), "{:?}", report.log);
+    assert!(parts.ledger.recordings().expect("list").is_empty());
+    assert!(parts.events().is_empty());
+}
+
+#[test]
+fn a_capture_instant_with_no_four_digit_year_is_deferred_as_an_invalid_container() {
+    let fixture = Fixture::new();
+    let mut bytes = box_of(b"ftyp", b"M4A ");
+    bytes.extend(box_of(b"mdat", b"audio"));
+    bytes.extend(box_of(b"moov", &mvhd_v1(253_402_300_800, 1)));
+    fixture.add_recording("far.m4a", &bytes);
+    let parts = fixture.parts();
+
+    let report = parts.ingest().run(&Mode::default()).expect("sweep");
+
+    assert_eq!(report.deferred[0].reason, DeferralReason::InvalidContainer);
+    assert_eq!(parts.trash.moved.borrow().len(), 1);
+    assert!(parts.ledger.recordings().expect("list").is_empty());
 }
 ```
 
@@ -10202,80 +10402,78 @@ fn the_deferred_event_is_raised_once_at_the_threshold() {
 
 Run: `cargo test -p vpt-adapters --test ingest_gates`
 
-Expected: the dataless test PANICS ("a dataless entry was opened"); the container test FAILS with
-`Archive("staged container invalid ...")` as an error rather than a deferral; the rest and size tests
-FAIL because the entries are ingested; the threshold test FAILS with no events.
+Expected: `dataless_never_opens` PANICS in the probe (the entry is opened); `oversize_never_reads`, the
+truncated-download test, the quiet-period test and the edited-recording test FAIL because the entries are
+ingested or fail outright; the threshold test FAILS with no events; `source_change_discards_stage` and
+`invalid_stage_is_trashed` FAIL with a `Recorder` or `Archive` error where a deferral is expected; the
+absent-trash and far-future tests FAIL the same way.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-Replace `process` in `crates/vpt-application/src/ingest/candidate.rs` and add `defer`:
+Replace `process` in `crates/vpt-application/src/ingest/candidate.rs` and add `defer` to the same `impl`
+block:
 
 ```rust
-use vpt_domain::container::inspect;
-use vpt_domain::notification::{EventKind, Notification};
-use vpt_domain::sweep::{CandidateFacts, DeferralReason, PreOpen, SeenFacts, SweepLimits, pre_open, rest_gate, size_gate};
-
-impl Ingest<'_> {
-    pub(super) fn process(
-        &self,
-        candidate: &Candidate,
-        titles: Option<&dyn TitleSource>,
-        report: &mut IngestReport,
-    ) -> Result<(), IngestFailure> {
+    pub(super) fn process(&self, candidate: &Candidate, mode: &Mode, report: &mut IngestReport) -> Result<(), IngestFailure> {
         let now = self.clock.now();
         let seen = self.ledger.seen(&candidate.path).map_err(IngestFailure::Ledger)?;
-        let facts = CandidateFacts { size: candidate.size, mtime: candidate.mtime, dataless: candidate.dataless };
+        let facts = CandidateFacts { size: candidate.size, mtime: candidate.mtime, flags: candidate.flags };
         let seen_facts = seen.as_ref().map(|row| SeenFacts {
             size: row.size,
             mtime: row.mtime,
-            ingested: row.recording.is_some(),
+            ingested: row.recording.is_some() && row.deferral_reason.is_none(),
             deferred_size: row.deferred_size,
         });
-        match pre_open(&facts, seen_facts.as_ref()) {
-            PreOpen::Dataless => return self.defer(candidate, seen, DeferralReason::Dataless, now, report),
-            PreOpen::Unchanged => {
-                report.skipped += 1;
-                return Ok(());
-            }
-            PreOpen::Open => {}
-        }
-        let mut handle = match self.recorder.open(&candidate.path) {
-            Ok(handle) => handle,
-            Err(RecorderError::NotRegular(_)) => return self.defer(candidate, seen, DeferralReason::InvalidContainer, now, report),
-            Err(error) => return Err(IngestFailure::Recorder(format!("{error:?}"))),
+        let seen = match pre_open(&facts, seen_facts.as_ref()) {
+            PreOpen::Dataless => return self.defer(candidate, seen, DeferralReason::Dataless, now, mode, report),
+            PreOpen::Unchanged => match seen {
+                Some(row) => return self.unchanged(row, now, mode, report),
+                None => None,
+            },
+            PreOpen::Open => seen,
         };
-        let metadata = handle.metadata().map_err(|error| IngestFailure::Recorder(format!("{error:?}")))?;
+        let handle = self.recorder.open(&candidate.path).map_err(recorder_failure)?;
+        let metadata = self.recorder.metadata(&handle).map_err(recorder_failure)?;
         let limits = SweepLimits { max_audio_bytes: self.settings.max_audio_bytes, quiet_period_secs: self.settings.quiet_period_secs };
         if let Err(reason) = size_gate(metadata.size, &limits) {
-            return self.defer(candidate, seen, reason, now, report);
+            return self.defer(candidate, seen, reason, now, mode, report);
         }
-        if inspect(&mut *handle).is_err() {
-            return self.defer(candidate, seen, DeferralReason::InvalidContainer, now, report);
+        if inspect(metadata.size, |offset, buf| self.recorder.read_at(&handle, offset, buf)).is_err() {
+            return self.defer(candidate, seen, DeferralReason::InvalidContainer, now, mode, report);
         }
         if let Err(reason) = rest_gate(metadata.mtime, metadata.size, now, seen_facts.as_ref(), &limits) {
-            return self.defer(candidate, seen, reason, now, report);
+            return self.defer(candidate, seen, reason, now, mode, report);
         }
-        self.stage_and_publish(candidate, &mut *handle, &metadata, seen, titles, now, report)
+        self.stage_and_publish(candidate, &handle, &metadata, seen, now, mode, report)
     }
 
+    /// Record one deferral and page exactly when the count crosses the threshold.
     pub(super) fn defer(
         &self,
         candidate: &Candidate,
         seen: Option<SeenRow>,
         reason: DeferralReason,
         now: UtcInstant,
+        mode: &Mode,
         report: &mut IngestReport,
     ) -> Result<(), IngestFailure> {
+        report.deferred.push(super::Deferred { path: candidate.path.clone(), reason });
+        if mode.dry_run {
+            return Ok(());
+        }
         let mut row = seen.unwrap_or_else(|| fresh_seen(candidate, now));
         row.size = candidate.size;
         row.mtime = candidate.mtime;
-        row.dataless = candidate.dataless;
+        row.flags = candidate.flags;
         row.last_seen = now;
-        row.deferral_count += 1;
+        row.source_gone_at = None;
+        let previous = row.deferral_count;
+        row.deferral_count = previous.saturating_add(1);
         row.deferral_reason = Some(reason);
         row.deferred_size = Some(candidate.size);
         self.ledger.record_seen(&row).map_err(IngestFailure::Ledger)?;
-        if row.deferral_count == self.settings.deferral_page_threshold {
+        let threshold = self.settings.deferral_page_threshold;
+        if previous < threshold && row.deferral_count >= threshold {
             self.notifier.deliver(&Notification::attention(
                 EventKind::Deferred,
                 None,
@@ -10284,40 +10482,51 @@ impl Ingest<'_> {
                 now,
             ));
         }
-        report.deferred.push(super::Deferred { path: candidate.path.clone(), reason });
         Ok(())
     }
-}
 ```
 
-with `use crate::ports::recorder::RecorderError;` added to the imports. In `publish.rs`, the two staged
-gates become deferrals instead of failures. Replace the `after != *metadata` block and the container
-line:
+with these imports in `candidate.rs` replacing the earlier `vpt_domain::sweep` line:
 
 ```rust
-        if after != *metadata {
-            self.discard(&staged.path, report);
-            return self.defer(candidate, seen, DeferralReason::ChangedDuringRead, now, report);
-        }
-        let mut reader = self.archive.open(&staged.path).map_err(archive_failure)?;
-        let container = match inspect(&mut *reader) {
-            Ok(container) => container,
-            Err(_) => {
-                drop(reader);
-                self.discard(&staged.path, report);
-                return self.defer(candidate, seen, DeferralReason::InvalidContainer, now, report);
-            }
-        };
-        drop(reader);
+use vpt_domain::container::inspect;
+use vpt_domain::notification::{EventKind, Notification};
+use vpt_domain::sweep::{CandidateFacts, DeferralReason, PreOpen, SeenFacts, SweepLimits, pre_open, rest_gate, size_gate};
 ```
 
-with `use vpt_domain::sweep::DeferralReason;` imported.
+In `publish.rs` the two staged gates and the identity become deferrals. Replace the block from
+`let after = ...` to the `let Ok(id) = ...` binding with:
+
+```rust
+        let after = self.owned(&staged.path, self.recorder.metadata(handle).map_err(recorder_failure), report)?;
+        if after != *metadata {
+            self.discard(&staged.path, report);
+            return self.defer(candidate, seen, DeferralReason::ChangedDuringRead, now, mode, report);
+        }
+        let container = match self.owned(&staged.path, self.inspect_archive(&staged.path), report)? {
+            Ok(container) => container,
+            Err(_) => {
+                self.discard(&staged.path, report);
+                return self.defer(candidate, seen, DeferralReason::InvalidContainer, now, mode, report);
+            }
+        };
+        let offset = self.clock.offset_at(container.creation_time);
+        let Ok(id) = RecordingId::derive(container.creation_time, offset, &staged.digest) else {
+            self.discard(&staged.path, report);
+            return self.defer(candidate, seen, DeferralReason::InvalidContainer, now, mode, report);
+        };
+```
+
+delete the `let _ = mode;` line, and add `use vpt_domain::sweep::DeferralReason;` to its imports. A
+capture instant whose local year has no four-digit form is the container's fault, so it defers as
+`invalid_container` (spec section 4.3 derives the identity from the container alone).
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters --test ingest_gates --test ingest_sweep`
 
-Expected: all 8 PASS.
+Expected: all 14 PASS. Run `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`
+and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
