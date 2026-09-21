@@ -4003,13 +4003,20 @@ ______________________________________________________________________
 - Produces: `vpt_domain::time::{UtcInstant { pub secs: i64 }, UtcOffset { pub secs: i32 },`
   `FileTime { pub secs: i64, pub nanos: u32 }, Civil { year, month, day, hour, minute,` `second }}` with
   `UtcInstant::rfc3339(&self) -> String`, `UtcInstant::rfc3339_with(&self, offset: UtcOffset) -> String`,
-  `UtcInstant::civil(&self, offset: UtcOffset) -> Civil`, `UtcOffset::label(&self) -> String`;
-  `vpt_domain::digest::Sha256Digest(pub [u8; 32])` with `hex()`, `hash12()`, `hash8()`,
-  `from_hex(&str) -> Option<Sha256Digest>`.
+  `UtcInstant::civil(&self, offset: UtcOffset) -> Civil`, `UtcOffset::label(&self) -> String`,
+  `Civil::instant(self, offset: UtcOffset) -> Option<UtcInstant>` (None when the instant leaves `i64`),
+  `Civil::is_valid(self) -> bool` (Gregorian month, day and leap-year rules and the hour, minute and
+  second bounds), `FileTime::age_secs(self, now: UtcInstant) -> i64` (whole seconds, nanoseconds counted,
+  saturating at the `i64` bounds); `vpt_domain::digest::Sha256Digest(pub [u8; 32])` with `hex()`,
+  `hash12()`, `hash8()`, `from_hex(&str) -> Option<Sha256Digest>`. Civil arithmetic uses `i128`
+  intermediates, so every `i64` instant plus any offset converts.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-domain/src/time.rs`, test section:
+Declare the modules first: `crates/vpt-domain/src/lib.rs` gains `pub mod digest;` and `pub mod time;`
+beside `duration`, `layout` and `retention`. Each new file starts as its test module alone.
+
+`crates/vpt-domain/src/time.rs`:
 
 ```rust
 #[cfg(test)]
@@ -4023,7 +4030,7 @@ mod tests {
 
     #[test]
     fn an_offset_shifts_the_civil_time_and_is_printed_with_its_sign() {
-        let captured = UtcInstant { secs: 1_787_690_856 };
+        let captured = UtcInstant { secs: 1_787_604_456 };
         assert_eq!(captured.rfc3339(), "2026-08-24T20:47:36Z");
         assert_eq!(captured.rfc3339_with(UtcOffset { secs: -21_600 }), "2026-08-24T14:47:36-06:00");
         assert_eq!(captured.rfc3339_with(UtcOffset { secs: 19_800 }), "2026-08-25T02:17:36+05:30");
@@ -4036,14 +4043,49 @@ mod tests {
     }
 
     #[test]
-    fn a_file_time_ages_by_whole_seconds() {
+    fn a_civil_time_names_the_instant_it_came_from() {
+        let captured = UtcInstant { secs: 1_787_604_456 };
+        for offset in [UtcOffset { secs: -21_600 }, UtcOffset { secs: 19_800 }, UtcOffset { secs: 0 }] {
+            assert_eq!(captured.civil(offset).instant(offset), Some(captured), "{}", offset.label());
+        }
+    }
+
+    #[test]
+    fn the_extremes_of_an_i64_instant_convert_without_overflow() {
+        let late = UtcInstant { secs: i64::MAX }.civil(UtcOffset { secs: 50_400 });
+        let early = UtcInstant { secs: i64::MIN }.civil(UtcOffset { secs: -50_400 });
+        assert!(late.year > early.year);
+        assert_eq!(late.instant(UtcOffset { secs: 50_400 }), Some(UtcInstant { secs: i64::MAX }));
+        assert_eq!(late.instant(UtcOffset { secs: -50_400 }), None);
+    }
+
+    #[test]
+    fn the_calendar_decides_which_civil_times_exist() {
+        let base = Civil { year: 2024, month: 2, day: 29, hour: 23, minute: 59, second: 59 };
+        assert!(base.is_valid());
+        assert!(!Civil { year: 2023, ..base }.is_valid());
+        assert!(Civil { year: 2000, ..base }.is_valid());
+        assert!(!Civil { year: 1900, ..base }.is_valid());
+        assert!(!Civil { month: 4, day: 31, ..base }.is_valid());
+        assert!(!Civil { month: 0, ..base }.is_valid());
+        assert!(!Civil { month: 13, ..base }.is_valid());
+        assert!(!Civil { day: 0, ..base }.is_valid());
+        assert!(!Civil { hour: 24, ..base }.is_valid());
+        assert!(!Civil { minute: 60, ..base }.is_valid());
+        assert!(!Civil { second: 60, ..base }.is_valid());
+    }
+
+    #[test]
+    fn a_file_time_ages_by_whole_seconds_counting_its_nanoseconds() {
         let mtime = FileTime { secs: 100, nanos: 999_999_999 };
-        assert_eq!(mtime.age_secs(UtcInstant { secs: 130 }), 30);
+        assert_eq!(mtime.age_secs(UtcInstant { secs: 130 }), 29);
+        assert_eq!(FileTime { secs: 100, nanos: 0 }.age_secs(UtcInstant { secs: 130 }), 30);
+        assert_eq!(FileTime { secs: i64::MIN, nanos: 1 }.age_secs(UtcInstant { secs: i64::MAX }), i64::MAX);
     }
 }
 ```
 
-`crates/vpt-domain/src/digest.rs`, test section:
+`crates/vpt-domain/src/digest.rs`:
 
 ```rust
 #[cfg(test)]
@@ -4072,17 +4114,20 @@ mod tests {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p vpt-domain time digest`
+Run: `cargo test -p vpt-domain`
 
-Expected: compile errors naming the missing types.
+Expected: the build of the crate's tests fails with `cannot find` for `UtcInstant`, `UtcOffset`,
+`FileTime`, `Civil` and `Sha256Digest`. A run that succeeds does not satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-`crates/vpt-domain/src/time.rs`:
+`crates/vpt-domain/src/time.rs`, above its test module:
 
 ```rust
 //! Instants, offsets and file times, with the civil-date arithmetic the
 //! identity and the notes need. No clock lives here.
+
+const NANOS_PER_SECOND: i128 = 1_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UtcInstant {
@@ -4112,7 +4157,7 @@ pub struct Civil {
 
 impl UtcInstant {
     pub fn civil(self, offset: UtcOffset) -> Civil {
-        let local = self.secs + i64::from(offset.secs);
+        let local = i128::from(self.secs) + i128::from(offset.secs);
         let days = local.div_euclid(86_400);
         let seconds = local.rem_euclid(86_400);
         let (year, month, day) = civil_from_days(days);
@@ -4148,14 +4193,42 @@ impl UtcOffset {
     }
 }
 
+impl Civil {
+    /// The instant this civil time names when read at `offset`.
+    pub fn instant(self, offset: UtcOffset) -> Option<UtcInstant> {
+        let seconds = i128::from(self.hour) * 3_600 + i128::from(self.minute) * 60 + i128::from(self.second);
+        let local = days_from_civil(self.year, self.month, self.day) * 86_400 + seconds;
+        i64::try_from(local - i128::from(offset.secs)).ok().map(|secs| UtcInstant { secs })
+    }
+
+    pub fn is_valid(self) -> bool {
+        (1..=12).contains(&self.month)
+            && (1..=days_in_month(self.year, self.month)).contains(&self.day)
+            && self.hour < 24
+            && self.minute < 60
+            && self.second < 60
+    }
+}
+
 impl FileTime {
+    /// Whole seconds from this file time to `now`, the nanoseconds counted.
     pub fn age_secs(self, now: UtcInstant) -> i64 {
-        now.secs - self.secs
+        let elapsed = (i128::from(now.secs) - i128::from(self.secs)) * NANOS_PER_SECOND - i128::from(self.nanos);
+        elapsed.div_euclid(NANOS_PER_SECOND).clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64
+    }
+}
+
+fn days_in_month(year: i64, month: u32) -> u32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+        _ => 28,
     }
 }
 
 /// Days since 1970-01-01 to a proleptic Gregorian date (Howard Hinnant's algorithm).
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+fn civil_from_days(days: i128) -> (i64, u32, u32) {
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097);
@@ -4165,11 +4238,23 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let mp = (5 * doy + 2) / 153;
     let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
     let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    (if m <= 2 { y + 1 } else { y }, m, d)
+    let year = if m <= 2 { y + 1 } else { y };
+    (i64::try_from(year).expect("an i64 instant spans fewer than i64 years"), m, d)
+}
+
+/// A proleptic Gregorian date to days since 1970-01-01 (the inverse of `civil_from_days`).
+fn days_from_civil(year: i64, month: u32, day: u32) -> i128 {
+    let y = i128::from(year) - i128::from(month <= 2);
+    let era = y.div_euclid(400);
+    let yoe = y.rem_euclid(400);
+    let m = i128::from(month);
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + i128::from(day) - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
 }
 ```
 
-`crates/vpt-domain/src/digest.rs`:
+`crates/vpt-domain/src/digest.rs`, above its test module:
 
 ```rust
 //! A SHA-256 digest and the prefixes the identity and note names use.
@@ -4209,13 +4294,12 @@ impl std::fmt::Debug for Sha256Digest {
 }
 ```
 
-`crates/vpt-domain/src/lib.rs` lists `digest`, `duration`, `layout`, `retention`, `time`.
-
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-domain`
 
-Expected: all PASS.
+Expected: the nine tests of `time` and `digest` PASS alongside the earlier domain tests. Run
+`cargo clippy -p vpt-domain --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
