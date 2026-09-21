@@ -406,13 +406,13 @@ leaves every entry's size, mtime and flags unchanged.
 The database, `CloudRecordings.db` beside `Recordings/`, is used for exactly one thing: the human title
 (`ZCUSTOMLABEL` keyed by `ZPATH`). It is read from a private copy: the database plus its `-wal` and
 `-shm` files are copied over the fixed paths under `<state_dir>/title-copy/` (directory 0700, files
-0600), overwritten in place on every sweep and never removed, and that copy is what is opened and read.
-The live database is never opened, because a read-only open still lets SQLite create journal files inside
-Apple's directory. A copy that fails, a schema that has changed, or a join that finds no row yields
-`title_source = "unavailable"` and the recording is ingested untitled. `[source] read_titles = false`
-skips the database entirely. The database supplies the title and nothing else: duration and ingestion
-eligibility come from the audio container alone, and nothing read from the database ever defers or
-refuses a recording.
+0600), overwritten in place on every sweep that is not a dry run and never removed, and that copy is what
+is opened and read. The live database is never opened, because a read-only open still lets SQLite create
+journal files inside Apple's directory. A copy that fails, a schema that has changed, or a join that
+finds no row yields `title_source = "unavailable"` and the recording is ingested untitled.
+`[source] read_titles = false` skips the database entirely. The database supplies the title and nothing
+else: duration and ingestion eligibility come from the audio container alone, and nothing read from the
+database ever defers or refuses a recording.
 
 ### 5.2 The sweep
 
@@ -494,8 +494,10 @@ path and takes nothing.
 | a sync of the staged file or the archive directory fails | abort, exit 1, no row recorded                | `ingest_failed`                                                                             |
 | audio store parent missing                               | refuse at startup, exit 2                     | `config_refused`                                                                            |
 
-`vpt ingest --dry-run` runs every gate and writes nothing durable: no clone, no row, no event (the title
-copy may be refreshed). `--once <path>` ingests exactly one file by path, gates included.
+`vpt ingest --dry-run` runs every gate and writes nothing durable: no clone, no row, no event and no
+title copy; it reports the title from accepted ledger state when the recording is already known and
+`title_source = "unavailable"` otherwise, and no gate depends on a title. `--once <path>` ingests exactly
+one file by path, gates included.
 
 ### 5.6 What stage 1 does not do
 
@@ -1278,7 +1280,7 @@ reports code 3 and nothing else does.
 directory creation, ledger write, artifact write, notification or Trash move. `run`, `transcribe` and
 `synthesize` spawn no engine and no agent command under it and report the operations they would perform;
 `brief --dry-run` may collect configured read-only context and prints the pack it would write;
-`ingest --dry-run` may refresh the title copy and creates no durable state.
+`ingest --dry-run` neither creates nor refreshes the title copy and creates no durable state.
 
 ## 10. Configuration
 
