@@ -2347,7 +2347,6 @@ pub use settings::{DEFAULT_HOME, from_table};
 
 `crates/vpt-adapters/src/lib.rs` also gains `pub use config::{RootError, Roots};`.
 
-
 Each new file starts as its test module alone. `crates/vpt-domain/src/layout.rs`:
 
 ```rust
@@ -3179,6 +3178,7 @@ writes or hands its path to the helper.
 - Consumes: `config::{RootError, Roots}` and its private `private_dir(path: &Path, key: &str) -> Result<(), RootError>` creator from Task 5.
 
 - Produces: descriptor-relative creation behind `Roots::create_state_dir` and `Roots::create_leaves`; links introduced after resolution return `RootError::PathEscape { key }`.
+
 - Produces, re-exported from `vpt_adapters`:
   `ContainedError::{Escape { root: PathBuf, path: PathBuf }, NotRegular(PathBuf),`
   `NotADirectory(PathBuf),` `Io { path: PathBuf, kind: std::io::ErrorKind }}`;
@@ -3368,7 +3368,6 @@ fn reading_a_subdirectory_creates_nothing_and_refuses_a_link() {
     assert!(!root.path().join("missing").exists());
 }
 ```
-
 
 Append to the existing private tests in `config/roots.rs`:
 
@@ -6189,7 +6188,6 @@ pub use sqlite::{OpenError, SCHEMA_VERSION, SqliteLedger};
 ```
 
 `crates/vpt-adapters/src/lib.rs` adds `pub use ledger::MemoryLedger;`.
-
 
 `crates/vpt-adapters/src/ledger/sqlite/mod.rs` gains `mod journal;` and `mod recordings;` beside
 `mod migrations;`, both files empty for now. `crates/vpt-adapters/src/ledger/contract.rs`:
@@ -12249,19 +12247,23 @@ ______________________________________________________________________
   `Trash::trash(&self, path: &Path) -> Result<PathBuf, TrashError>` and
   `Trash::take_diagnostics(&self) -> Vec<String>`;
   `TrashError::{HelperAbsent, HelperVersion { found: u32 }, Failed(String), Unknown(String)}`.
+
 - Consumes: `config::load_file(path: &Path) -> Result<toml::Table, ConfigError>`,
   `config::from_table(table: &toml::Table, home: &Path) -> Result<Settings, ConfigError>`;
   `Settings::helper_path: PathBuf`;
   `Environment::{config_path(&self) -> PathBuf, home_dir(&self) -> PathBuf}`;
   `Invocation::config: Option<PathBuf>`.
+
 - Produces protocol root exports: `Limits { pub bytes: usize, pub depth: usize, pub text_chars: usize, pub array_len: usize }`,
   `Limits::incoming() -> Limits`, `LimitViolation::{Bytes(usize), Depth(usize), Text(usize), Array(usize), Syntax(String)}`,
   `read_bounded(bytes: &[u8], limits: &Limits) -> Result<serde_json::Value, LimitViolation>`.
   Check depth before descending; refuse array entry `array_len + 1` before decoding or appending it;
   validate decoded strings and keys before retaining them; finish with `Deserializer::end()`.
+
 - Produces protocol root exports: `HELPER_SCHEMA: &str = "vpt.helper/1"`,
   `HelperVersion { pub schema: String, pub version: String }`, `HelperVersion::major(&self) -> Option<u32>`,
   `Posted { pub posted: bool }`, `Trashed { pub trashed: String }`, each reply implementing `Deserialize`.
+
 - Produces adapter root exports: `HelperClient::new(path: PathBuf) -> HelperClient`,
   `HelperClient::with_deadline(self, deadline: Duration) -> HelperClient`,
   `HelperClient::version(&self) -> Result<String, HelperError>`,
@@ -12275,10 +12277,12 @@ ______________________________________________________________________
   The first notify or Trash request validates the configured helper. Only successful compatibility is
   cached. Unknown additive field names enter the drainable diagnostics queue; values never do.
   A caller keeps the client and test environment fixed for one command.
+
 - Produces `commands::version::{run(environment: &Environment, config: Option<&Path>) -> Outcome, document(helper_version: Option<&str>) -> serde_json::Value, human(helper_version: Option<&str>) -> String}`.
   Version uses the selected configuration, including `--config` and `VPT_CONFIG`; only an absent
   configuration permits the default `vpt-macos`. An unreadable or invalid existing configuration, or
   an unidentified selected helper, produces `helper_version: null` with exit 0.
+
 - Test support: `FAKE_ENGINE: &str`, `Sandbox::install_fake_helper(&self)`,
   `Sandbox::fake_log(&self) -> PathBuf`. Every integration call selects the fake or a missing sandbox path.
 
@@ -13429,14 +13433,17 @@ ______________________________________________________________________
 - Consumes: `Notification { pub event: EventKind, pub state: EventState, pub recording: Option<RecordingId>, pub detail: String, pub counts: Vec<(String, u64)>, pub paths: Vec<(String, PathBuf)>, pub occurred_at: UtcInstant }`;
   `EventKind::as_str(self) -> &'static str`, `EventState::as_str(self) -> &'static str`,
   `RecordingId::as_str(&self) -> &str`, `UtcInstant::rfc3339(self) -> String`.
+
 - Consumes: `Notifier::deliver(&self, notification: &Notification) -> DeliveryOutcome`,
   `Notifier::take_diagnostics(&self) -> Vec<String>`,
   `DeliveryOutcome::{Delivered, Suppressed, Failed(String)}`;
   `HelperClient::notify_with_env(&self, title: &str, body: &str, env: &[(&str, &str)]) -> Result<(), HelperError>`,
   `HelperClient::take_diagnostics(&self) -> Vec<String>`;
   `spawn::run_with_env(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize, env: &[(&str, &str)]) -> Result<spawn::Outcome, spawn::SpawnError>`.
+
 - Produces protocol root exports: `EVENT_SCHEMA: &str = "vpt.event/1"`,
   `EventDocument { pub schema: String, pub event: String, pub state: String, pub recording: Option<String>, pub detail: String, pub counts: serde_json::Map<String, serde_json::Value>, pub paths: serde_json::Map<String, serde_json::Value>, pub occurred_at: String }`, implementing `Serialize`.
+
 - Produces adapter root exports:
   `notification_document(notification: &Notification) -> EventDocument`,
   `notification_tokens(notification: &Notification, argv: &[String]) -> Vec<String>`,
@@ -14127,45 +14134,42 @@ ______________________________________________________________________
   `Roots::{create_state_dir(&self) -> Result<(), RootError>, create_leaves(&self) -> Result<(), RootError>}`;
   `RootDir::open(path: &Path) -> Result<RootDir, ContainedError>`;
   `WriteLock::acquire(state: &RootDir, wait: Duration) -> Result<WriteLock, LockError>`;
-  `SqliteLedger::{open(state: &RootDir) -> Result<SqliteLedger, OpenError>,
-  open_read_only(state: &Path) -> Result<Option<SqliteLedger>, OpenError>}`;
-  `VoiceMemosStore::{open(path: &Path) -> Result<VoiceMemosStore, ContainedError>,
-  with_titles(self, state: PathBuf, refresh: bool) -> VoiceMemosStore}`;
+  `SqliteLedger::{open(state: &RootDir) -> Result<SqliteLedger, OpenError>, open_read_only(state: &Path) -> Result<Option<SqliteLedger>, OpenError>}`;
+  `VoiceMemosStore::{open(path: &Path) -> Result<VoiceMemosStore, ContainedError>, with_titles(self, state: PathBuf, refresh: bool) -> VoiceMemosStore}`;
   `ClonefileArchive::open_read_only(path: &Path) -> Result<ClonefileArchive, ContainedError>`;
   `FilesystemStores::open_read_only(paths: &[PathBuf]) -> Result<FilesystemStores, ContainedError>`;
   `HelperClient::{new(path: PathBuf) -> HelperClient, take_diagnostics(&self) -> Vec<String>}`.
+
 - Consumes application capabilities:
-  `repair_publications<J: PublicationJournal, S: Stores>(journal: &J, stores: &S,
-  render: impl Fn(&Path) -> Option<Vec<u8>>) -> Result<RepairReport, RepairError>`;
+  `repair_publications<J: PublicationJournal, S: Stores>(journal: &J, stores: &S, render: impl Fn(&Path) -> Option<Vec<u8>>) -> Result<RepairReport, RepairError>`;
   `Ingest::run(&self, mode: &Mode) -> Result<IngestReport, Box<IngestError>>`;
   `Mode { pub dry_run: bool, pub once: Option<PathBuf> }`;
-  `Notifier::{deliver(&self, notification: &Notification) -> DeliveryOutcome,
-  take_diagnostics(&self) -> Vec<String>}`.
+  `Notifier::{deliver(&self, notification: &Notification) -> DeliveryOutcome, take_diagnostics(&self) -> Vec<String>}`.
+
 - Produces crate-private composition:
   `AccessMode::{ReadOnly, Mutating}`;
-  `Runtime::load(environment: &Environment, config: Option<&Path>, access: AccessMode)
-  -> Result<Runtime, Box<ErrorDocument>>`;
+  `Runtime::load(environment: &Environment, config: Option<&Path>, access: AccessMode) -> Result<Runtime, Box<ErrorDocument>>`;
   `Runtime::mutating(&self) -> Result<RepairReport, Box<ErrorDocument>>`;
   `Runtime::trash(&self) -> &dyn Trash`;
   `Runtime::diagnostics(&self) -> Vec<String>`;
   `WRITE_LOCK_WAIT: Duration = Duration::from_secs(5)`.
-  Runtime fields: `settings: Settings, roots: Roots, ledger: RuntimeLedger,
-  recorder: VoiceMemosStore, archive: ClonefileArchive, stores: FilesystemStores,
-  clock: RuntimeClock, helper: HelperClient, notifier: Box<dyn Notifier>`, all `pub(crate)`;
+  Runtime fields: `settings: Settings, roots: Roots, ledger: RuntimeLedger, recorder: VoiceMemosStore, archive: ClonefileArchive, stores: FilesystemStores, clock: RuntimeClock, helper: HelperClient, notifier: Box<dyn Notifier>`, all `pub(crate)`;
   `_lock: Option<WriteLock>` is private and retained for the runtime lifetime.
   `RuntimeLedger::{Sqlite(SqliteLedger), Empty(MemoryLedger)}` implements
   `RecordingLedger` and `PublicationJournal`;
   `RuntimeLedger::read_only(path: &Path) -> Result<RuntimeLedger, Box<ErrorDocument>>`.
   `RuntimeClock::from_environment(environment: &Environment) -> Result<RuntimeClock, Box<ErrorDocument>>`
   implements `Clock`; only `dev-tools` reads `VPT_TEST_NOW_SECS`.
+
 - Produces adapter root export `SystemClock`, implementing
   `Clock::{now(&self) -> UtcInstant, offset_at(&self, at: UtcInstant) -> UtcOffset}`.
+
 - Produces command-private
   `documents::record_json(record: &RecordingRecord) -> serde_json::Value`;
   `commands::ingest::run(runtime: &Runtime, dry_run: bool, once: Option<PathBuf>) -> Outcome`.
+
 - Test support adds `FIXED_NOW_SECS: i64 = 1_787_690_916`,
-  `Sandbox::{write_config(&self, extra: &str), add_recording(&self, name: &str,
-  bytes: &[u8]) -> PathBuf, ledger(&self) -> rusqlite::Connection}`.
+  `Sandbox::{write_config(&self, extra: &str), add_recording(&self, name: &str, bytes: &[u8]) -> PathBuf, ledger(&self) -> rusqlite::Connection}`.
   Every `Sandbox::vpt()` sets `VPT_TEST_NOW_SECS` to that constant, and recording mtime is
   `FIXED_NOW_SECS - 60`. Task 32's `set_mtime` subtracts its age from the same constant.
 
@@ -15036,27 +15040,26 @@ any other stage word is a usage error.
 
 **Interfaces:**
 
-- Consumes `RecordingLedger::{by_id(&self, id: &RecordingId) -> Result<Option<RecordingRecord>, LedgerError>,
-  recordings(&self) -> Result<Vec<RecordingRecord>, LedgerError>}`;
+- Consumes `RecordingLedger::{by_id(&self, id: &RecordingId) -> Result<Option<RecordingRecord>, LedgerError>, recordings(&self) -> Result<Vec<RecordingRecord>, LedgerError>}`;
   `record_json(record: &RecordingRecord) -> serde_json::Value`;
-  `Runtime::load(environment: &Environment, config: Option<&Path>, access: AccessMode)
-  -> Result<Runtime, Box<ErrorDocument>>`;
+  `Runtime::load(environment: &Environment, config: Option<&Path>, access: AccessMode) -> Result<Runtime, Box<ErrorDocument>>`;
   `StoreKey::{all() -> [StoreKey; 7], key_name(self) -> &'static str}`;
   `Runtime.stores: FilesystemStores`, with retained configured paths and opened root handles.
+
 - Adds `StoreEntry { pub path: PathBuf, pub size: u64, pub mtime: FileTime }` to the
   `vpt_application::ports` exports and extends the existing `Stores` trait with
   `fn entries(&self, root: &Path) -> Result<Vec<StoreEntry>, StoreError>`.
   It lists regular files at depth one, refuses symbolic links, and treats an absent configured root
   as empty. Unknown roots are `StoreError::Escape`.
-- Exports `vpt_application::{StoreInventory { pub files: u64, pub bytes: u64,
-  pub oldest: Option<FileTime>, pub newest: Option<FileTime> },
-  inventory(entries: &[StoreEntry]) -> StoreInventory}`.
+
+- Exports `vpt_application::{StoreInventory { pub files: u64, pub bytes: u64, pub oldest: Option<FileTime>, pub newest: Option<FileTime> }, inventory(entries: &[StoreEntry]) -> StoreInventory}`.
+
 - Command-private functions:
   `show::run(runtime: &Runtime, id: &str) -> Outcome`,
   `list::run(runtime: &Runtime, stage: Option<&str>) -> Outcome`,
   `storage::run(runtime: &Runtime) -> Outcome`;
-  `with_runtime(environment: &Environment, invocation: &Invocation, access: AccessMode,
-  command: impl FnOnce(&Runtime) -> Outcome) -> Outcome`.
+  `with_runtime(environment: &Environment, invocation: &Invocation, access: AccessMode, command: impl FnOnce(&Runtime) -> Outcome) -> Outcome`.
+
 - Acceptance support: `state_snapshot(sandbox: &Sandbox) -> Vec<(PathBuf, u32, Vec<u8>)>`
   recursively captures sorted state and store paths, permission bits and file bytes.
 
@@ -15237,7 +15240,6 @@ fn observations_preserve_dirty_ledger_bytes_modes_and_store_contents() {
 
 ```
 
-
 Append to `crates/vpt/tests/support/mod.rs` in Step 1:
 
 ```rust
@@ -15265,6 +15267,7 @@ pub fn state_snapshot(sandbox: &Sandbox) -> Vec<(PathBuf, u32, Vec<u8>)> {
     rows
 }
 ```
+
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run separately: `cargo test -p vpt-application inventory`, `cargo test -p vpt-adapters stores`, and
@@ -15524,18 +15527,17 @@ ______________________________________________________________________
 
 **Interfaces:**
 
-- Consumes `settings_from(environment: &Environment, config: Option<&Path>)
-  -> Result<Settings, Box<ErrorDocument>>`, `Settings.home: PathBuf`,
-  `Settings.symlink_target: Option<PathBuf>`, `RootDir::open(path: &Path)
-  -> Result<RootDir, ContainedError>`, and
+- Consumes `settings_from(environment: &Environment, config: Option<&Path>) -> Result<Settings, Box<ErrorDocument>>`, `Settings.home: PathBuf`,
+  `Settings.symlink_target: Option<PathBuf>`, `RootDir::open(path: &Path) -> Result<RootDir, ContainedError>`, and
   `RootDir::subdirectory(&self, name: &str) -> Result<RootDir, ContainedError>`.
+
 - Adapter root exports:
   `LinkState::{Absent, LinkTo(PathBuf), Other(String), Unreadable(String)}`;
-  `SymlinkError::{Occupied(String), TargetParentMissing, TargetNotDirectory,
-  TargetMissing, Missing, WrongTarget(PathBuf), Io(String)}`;
+  `SymlinkError::{Occupied(String), TargetParentMissing, TargetNotDirectory, TargetMissing, Missing, WrongTarget(PathBuf), Io(String)}`;
   `inspect_symlink(link: &Path) -> LinkState`;
   `deploy_symlink(link: &Path, target: &Path) -> Result<(), SymlinkError>`;
   `verify_symlink(link: &Path, target: &Path) -> Result<(), SymlinkError>`.
+
 - Command-private functions
   `deploy(environment: &Environment, config: Option<&Path>) -> Outcome` and
   `verify(environment: &Environment, config: Option<&Path>) -> Outcome`.
@@ -15543,8 +15545,7 @@ ______________________________________________________________________
 - [ ] **Step 1: Write the failing tests**
 
 In adapter `lib.rs`, register `mod symlink;` and
-`pub use symlink::{LinkState, SymlinkError, deploy as deploy_symlink,
-inspect as inspect_symlink, verify as verify_symlink};`. The file starts with the test module.
+`pub use symlink::{LinkState, SymlinkError, deploy as deploy_symlink, inspect as inspect_symlink, verify as verify_symlink};`. The file starts with the test module.
 Register `pub(crate) mod symlink;` in `commands/mod.rs` and create that command file empty.
 
 `crates/vpt-adapters/src/symlink.rs`, test section:
@@ -15933,29 +15934,29 @@ subdirectory, cleanup pending and source gone.
 
 **Interfaces:**
 
-- Consumes `settings_from(environment: &Environment, config: Option<&Path>)
-  -> Result<Settings, Box<ErrorDocument>>`;
+- Consumes `settings_from(environment: &Environment, config: Option<&Path>) -> Result<Settings, Box<ErrorDocument>>`;
   `resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootError>`;
   `HelperClient::version(&self) -> Result<String, HelperError>`;
   `VoiceMemosStore::open(path: &Path) -> Result<VoiceMemosStore, ContainedError>`;
   `RecorderStore::candidates(&self) -> Result<Vec<Candidate>, RecorderError>`;
-  `RootDir::{open(path: &Path) -> Result<RootDir, ContainedError>,
-  open_subdirectory(&self, name: &str) -> Result<RootDir, ContainedError>,
-  names(&self) -> Result<Vec<String>, ContainedError>}`;
+  `RootDir::{open(path: &Path) -> Result<RootDir, ContainedError>, open_subdirectory(&self, name: &str) -> Result<RootDir, ContainedError>, names(&self) -> Result<Vec<String>, ContainedError>}`;
   `ClonefileArchive::open_read_only(path: &Path) -> Result<ClonefileArchive, ContainedError>`;
   `Archive::staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError>`;
   `RuntimeLedger::read_only(path: &Path) -> Result<RuntimeLedger, Box<ErrorDocument>>`;
   `RecordingLedger::seen_all(&self) -> Result<Vec<SeenRow>, LedgerError>`;
   `Check { pub name: String, pub ok: bool, pub detail: String }`;
-  `ErrorDocument::{checks(self, checks: Vec<Check>) -> Self,
-  diagnostics(self, diagnostics: Vec<String>) -> Self}`.
+  `ErrorDocument::{checks(self, checks: Vec<Check>) -> Self, diagnostics(self, diagnostics: Vec<String>) -> Self}`.
+
 - Adapter root export `enclosing_git_tree(path: &Path) -> Option<PathBuf>` returns the nearest
   ancestor, including the path itself, with a `.git` entry of any type.
+
 - `Outcome::FailedReport { error: ErrorDocument, human: String }`;
   `emit(outcome: Outcome, json: bool) -> i32` preserves stdout write failures as exit 1.
+
 - Command-private `doctor::run(environment: &Environment, config: Option<&Path>) -> Outcome`;
   `checks::all(environment: &Environment, config: Option<&Path>) -> Vec<Check>`
   is `pub(super)` inside private `doctor::checks`.
+
 - `INSTALL_HINT: &str` names the two install commands from spec section 13.
   Every invocation emits exactly 18 named Stage 1 checks, including failures and explicit dependent
   checks that could not run.
@@ -18401,34 +18402,34 @@ Verify the mutants by hand and record the table:
 For each row, apply the mutation to a scratch copy of the working tree, run the named test, confirm it
 fails, then run the unmutated control and confirm it passes. The table goes in the pull request body.
 
-| Behavior                              | Mutation                                                       | Test that must go red                                                          |
-| ------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| the wholeness gate                    | `inspect` returns `Ok` when `moov` is missing                  | `a_file_without_moov_is_refused`                                               |
-| the rest gate                         | `>=` becomes `>` on the quiet period                           | `the_rest_gate_needs_the_whole_quiet_period`                                   |
-| the size gate                         | the limit comparison drops one byte                            | `the_size_gate_defers_one_byte_over_the_limit_and_accepts_the_limit`           |
-| the source stays read-only            | `open` drops `O_NOFOLLOW`                                      | `open_refuses_a_symbolic_link_and_reads_a_regular_file_by_descriptor`          |
-| the source is unchanged after a sweep | staging writes back one byte to the source handle              | `a_full_sweep_with_titles_leaves_every_container_entry_with_its_size_mtime_and_flags`               |
-| dry run touches no title copy         | `Mode::DryRun` refreshes the title copy                        | `dry_run_creates_no_state_directory_and_no_title_copy`                         |
-| exclusive publication                 | `exclusive` falls back to `rename` when the target exists      | `publish_never_replaces_an_existing_target_and_names_it`                       |
-| repair after rename, before clear     | `repair_publications` skips the directory sync before clearing | `a_failed_directory_sync_leaves_the_entry_pending`                             |
-| target modified refuses               | the digest comparison in repair always matches                 | `any_other_bytes_are_refused_as_target_modified_and_nothing_is_overwritten`    |
-| a future schema is refused            | `migrate` accepts any `user_version`                           | `a_future_schema_version_is_refused_with_its_number`                           |
-| the write lock                        | `acquire` returns before `flock` succeeds                      | `a_held_lock_makes_a_second_acquisition_busy_after_its_wait`                |
-| the deadline kills the group          | `terminate` signals the child pid instead of the group         | `the_deadline_terminates_the_whole_process_group_and_reaps_it`                 |
-| the bounded reader                    | disable `Node::enter`'s depth guard                                      | `depth_is_checked_before_reading_children`          |
-| helper major version                  | compatibility preflight accepts any major                           | `incompatible_version_never_receives_notify_or_trash`                       |
-| command notify falls back once        | the fallback delivery is removed                               | `failed_command_is_recorded_before_one_fallback_and_keeps_its_status`  |
-| an untracked file survives retention  | `Retention::run` trashes entries with no ledger owner          | `an_untracked_file_in_a_store_survives_and_is_reported_kept`                   |
-| retention target modified             | `reconcile_intents` moves a path whose digest differs          | `replaced_content_is_a_refusal_naming_the_path_and_stays_pending`              |
-| audio excluded by default             | `include_audio` is ignored                                     | `audio_is_excluded_unless_include_audio_is_set`                                |
-| doctor never refuses at startup       | `checks::all` returns early on a config error                  | `without_a_config_the_config_check_fails_and_the_rest_are_reported_as_not_run` |
-| symlink verify writes nothing         | `verify` creates the target when missing                       | `verify_names_a_missing_link_and_a_wrong_target_and_writes_nothing`            |
-| expiration arithmetic | cast the hold to `i64` or ignore nanoseconds | `a_large_hold_does_not_wrap_and_nanoseconds_delay_the_boundary` |
-| partial retention | append moves after ledger updates | `a_ledger_failure_after_the_move_still_reports_its_recording_id` |
-| partial recovery | drop progress when a later intent fails | `partial_startup_retains_completed_ids_and_one_event_on_retention_and_ingest` |
-| single recovery event | emit recovery and new-move events separately | `retention_combines_recovery_and_new_moves_in_one_report_and_event` |
-| root substitution | skip root revalidation before the helper | `replacing_the_audio_root_with_a_symlink_never_reaches_trash` |
-| helper recovery compatibility | skip the helper version check in Trash | `incompatible_helper_blocks_reconciliation_without_a_trash_request` |
+| Behavior                              | Mutation                                                       | Test that must go red                                                                 |
+| ------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| the wholeness gate                    | `inspect` returns `Ok` when `moov` is missing                  | `a_file_without_moov_is_refused`                                                      |
+| the rest gate                         | `>=` becomes `>` on the quiet period                           | `the_rest_gate_needs_the_whole_quiet_period`                                          |
+| the size gate                         | the limit comparison drops one byte                            | `the_size_gate_defers_one_byte_over_the_limit_and_accepts_the_limit`                  |
+| the source stays read-only            | `open` drops `O_NOFOLLOW`                                      | `open_refuses_a_symbolic_link_and_reads_a_regular_file_by_descriptor`                 |
+| the source is unchanged after a sweep | staging writes back one byte to the source handle              | `a_full_sweep_with_titles_leaves_every_container_entry_with_its_size_mtime_and_flags` |
+| dry run touches no title copy         | `Mode::DryRun` refreshes the title copy                        | `dry_run_creates_no_state_directory_and_no_title_copy`                                |
+| exclusive publication                 | `exclusive` falls back to `rename` when the target exists      | `publish_never_replaces_an_existing_target_and_names_it`                              |
+| repair after rename, before clear     | `repair_publications` skips the directory sync before clearing | `a_failed_directory_sync_leaves_the_entry_pending`                                    |
+| target modified refuses               | the digest comparison in repair always matches                 | `any_other_bytes_are_refused_as_target_modified_and_nothing_is_overwritten`           |
+| a future schema is refused            | `migrate` accepts any `user_version`                           | `a_future_schema_version_is_refused_with_its_number`                                  |
+| the write lock                        | `acquire` returns before `flock` succeeds                      | `a_held_lock_makes_a_second_acquisition_busy_after_its_wait`                          |
+| the deadline kills the group          | `terminate` signals the child pid instead of the group         | `the_deadline_terminates_the_whole_process_group_and_reaps_it`                        |
+| the bounded reader                    | disable `Node::enter`'s depth guard                            | `depth_is_checked_before_reading_children`                                            |
+| helper major version                  | compatibility preflight accepts any major                      | `incompatible_version_never_receives_notify_or_trash`                                 |
+| command notify falls back once        | the fallback delivery is removed                               | `failed_command_is_recorded_before_one_fallback_and_keeps_its_status`                 |
+| an untracked file survives retention  | `Retention::run` trashes entries with no ledger owner          | `an_untracked_file_in_a_store_survives_and_is_reported_kept`                          |
+| retention target modified             | `reconcile_intents` moves a path whose digest differs          | `replaced_content_is_a_refusal_naming_the_path_and_stays_pending`                     |
+| audio excluded by default             | `include_audio` is ignored                                     | `audio_is_excluded_unless_include_audio_is_set`                                       |
+| doctor never refuses at startup       | `checks::all` returns early on a config error                  | `without_a_config_the_config_check_fails_and_the_rest_are_reported_as_not_run`        |
+| symlink verify writes nothing         | `verify` creates the target when missing                       | `verify_names_a_missing_link_and_a_wrong_target_and_writes_nothing`                   |
+| expiration arithmetic                 | cast the hold to `i64` or ignore nanoseconds                   | `a_large_hold_does_not_wrap_and_nanoseconds_delay_the_boundary`                       |
+| partial retention                     | append moves after ledger updates                              | `a_ledger_failure_after_the_move_still_reports_its_recording_id`                      |
+| partial recovery                      | drop progress when a later intent fails                        | `partial_startup_retains_completed_ids_and_one_event_on_retention_and_ingest`         |
+| single recovery event                 | emit recovery and new-move events separately                   | `retention_combines_recovery_and_new_moves_in_one_report_and_event`                   |
+| root substitution                     | skip root revalidation before the helper                       | `replacing_the_audio_root_with_a_symlink_never_reaches_trash`                         |
+| helper recovery compatibility         | skip the helper version check in Trash                         | `incompatible_helper_blocks_reconciliation_without_a_trash_request`                   |
 
 Confirm the README carries both install steps:
 
@@ -18436,7 +18437,6 @@ Run: `grep -c 'cargo install --git https://github.com/webdavis/vpt vpt' README.m
 `grep -c 'swift build -c release' README.md`
 
 Expected: `1` and `1`.
-
 
 - [ ] **Step 5: Commit**
 
@@ -18465,82 +18465,82 @@ ______________________________________________________________________
 These are implementation assignments. Execution must record the named test results and gate output
 before claiming the behavior is verified.
 
-| Spec requirement                                                                                                                                                                                       | Task                                                                                                                                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 4.1 one home, default `~/.vpt`, seven stores with per-store overrides, `~` and `<home>/` expansion                                                                                                     | 3, 5                                                                                                                                                                                                             |
-| 4.1 a root must be absolute after expansion; an invalid root is exit 2 naming the keys                                                                                                                 | 5, 27                                                                                                                                                                                                            |
-| 4.1 setup creates the default store leaves; a store elsewhere needs an existing parent, leaf created                                                                                                   | 5, 6                                                                                                                                                                                                             |
-| 4.1 every root resolved once at startup before any work                                                                                                                                                | 5, 27                                                                                                                                                                                                            |
-| 4.1 stores pairwise disjoint, the home may contain them, no overlap with the Voice Memos container                                                                                                     | 5                                                                                                                                                                                                                |
-| 4.1 a release destination may not overlap a private store, the state directory or the config directory                                                                                                 | 5                                                                                                                                                                                                                |
+| Spec requirement                                                                                                                                                                                       | Task                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 4.1 one home, default `~/.vpt`, seven stores with per-store overrides, `~` and `<home>/` expansion                                                                                                     | 3, 5                                                                                                                               |
+| 4.1 a root must be absolute after expansion; an invalid root is exit 2 naming the keys                                                                                                                 | 5, 27                                                                                                                              |
+| 4.1 setup creates the default store leaves; a store elsewhere needs an existing parent, leaf created                                                                                                   | 5, 6                                                                                                                               |
+| 4.1 every root resolved once at startup before any work                                                                                                                                                | 5, 27                                                                                                                              |
+| 4.1 stores pairwise disjoint, the home may contain them, no overlap with the Voice Memos container                                                                                                     | 5                                                                                                                                  |
+| 4.1 a release destination may not overlap a private store, the state directory or the config directory                                                                                                 | 5                                                                                                                                  |
 | 4.1 `path_escape` below a resolved root                                                                                                                                                                | 5a, 11, 13 to 18, 27 to 32: held root descriptors, no-follow leaves, journal validation, and root revalidation before helper calls |
-| 4.1 the ledger lives in `~/.local/state/vpt/` by default, never in a store                                                                                                                             | 5, 11                                                                                                                                                                                                            |
-| 4.1 config at `~/.config/vpt/config.toml`, mode 0600                                                                                                                                                   | 5, 6                                                                                                                                                                                                             |
-| 4.2 `symlink_target` with a non-default home is a startup refusal                                                                                                                                      | 5                                                                                                                                                                                                                |
-| 4.2 `vpt symlink deploy` and `verify`, the refusals, the leaf creation, verify writes nothing                                                                                                          | 29                                                                                                                                                                                                               |
-| 4.2 doctor runs verify; an unmanaged link is followed and reported, never removed                                                                                                                      | 30                                                                                                                                                                                                               |
-| 4.3 the identity: local capture timestamp without a colon plus twelve hex characters of the digest                                                                                                     | 7, 8                                                                                                                                                                                                             |
-| 4.3 the archive name `<id>.m4a`                                                                                                                                                                        | 19                                                                                                                                                                                                               |
-| 4.4 SQLite in the state directory, 0600 in 0700, WAL, busy timeout, `user_version`, a future version refused                                                                                           | 11                                                                                                                                                                                                               |
-| 4.4 the eleven tables of version 1, columns for stages 2 to 4 anticipated                                                                                                                              | 11                                                                                                                                                                                                               |
-| 4.4 the in-memory twin under the same contract suites                                                                                                                                                  | 12, 14, 31                                                                                                                                                                                                       |
-| 4.4 the write lock every mutating command holds                                                                                                                                                        | 13, 27                                                                                                                                                                                                           |
-| 4.4 the dirty-publication protocol: record, publish, sync the directory, clear; repair before new work                                                                                                 | 14, 27                                                                                                                                                                                                           |
-| 4.4 recovery clears nothing before the directory is durable (F19)                                                                                                                                      | 14                                                                                                                                                                                                               |
-| 4.4 `target_modified` refuses every mutating command                                                                                                                                                   | 14, 27                                                                                                                                                                                                           |
-| 4.4 `vpt show <id> --json` and `vpt list --json`                                                                                                                                                       | 28                                                                                                                                                                                                               |
-| 4.5 off by default; holds per store from a file's own mtime; `0` means never                                                                                                                           | 3, 4, 31                                                                                                                                                                                                         |
-| 4.5 rule 1: only ledger-owned artifacts, identity verified by digest, untracked files kept and reported                                                                                                | 32                                                                                                                                                                                                               |
-| 4.5 rule 2: journaled intents, reconciliation before new work, `retention_target_modified`                                                                                                             | 31, 32                                                                                                                                                                                                           |
-| 4.5 rule 3: audio excluded unless `include_audio`; `audio_trashed_at` recorded                                                                                                                         | 32                                                                                                                                                                                                               |
-| 4.5 rule 4: nothing unlinked; helper absent is `no_trash`                                                                                                                                              | 32                                                                                                                                                                                                               |
-| 4.5 rule 5: the `retention` event with counts per store                                                                                                                                                | 32                                                                                                                                                                                                               |
-| 5.1 depth-one `*.m4a` candidates, the Apple subdirectories never entered, counts for doctor                                                                                                            | 15, 30                                                                                                                                                                                                           |
-| 5.1 `SF_DATALESS` through the port, never opened                                                                                                                                                       | 10, 15, 20                                                                                                                                                                                                       |
-| 5.1 read-only descriptors, `O_NOFOLLOW`, no write to the container ever                                                                                                                                | 15, 19                                                                                                                                                                                                           |
-| 5.1 the private title copy under the state directory, read-only open, schema change is unavailable                                                                                                     | 16                                                                                                                                                                                                               |
-| 5.2 the seen triple skip, the size gate, the rest gate, the wholeness gate                                                                                                                             | 9, 10, 19, 20                                                                                                                                                                                                    |
-| 5.2 deferral counts, the deferred page at the threshold, `--once`                                                                                                                                      | 20, 23                                                                                                                                                                                                           |
-| 5.2 dry run: no title copy, no durable state                                                                                                                                                           | 23, 27                                                                                                                                                                                                           |
-| 5.3 staging by clone, digest, exclusive publication, file and directory sync before commit                                                                                                             | 17, 18, 19                                                                                                                                                                                                       |
-| 5.3 duplicates: same digest is skipped or recovered; a different file at the target is `archive_collision`                                                                                             | 21                                                                                                                                                                                                               |
-| 5.3 a failed staging goes to the Trash; helper absent leaves it and doctor reports `cleanup_pending`                                                                                                   | 19, 23, 30                                                                                                                                                                                                       |
-| 5.4 a deleted source is `source_gone_at`, reported by doctor; a moved source is recovered by digest                                                                                                    | 21, 22, 30                                                                                                                                                                                                       |
-| 5.4 an orphaned archive is recovered into the ledger                                                                                                                                                   | 22                                                                                                                                                                                                               |
-| 5.5 an unreadable or emptied store is exit 1 with `completed`; no space; the `ingest_failed` event                                                                                                     | 20, 23, 27                                                                                                                                                                                                       |
-| 5.6 what stage 1 does not do                                                                                                                                                                           | nothing to build                                                                                                                                                                                                 |
-| 9 `--json` withheld until the final status; error on stderr with `completed`; `vpt: <message>` otherwise                                                                                               | 2, 27                                                                                                                                                                                                            |
-| 9 `--config` and `VPT_CONFIG`; unknown argument is usage exit 2                                                                                                                                        | 1, 2, 5                                                                                                                                                                                                          |
-| 9 `vpt setup [--force]`                                                                                                                                                                                | 6                                                                                                                                                                                                                |
-| 9 `vpt doctor` and its two output shapes                                                                                                                                                               | 30                                                                                                                                                                                                               |
-| 9 `vpt ingest [--dry-run] [--once <path>]` and its shape                                                                                                                                               | 23, 27                                                                                                                                                                                                           |
-| 9 `vpt show`, `vpt list [--stage]`, `vpt storage`                                                                                                                                                      | 28                                                                                                                                                                                                               |
-| 9 `vpt retention run [--dry-run]`                                                                                                                                                                      | 32                                                                                                                                                                                                               |
-| 9 `vpt symlink deploy` and `verify`                                                                                                                                                                    | 29                                                                                                                                                                                                               |
-| 9 `vpt --version` with `helper_version`                                                                                                                                                                | 1, 25                                                                                                                                                                                                            |
-| 9 the exit code mapping and the error document fields                                                                                                                                                  | 2                                                                                                                                                                                                                |
-| 9 `--dry-run` opens existing state read-only, no migration, no write, no notification, no Trash                                                                                                        | 23, 27, 32                                                                                                                                                                                                       |
-| 10 one key table with defaults, comments, secrets marked; `config_version = 1`; unknown keys refused                                                                                                   | 3                                                                                                                                                                                                                |
-| 10 value rules by kind, the duration syntax, dynamic engine tables                                                                                                                                     | 3, 4                                                                                                                                                                                                             |
-| 10 the setup template with the main engine chosen and every other key at its default                                                                                                                   | 3, 6                                                                                                                                                                                                             |
-| 10.2 a home inside a vault: a symlinked home, stores overlapping the home                                                                                                                              | 5                                                                                                                                                                                                                |
-| 11 the eight kinds and the rules stage 1 keeps: `archive_collision`, `target_modified`, `no_trash`, `retention_target_modified`, `doctor_checks`, `helper_version`, `symlink_deploy`, `symlink_verify` | 2, 21, 27, 29, 30, 32                                                                                                                                                                                            |
-| 11 helper major mismatch is a refusal for the verbs that need the helper; doctor reports it                                                                                                            | 25, 30, 32                                                                                                                                                                                                       |
-| 11 doctor never refuses at startup                                                                                                                                                                     | 30                                                                                                                                                                                                               |
-| 11 nothing deletes; the staged file with no helper stays 0600 and is `cleanup_pending`                                                                                                                 | 19, 30                                                                                                                                                                                                           |
-| 12 test-first, one second per test, unit tests beside the code                                                                                                                                         | every task                                                                                                                                                                                                       |
-| 12 the fake engine behind `dev-tools`: `--version`, `notify`, `trash`, a hang, a command sink                                                                                                          | 24                                                                                                                                                                                                               |
-| 12 the fake recorder store: assembled MPEG-4 bytes, the Apple subdirectories, the title database fixture                                                                                               | 9, 15, 16, 19                                                                                                                                                                                                    |
-| 12 the fixed clock, the in-memory ledger under the contract, the temporary HOME with no real reads                                                                                                     | 1, 12, 19                                                                                                                                                                                                        |
-| 12 the four stage 1 behaviors written first: source unchanged after a sweep, dry run leaves the title copy, repair after rename before clear, an untracked file survives retention                     | 19, 23, 14, 32                                                                                                                                                                                                   |
-| 12 the Swift suite reaches no real destination; `just smoke` is operator-run                                                                                                                           | 33                                                                                                                                                                                                               |
-| 12 CI on macOS with the seven gates and `just ship`                                                                                                                                                    | 1, 33                                                                                                                                                                                                            |
-| 13 the repository layout, `rust-toolchain.toml` pinning stable, `Cargo.lock` committed                                                                                                                 | 1                                                                                                                                                                                                                |
-| 13 `cargo install` installs `vpt` alone; the fake engine needs `dev-tools`                                                                                                                             | 1, 24                                                                                                                                                                                                            |
-| 13 the helper built with `swift build -c release`; the README states both steps; doctor names them                                                                                                     | 1, 30, 33                                                                                                                                                                                                        |
-| 13 the dotfiles builder and LaunchAgent                                                                                                                                                                | the dotfiles repository's, out of scope by the spec's own words                                                                                                                                                  |
-| 13 `recordings_dir readable` reported by doctor                                                                                                                                                        | 30                                                                                                                                                                                                               |
-| 14 the Stage 1 entry, every item                                                                                                                                                                       | 1 to 33                                                                                                                                                                                                          |
+| 4.1 the ledger lives in `~/.local/state/vpt/` by default, never in a store                                                                                                                             | 5, 11                                                                                                                              |
+| 4.1 config at `~/.config/vpt/config.toml`, mode 0600                                                                                                                                                   | 5, 6                                                                                                                               |
+| 4.2 `symlink_target` with a non-default home is a startup refusal                                                                                                                                      | 5                                                                                                                                  |
+| 4.2 `vpt symlink deploy` and `verify`, the refusals, the leaf creation, verify writes nothing                                                                                                          | 29                                                                                                                                 |
+| 4.2 doctor runs verify; an unmanaged link is followed and reported, never removed                                                                                                                      | 30                                                                                                                                 |
+| 4.3 the identity: local capture timestamp without a colon plus twelve hex characters of the digest                                                                                                     | 7, 8                                                                                                                               |
+| 4.3 the archive name `<id>.m4a`                                                                                                                                                                        | 19                                                                                                                                 |
+| 4.4 SQLite in the state directory, 0600 in 0700, WAL, busy timeout, `user_version`, a future version refused                                                                                           | 11                                                                                                                                 |
+| 4.4 the eleven tables of version 1, columns for stages 2 to 4 anticipated                                                                                                                              | 11                                                                                                                                 |
+| 4.4 the in-memory twin under the same contract suites                                                                                                                                                  | 12, 14, 31                                                                                                                         |
+| 4.4 the write lock every mutating command holds                                                                                                                                                        | 13, 27                                                                                                                             |
+| 4.4 the dirty-publication protocol: record, publish, sync the directory, clear; repair before new work                                                                                                 | 14, 27                                                                                                                             |
+| 4.4 recovery clears nothing before the directory is durable (F19)                                                                                                                                      | 14                                                                                                                                 |
+| 4.4 `target_modified` refuses every mutating command                                                                                                                                                   | 14, 27                                                                                                                             |
+| 4.4 `vpt show <id> --json` and `vpt list --json`                                                                                                                                                       | 28                                                                                                                                 |
+| 4.5 off by default; holds per store from a file's own mtime; `0` means never                                                                                                                           | 3, 4, 31                                                                                                                           |
+| 4.5 rule 1: only ledger-owned artifacts, identity verified by digest, untracked files kept and reported                                                                                                | 32                                                                                                                                 |
+| 4.5 rule 2: journaled intents, reconciliation before new work, `retention_target_modified`                                                                                                             | 31, 32                                                                                                                             |
+| 4.5 rule 3: audio excluded unless `include_audio`; `audio_trashed_at` recorded                                                                                                                         | 32                                                                                                                                 |
+| 4.5 rule 4: nothing unlinked; helper absent is `no_trash`                                                                                                                                              | 32                                                                                                                                 |
+| 4.5 rule 5: the `retention` event with counts per store                                                                                                                                                | 32                                                                                                                                 |
+| 5.1 depth-one `*.m4a` candidates, the Apple subdirectories never entered, counts for doctor                                                                                                            | 15, 30                                                                                                                             |
+| 5.1 `SF_DATALESS` through the port, never opened                                                                                                                                                       | 10, 15, 20                                                                                                                         |
+| 5.1 read-only descriptors, `O_NOFOLLOW`, no write to the container ever                                                                                                                                | 15, 19                                                                                                                             |
+| 5.1 the private title copy under the state directory, read-only open, schema change is unavailable                                                                                                     | 16                                                                                                                                 |
+| 5.2 the seen triple skip, the size gate, the rest gate, the wholeness gate                                                                                                                             | 9, 10, 19, 20                                                                                                                      |
+| 5.2 deferral counts, the deferred page at the threshold, `--once`                                                                                                                                      | 20, 23                                                                                                                             |
+| 5.2 dry run: no title copy, no durable state                                                                                                                                                           | 23, 27                                                                                                                             |
+| 5.3 staging by clone, digest, exclusive publication, file and directory sync before commit                                                                                                             | 17, 18, 19                                                                                                                         |
+| 5.3 duplicates: same digest is skipped or recovered; a different file at the target is `archive_collision`                                                                                             | 21                                                                                                                                 |
+| 5.3 a failed staging goes to the Trash; helper absent leaves it and doctor reports `cleanup_pending`                                                                                                   | 19, 23, 30                                                                                                                         |
+| 5.4 a deleted source is `source_gone_at`, reported by doctor; a moved source is recovered by digest                                                                                                    | 21, 22, 30                                                                                                                         |
+| 5.4 an orphaned archive is recovered into the ledger                                                                                                                                                   | 22                                                                                                                                 |
+| 5.5 an unreadable or emptied store is exit 1 with `completed`; no space; the `ingest_failed` event                                                                                                     | 20, 23, 27                                                                                                                         |
+| 5.6 what stage 1 does not do                                                                                                                                                                           | nothing to build                                                                                                                   |
+| 9 `--json` withheld until the final status; error on stderr with `completed`; `vpt: <message>` otherwise                                                                                               | 2, 27                                                                                                                              |
+| 9 `--config` and `VPT_CONFIG`; unknown argument is usage exit 2                                                                                                                                        | 1, 2, 5                                                                                                                            |
+| 9 `vpt setup [--force]`                                                                                                                                                                                | 6                                                                                                                                  |
+| 9 `vpt doctor` and its two output shapes                                                                                                                                                               | 30                                                                                                                                 |
+| 9 `vpt ingest [--dry-run] [--once <path>]` and its shape                                                                                                                                               | 23, 27                                                                                                                             |
+| 9 `vpt show`, `vpt list [--stage]`, `vpt storage`                                                                                                                                                      | 28                                                                                                                                 |
+| 9 `vpt retention run [--dry-run]`                                                                                                                                                                      | 32                                                                                                                                 |
+| 9 `vpt symlink deploy` and `verify`                                                                                                                                                                    | 29                                                                                                                                 |
+| 9 `vpt --version` with `helper_version`                                                                                                                                                                | 1, 25                                                                                                                              |
+| 9 the exit code mapping and the error document fields                                                                                                                                                  | 2                                                                                                                                  |
+| 9 `--dry-run` opens existing state read-only, no migration, no write, no notification, no Trash                                                                                                        | 23, 27, 32                                                                                                                         |
+| 10 one key table with defaults, comments, secrets marked; `config_version = 1`; unknown keys refused                                                                                                   | 3                                                                                                                                  |
+| 10 value rules by kind, the duration syntax, dynamic engine tables                                                                                                                                     | 3, 4                                                                                                                               |
+| 10 the setup template with the main engine chosen and every other key at its default                                                                                                                   | 3, 6                                                                                                                               |
+| 10.2 a home inside a vault: a symlinked home, stores overlapping the home                                                                                                                              | 5                                                                                                                                  |
+| 11 the eight kinds and the rules stage 1 keeps: `archive_collision`, `target_modified`, `no_trash`, `retention_target_modified`, `doctor_checks`, `helper_version`, `symlink_deploy`, `symlink_verify` | 2, 21, 27, 29, 30, 32                                                                                                              |
+| 11 helper major mismatch is a refusal for the verbs that need the helper; doctor reports it                                                                                                            | 25, 30, 32                                                                                                                         |
+| 11 doctor never refuses at startup                                                                                                                                                                     | 30                                                                                                                                 |
+| 11 nothing deletes; the staged file with no helper stays 0600 and is `cleanup_pending`                                                                                                                 | 19, 30                                                                                                                             |
+| 12 test-first, one second per test, unit tests beside the code                                                                                                                                         | every task                                                                                                                         |
+| 12 the fake engine behind `dev-tools`: `--version`, `notify`, `trash`, a hang, a command sink                                                                                                          | 24                                                                                                                                 |
+| 12 the fake recorder store: assembled MPEG-4 bytes, the Apple subdirectories, the title database fixture                                                                                               | 9, 15, 16, 19                                                                                                                      |
+| 12 the fixed clock, the in-memory ledger under the contract, the temporary HOME with no real reads                                                                                                     | 1, 12, 19                                                                                                                          |
+| 12 the four stage 1 behaviors written first: source unchanged after a sweep, dry run leaves the title copy, repair after rename before clear, an untracked file survives retention                     | 19, 23, 14, 32                                                                                                                     |
+| 12 the Swift suite reaches no real destination; `just smoke` is operator-run                                                                                                                           | 33                                                                                                                                 |
+| 12 CI on macOS with the seven gates and `just ship`                                                                                                                                                    | 1, 33                                                                                                                              |
+| 13 the repository layout, `rust-toolchain.toml` pinning stable, `Cargo.lock` committed                                                                                                                 | 1                                                                                                                                  |
+| 13 `cargo install` installs `vpt` alone; the fake engine needs `dev-tools`                                                                                                                             | 1, 24                                                                                                                              |
+| 13 the helper built with `swift build -c release`; the README states both steps; doctor names them                                                                                                     | 1, 30, 33                                                                                                                          |
+| 13 the dotfiles builder and LaunchAgent                                                                                                                                                                | the dotfiles repository's, out of scope by the spec's own words                                                                    |
+| 13 `recordings_dir readable` reported by doctor                                                                                                                                                        | 30                                                                                                                                 |
+| 14 the Stage 1 entry, every item                                                                                                                                                                       | 1 to 33                                                                                                                            |
 
 ### Placeholder scan
 

@@ -3,36 +3,36 @@
 One line per finding: applied or declined, the commit sha once committed, and a reason when declined
 or applied in a different form. The statuses describe repairs to the plan, not implemented product features.
 
-- F01: applied: prior interface repairs through Task 24, 0f0e4eb shared diagnostics and read-only interfaces, 09bebc1 Tasks 25 and 26, and the current runtime and retention repairs through Task 32
-- F02: applied: prior module-registration repairs through Task 24, 09bebc1 private helper tests, and the current runtime and retention tasks register and select every new test before the red run
+- F01: applied cee0a80, a7411f6: prior interface repairs through Task 24, 0f0e4eb shared diagnostics and read-only interfaces, 09bebc1 Tasks 25 and 26, and runtime and retention repairs through Task 32
+- F02: applied cee0a80, a7411f6: prior module-registration repairs through Task 24, 09bebc1 private helper tests, and runtime and retention tasks register and select every new test before the red run
 - F03: applied f7f3f67 (test moved to Task 1), 589cb20 (Task 2 wording)
-- F04: applied: 589cb20 Task 2 and the Task 30 replacement emitter retain stdout write failures; injectable-writer tests cover both output modes
+- F04: applied cee0a80: 589cb20 Task 2 and the Task 30 replacement emitter retain stdout write failures; injectable-writer tests cover both output modes
 - F05: applied 0d52377 (schema.rs with schema/types.rs and schema/dynamic.rs)
 - F06: applied 0d52377 (quoted() through serde_json, round-trip test)
 - F07: applied 0d52377 (table_is_declared, WrongType for a table where a scalar belongs, two tests)
 - F08: applied 0d52377 (fixed sentence on both parse sites, Unreadable carries the io kind, canary test)
 - F09: applied 0d52377 (four kinds) and 01bb10d (boundary tests over u32)
 - F10: applied 01bb10d (number() widens integers for both ratio kinds)
-- F11: applied (resolve writes nothing; Roots::create_state_dir and create_leaves; container metadata and nonexistence assertions)
-- F12: applied (resolve takes config_dir; RootName::Config; Tasks 27 and 30 pass the selected file's parent)
-- F13: applied (Roots.container is the parent of recordings_dir; fixtures use voice-memos/Recordings)
-- F14: applied (the refusal names source.recordings_dir first)
+- F11: applied 6a44793: (resolve writes nothing; Roots::create_state_dir and create_leaves; container metadata and nonexistence assertions)
+- F12: applied 6a44793, cee0a80: (resolve takes config_dir; RootName::Config; Tasks 27 and 30 pass the selected file's parent)
+- F13: applied 6a44793: (Roots.container is the parent of recordings_dir; fixtures use voice-memos/Recordings)
+- F14: applied 6a44793: (the refusal names source.recordings_dir first)
 - F15: applied fc02c04 SetupOutcome derives Debug (Task 6), 67fd6db SqliteLedger derives Debug (Task 11)
-- F16: applied (the check is exact code with SetupWriter imported)
-- F17: applied (run takes config: Option<&Path>; dispatch passes invocation.config)
-- F18: applied (Sandbox::vpt() setsid in pre_exec; libc dev-dependency; the pty test builds its own script command)
-- F19: applied (let vpt)
-- F20: applied (zero-length read is Closed)
-- F21: applied (set_permissions 0600 on the file and 0700 on directories, tests for both)
-- F22: applied (write_config takes force; create_new(!force); AlreadyExists is Exists)
-- F23: applied: 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 32c2f6e Task 19; Task 26 uses 2026-09-16T22:53:20Z for 1_789_599_200
+- F16: applied fc02c04: (the check is exact code with SetupWriter imported)
+- F17: applied fc02c04: (run takes config: Option\<&Path>; dispatch passes invocation.config)
+- F18: applied fc02c04: (Sandbox::vpt() setsid in pre_exec; libc dev-dependency; the pty test builds its own script command)
+- F19: applied fc02c04: (let vpt)
+- F20: applied fc02c04: (zero-length read is Closed)
+- F21: applied fc02c04: (set_permissions 0600 on the file and 0700 on directories, tests for both)
+- F22: applied fc02c04: (write_config takes force; create_new(!force); AlreadyExists is Exists)
+- F23: applied 09bebc1: 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 32c2f6e Task 19; Task 26 uses 2026-09-16T22:53:20Z for 1_789_599_200
 - F24: applied 633f045
 - F25: applied 633f045 Task 7 age_secs and the expected 29, e24d803 Task 10 nanosecond rest case
-- F26: applied 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 6dbfba7 Task 20 maps an unrepresentable capture to invalid_container; the current repair fixes the far-future fixture to use a zero offset so it cannot fall back into year 9999
+- F26: applied 26b95d3: 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 6dbfba7 Task 20 maps an unrepresentable capture to invalid_container; 26b95d3 fixes the far-future fixture to use a zero offset so it cannot fall back into year 9999
 - F27: applied 58a44d4
 - F28: applied 58a44d4
 - F29: applied 58a44d4 in the F79 form: BoxReader removed, inspect takes len and a read callback
-- F30: applied: 48de0b7 Task 12 and Task 31 contract macros import their invocation parent; the retention factories reuse open_ledger and fresh
+- F30: applied a7411f6: 48de0b7 Task 12 and Task 31 contract macros import their invocation parent; the retention factories reuse open_ledger and fresh
 - F31: applied 48de0b7
 - F32: applied 48de0b7
 - F33: applied bca62c2 Task 13 and eb02c7e Task 24 (Controls with cancellation, clock, wait and grace; no test touches the production flag or asserts elapsed time; zero grace in group tests)
@@ -46,51 +46,51 @@ or applied in a different form. The statuses describe repairs to the plan, not i
 - F41: applied 85021c0 Task 17 StageFailure.owned_staging, 32c2f6e Task 19 owned cleanup on every exit before publication, 7d15839 Task 21 fault cases
 - F42: applied 7a6f95f (no link-and-unlink fallback; the typed failure keeps staging for the owned cleanup)
 - F43: applied 32c2f6e, 6dbfba7, 7d15839, 76c3fd4, 9405d1c (every ingest test imports Archive explicitly)
-- F44: applied: 527ce14 and 6dbfba7 use fixed fixture times; Tasks 27 and 32 now derive child clocks and mtimes from FIXED_NOW_SECS
+- F44: applied cee0a80, a7411f6: 527ce14 and 6dbfba7 use fixed fixture times; Tasks 27 and 32 now derive child clocks and mtimes from FIXED_NOW_SECS
 - F45: applied 6dbfba7 (Task 23 passes the full mode to every call)
 - F46: applied 527ce14 (ingested requires no deferral reason) and 6dbfba7 (edit, fresh deferral, clock advance, second recording)
 - F47: applied 527ce14 (unchanged refreshes last_seen and clears source_gone_at, not in a dry run)
-- F48: applied 6dbfba7 (saturating_add, page when previous < threshold <= count)
+- F48: applied 6dbfba7 (saturating_add, page when previous < threshold \<= count)
 - F49: applied 7d15839 (resolve_existing) and 76c3fd4 (recover_orphans syncs the archive before the commit)
 - F50: applied 633f045 Civil::instant and is_valid, 971b3c0 parse_local_timestamp, 76c3fd4 Task 22 archived_offset with recovery tested at 19_800 and -21_600
-- F51: applied: 32c2f6e and 9405d1c carry the complete Mode; Task 27 passes dry_run and once together, with a binary acceptance test
-- F52: applied: 32c2f6e and 9405d1c suppress dry-run events; Task 27 covers invalid roots and unreadable sources without notification or state creation
+- F51: applied cee0a80: 32c2f6e and 9405d1c carry the complete Mode; Task 27 passes dry_run and once together, with a binary acceptance test
+- F52: applied cee0a80: 32c2f6e and 9405d1c suppress dry-run events; Task 27 covers invalid roots and unreadable sources without notification or state creation
 - F53: applied 9405d1c (mark_gone before EmptyStore; gone timestamp, failure and one event asserted; the ordinary-disappearance test keeps a surviving recording through recovery in Task 22)
 - F54: applied 9405d1c (two new files, b's target prepopulated, exactly a's identity in completed)
 - F55: applied 9405d1c (by_id through ? in would_ingest)
 - F56: applied eb02c7e (status retained, deadline and interrupt checked until the workers finish, group terminated and child reaped on every return path including a wait error, two descendant regressions)
-- F57: applied: Task 25 bounded deserialization checks depth and the next array entry before decoding children, checks text and keys before retention, and requires the end of the document
-- F58: applied: Task 25 captures the 65,537th byte so a valid oversized prefix is refused
-- F59: applied: 09bebc1 records escaped additive field names for all helper replies; Tasks 27, 30 and 32 retain diagnostic drains in final output
-- F60: applied: 09bebc1 caches successful compatibility before notify and Trash; 0f0e4eb and Tasks 27 and 32 preserve the typed cleanup refusal and map it to helper_version, exit 3; optional notification failures preserve work status under spec section 8.7
-- F61: applied: Task 25 accepts Trash confirmation only for the exact requested path
-- F62: applied: Task 25 version dispatch honors the selected configuration and its helper path
-- F63: applied: Task 5 and Task 26 use notify-command, with no notification engine named
-- F64: applied: Task 26 substitutes tokens once without rescanning inserted text
-- F65: applied: 09bebc1 records command failure before one fallback and disables absent desktop delivery after one diagnostic; Tasks 27, 30 and 32 retain diagnostics in the single final document or human log
-- F66: applied: 67fd6db read-only ledger open; Tasks 27, 28, 30 and 32 use explicit read-only composition with an empty-memory fallback, and mutable composition holds its lock before writable open and repair
-- F67: applied: Task 29 accepts relative equivalent links, rejects dangling verification and regular-file targets, and creates the approved missing target on deploy
-- F68: applied: Task 30 checks cleanup through open_read_only, treating absent audio as an empty observation without creating it
-- F69: applied: Task 30 runs separate git_tree, output and doctor test commands, with no filtering that silently selects zero tests
-- F70: applied: Task 30 always emits the same 18 named checks, running independent checks and reporting dependency failures explicitly
-- F71: applied: Task 31 compares i128 nanoseconds; tests include u64::MAX holds, extreme instants and one nanosecond before expiry
-- F72: applied: Task 32 carries RecordingId with every move and serializes completed recording identities rather than paths
-- F73: applied: Task 32 records each successful move before row or journal updates; both failure cases retain completed progress
-- F74: applied: Task 32 carries structured progress through partial reconciliation and startup failure, combines it with new work, and emits one retention event
-- F75: applied: Task 32 accepts only a successful helper preflight; absent, mismatched, malformed and failed version checks stop removal
-- F76: applied: Task 32 prints the complete borrowing-correct retention implementation, with direct report.failure calls
-- F77: applied: Task 33 requires stable gates and a separate installed-nightly per-test timing run, rejecting every test reaching one second
-- F78: applied: earlier checked-access repairs plus 0f0e4eb and 26b95d3 retain root handles, revalidate identity before pathname use, and reject replacement links; Tasks 27 through 32 use checked store operations and validate journal ownership before reads and Trash calls
-- F79: applied: prior generic port repairs, 0f0e4eb unsized composition-boundary bounds, and Task 32 generic retention and reconciliation; no application-owned dynamic dispatch or unused renderer abstraction remains
+- F57: applied 09bebc1: Task 25 bounded deserialization checks depth and the next array entry before decoding children, checks text and keys before retention, and requires the end of the document
+- F58: applied 09bebc1: Task 25 captures the 65,537th byte so a valid oversized prefix is refused
+- F59: applied cee0a80, a7411f6: 09bebc1 records escaped additive field names for all helper replies; Tasks 27, 30 and 32 retain diagnostic drains in final output
+- F60: applied cee0a80, a7411f6: 09bebc1 caches successful compatibility before notify and Trash; 0f0e4eb and Tasks 27 and 32 preserve the typed cleanup refusal and map it to helper_version, exit 3; optional notification failures preserve work status under spec section 8.7
+- F61: applied 09bebc1: Task 25 accepts Trash confirmation only for the exact requested path
+- F62: applied 09bebc1: Task 25 version dispatch honors the selected configuration and its helper path
+- F63: applied 09bebc1: Task 5 and Task 26 use notify-command, with no notification engine named
+- F64: applied 09bebc1: Task 26 substitutes tokens once without rescanning inserted text
+- F65: applied cee0a80, a7411f6: 09bebc1 records command failure before one fallback and disables absent desktop delivery after one diagnostic; Tasks 27, 30 and 32 retain diagnostics in the single final document or human log
+- F66: applied cee0a80, a7411f6: 67fd6db read-only ledger open; Tasks 27, 28, 30 and 32 use explicit read-only composition with an empty-memory fallback, and mutable composition holds its lock before writable open and repair
+- F67: applied cee0a80: Task 29 accepts relative equivalent links, rejects dangling verification and regular-file targets, and creates the approved missing target on deploy
+- F68: applied cee0a80: Task 30 checks cleanup through open_read_only, treating absent audio as an empty observation without creating it
+- F69: applied cee0a80: Task 30 runs separate git_tree, output and doctor test commands, with no filtering that silently selects zero tests
+- F70: applied cee0a80: Task 30 always emits the same 18 named checks, running independent checks and reporting dependency failures explicitly
+- F71: applied a7411f6: Task 31 compares i128 nanoseconds; tests include u64::MAX holds, extreme instants and one nanosecond before expiry
+- F72: applied a7411f6: Task 32 carries RecordingId with every move and serializes completed recording identities rather than paths
+- F73: applied a7411f6: Task 32 records each successful move before row or journal updates; both failure cases retain completed progress
+- F74: applied a7411f6: Task 32 carries structured progress through partial reconciliation and startup failure, combines it with new work, and emits one retention event
+- F75: applied a7411f6: Task 32 accepts only a successful helper preflight; absent, mismatched, malformed and failed version checks stop removal
+- F76: applied a7411f6: Task 32 prints the complete borrowing-correct retention implementation, with direct report.failure calls
+- F77: applied a7411f6: Task 33 requires stable gates and a separate installed-nightly per-test timing run, rejecting every test reaching one second
+- F78: applied cee0a80, a7411f6: earlier checked-access repairs plus 0f0e4eb and 26b95d3 retain root handles, revalidate identity before pathname use, and reject replacement links; Tasks 27 through 32 use checked store operations and validate journal ownership before reads and Trash calls
+- F79: applied a7411f6: prior generic port repairs, 0f0e4eb unsized composition-boundary bounds, and Task 32 generic retention and reconciliation; no application-owned dynamic dispatch or unused renderer abstraction remains
 - F80: applied 48de0b7 in the LedgerCommit form: one commit carries recordings, seen rows and journal entries; the rollback scenario runs on both implementations
 - F81: applied 6dbfba7 (dataless_never_opens, oversize_never_reads, source_change_discards_stage, invalid_stage_is_trashed, absent_trash_preserves_private_stage) and 7d15839 (exdev_uses_bounded_copy, enospc_aborts_without_row, stage_sync_failure_commits_no_row, directory_sync_failure_commits_no_row); each double records operations and injects the named failure, assertions cover rows, publication, cleanup and event count
 - F82: applied 32c2f6e whole-container snapshot under a titled sweep, 9405d1c the dry run keeps the prepopulated copy byte for byte with its mtime and mode
 - F83: applied 345453a (per-instance sequence, exclusive creation, only AlreadyExists retried, blockers kept)
 - F84: applied 32c2f6e IngestReport::completed and 9405d1c the recovery-then-failure test
-- F85: applied: 09bebc1 fixes structural error redaction with canary tests; Task 30 consumes only sanitized helper errors
-- F86: applied: 0f0e4eb, 09bebc1 and Tasks 27 through 33 keep implementation modules private with curated exports; config, domain and protocol capability APIs remain intentional
+- F85: applied cee0a80: 09bebc1 fixes structural error redaction with canary tests; Task 30 consumes only sanitized helper errors
+- F86: applied cee0a80, a7411f6: 0f0e4eb, 09bebc1 and Tasks 27 through 33 keep implementation modules private with curated exports; config, domain and protocol capability APIs remain intentional
 - F87: applied 757b59f (EXDEV only; StorageFull at creation and on write is NoSpace)
 - F88: applied: e24d803 Task 10, 67fd6db Task 11 flags column, 48de0b7 Task 12 SeenRow.flags with checked codecs, 9242fcb Task 15, 32c2f6e Task 19 and 6dbfba7 Task 20 carry candidate.flags; 0f0e4eb tests preservation of an additional flag alongside the dataless bit
-- F89: applied: Task 34 is removed, its verification precedes the Task 33 commit, and delivery is an unnumbered checklist
+- F89: applied a7411f6: Task 34 is removed, its verification precedes the Task 33 commit, and delivery is an unnumbered checklist
 
 Summary: closed 89, rejected 0, partial 0, pending 0. Codex plan pass 2 follows the integrated repair.
