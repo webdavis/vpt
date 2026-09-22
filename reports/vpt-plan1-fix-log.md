@@ -6,7 +6,7 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F01: applied in part: Tasks 1 to 24 (eb02c7e carries the full run_with_env signature)
 - F02: applied in part: Tasks 1 to 24
 - F03: applied f7f3f67 (test moved to Task 1), 589cb20 (Task 2 wording)
-- F04: applied in part: Task 2 589cb20 (Task 30 pending)
+- F04: applied: 589cb20 Task 2 and the Task 30 replacement emitter retain stdout write failures; injectable-writer tests cover both output modes
 - F05: applied 0d52377 (schema.rs with schema/types.rs and schema/dynamic.rs)
 - F06: applied 0d52377 (quoted() through serde_json, round-trip test)
 - F07: applied 0d52377 (table_is_declared, WrongType for a table where a scalar belongs, two tests)
@@ -53,8 +53,8 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F48: applied 6dbfba7 (saturating_add, page when previous < threshold <= count)
 - F49: applied 7d15839 (resolve_existing) and 76c3fd4 (recover_orphans syncs the archive before the commit)
 - F50: applied 633f045 Civil::instant and is_valid, 971b3c0 parse_local_timestamp, 76c3fd4 Task 22 archived_offset with recovery tested at 19_800 and -21_600
-- F51: applied 32c2f6e Mode { dry_run, once } from Task 19, 9405d1c Task 23 full sweep bodies with once selected independently of dry_run (Task 27 pending)
-- F52: applied in part: 32c2f6e the failure event is gated on mode.dry_run, 9405d1c the unreadable-source dry-run test asserts no event (Task 27 invalid-root case pending)
+- F51: applied: 32c2f6e and 9405d1c carry the complete Mode; Task 27 passes dry_run and once together, with a binary acceptance test
+- F52: applied: 32c2f6e and 9405d1c suppress dry-run events; Task 27 covers invalid roots and unreadable sources without notification or state creation
 - F53: applied 9405d1c (mark_gone before EmptyStore; gone timestamp, failure and one event asserted; the ordinary-disappearance test keeps a surviving recording through recovery in Task 22)
 - F54: applied 9405d1c (two new files, b's target prepopulated, exactly a's identity in completed)
 - F55: applied 9405d1c (by_id through ? in would_ingest)
@@ -69,10 +69,10 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F64: applied: Task 26 substitutes tokens once without rescanning inserted text
 - F65: applied in part: Task 26 records command failure before one fallback and disables absent desktop delivery after one diagnostic; final output drains are in the runtime and retention repair
 - F66: applied in part: 67fd6db Task 11 open_read_only and the writable open through the held state root (Tasks 27, 28, 30, 32 pending)
-- F67: pending
-- F68: pending
-- F69: pending
-- F70: pending
+- F67: applied: Task 29 accepts relative equivalent links, rejects dangling verification and regular-file targets, and creates the approved missing target on deploy
+- F68: applied: Task 30 checks cleanup through open_read_only, treating absent audio as an empty observation without creating it
+- F69: applied: Task 30 runs separate git_tree, output and doctor test commands, with no filtering that silently selects zero tests
+- F70: applied: Task 30 always emits the same 18 named checks, running independent checks and reporting dependency failures explicitly
 - F71: pending
 - F72: pending
 - F73: pending
@@ -87,7 +87,7 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F82: applied 32c2f6e whole-container snapshot under a titled sweep, 9405d1c the dry run keeps the prepopulated copy byte for byte with its mtime and mode
 - F83: applied 345453a (per-instance sequence, exclusive creation, only AlreadyExists retried, blockers kept)
 - F84: applied 32c2f6e IngestReport::completed and 9405d1c the recovery-then-failure test
-- F85: applied in part: Task 25 returns fixed structural messages and parsed unsupported majors, with wrong-type and wrong-schema canaries; doctor consumes those errors in the runtime repair
+- F85: applied: 09bebc1 fixes structural error redaction with canary tests; Task 30 consumes only sanitized helper errors
 - F86: applied in part: Tasks 1 to 24 now keep adapter implementation modules private and publish named root exports; config, domain and protocol modules remain capability APIs (Tasks 25 to 33 pending)
 - F87: applied 757b59f (EXDEV only; StorageFull at creation and on write is NoSpace)
 - F88: applied: e24d803 Task 10, 67fd6db Task 11 flags column, 48de0b7 Task 12 SeenRow.flags with checked codecs, 9242fcb Task 15, 32c2f6e Task 19 and 6dbfba7 Task 20 carry candidate.flags; 0f0e4eb tests preservation of an additional flag alongside the dataless bit
