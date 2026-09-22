@@ -1,0 +1,94 @@
+# Fix round 1 on the Stage 1 plan (Codex review of 153eddd)
+
+One line per finding: applied or declined, the commit sha once committed, and a reason when declined
+or applied in a different form. A line reading `pending` has not been worked yet.
+
+- F01: applied in part: Tasks 1 to 24 (eb02c7e carries the full run_with_env signature)
+- F02: applied in part: Tasks 1 to 24
+- F03: applied f7f3f67 (test moved to Task 1), 589cb20 (Task 2 wording)
+- F04: applied in part: Task 2 589cb20 (Task 30 pending)
+- F05: applied 0d52377 (schema.rs with schema/types.rs and schema/dynamic.rs)
+- F06: applied 0d52377 (quoted() through serde_json, round-trip test)
+- F07: applied 0d52377 (table_is_declared, WrongType for a table where a scalar belongs, two tests)
+- F08: applied 0d52377 (fixed sentence on both parse sites, Unreadable carries the io kind, canary test)
+- F09: applied 0d52377 (four kinds) and 01bb10d (boundary tests over u32)
+- F10: applied 01bb10d (number() widens integers for both ratio kinds)
+- F11: applied (resolve writes nothing; Roots::create_state_dir and create_leaves; container metadata and nonexistence assertions)
+- F12: applied (resolve takes config_dir; RootName::Config; Tasks 27 and 30 pass the selected file's parent)
+- F13: applied (Roots.container is the parent of recordings_dir; fixtures use voice-memos/Recordings)
+- F14: applied (the refusal names source.recordings_dir first)
+- F15: applied fc02c04 SetupOutcome derives Debug (Task 6), 67fd6db SqliteLedger derives Debug (Task 11)
+- F16: applied (the check is exact code with SetupWriter imported)
+- F17: applied (run takes config: Option<&Path>; dispatch passes invocation.config)
+- F18: applied (Sandbox::vpt() setsid in pre_exec; libc dev-dependency; the pty test builds its own script command)
+- F19: applied (let vpt)
+- F20: applied (zero-length read is Closed)
+- F21: applied (set_permissions 0600 on the file and 0700 on directories, tests for both)
+- F22: applied (write_config takes force; create_new(!force); AlreadyExists is Exists)
+- F23: applied in part: 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 32c2f6e Task 19 (Task 26 pending)
+- F24: applied 633f045
+- F25: applied 633f045 Task 7 age_secs and the expected 29, e24d803 Task 10 nanosecond rest case
+- F26: applied 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 6dbfba7 Task 20 maps an unrepresentable capture to invalid_container
+- F27: applied 58a44d4
+- F28: applied 58a44d4
+- F29: applied 58a44d4 in the F79 form: BoxReader removed, inspect takes len and a read callback
+- F30: applied 48de0b7 Task 12 macros carry use super::* (Task 31 pending)
+- F31: applied 48de0b7
+- F32: applied 48de0b7
+- F33: applied bca62c2 Task 13 and eb02c7e Task 24 (Controls with cancellation, clock, wait and grace; no test touches the production flag or asserts elapsed time; zero grace in group tests)
+- F34: applied 345453a (the journal fake and the imports are exact; DirtyPublication comes from ports)
+- F35: applied 345453a (Stores::digest_bytes, RepairError::RenderedDigestMismatch, mismatch test)
+- F36: applied 757b59f (FileExt::read_exact_at)
+- F37: applied in the moved form: 757b59f and cbf8508 (title arrives with Task 16 on the trait), 85021c0 and 7a6f95f (publish and sync_existing arrive with Task 18 on the trait); no stand-in remains, the numbering is kept
+- F38: applied cbf8508 (a separate state temp dir, sorted names compared)
+- F39: applied cbf8508 (the fixture keeps its connection, the live WAL is asserted nonzero before refresh)
+- F40: applied cbf8508 (backslash escaped, ESCAPE in the printed query, no prose amendment)
+- F41: applied 85021c0 Task 17 StageFailure.owned_staging, 32c2f6e Task 19 owned cleanup on every exit before publication, 7d15839 Task 21 fault cases
+- F42: applied 7a6f95f (no link-and-unlink fallback; the typed failure keeps staging for the owned cleanup)
+- F43: applied 32c2f6e, 6dbfba7, 7d15839, 76c3fd4, 9405d1c (every ingest test imports Archive explicitly)
+- F44: applied in part: 527ce14 fixture mtimes from the fixed clock, 6dbfba7 the fresh-file test derives from that clock (Tasks 27, 32 pending)
+- F45: applied 6dbfba7 (Task 23 passes the full mode to every call)
+- F46: applied 527ce14 (ingested requires no deferral reason) and 6dbfba7 (edit, fresh deferral, clock advance, second recording)
+- F47: applied 527ce14 (unchanged refreshes last_seen and clears source_gone_at, not in a dry run)
+- F48: applied 6dbfba7 (saturating_add, page when previous < threshold <= count)
+- F49: applied 7d15839 (resolve_existing) and 76c3fd4 (recover_orphans syncs the archive before the commit)
+- F50: applied 633f045 Civil::instant and is_valid, 971b3c0 parse_local_timestamp, 76c3fd4 Task 22 archived_offset with recovery tested at 19_800 and -21_600
+- F51: applied 32c2f6e Mode { dry_run, once } from Task 19, 9405d1c Task 23 full sweep bodies with once selected independently of dry_run (Task 27 pending)
+- F52: applied in part: 32c2f6e the failure event is gated on mode.dry_run, 9405d1c the unreadable-source dry-run test asserts no event (Task 27 invalid-root case pending)
+- F53: applied 9405d1c (mark_gone before EmptyStore; gone timestamp, failure and one event asserted; the ordinary-disappearance test keeps a surviving recording through recovery in Task 22)
+- F54: applied 9405d1c (two new files, b's target prepopulated, exactly a's identity in completed)
+- F55: applied 9405d1c (by_id through ? in would_ingest)
+- F56: applied eb02c7e (status retained, deadline and interrupt checked until the workers finish, group terminated and child reaped on every return path including a wait error, two descendant regressions)
+- F57: pending
+- F58: pending
+- F59: pending
+- F60: pending
+- F61: pending
+- F62: pending
+- F63: applied in part: the Task 5 settings test (notify-command); Task 26 pending
+- F64: pending
+- F65: pending
+- F66: applied in part: 67fd6db Task 11 open_read_only and the writable open through the held state root (Tasks 27, 28, 30, 32 pending)
+- F67: pending
+- F68: pending
+- F69: pending
+- F70: pending
+- F71: pending
+- F72: pending
+- F73: pending
+- F74: pending
+- F75: pending
+- F76: pending
+- F77: pending
+- F78: applied in part: 1ee265f and e35c3d9 Task 5a, 67fd6db Task 11, bca62c2 Task 13, 11bef3c Task 14, 9242fcb Task 15, cbf8508 Task 16, 85021c0 Task 17, 7a6f95f Task 18; this repair adds root-identity revalidation, checked store validation, and no-create archive/store constructors (Tasks 27 to 32 pending)
+- F79: applied in part: fc02c04 Task 6, 58a44d4 Task 9, 11bef3c Task 14, 9242fcb Task 15 associated Handle, 85021c0 Task 17 clone closure and associated Handle, 32c2f6e Task 19 generic ports; this repair permits composition-root trait objects through generic bounds (Task 32 pending)
+- F80: applied 48de0b7 in the LedgerCommit form: one commit carries recordings, seen rows and journal entries; the rollback scenario runs on both implementations
+- F81: applied 6dbfba7 (dataless_never_opens, oversize_never_reads, source_change_discards_stage, invalid_stage_is_trashed, absent_trash_preserves_private_stage) and 7d15839 (exdev_uses_bounded_copy, enospc_aborts_without_row, stage_sync_failure_commits_no_row, directory_sync_failure_commits_no_row); each double records operations and injects the named failure, assertions cover rows, publication, cleanup and event count
+- F82: applied 32c2f6e whole-container snapshot under a titled sweep, 9405d1c the dry run keeps the prepopulated copy byte for byte with its mtime and mode
+- F83: applied 345453a (per-instance sequence, exclusive creation, only AlreadyExists retried, blockers kept)
+- F84: applied 32c2f6e IngestReport::completed and 9405d1c the recovery-then-failure test
+- F85: pending
+- F86: applied in part: Tasks 1 to 24 now keep adapter implementation modules private and publish named root exports; config, domain and protocol modules remain capability APIs (Tasks 25 to 33 pending)
+- F87: applied 757b59f (EXDEV only; StorageFull at creation and on write is NoSpace)
+- F88: applied: e24d803 Task 10, 67fd6db Task 11 flags column, 48de0b7 Task 12 SeenRow.flags with checked codecs, 9242fcb Task 15, 32c2f6e Task 19 and 6dbfba7 Task 20 carry candidate.flags; this repair tests preservation of an additional flag alongside the dataless bit
+- F89: pending
