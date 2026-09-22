@@ -48,9 +48,9 @@ Every task's requirements implicitly include this section. Values are copied fro
 - **Clean code and SOLID.** One responsibility per file, module, type and function; concrete use-case
   types; ports narrow but cohesive; typed outcomes, never a bare `Option` where failure classes differ;
   no `unwrap` or `expect` on untrusted input; no `Arc<Mutex<_>>` by default; private by default with
-  curated `lib.rs` exports; no `#[cfg(test)]` item above production code. Implementation modules
-  stay private. Named capability APIs (`config`, application `ports`, domain and protocol document
-  modules) expose only their intended types and functions; tests stay in private children.
+  curated `lib.rs` exports; no `#[cfg(test)]` item above production code. Implementation modules stay
+  private. Named capability APIs (`config`, application `ports`, domain and protocol document modules)
+  expose only their intended types and functions; tests stay in private children.
 - **Test-first without exception** (spec section 12): the failing test first, seen to fail for the
   intended reason, then the code. Unit tests live beside their implementation under `#[cfg(test)]`, in a
   private `tests.rs` child when large. Every test finishes within one second under
@@ -146,11 +146,14 @@ crates/vpt-adapters/src/config/load.rs       read, parse, unknown keys, merge ov
 crates/vpt-adapters/src/config/validate.rs   value rules by kind
 crates/vpt-adapters/src/config/settings.rs   table to Settings, path expansion
 crates/vpt-adapters/src/config/roots.rs      root resolution and overlap refusals
+crates/vpt-adapters/src/config/roots/tests.rs private root-resolution regressions
 crates/vpt-adapters/src/config/paths.rs      config path discovery (VPT_CONFIG, XDG, HOME)
 crates/vpt-adapters/src/config/write.rs      setup's filesystem writes
 crates/vpt-adapters/src/ledger/mod.rs        LedgerError
 crates/vpt-adapters/src/ledger/sqlite/mod.rs SqliteLedger: open, permissions, WAL, busy timeout
 crates/vpt-adapters/src/ledger/sqlite/migrations.rs the versioned schema
+crates/vpt-adapters/src/ledger/sqlite/connection.rs retained-root checks and read-only WAL access
+crates/vpt-adapters/src/ledger/sqlite/boundary_tests.rs connection-boundary regressions
 crates/vpt-adapters/src/ledger/sqlite/recordings.rs RecordingLedger for SQLite
 crates/vpt-adapters/src/ledger/sqlite/journal.rs PublicationJournal for SQLite
 crates/vpt-adapters/src/ledger/sqlite/retention.rs RetentionJournal for SQLite
@@ -160,10 +163,15 @@ crates/vpt-adapters/src/ledger/contract/retention.rs private retention contract 
 crates/vpt-adapters/src/lock.rs              WriteLock over flock
 crates/vpt-adapters/src/clock.rs             SystemClock
 crates/vpt-adapters/src/voice_memos/store.rs VoiceMemosStore: listing and read-only descriptors
+crates/vpt-adapters/src/voice_memos/store/tests.rs private source-boundary tests
 crates/vpt-adapters/src/voice_memos/titles.rs the private database copy and the title lookup
+crates/vpt-adapters/src/voice_memos/titles/tests.rs private title-copy tests
 crates/vpt-adapters/src/archive/mod.rs       ClonefileArchive: staging and digests
+crates/vpt-adapters/src/archive/tests.rs     private staging and cleanup tests
 crates/vpt-adapters/src/archive/publish.rs   exclusive publication and directory sync
 crates/vpt-adapters/src/spawn.rs             bounded process execution
+crates/vpt-adapters/src/spawn/tests.rs      controlled executor regressions
+crates/vpt-adapters/src/spawn/tests/support.rs isolated process fixtures
 crates/vpt-adapters/src/helper.rs            HelperClient: version, notify, trash
 crates/vpt-adapters/src/helper/reply.rs      known fields and additive diagnostics
 crates/vpt-adapters/src/helper/tests.rs      private helper protocol regressions
@@ -183,6 +191,8 @@ crates/vpt/src/compose.rs                    Runtime: settings, roots, adapters
 crates/vpt/src/compose/clock.rs             production and dev-tools clocks
 crates/vpt/src/compose/errors.rs            typed failures to error documents
 crates/vpt/src/compose/ledger.rs            read-only or writable ledger composition
+crates/vpt/src/compose/runtime.rs           operation-specific startup and retained state
+crates/vpt/src/compose/observations.rs      ledger-only and stores-only observation
 crates/vpt/src/compose/recovery.rs          startup progress and retention events
 crates/vpt/src/compose/tests.rs             private composition regressions
 crates/vpt/src/documents/record.rs           RecordingRecord to JSON
@@ -915,6 +925,8 @@ jobs:
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt`
 
 Expected: `test result: ok.` for the four unit tests in `args.rs`, the two tests in `version.rs` and the
@@ -926,6 +938,8 @@ Run: `cargo fmt --all -- --check &&`
 Expected: no output from fmt; clippy finishes with `Finished` and no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add Cargo.toml Cargo.lock rust-toolchain.toml README.md justfile .github crates
@@ -959,8 +973,8 @@ ______________________________________________________________________
   `ErrorDocument::new(kind: ErrorKind, message: impl Into<String>) -> ErrorDocument`, the builder methods
   `rule(self, rule: &str) -> Self`, `ids(self, ids: Vec<String>) -> Self`,
   `completed(self, completed: Vec<String>) -> Self`, `checks(self, checks: Vec<Check>) -> Self`,
-  `diagnostics(self, diagnostics: Vec<String>) -> Self`, and
-  `exit_code(&self) -> i32`, `to_json(&self) -> serde_json::Value`;
+  `diagnostics(self, diagnostics: Vec<String>) -> Self`, and `exit_code(&self) -> i32`,
+  `to_json(&self) -> serde_json::Value`;
   `cli::output::Outcome::{Success { document: serde_json::Value, human: String },`
   `Failure(ErrorDocument)}` and `emit(outcome: Outcome, json: bool) -> i32`, which writes stdout or
   stderr and returns the exit code (a stdout that cannot be written is a `Store` failure, exit 1).
@@ -1323,11 +1337,15 @@ fn dispatch(invocation: &Invocation) -> i32 {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-protocol -p vpt`
 
 Expected: all tests in `error.rs`, `result.rs`, `args.rs`, `version.rs` and `usage.rs` PASS.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates Cargo.lock
@@ -1926,11 +1944,15 @@ error kind rather than the operating system's text, so no refusal quotes the con
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters config`
 
 Expected: 15 tests PASS.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates/vpt-adapters
@@ -2250,11 +2272,15 @@ and in `load_text`, replace `Ok(merged)` with:
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-domain -p vpt-adapters`
 
 Expected: all PASS, Task 3's fifteen tests included.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates/vpt-domain crates/vpt-adapters
@@ -2279,7 +2305,7 @@ overlap rule too; the configuration directory is a root of its own.
 - Create: `crates/vpt-application/src/settings.rs`
 - Modify: `crates/vpt-application/src/lib.rs`
 - Create: `crates/vpt-adapters/src/config/settings.rs`, `crates/vpt-adapters/src/config/roots.rs`,
-  `crates/vpt-adapters/src/config/paths.rs`
+  `crates/vpt-adapters/src/config/roots/tests.rs`, `crates/vpt-adapters/src/config/paths.rs`
 - Modify: `crates/vpt-adapters/src/config/mod.rs`
 
 **Interfaces:**
@@ -2317,8 +2343,10 @@ overlap rule too; the configuration directory is a root of its own.
     `Roots { pub home: PathBuf, pub state_dir: PathBuf, pub stores: StorePaths,`
     `pub recordings_dir: PathBuf,` `pub container: PathBuf, pub config_dir: PathBuf }` (every path
     absolute, canonical where it exists);
-    `resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootError>` (writes nothing);
-    `Roots::create_state_dir(&self) -> Result<(), RootError>` and
+    `planned_directory(path: &Path, key: &str) -> Result<PathBuf, RootError>` (resolve existing ancestors
+    without creation); `resolve_stores(settings: &Settings) -> Result<StorePaths, RootError>` (home and
+    stores only); `resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootError>` (writes
+    nothing); `Roots::create_state_dir(&self) -> Result<(), RootError>` and
     `Roots::create_leaves(&self) -> Result<(), RootError>` (the home and every missing store leaf, mode
     0700, only after a resolution succeeded).
   - `vpt_adapters::config::{config_path(env: impl Fn(&str) -> Option<String>) -> PathBuf,`
@@ -2341,7 +2369,7 @@ and `crates/vpt-adapters/src/config/mod.rs` gains `mod paths; mod roots; mod set
 
 ```rust
 pub use paths::{config_path, default_state_dir};
-pub use roots::{RootError, Roots, resolve};
+pub use roots::{RootError, Roots, planned_directory, resolve, resolve_stores};
 pub use settings::{DEFAULT_HOME, from_table};
 ```
 
@@ -2398,129 +2426,268 @@ mod tests {
 }
 ```
 
-`crates/vpt-adapters/src/config/roots.rs`:
+`crates/vpt-adapters/src/config/roots.rs` starts with `#[cfg(test)] mod tests;`.
+`crates/vpt-adapters/src/config/roots/tests.rs`:
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::{from_table, load_text};
-    use std::os::unix::fs::PermissionsExt;
-    use vpt_application::Settings;
+use super::*;
+use crate::config::{from_table, load_text};
+use std::os::unix::fs::PermissionsExt;
+use vpt_application::Settings;
 
-    /// A fixture whose Voice Memos container is `<temp>/voice-memos` and whose
-    /// writable roots all sit outside it.
-    fn fixture() -> tempfile::TempDir {
-        let temp = tempfile::tempdir().expect("temp");
-        std::fs::create_dir_all(temp.path().join("h")).expect("home");
-        std::fs::create_dir_all(temp.path().join("voice-memos/Recordings")).expect("voice memos");
-        std::fs::write(temp.path().join("voice-memos/CloudRecordings.db"), b"live").expect("live db");
-        std::fs::create_dir_all(temp.path().join("cfg")).expect("config dir");
-        temp
-    }
+/// A fixture whose Voice Memos container is `<temp>/voice-memos` and whose
+/// writable roots all sit outside it.
+fn fixture() -> tempfile::TempDir {
+    let temp = tempfile::tempdir().expect("temp");
+    std::fs::create_dir_all(temp.path().join("h")).expect("home");
+    std::fs::create_dir_all(temp.path().join("voice-memos/Recordings")).expect("voice memos");
+    std::fs::write(temp.path().join("voice-memos/CloudRecordings.db"), b"live").expect("live db");
+    std::fs::create_dir_all(temp.path().join("cfg")).expect("config dir");
+    temp
+}
 
-    fn settings_in(root: &Path, extra: &str) -> Settings {
-        let text = format!(
-            "config_version = 1\n[home]\npath = \"{}\"\nstate_dir = \"{}\"\n[source]\nrecordings_dir = \"{}\"\n{extra}",
-            root.join("h").display(),
-            root.join("s").display(),
-            root.join("voice-memos/Recordings").display()
-        );
-        from_table(&load_text(&text).expect("loads"), root).expect("settings")
-    }
+fn settings_in(root: &Path, extra: &str) -> Settings {
+    let text = format!(
+        "config_version = 1\n[home]\npath = \"{}\"\nstate_dir = \"{}\"\n[source]\nrecordings_dir = \"{}\"\n{extra}",
+        root.join("h").display(),
+        root.join("s").display(),
+        root.join("voice-memos/Recordings").display()
+    );
+    from_table(&load_text(&text).expect("loads"), root).expect("settings")
+}
 
-    fn entries(dir: &Path) -> Vec<String> {
-        let mut names: Vec<String> = std::fs::read_dir(dir)
-            .expect("readable")
-            .map(|entry| entry.expect("entry").file_name().to_string_lossy().into_owned())
-            .collect();
-        names.sort();
-        names
-    }
+fn entries(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .expect("readable")
+        .map(|entry| {
+            entry
+                .expect("entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    names.sort();
+    names
+}
 
-    #[test]
-    fn resolution_writes_nothing_and_create_leaves_makes_the_store_leaves_0700() {
-        let temp = fixture();
-        let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("resolves");
-        assert!(!temp.path().join("h/audio").exists(), "resolve created a leaf");
-        assert!(!temp.path().join("s").exists(), "resolve created the state directory");
-        roots.create_leaves().expect("leaves");
-        assert!(roots.stores.audio.is_dir());
-        assert_eq!(roots.stores.audio, temp.path().join("h/audio").canonicalize().expect("canonical"));
-        assert_eq!(std::fs::metadata(&roots.stores.audio).expect("meta").permissions().mode() & 0o777, 0o700);
-        roots.create_state_dir().expect("state");
-        assert_eq!(std::fs::metadata(&roots.state_dir).expect("meta").permissions().mode() & 0o777, 0o700);
-    }
+#[test]
+fn resolution_writes_nothing_and_create_leaves_makes_the_store_leaves_0700() {
+    let temp = fixture();
+    let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("resolves");
+    assert!(
+        !temp.path().join("h/audio").exists(),
+        "resolve created a leaf"
+    );
+    assert!(
+        !temp.path().join("s").exists(),
+        "resolve created the state directory"
+    );
+    roots.create_leaves().expect("leaves");
+    assert!(roots.stores.audio.is_dir());
+    assert_eq!(
+        roots.stores.audio,
+        temp.path()
+            .join("h/audio")
+            .canonicalize()
+            .expect("canonical")
+    );
+    assert_eq!(
+        std::fs::metadata(&roots.stores.audio)
+            .expect("meta")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
+    roots.create_state_dir().expect("state");
+    assert_eq!(
+        std::fs::metadata(&roots.state_dir)
+            .expect("meta")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
+}
 
-    #[test]
-    fn a_missing_default_home_is_a_prospective_leaf_with_its_stores_below_it() {
-        let temp = fixture();
-        std::fs::remove_dir(temp.path().join("h")).expect("no home yet");
-        let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("resolves");
-        assert_eq!(roots.stores.drafts, temp.path().canonicalize().expect("canonical").join("h/drafts"));
-        roots.create_leaves().expect("leaves");
-        assert!(temp.path().join("h/drafts").is_dir());
-    }
+#[test]
+fn a_missing_default_home_is_a_prospective_leaf_with_its_stores_below_it() {
+    let temp = fixture();
+    std::fs::remove_dir(temp.path().join("h")).expect("no home yet");
+    let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("resolves");
+    assert_eq!(
+        roots.stores.drafts,
+        temp.path()
+            .canonicalize()
+            .expect("canonical")
+            .join("h/drafts")
+    );
+    roots.create_leaves().expect("leaves");
+    assert!(temp.path().join("h/drafts").is_dir());
+}
 
-    #[test]
-    fn a_store_pointed_elsewhere_needs_an_existing_parent() {
-        let temp = fixture();
-        let extra = format!("[stores]\naudio = \"{}\"\n", temp.path().join("missing/audio").display());
-        let error = resolve(&settings_in(temp.path(), &extra), &temp.path().join("cfg")).unwrap_err();
-        assert_eq!(error, RootError::ParentMissing { key: "stores.audio".into() });
-    }
+#[test]
+fn a_store_pointed_elsewhere_needs_an_existing_parent() {
+    let temp = fixture();
+    let extra = format!(
+        "[stores]\naudio = \"{}\"\n",
+        temp.path().join("missing/audio").display()
+    );
+    let error = resolve(&settings_in(temp.path(), &extra), &temp.path().join("cfg")).unwrap_err();
+    assert_eq!(
+        error,
+        RootError::ParentMissing {
+            key: "stores.audio".into()
+        }
+    );
+}
 
-    #[test]
-    fn a_store_inside_the_voice_memos_container_is_refused_and_the_container_is_untouched() {
-        let temp = fixture();
-        let container = temp.path().join("voice-memos");
-        let before = entries(&container);
-        let live = std::fs::metadata(container.join("CloudRecordings.db")).expect("live");
-        let extra = format!("[stores]\ndrafts = \"{}\"\n", container.join("drafts").display());
+#[test]
+fn a_store_inside_the_voice_memos_container_is_refused_and_the_container_is_untouched() {
+    let temp = fixture();
+    let container = temp.path().join("voice-memos");
+    let before = entries(&container);
+    let live = std::fs::metadata(container.join("CloudRecordings.db")).expect("live");
+    let extra = format!(
+        "[stores]\ndrafts = \"{}\"\n",
+        container.join("drafts").display()
+    );
 
-        let error = resolve(&settings_in(temp.path(), &extra), &temp.path().join("cfg")).unwrap_err();
+    let error = resolve(&settings_in(temp.path(), &extra), &temp.path().join("cfg")).unwrap_err();
 
-        assert_eq!(error, RootError::Overlap { first: "source.recordings_dir".into(), second: "stores.drafts".into() });
-        assert_eq!(entries(&container), before);
-        assert!(!container.join("drafts").exists());
-        let after = std::fs::metadata(container.join("CloudRecordings.db")).expect("live");
-        assert_eq!((after.len(), after.modified().expect("mtime")), (live.len(), live.modified().expect("mtime")));
-        assert!(!temp.path().join("h/audio").exists(), "a refusal created a leaf elsewhere");
-    }
+    assert_eq!(
+        error,
+        RootError::Overlap {
+            first: "source.recordings_dir".into(),
+            second: "stores.drafts".into()
+        }
+    );
+    assert_eq!(entries(&container), before);
+    assert!(!container.join("drafts").exists());
+    let after = std::fs::metadata(container.join("CloudRecordings.db")).expect("live");
+    assert_eq!(
+        (after.len(), after.modified().expect("mtime")),
+        (live.len(), live.modified().expect("mtime"))
+    );
+    assert!(
+        !temp.path().join("h/audio").exists(),
+        "a refusal created a leaf elsewhere"
+    );
+}
 
-    #[test]
-    fn the_configuration_directory_is_a_root_the_released_store_may_not_overlap() {
-        let temp = fixture();
-        let extra = format!("[stores]\nreleased = \"{}\"\n", temp.path().join("cfg/out").display());
-        let error = resolve(&settings_in(temp.path(), &extra), &temp.path().join("cfg")).unwrap_err();
-        assert_eq!(error, RootError::Overlap { first: "config".into(), second: "stores.released".into() });
-    }
+#[test]
+fn the_configuration_directory_is_a_root_the_released_store_may_not_overlap() {
+    let temp = fixture();
+    let extra = format!(
+        "[stores]\nreleased = \"{}\"\n",
+        temp.path().join("cfg/out").display()
+    );
+    let error = resolve(&settings_in(temp.path(), &extra), &temp.path().join("cfg")).unwrap_err();
+    assert_eq!(
+        error,
+        RootError::Overlap {
+            first: "config".into(),
+            second: "stores.released".into()
+        }
+    );
+}
 
-    #[test]
-    fn a_relative_root_after_expansion_is_refused() {
-        let temp = fixture();
-        let error = resolve(&settings_in(temp.path(), "[stores]\nbriefs = \"briefs\"\n"), &temp.path().join("cfg")).unwrap_err();
-        assert_eq!(error, RootError::NotAbsolute { key: "stores.briefs".into() });
-    }
+#[test]
+fn a_relative_root_after_expansion_is_refused() {
+    let temp = fixture();
+    let error = resolve(
+        &settings_in(temp.path(), "[stores]\nbriefs = \"briefs\"\n"),
+        &temp.path().join("cfg"),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        RootError::NotAbsolute {
+            key: "stores.briefs".into()
+        }
+    );
+}
 
-    #[test]
-    fn a_file_where_a_root_belongs_is_refused() {
-        let temp = fixture();
-        std::fs::write(temp.path().join("h/audio"), b"not a directory").expect("file");
-        let error = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).unwrap_err();
-        assert_eq!(error, RootError::NotADirectory { key: "stores.audio".into() });
-    }
+#[test]
+fn a_file_where_a_root_belongs_is_refused() {
+    let temp = fixture();
+    std::fs::write(temp.path().join("h/audio"), b"not a directory").expect("file");
+    let error = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).unwrap_err();
+    assert_eq!(
+        error,
+        RootError::NotADirectory {
+            key: "stores.audio".into()
+        }
+    );
+}
 
-    #[test]
-    fn a_symlinked_home_is_followed_when_no_target_is_configured() {
-        let temp = fixture();
-        std::fs::remove_dir(temp.path().join("h")).expect("replace the home");
-        std::fs::create_dir_all(temp.path().join("real")).expect("real home");
-        std::os::unix::fs::symlink(temp.path().join("real"), temp.path().join("h")).expect("link");
-        let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("resolves");
-        assert_eq!(roots.home, temp.path().join("real").canonicalize().expect("canonical"));
-        assert_eq!(roots.container, temp.path().join("voice-memos").canonicalize().expect("canonical"));
-    }
+#[test]
+fn a_symlinked_home_is_followed_when_no_target_is_configured() {
+    let temp = fixture();
+    std::fs::remove_dir(temp.path().join("h")).expect("replace the home");
+    std::fs::create_dir_all(temp.path().join("real")).expect("real home");
+    std::os::unix::fs::symlink(temp.path().join("real"), temp.path().join("h")).expect("link");
+    let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("resolves");
+    assert_eq!(
+        roots.home,
+        temp.path().join("real").canonicalize().expect("canonical")
+    );
+    assert_eq!(
+        roots.container,
+        temp.path()
+            .join("voice-memos")
+            .canonicalize()
+            .expect("canonical")
+    );
+}
+
+#[test]
+fn a_missing_home_does_not_authorize_parent_traversal_into_the_source() {
+    let temp = fixture();
+    std::fs::remove_dir(temp.path().join("h")).expect("missing home");
+    let before = entries(&temp.path().join("voice-memos"));
+    let settings = settings_in(
+        temp.path(),
+        "[stores]\naudio = \"<home>/../voice-memos/evil\"\n",
+    );
+
+    assert_eq!(
+        resolve(&settings, &temp.path().join("cfg")).unwrap_err(),
+        RootError::ParentMissing {
+            key: "stores.audio".into(),
+        }
+    );
+    assert_eq!(entries(&temp.path().join("voice-memos")), before);
+    assert!(!temp.path().join("h").exists());
+}
+#[test]
+fn a_dangling_configuration_directory_link_is_refused() {
+    let temp = fixture();
+    let selected = temp.path().join("config-link");
+    std::os::unix::fs::symlink(temp.path().join("absent"), &selected).expect("link");
+    assert_eq!(
+        resolve(&settings_in(temp.path(), ""), &selected).unwrap_err(),
+        RootError::PathEscape {
+            key: "config".into()
+        }
+    );
+}
+
+#[test]
+fn resolution_can_describe_absent_source_and_deep_default_directories_without_writes() {
+    let temp = fixture();
+    let mut settings = settings_in(temp.path(), "");
+    settings.state_dir = temp.path().join("new/local/state/vpt");
+    settings.source.recordings_dir = temp.path().join("absent-source/Recordings");
+    let selected = temp.path().join("new/config/vpt");
+    let roots = resolve(&settings, &selected).expect("prospective roots");
+    let base = temp.path().canonicalize().expect("canonical");
+    assert_eq!(roots.config_dir, base.join("new/config/vpt"));
+    assert_eq!(roots.state_dir, base.join("new/local/state/vpt"));
+    assert_eq!(roots.container, base.join("absent-source"));
+    assert!(!temp.path().join("new").exists());
+    assert!(!temp.path().join("absent-source").exists());
 }
 ```
 
@@ -2607,7 +2774,11 @@ lines; the re-exports in `lib.rs` name items that do not exist yet, which is par
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p vpt-domain layout && cargo test -p vpt-adapters config`
+Run independently, including the second command after the first expected failure:
+
+Run: `cargo test -p vpt-domain layout`
+
+Run: `cargo test -p vpt-adapters config`
 
 Expected: the builds fail with `cannot find` for `check_overlaps`, `RootName`, `from_table`, `resolve`,
 `config_path` and the `Settings` re-export. Every new test module is compiled and selected; a run that
@@ -3025,15 +3196,46 @@ pub struct Roots {
 }
 
 pub fn resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootError> {
-    let home = prospective(&settings.home, "home.path", None)?;
-    let state_dir = prospective(&settings.state_dir, "home.state_dir", None)?;
-    let recordings_dir = existing(&settings.source.recordings_dir, "source.recordings_dir")?;
-    let container = recordings_dir.parent().map(Path::to_path_buf).ok_or_else(|| RootError::NotAbsolute { key: "source.recordings_dir".into() })?;
-    let config_dir = config_dir.canonicalize().unwrap_or_else(|_| config_dir.to_path_buf());
+    let home = planned_directory(&settings.home, "home.path")?;
+    let state_dir = planned_directory(&settings.state_dir, "home.state_dir")?;
+    let recordings_dir =
+        planned_directory(&settings.source.recordings_dir, "source.recordings_dir")?;
+    let container = recordings_dir
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| RootError::NotAbsolute {
+            key: "source.recordings_dir".into(),
+        })?;
+    let config_path = if config_dir.is_absolute() {
+        config_dir.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|error| RootError::Io {
+                key: "config".into(),
+                detail: error.kind().to_string(),
+            })?
+            .join(config_dir)
+    };
+    let config_dir = planned_directory(&config_path, "config")?;
     let mut stores = settings.stores.clone();
     for key in StoreKey::all() {
-        let below_home = settings.stores.get(key).strip_prefix(&settings.home).ok().map(|rest| home.join(rest));
-        let path = prospective(settings.stores.get(key), &format!("stores.{}", key.key_name()), below_home)?;
+        let below_home = settings
+            .stores
+            .get(key)
+            .strip_prefix(&settings.home)
+            .ok()
+            .and_then(|rest| {
+                let mut components = rest.components();
+                match (components.next(), components.next()) {
+                    (Some(std::path::Component::Normal(name)), None) => Some(home.join(name)),
+                    _ => None,
+                }
+            });
+        let path = prospective(
+            settings.stores.get(key),
+            &format!("stores.{}", key.key_name()),
+            below_home,
+        )?;
         stores.set(key, path);
     }
     let mut roots: Vec<(RootName, &Path)> = vec![
@@ -3045,9 +3247,18 @@ pub fn resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootErro
     for key in StoreKey::all() {
         roots.push((RootName::Store(key), stores.get(key)));
     }
-    check_overlaps(&roots)
-        .map_err(|conflict| RootError::Overlap { first: conflict.first.key_name(), second: conflict.second.key_name() })?;
-    Ok(Roots { home, state_dir, stores, recordings_dir, container, config_dir })
+    check_overlaps(&roots).map_err(|conflict| RootError::Overlap {
+        first: conflict.first.key_name(),
+        second: conflict.second.key_name(),
+    })?;
+    Ok(Roots {
+        home,
+        state_dir,
+        stores,
+        recordings_dir,
+        container,
+        config_dir,
+    })
 }
 
 impl Roots {
@@ -3066,16 +3277,85 @@ impl Roots {
     }
 }
 
-/// An absolute path that exists as a directory, canonical.
-fn existing(path: &Path, key: &str) -> Result<PathBuf, RootError> {
+pub fn planned_directory(path: &Path, key: &str) -> Result<PathBuf, RootError> {
     if !path.is_absolute() {
         return Err(RootError::NotAbsolute { key: key.into() });
     }
-    let canonical = path.canonicalize().map_err(|_| RootError::ParentMissing { key: key.into() })?;
-    if !canonical.is_dir() {
-        return Err(RootError::NotADirectory { key: key.into() });
+    let mut cursor = path;
+    let mut missing = Vec::new();
+    loop {
+        match cursor.canonicalize() {
+            Ok(mut parent) => {
+                if !parent.is_dir() {
+                    return Err(RootError::NotADirectory { key: key.into() });
+                }
+                for leaf in missing.iter().rev() {
+                    parent.push(leaf);
+                }
+                return Ok(parent);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                match cursor.symlink_metadata() {
+                    Ok(_) => return Err(RootError::PathEscape { key: key.into() }),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => {
+                        return Err(RootError::Io {
+                            key: key.into(),
+                            detail: error.kind().to_string(),
+                        });
+                    }
+                }
+                let leaf = cursor
+                    .file_name()
+                    .ok_or_else(|| RootError::ParentMissing { key: key.into() })?;
+                missing.push(leaf.to_os_string());
+                cursor = cursor
+                    .parent()
+                    .ok_or_else(|| RootError::ParentMissing { key: key.into() })?;
+            }
+            Err(error) => {
+                return Err(RootError::Io {
+                    key: key.into(),
+                    detail: error.kind().to_string(),
+                });
+            }
+        }
     }
-    Ok(canonical)
+}
+
+pub fn resolve_stores(settings: &Settings) -> Result<StorePaths, RootError> {
+    let home = planned_directory(&settings.home, "home.path")?;
+    let mut stores = settings.stores.clone();
+    for key in StoreKey::all() {
+        let configured = settings.stores.get(key);
+        let below_home = configured
+            .strip_prefix(&settings.home)
+            .ok()
+            .and_then(|rest| {
+                let mut components = rest.components();
+                match (components.next(), components.next()) {
+                    (Some(std::path::Component::Normal(name)), None) => Some(home.join(name)),
+                    _ => None,
+                }
+            });
+        stores.set(
+            key,
+            prospective(
+                configured,
+                &format!("stores.{}", key.key_name()),
+                below_home,
+            )?,
+        );
+    }
+    let mut roots = vec![(RootName::Home, home.as_path())];
+    for key in StoreKey::all() {
+        roots.push((RootName::Store(key), stores.get(key)));
+    }
+    check_overlaps(&roots).map_err(|conflict| RootError::Overlap {
+        first: conflict.first.key_name(),
+        second: conflict.second.key_name(),
+    })?;
+    Ok(stores)
 }
 
 /// An absolute path, canonical where it exists. A missing leaf under an
@@ -3086,17 +3366,51 @@ fn prospective(path: &Path, key: &str, below_home: Option<PathBuf>) -> Result<Pa
     if !path.is_absolute() {
         return Err(RootError::NotAbsolute { key: key.into() });
     }
-    if let Ok(canonical) = path.canonicalize() {
-        if !canonical.is_dir() {
-            return Err(RootError::NotADirectory { key: key.into() });
+    match path.canonicalize() {
+        Ok(canonical) => {
+            if !canonical.is_dir() {
+                return Err(RootError::NotADirectory { key: key.into() });
+            }
+            return Ok(canonical);
         }
-        return Ok(canonical);
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(RootError::Io {
+                key: key.into(),
+                detail: error.kind().to_string(),
+            });
+        }
     }
-    let parent = path.parent().ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
-    let leaf = path.file_name().ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
+    match path.symlink_metadata() {
+        Ok(_) => return Err(RootError::PathEscape { key: key.into() }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(RootError::Io {
+                key: key.into(),
+                detail: error.kind().to_string(),
+            });
+        }
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
+    let leaf = path
+        .file_name()
+        .ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
     match parent.canonicalize() {
-        Ok(parent) => Ok(parent.join(leaf)),
-        Err(_) => below_home.ok_or_else(|| RootError::ParentMissing { key: key.into() }),
+        Ok(parent) => {
+            if !parent.is_dir() {
+                return Err(RootError::NotADirectory { key: key.into() });
+            }
+            Ok(parent.join(leaf))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            below_home.ok_or_else(|| RootError::ParentMissing { key: key.into() })
+        }
+        Err(error) => Err(RootError::Io {
+            key: key.into(),
+            detail: error.kind().to_string(),
+        }),
     }
 }
 
@@ -3104,7 +3418,10 @@ fn private_dir(path: &Path, key: &str) -> Result<(), RootError> {
     match DirBuilder::new().mode(0o700).create(path) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
-        Err(error) => Err(RootError::Io { key: key.into(), detail: error.kind().to_string() }),
+        Err(error) => Err(RootError::Io {
+            key: key.into(),
+            detail: error.kind().to_string(),
+        }),
     }
 }
 ```
@@ -3112,8 +3429,8 @@ fn private_dir(path: &Path, key: &str) -> Result<(), RootError> {
 `Roots.container` is what the overlap rule protects, so a store beside `Recordings/` inside Apple's group
 container is refused as well as one inside it, and the refusal names `source.recordings_dir` first
 because the container precedes every store in the list `check_overlaps` walks. The unresolved
-`settings.home` prefix is how a store under a not-yet-existing home stays prospective: its resolved form
-is the resolved home plus the remainder, and `create_leaves` creates the home first.
+`settings.home` prefix permits exactly one normal store component beneath a missing home. A parent
+traversal or deeper missing store parent is refused. `create_leaves` creates the home first.
 
 `crates/vpt-adapters/src/config/paths.rs`, above its test module:
 
@@ -3143,11 +3460,15 @@ pub fn default_state_dir(env: impl Fn(&str) -> Option<String>) -> String {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test --workspace`
 
 Expected: all PASS.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -3171,13 +3492,16 @@ writes or hands its path to the helper.
 **Files:**
 
 - Create: `crates/vpt-adapters/src/contained.rs`, `crates/vpt-adapters/src/contained/tests.rs`
-- Modify: `crates/vpt-adapters/src/lib.rs`, `crates/vpt-adapters/src/config/roots.rs`
+- Modify: `crates/vpt-adapters/src/lib.rs`, `crates/vpt-adapters/src/config/roots.rs`,
+  `crates/vpt-adapters/src/config/roots/tests.rs`, `crates/vpt-adapters/src/config/load.rs`
 
 **Interfaces:**
 
-- Consumes: `config::{RootError, Roots}` and its private `private_dir(path: &Path, key: &str) -> Result<(), RootError>` creator from Task 5.
+- Consumes: `config::{RootError, Roots}` and its private
+  `private_dir(path: &Path, key: &str) -> Result<(), RootError>` creator from Task 5.
 
-- Produces: descriptor-relative creation behind `Roots::create_state_dir` and `Roots::create_leaves`; links introduced after resolution return `RootError::PathEscape { key }`.
+- Produces: descriptor-relative creation behind `Roots::create_state_dir` and `Roots::create_leaves`;
+  links introduced after resolution return `RootError::PathEscape { key }`.
 
 - Produces, re-exported from `vpt_adapters`:
   `ContainedError::{Escape { root: PathBuf, path: PathBuf }, NotRegular(PathBuf),`
@@ -3190,6 +3514,8 @@ writes or hands its path to the helper.
   directory descriptor of one canonical root, with
   `RootDir::open(path: &Path) -> Result<RootDir, ContainedError>` (a link in any component or a
   non-directory is `NotADirectory`), `fn path(&self) -> &Path`,
+  `fn try_clone(&self) -> Result<RootDir, ContainedError>` (duplicate the retained descriptor),
+  `fn identity(&self) -> Result<(u64, u64), ContainedError>` (device and inode of that descriptor),
   `fn revalidate(&self) -> Result<(), ContainedError>` (reopen without following links and require the
   same device and inode before handing an absolute path to another process),
   `fn leaf(&self, path: &Path) -> Result<PathBuf, ContainedError>` (`leaf_below` against this root),
@@ -3197,7 +3523,7 @@ writes or hands its path to the helper.
   `fn regular(&self, path: &Path) -> Result<PathBuf, ContainedError>` (an existing regular file, a link
   refused as `NotRegular`),
   `fn open_file(&self, path: &Path, access: Access) -> Result<File, ContainedError>` (`openat` with
-  `O_NOFOLLOW` and `O_CLOEXEC`; a link or a non-file at the leaf is `NotRegular`),
+  `O_NOFOLLOW`, `O_CLOEXEC` and `O_NONBLOCK`; a link or a non-file at the leaf is `NotRegular`),
   `fn create_file(&self, path: &Path, mode: u32) -> Result<File, ContainedError>` (exclusive creation at
   that mode, an existing name is `Io` with kind `AlreadyExists`),
   `fn subdirectory(&self, name: &str) -> Result<RootDir, ContainedError>` (a mode-0700 directory, created
@@ -3212,6 +3538,10 @@ writes or hands its path to the helper.
   `fn c_name(&self, path: &Path) -> Result<CString, ContainedError>` (the validated leaf's file name as a
   C string); `RootDir` implements `std::os::fd::AsFd`, so a caller that clones into the root with
   `fclonefileat` names it by descriptor.
+
+- Produces: `ConfigError::PathEscape(String)`;
+  `load_file(path: &Path) -> Result<toml::Table, ConfigError>` opens the selected leaf read-only below a
+  checked configuration directory.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3367,9 +3697,41 @@ fn reading_a_subdirectory_creates_nothing_and_refuses_a_link() {
     assert!(root.open_subdirectory("missing").is_err());
     assert!(!root.path().join("missing").exists());
 }
+
+#[test]
+fn opening_a_fifo_returns_not_regular_without_a_writer() {
+    let temp = tempfile::tempdir().expect("temp");
+    let path = temp.path().canonicalize().expect("canonical");
+    let root = RootDir::open(&path).expect("root");
+    let fifo = path.join("fifo");
+    let name = c_string(&fifo).expect("name");
+    // SAFETY: the temporary path is NUL-terminated and outlives the call.
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+    assert!(matches!(
+        root.open_file(&fifo, Access::Read),
+        Err(ContainedError::NotRegular(_))
+    ));
+}
+
+#[test]
+fn a_cloned_root_retains_its_identity_and_refuses_replacement() {
+    let temp = tempfile::tempdir().expect("temp");
+    let base = temp.path().canonicalize().expect("canonical");
+    let path = base.join("root");
+    std::fs::create_dir(&path).expect("root");
+    let root = RootDir::open(&path).expect("open");
+    let clone = root.try_clone().expect("clone");
+    assert_eq!(
+        root.identity().expect("identity"),
+        clone.identity().expect("identity")
+    );
+    std::fs::rename(&path, base.join("held")).expect("move");
+    std::fs::create_dir(&path).expect("replacement");
+    assert!(clone.revalidate().is_err());
+}
 ```
 
-Append to the existing private tests in `config/roots.rs`:
+Append to `config/roots/tests.rs`:
 
 ```rust
 #[test]
@@ -3386,15 +3748,40 @@ fn creating_roots_refuses_a_link_added_after_resolution() {
 }
 ```
 
+Add `PathEscape(String)` to `ConfigError` before this red run. Add this test inside the existing private
+test module in `config/load.rs`:
+
+```rust
+#[test]
+fn a_configuration_leaf_symlink_is_refused() {
+    let temp = tempfile::tempdir().expect("temp");
+    let target = temp.path().join("target.toml");
+    let selected = temp.path().join("config.toml");
+    std::fs::write(&target, "config_version = 1\n").expect("target");
+    std::os::unix::fs::symlink(&target, &selected).expect("link");
+
+    assert_eq!(
+        load_file(&selected),
+        Err(ConfigError::PathEscape(selected.display().to_string()))
+    );
+    assert_eq!(
+        std::fs::read_to_string(target).expect("unchanged"),
+        "config_version = 1\n"
+    );
+}
+```
+
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-adapters contained`
 
 Expected: the build of the `contained::tests` module fails with `cannot find` for `RootDir`,
 `leaf_below`, `ContainedError`, `Access` and `Kind`. The module is compiled and selected; a run that
-selects zero tests, or that succeeds, does not satisfy this step.
-Also run `cargo test -p vpt-adapters creating_roots_refuses_a_link_added_after_resolution`;
-once the new module compiles, it must fail because the old creator accepts the state link.
+selects zero tests, or that succeeds, does not satisfy this step. Also run
+`cargo test -p vpt-adapters creating_roots_refuses_a_link_added_after_resolution`; once the new module
+compiles, it must fail because the old creator accepts the state link. Run
+`cargo test -p vpt-adapters a_configuration_leaf_symlink_is_refused` independently and require the
+current raw loader to fail this regression.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -3414,10 +3801,16 @@ use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContainedError {
-    Escape { root: PathBuf, path: PathBuf },
+    Escape {
+        root: PathBuf,
+        path: PathBuf,
+    },
     NotRegular(PathBuf),
     NotADirectory(PathBuf),
-    Io { path: PathBuf, kind: std::io::ErrorKind },
+    Io {
+        path: PathBuf,
+        kind: std::io::ErrorKind,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3465,26 +3858,46 @@ pub struct RootDir {
 const NO_FOLLOW: libc::c_int = libc::O_NOFOLLOW | libc::O_CLOEXEC;
 
 fn escape(root: &Path, path: &Path) -> ContainedError {
-    ContainedError::Escape { root: root.to_path_buf(), path: path.to_path_buf() }
+    ContainedError::Escape {
+        root: root.to_path_buf(),
+        path: path.to_path_buf(),
+    }
 }
 
 fn io(path: &Path, error: &std::io::Error) -> ContainedError {
-    ContainedError::Io { path: path.to_path_buf(), kind: error.kind() }
+    ContainedError::Io {
+        path: path.to_path_buf(),
+        kind: error.kind(),
+    }
 }
 
 fn c_string(path: &Path) -> Result<CString, ContainedError> {
-    CString::new(path.as_os_str().as_bytes()).map_err(|_| io(path, &std::io::Error::from(std::io::ErrorKind::InvalidInput)))
+    CString::new(path.as_os_str().as_bytes()).map_err(|_| {
+        io(
+            path,
+            &std::io::Error::from(std::io::ErrorKind::InvalidInput),
+        )
+    })
 }
 
 /// The file name of a validated leaf, as the C string `openat` and friends take.
 fn c_name(leaf: &Path) -> Result<CString, ContainedError> {
-    let name = leaf.file_name().ok_or_else(|| io(leaf, &std::io::Error::from(std::io::ErrorKind::InvalidInput)))?;
+    let name = leaf.file_name().ok_or_else(|| {
+        io(
+            leaf,
+            &std::io::Error::from(std::io::ErrorKind::InvalidInput),
+        )
+    })?;
     c_string(Path::new(name))
 }
 
 /// `<root>/<name>` for a bare name, or the path itself when it already is exactly that.
 pub fn leaf_below(root: &Path, path: &Path) -> Result<PathBuf, ContainedError> {
-    let relative = if path.is_absolute() { path.strip_prefix(root).map_err(|_| escape(root, path))? } else { path };
+    let relative = if path.is_absolute() {
+        path.strip_prefix(root).map_err(|_| escape(root, path))?
+    } else {
+        path
+    };
     let mut components = relative.components();
     match (components.next(), components.next()) {
         (Some(Component::Normal(name)), None) if !name.is_empty() => Ok(root.join(name)),
@@ -3502,25 +3915,57 @@ impl RootDir {
         if fd < 0 {
             let error = std::io::Error::last_os_error();
             return Err(match error.raw_os_error() {
-                Some(libc::ELOOP) | Some(libc::ENOTDIR) => ContainedError::NotADirectory(path.to_path_buf()),
+                Some(libc::ELOOP) | Some(libc::ENOTDIR) => {
+                    ContainedError::NotADirectory(path.to_path_buf())
+                }
                 _ => io(path, &error),
             });
         }
         // SAFETY: `fd` is a fresh descriptor this value now owns.
-        Ok(RootDir { fd: unsafe { OwnedFd::from_raw_fd(fd) }, path: path.to_path_buf() })
+        Ok(RootDir {
+            fd: unsafe { OwnedFd::from_raw_fd(fd) },
+            path: path.to_path_buf(),
+        })
     }
 
     pub fn path(&self) -> &Path {
         &self.path
     }
 
+    pub fn try_clone(&self) -> Result<Self, ContainedError> {
+        Ok(Self {
+            fd: self
+                .fd
+                .try_clone()
+                .map_err(|error| io(&self.path, &error))?,
+            path: self.path.clone(),
+        })
+    }
+
+    pub fn identity(&self) -> Result<(u64, u64), ContainedError> {
+        use std::os::unix::fs::MetadataExt;
+        let file = File::from(
+            self.fd
+                .try_clone()
+                .map_err(|error| io(&self.path, &error))?,
+        );
+        let metadata = file.metadata().map_err(|error| io(&self.path, &error))?;
+        Ok((metadata.dev(), metadata.ino()))
+    }
+
     pub fn revalidate(&self) -> Result<(), ContainedError> {
         use std::os::unix::fs::MetadataExt;
         let current = Self::open(&self.path)?;
-        let held = File::from(self.fd.try_clone().map_err(|error| io(&self.path, &error))?)
-            .metadata().map_err(|error| io(&self.path, &error))?;
+        let held = File::from(
+            self.fd
+                .try_clone()
+                .map_err(|error| io(&self.path, &error))?,
+        )
+        .metadata()
+        .map_err(|error| io(&self.path, &error))?;
         let observed = File::from(current.fd)
-            .metadata().map_err(|error| io(&self.path, &error))?;
+            .metadata()
+            .map_err(|error| io(&self.path, &error))?;
         if (held.dev(), held.ino()) != (observed.dev(), observed.ino()) {
             return Err(escape(&self.path, &self.path));
         }
@@ -3539,7 +3984,10 @@ impl RootDir {
     pub fn open_subdirectory(&self, name: &str) -> Result<RootDir, ContainedError> {
         let path = self.leaf(Path::new(name))?;
         let file = self.open_at(&path, libc::O_RDONLY | libc::O_DIRECTORY | NO_FOLLOW, 0)?;
-        Ok(RootDir { fd: file.into(), path })
+        Ok(RootDir {
+            fd: file.into(),
+            path,
+        })
     }
 
     /// `openat` relative to the root; ELOOP at the leaf is a link and is refused.
@@ -3547,7 +3995,14 @@ impl RootDir {
         let name = c_name(leaf)?;
         // SAFETY: `name` is NUL-terminated and outlives the call; the directory
         // descriptor stays open for the lifetime of `self`.
-        let fd = unsafe { libc::openat(self.fd.as_raw_fd(), name.as_ptr(), flags, mode as libc::c_uint) };
+        let fd = unsafe {
+            libc::openat(
+                self.fd.as_raw_fd(),
+                name.as_ptr(),
+                flags,
+                mode as libc::c_uint,
+            )
+        };
         if fd < 0 {
             let error = std::io::Error::last_os_error();
             return Err(match error.raw_os_error() {
@@ -3565,7 +4020,14 @@ impl RootDir {
         // SAFETY: `raw` is a plain-data struct the call fills in; `name` is
         // NUL-terminated and outlives the call.
         let mut raw: libc::stat = unsafe { std::mem::zeroed() };
-        let outcome = unsafe { libc::fstatat(self.fd.as_raw_fd(), name.as_ptr(), &mut raw, libc::AT_SYMLINK_NOFOLLOW) };
+        let outcome = unsafe {
+            libc::fstatat(
+                self.fd.as_raw_fd(),
+                name.as_ptr(),
+                &mut raw,
+                libc::AT_SYMLINK_NOFOLLOW,
+            )
+        };
         if outcome != 0 {
             return Err(io(&leaf, &std::io::Error::last_os_error()));
         }
@@ -3596,7 +4058,7 @@ impl RootDir {
     /// Open the leaf without following a link; a non-file at the leaf is refused.
     pub fn open_file(&self, path: &Path, access: Access) -> Result<File, ContainedError> {
         let leaf = self.leaf(path)?;
-        let file = self.open_at(&leaf, access.flags() | NO_FOLLOW, 0)?;
+        let file = self.open_at(&leaf, access.flags() | NO_FOLLOW | libc::O_NONBLOCK, 0)?;
         let metadata = file.metadata().map_err(|error| io(&leaf, &error))?;
         if !metadata.is_file() {
             return Err(ContainedError::NotRegular(leaf));
@@ -3607,8 +4069,13 @@ impl RootDir {
     /// Create the leaf exclusively at `mode`; nothing is ever replaced.
     pub fn create_file(&self, path: &Path, mode: u32) -> Result<File, ContainedError> {
         let leaf = self.leaf(path)?;
-        let file = self.open_at(&leaf, libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | NO_FOLLOW, mode)?;
-        file.set_permissions(std::fs::Permissions::from_mode(mode)).map_err(|error| io(&leaf, &error))?;
+        let file = self.open_at(
+            &leaf,
+            libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | NO_FOLLOW,
+            mode,
+        )?;
+        file.set_permissions(std::fs::Permissions::from_mode(mode))
+            .map_err(|error| io(&leaf, &error))?;
         Ok(file)
     }
 
@@ -3635,21 +4102,44 @@ impl RootDir {
             });
         }
         // SAFETY: `fd` is a fresh descriptor this value now owns.
-        let directory = RootDir { fd: unsafe { OwnedFd::from_raw_fd(fd) }, path: leaf };
+        let directory = RootDir {
+            fd: unsafe { OwnedFd::from_raw_fd(fd) },
+            path: leaf,
+        };
         if made == 0 {
-            let handle = File::from(directory.fd.try_clone().map_err(|error| io(&directory.path, &error))?);
-            handle.set_permissions(std::fs::Permissions::from_mode(0o700)).map_err(|error| io(&directory.path, &error))?;
+            let handle = File::from(
+                directory
+                    .fd
+                    .try_clone()
+                    .map_err(|error| io(&directory.path, &error))?,
+            );
+            handle
+                .set_permissions(std::fs::Permissions::from_mode(0o700))
+                .map_err(|error| io(&directory.path, &error))?;
         }
         Ok(directory)
     }
 
     fn rename(&self, from: &Path, to: &Path, flags: libc::c_uint) -> Result<(), std::io::Error> {
-        let from = c_name(from).map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+        let from =
+            c_name(from).map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
         let to = c_name(to).map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
         // SAFETY: both names are NUL-terminated and outlive the call; the
         // directory descriptor stays open for the lifetime of `self`.
-        let outcome = unsafe { libc::renameatx_np(self.fd.as_raw_fd(), from.as_ptr(), self.fd.as_raw_fd(), to.as_ptr(), flags) };
-        if outcome == 0 { Ok(()) } else { Err(std::io::Error::last_os_error()) }
+        let outcome = unsafe {
+            libc::renameatx_np(
+                self.fd.as_raw_fd(),
+                from.as_ptr(),
+                self.fd.as_raw_fd(),
+                to.as_ptr(),
+                flags,
+            )
+        };
+        if outcome == 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::last_os_error())
+        }
     }
 
     /// Move `from` onto `to`, replacing whatever `to` held.
@@ -3670,7 +4160,11 @@ impl RootDir {
 
     /// Flush the directory itself, so a rename or a creation is durable.
     pub fn sync(&self) -> Result<(), ContainedError> {
-        let handle = File::from(self.fd.try_clone().map_err(|error| io(&self.path, &error))?);
+        let handle = File::from(
+            self.fd
+                .try_clone()
+                .map_err(|error| io(&self.path, &error))?,
+        );
         handle.sync_all().map_err(|error| io(&self.path, &error))
     }
 
@@ -3722,15 +4216,73 @@ fn private_dir(path: &Path, key: &str) -> Result<(), RootError> {
 }
 ```
 
+In `config/load.rs`, add these imports and replace `load_file` with the checked implementation and its
+error helpers below. Keep `load_text` and its tests unchanged.
+
+```rust
+use crate::contained::{Access, ContainedError, RootDir};
+use std::io::Read;
+```
+
+```rust
+pub fn load_file(path: &Path) -> Result<Table, ConfigError> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let parent = parent
+        .canonicalize()
+        .map_err(|error| config_io(path, error))?;
+    let root = RootDir::open(&parent)
+        .map_err(|error| config_contained(path, error))?;
+    let name = path.file_name().ok_or_else(|| ConfigError::Unreadable {
+        path: path.display().to_string(),
+        detail: std::io::ErrorKind::InvalidInput.to_string(),
+    })?;
+    let mut file = root
+        .open_file(Path::new(name), Access::Read)
+        .map_err(|error| config_contained(path, error))?;
+    let mut text = String::new();
+    file.read_to_string(&mut text)
+        .map_err(|error| config_io(path, error))?;
+    load_text(&text)
+}
+
+fn config_io(path: &Path, error: std::io::Error) -> ConfigError {
+    if error.kind() == std::io::ErrorKind::NotFound {
+        ConfigError::Missing(path.display().to_string())
+    } else {
+        ConfigError::Unreadable {
+            path: path.display().to_string(),
+            detail: error.kind().to_string(),
+        }
+    }
+}
+
+fn config_contained(path: &Path, error: ContainedError) -> ConfigError {
+    match error {
+        ContainedError::Io { kind, .. } => {
+            config_io(path, std::io::Error::from(kind))
+        }
+        _ => ConfigError::PathEscape(path.display().to_string()),
+    }
+}
+```
+
 - [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `cargo fmt --all`
 
 Run: `cargo test -p vpt-adapters contained`
 
-Expected: all 11 contained-access tests PASS. Also run
-`cargo test -p vpt-adapters config::roots` and require the root-creation regression to pass. Run `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no
-warnings.
+Expected: all 13 contained-access tests PASS. Also run `cargo test -p vpt-adapters config::roots` and
+require the root-creation regression to pass. Run
+`cargo test -p vpt-adapters a_configuration_leaf_symlink_is_refused` and require it to pass. Run
+`cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates/vpt-adapters
@@ -3755,7 +4307,8 @@ ______________________________________________________________________
 
 **Interfaces:**
 
-- Consumes: `config::{template, config_path, default_state_dir, from_table, load_text}`.
+- Consumes: `config::{template, config_path, default_state_dir, from_table, load_text, resolve}`,
+  `RootDir::{try_clone, revalidate, open_file, create_file, subdirectory, sync}`.
 
 - Produces:
 
@@ -3763,7 +4316,7 @@ ______________________________________________________________________
     `PromptError::{NoTerminal, Closed}`; `trait Prompt { fn choose(&mut self, question: &str,`
     `options: &[&str], preselected: usize) -> Result<usize, PromptError>; }`.
   - `vpt_application::{Setup, SetupWriter, SetupError, SetupOutcome}`:
-    `SetupError::{NoTerminal, Exists(PathBuf), Io(String)}`;
+    `SetupError::{NoTerminal, Exists(PathBuf), PathEscape(PathBuf), Io(String)}`;
     `trait SetupWriter { fn config_path(&self) -> PathBuf; fn config_exists(&self) -> bool;`
     `fn write_config(&self, text: &str, force: bool) -> Result<PathBuf, SetupError>;`
     `fn create_private_dir(&self, path: &Path) -> Result<(), SetupError>; }`;
@@ -3772,10 +4325,11 @@ ______________________________________________________________________
     `pub directories: Vec<PathBuf> }` with
     `run<P: Prompt, W: SetupWriter>(&self, prompt: &mut P, writer: &W, force: bool) ->`
     `Result<SetupOutcome, SetupError>`.
-  - `vpt_adapters::TtyPrompt::open() -> Result<TtyPrompt, PromptError>` (implements `Prompt`; end
-    of file on the terminal is `Closed`, never a default choice).
-  - `vpt_adapters::config::FilesystemSetupWriter::new(config_path: PathBuf) -> FilesystemSetupWriter`
-    (implements `SetupWriter`; the file is 0600 and every directory 0700, existing ones repaired).
+  - `vpt_adapters::TtyPrompt::open() -> Result<TtyPrompt, PromptError>` (implements `Prompt`; end of file
+    on the terminal is `Closed`, never a default choice).
+  - `vpt_adapters::config::FilesystemSetupWriter::new(config_path: PathBuf, directories: &[PathBuf]) ->`
+    `Result<FilesystemSetupWriter, SetupError>` (retains checked existing ancestors without writing;
+    implements `SetupWriter`, file mode 0600 and prepared directory mode 0700, existing modes repaired).
   - `compose::Environment::from_process() -> Environment` with
     `var(&self, name: &str) -> Option<String>`, `config_path(&self) -> PathBuf`,
     `home_dir(&self) -> PathBuf`, `state_dir_default(&self) -> String`.
@@ -3809,12 +4363,11 @@ mod prompt;
 pub use prompt::{Prompt, PromptError};
 ```
 
-`crates/vpt-adapters/src/lib.rs` gains `mod prompt;` and
-`pub use prompt::{TtyPrompt};`; `crates/vpt-adapters/src/config/mod.rs` gains
-`mod write;` and `pub use write::FilesystemSetupWriter;`; `crates/vpt/src/lib.rs` gains `mod compose;`;
-`crates/vpt/src/commands/mod.rs` gains `pub(crate) mod setup;`. `ports/prompt.rs`, `prompt.rs`,
-`compose.rs` and `commands/setup.rs` start as their doc lines. `crates/vpt/Cargo.toml` gains
-`libc = "0.2.189"` under `[dev-dependencies]`.
+`crates/vpt-adapters/src/lib.rs` gains `mod prompt;` and `pub use prompt::{TtyPrompt};`;
+`crates/vpt-adapters/src/config/mod.rs` gains `mod write;` and `pub use write::FilesystemSetupWriter;`;
+`crates/vpt/src/lib.rs` gains `mod compose;`; `crates/vpt/src/commands/mod.rs` gains
+`pub(crate) mod setup;`. `ports/prompt.rs`, `prompt.rs`, `compose.rs` and `commands/setup.rs` start as
+their doc lines. `crates/vpt/Cargo.toml` gains `libc = "0.2.189"` under `[dev-dependencies]`.
 
 `crates/vpt-application/src/setup.rs` starts as its test module alone:
 
@@ -3919,31 +4472,79 @@ mod tests {
     }
 
     #[test]
+    fn a_replaced_config_parent_is_refused_without_writing_either_directory() {
+        let temp = tempfile::tempdir().expect("temp");
+        let base = temp.path().canonicalize().expect("canonical");
+        let parent = base.join("config");
+        let outside = base.join("outside");
+        std::fs::create_dir(&parent).expect("parent");
+        std::fs::create_dir(&outside).expect("outside");
+        let writer = FilesystemSetupWriter::new(parent.join("config.toml"), &[]).expect("prepared");
+        std::fs::rename(&parent, base.join("held")).expect("move");
+        std::os::unix::fs::symlink(&outside, &parent).expect("replacement");
+        assert!(matches!(
+            writer.write_config("replace", true),
+            Err(SetupError::PathEscape(_))
+        ));
+        assert!(!outside.join("config.toml").exists());
+        assert!(!base.join("held/config.toml").exists());
+    }
+
+    #[test]
+    fn prepared_missing_ancestors_are_created_only_when_writing() {
+        let temp = tempfile::tempdir().expect("temp");
+        let base = temp.path().canonicalize().expect("canonical");
+        let directories = vec![base.join("home/.vpt"), base.join("state/local/vpt")];
+        let writer = FilesystemSetupWriter::new(base.join("config/vpt/config.toml"), &directories)
+            .expect("prepared");
+        assert!(!base.join("config").exists());
+        assert!(!base.join("home").exists());
+        assert!(!base.join("state").exists());
+        writer
+            .write_config("config_version = 1", false)
+            .expect("config");
+        for directory in &directories {
+            writer.create_private_dir(directory).expect("directory");
+            assert_eq!(mode(directory), 0o700);
+        }
+    }
+
+    #[test]
     fn a_new_config_is_0600_inside_a_0700_directory() {
         let temp = tempfile::tempdir().expect("temp");
-        let writer = FilesystemSetupWriter::new(temp.path().join("vpt/config.toml"));
-        let written = writer.write_config("config_version = 1\n", false).expect("written");
+        let base = temp.path().canonicalize().expect("canonical");
+        let writer =
+            FilesystemSetupWriter::new(base.join("vpt/config.toml"), &[]).expect("prepared");
+        let written = writer
+            .write_config("config_version = 1\n", false)
+            .expect("written");
         assert_eq!(mode(&written), 0o600);
-        assert_eq!(mode(&temp.path().join("vpt")), 0o700);
+        assert_eq!(mode(&base.join("vpt")), 0o700);
     }
 
     #[test]
     fn without_force_an_existing_file_is_exists_even_when_created_after_the_check() {
         let temp = tempfile::tempdir().expect("temp");
-        let path = temp.path().join("config.toml");
+        let base = temp.path().canonicalize().expect("canonical");
+        let path = base.join("config.toml");
         std::fs::write(&path, b"old").expect("existing");
-        let writer = FilesystemSetupWriter::new(path.clone());
-        assert_eq!(writer.write_config("new", false).unwrap_err(), SetupError::Exists(path.clone()));
+        let writer = FilesystemSetupWriter::new(path.clone(), &[]).expect("prepared");
+        assert_eq!(
+            writer.write_config("new", false).unwrap_err(),
+            SetupError::Exists(path.clone())
+        );
         assert_eq!(std::fs::read(&path).expect("kept"), b"old");
     }
 
     #[test]
     fn force_replaces_the_text_and_repairs_a_permissive_mode() {
         let temp = tempfile::tempdir().expect("temp");
-        let path = temp.path().join("config.toml");
+        let base = temp.path().canonicalize().expect("canonical");
+        let path = base.join("config.toml");
         std::fs::write(&path, b"old").expect("existing");
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).expect("permissive");
-        let writer = FilesystemSetupWriter::new(path.clone());
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644))
+            .expect("permissive");
+        let writer = FilesystemSetupWriter::new(path.clone(), &[]).expect("prepared");
         writer.write_config("new", true).expect("replaced");
         assert_eq!(std::fs::read(&path).expect("read"), b"new");
         assert_eq!(mode(&path), 0o600);
@@ -3952,11 +4553,32 @@ mod tests {
     #[test]
     fn an_existing_permissive_directory_is_repaired_to_0700() {
         let temp = tempfile::tempdir().expect("temp");
-        let dir = temp.path().join("home");
+        let base = temp.path().canonicalize().expect("canonical");
+        let dir = base.join("home");
         std::fs::create_dir(&dir).expect("dir");
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).expect("permissive");
-        FilesystemSetupWriter::new(temp.path().join("c.toml")).create_private_dir(&dir).expect("repaired");
+        FilesystemSetupWriter::new(base.join("c.toml"), std::slice::from_ref(&dir))
+            .expect("prepared")
+            .create_private_dir(&dir)
+            .expect("repaired");
         assert_eq!(mode(&dir), 0o700);
+    }
+
+    #[test]
+    fn force_refuses_a_configuration_symlink_without_changing_its_target() {
+        let temp = tempfile::tempdir().expect("temp");
+        let base = temp.path().canonicalize().expect("canonical");
+        let target = base.join("target");
+        let selected = base.join("config.toml");
+        std::fs::write(&target, b"keep").expect("target");
+        std::os::unix::fs::symlink(&target, &selected).expect("link");
+        let writer = FilesystemSetupWriter::new(selected.clone(), &[]).expect("prepared");
+
+        assert_eq!(
+            writer.write_config("replace", true),
+            Err(SetupError::PathEscape(selected))
+        );
+        assert_eq!(std::fs::read(target).expect("target"), b"keep");
     }
 }
 ```
@@ -4069,7 +4691,11 @@ interactive test attaches to, so it is the one child that keeps a terminal.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p vpt-application setup && cargo test -p vpt-adapters write`
+Run independently, including the second command after the first expected failure:
+
+Run: `cargo test -p vpt-application setup`
+
+Run: `cargo test -p vpt-adapters write`
 
 Expected: the builds fail with `cannot find` for `Setup`, `SetupWriter`, `Prompt`,
 `FilesystemSetupWriter`. Both test modules are compiled and selected; a run that selects zero tests, or
@@ -4111,6 +4737,7 @@ use std::path::{Path, PathBuf};
 pub enum SetupError {
     NoTerminal,
     Exists(PathBuf),
+    PathEscape(PathBuf),
     Io(String),
 }
 
@@ -4205,27 +4832,112 @@ the operator has gone.
 `crates/vpt-adapters/src/config/write.rs`, above its test module:
 
 ```rust
-//! What `vpt setup` writes: a 0600 file in a 0700 directory, and 0700 directories,
-//! existing ones repaired to those modes.
-
-use std::fs::{DirBuilder, OpenOptions, Permissions};
+use crate::contained::{Access, ContainedError, RootDir};
+use std::ffi::OsString;
+use std::fs::{File, Permissions};
 use std::io::Write;
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use std::os::fd::AsFd;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use vpt_application::{SetupError, SetupWriter};
 
+struct PlannedDirectory {
+    path: PathBuf,
+    anchor: RootDir,
+    missing: Vec<OsString>,
+}
+
+impl PlannedDirectory {
+    fn capture(path: &Path) -> Result<Self, SetupError> {
+        if !path.is_absolute() {
+            return Err(SetupError::PathEscape(path.to_path_buf()));
+        }
+        let mut cursor = path.to_path_buf();
+        let mut missing = Vec::new();
+        loop {
+            match RootDir::open(&cursor) {
+                Ok(anchor) => {
+                    missing.reverse();
+                    return Ok(Self {
+                        path: path.to_path_buf(),
+                        anchor,
+                        missing,
+                    });
+                }
+                Err(ContainedError::Io {
+                    kind: std::io::ErrorKind::NotFound,
+                    ..
+                }) => {
+                    let leaf = cursor
+                        .file_name()
+                        .ok_or_else(|| SetupError::PathEscape(path.to_path_buf()))?
+                        .to_os_string();
+                    missing.push(leaf);
+                    cursor = cursor
+                        .parent()
+                        .ok_or_else(|| SetupError::PathEscape(path.to_path_buf()))?
+                        .to_path_buf();
+                }
+                Err(error) => return Err(contained(error)),
+            }
+        }
+    }
+
+    fn create(&self) -> Result<RootDir, SetupError> {
+        self.anchor.revalidate().map_err(contained)?;
+        let mut directory = self.anchor.try_clone().map_err(contained)?;
+        for component in &self.missing {
+            directory.revalidate().map_err(contained)?;
+            let component = component
+                .to_str()
+                .ok_or_else(|| SetupError::Io("directory name is not UTF-8".into()))?;
+            directory = directory.subdirectory(component).map_err(contained)?;
+        }
+        directory.revalidate().map_err(contained)?;
+        let file = File::from(directory.as_fd().try_clone_to_owned().map_err(io)?);
+        file.set_permissions(Permissions::from_mode(0o700))
+            .map_err(io)?;
+        Ok(directory)
+    }
+}
+
 pub struct FilesystemSetupWriter {
     config_path: PathBuf,
+    config_parent: PlannedDirectory,
+    directories: Vec<PlannedDirectory>,
 }
 
 impl FilesystemSetupWriter {
-    pub fn new(config_path: PathBuf) -> Self {
-        FilesystemSetupWriter { config_path }
+    pub fn new(config_path: PathBuf, directories: &[PathBuf]) -> Result<Self, SetupError> {
+        let parent = config_path
+            .parent()
+            .ok_or_else(|| SetupError::PathEscape(config_path.clone()))?;
+        Ok(Self {
+            config_parent: PlannedDirectory::capture(parent)?,
+            config_path,
+            directories: directories
+                .iter()
+                .map(|path| PlannedDirectory::capture(path))
+                .collect::<Result<_, _>>()?,
+        })
     }
 }
 
 fn io(error: std::io::Error) -> SetupError {
     SetupError::Io(error.kind().to_string())
+}
+
+fn contained(error: ContainedError) -> SetupError {
+    match error {
+        ContainedError::Io {
+            path,
+            kind: std::io::ErrorKind::AlreadyExists,
+        } => SetupError::Exists(path),
+        ContainedError::Io { kind, .. } => SetupError::Io(kind.to_string()),
+        ContainedError::Escape { path, .. }
+        | ContainedError::NotRegular(path)
+        | ContainedError::NotADirectory(path) => SetupError::PathEscape(path),
+    }
 }
 
 impl SetupWriter for FilesystemSetupWriter {
@@ -4234,37 +4946,48 @@ impl SetupWriter for FilesystemSetupWriter {
     }
 
     fn config_exists(&self) -> bool {
-        self.config_path.exists()
+        self.config_path.symlink_metadata().is_ok()
     }
 
     fn write_config(&self, text: &str, force: bool) -> Result<PathBuf, SetupError> {
-        if let Some(parent) = self.config_path.parent() {
-            self.create_private_dir(parent)?;
+        let root = self.config_parent.create()?;
+        root.revalidate().map_err(contained)?;
+        let name = self
+            .config_path
+            .file_name()
+            .ok_or_else(|| SetupError::PathEscape(self.config_path.clone()))?;
+        let name = Path::new(name);
+        let mut file = if force {
+            match root.open_file(name, Access::Write) {
+                Ok(file) => file,
+                Err(ContainedError::Io {
+                    kind: std::io::ErrorKind::NotFound,
+                    ..
+                }) => root.create_file(name, 0o600).map_err(contained)?,
+                Err(error) => return Err(contained(error)),
+            }
+        } else {
+            root.create_file(name, 0o600).map_err(contained)?
+        };
+        file.set_permissions(Permissions::from_mode(0o600))
+            .map_err(io)?;
+        if force {
+            file.set_len(0).map_err(io)?;
         }
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(force)
-            .create_new(!force)
-            .truncate(force)
-            .mode(0o600)
-            .open(&self.config_path)
-            .map_err(|error| match error.kind() {
-                std::io::ErrorKind::AlreadyExists => SetupError::Exists(self.config_path.clone()),
-                _ => io(error),
-            })?;
-        file.set_permissions(Permissions::from_mode(0o600)).map_err(io)?;
         file.write_all(text.as_bytes()).map_err(io)?;
         file.sync_all().map_err(io)?;
+        root.revalidate().map_err(contained)?;
+        root.sync().map_err(contained)?;
         Ok(self.config_path.clone())
     }
 
     fn create_private_dir(&self, path: &Path) -> Result<(), SetupError> {
-        match DirBuilder::new().recursive(true).mode(0o700).create(path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(error) => return Err(io(error)),
-        }
-        std::fs::set_permissions(path, Permissions::from_mode(0o700)).map_err(io)
+        let directory = self
+            .directories
+            .iter()
+            .find(|directory| directory.path == path)
+            .ok_or_else(|| SetupError::PathEscape(path.to_path_buf()))?;
+        directory.create().map(|_| ())
     }
 }
 ```
@@ -4314,7 +5037,7 @@ use crate::cli::output::Outcome;
 use crate::compose::Environment;
 use serde_json::json;
 use std::path::Path;
-use vpt_adapters::config::{FilesystemSetupWriter, from_table, load_text, template};
+use vpt_adapters::config::{FilesystemSetupWriter, from_table, load_text, resolve, template};
 use vpt_adapters::TtyPrompt;
 use vpt_application::ports::PromptError;
 use vpt_application::{Setup, SetupError, SetupWriter};
@@ -4323,22 +5046,58 @@ use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
 pub fn run(environment: &Environment, config: Option<&Path>, force: bool) -> Outcome {
-    let writer = FilesystemSetupWriter::new(config.map(Path::to_path_buf).unwrap_or_else(|| environment.config_path()));
-    if writer.config_exists() && !force {
-        let message = format!("{} exists; pass --force to overwrite it", writer.config_path().display());
-        return Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, message));
-    }
+    let selected = config
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| environment.config_path());
     let state_dir = environment.state_dir_default();
     let home_dir = environment.home_dir();
     let rendered_defaults = template("apple", &state_dir);
-    let directories = match load_text(&rendered_defaults).and_then(|table| from_table(&table, &home_dir)) {
-        Ok(settings) => {
-            let mut directories = vec![settings.home.clone(), settings.state_dir.clone()];
-            directories.extend(StoreKey::all().iter().map(|key| settings.stores.get(*key).to_path_buf()));
-            directories
+    let settings = match load_text(&rendered_defaults)
+        .and_then(|table| from_table(&table, &home_dir))
+    {
+        Ok(settings) => settings,
+        Err(error) => {
+            return Outcome::Failure(ErrorDocument::new(
+                ErrorKind::Config,
+                format!("{error:?}"),
+            ));
         }
-        Err(error) => return Outcome::Failure(ErrorDocument::new(ErrorKind::Config, format!("{error:?}"))),
     };
+    let parent = selected
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let roots = match resolve(&settings, parent) {
+        Ok(roots) => roots,
+        Err(error) => {
+            return Outcome::Failure(ErrorDocument::new(
+                ErrorKind::Config,
+                format!("{error:?}"),
+            ));
+        }
+    };
+    let Some(name) = selected.file_name() else {
+        return Outcome::Failure(ErrorDocument::new(
+            ErrorKind::Usage,
+            "the configuration path needs a file name",
+        ));
+    };
+    let mut directories = vec![roots.home.clone(), roots.state_dir.clone()];
+    directories.extend(
+        StoreKey::all()
+            .iter()
+            .map(|key| roots.stores.get(*key).to_path_buf()),
+    );
+    let writer = match FilesystemSetupWriter::new(
+        roots.config_dir.join(name),
+        &directories,
+    ) {
+        Ok(writer) => writer,
+        Err(error) => return setup_failure(error),
+    };
+    if writer.config_exists() && !force {
+        return setup_failure(SetupError::Exists(writer.config_path()));
+    }
     let setup = Setup {
         engines: vec!["apple".into(), "whisply".into()],
         render: move |engine: &str| template(engine, &state_dir),
@@ -4355,20 +5114,36 @@ pub fn run(environment: &Environment, config: Option<&Path>, force: bool) -> Out
             document: document("setup", json!({"written": outcome.written, "main_engine": outcome.main_engine})),
             human: format!("wrote {} (main engine {})\n", outcome.written.display(), outcome.main_engine),
         },
-        Err(SetupError::NoTerminal) => Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, "vpt setup needs a controlling terminal")),
-        Err(SetupError::Exists(path)) => Outcome::Failure(ErrorDocument::new(
+        Err(error) => setup_failure(error),
+    }
+}
+
+fn setup_failure(error: SetupError) -> Outcome {
+    let document = match error {
+        SetupError::NoTerminal => ErrorDocument::new(
+            ErrorKind::Usage,
+            "vpt setup needs a controlling terminal",
+        ),
+        SetupError::Exists(path) => ErrorDocument::new(
             ErrorKind::Usage,
             format!("{} exists; pass --force to overwrite it", path.display()),
-        )),
-        Err(SetupError::Io(detail)) => Outcome::Failure(ErrorDocument::new(ErrorKind::Store, detail)),
-    }
+        ),
+        SetupError::PathEscape(path) => ErrorDocument::new(
+            ErrorKind::Refused,
+            format!("{} escapes its prepared root", path.display()),
+        )
+        .rule("path_escape"),
+        SetupError::Io(detail) => ErrorDocument::new(ErrorKind::Store, detail),
+    };
+    Outcome::Failure(document)
 }
 ```
 
-The existence check runs before the terminal is opened, so the refusal needs no tty, and the writer is
-built from the selected configuration path, `--config` and `VPT_CONFIG` included. The `ConfigError` Debug
-form names keys and kinds, never values, so formatting it here quotes nothing from the file. In
-`crates/vpt/src/lib.rs` the dispatch arm is
+Resolution and overlap checks run before the terminal is opened or anything is created. The writer
+retains the checked ancestors for the configuration, home, state and stores. Existing configuration
+without `--force` is refused before prompting. The selected path includes `--config` and `VPT_CONFIG`
+included. The `ConfigError` Debug form names keys and kinds, never values, so formatting it here quotes
+nothing from the file. In `crates/vpt/src/lib.rs` the dispatch arm is
 
 ```rust
         Verb::Setup { force } => commands::setup::run(&Environment::from_process(), invocation.config.as_deref(), *force),
@@ -4378,11 +5153,15 @@ with `use compose::Environment;` at the top.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test --workspace --features dev-tools`
 
 Expected: all PASS, the pty test included.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -4403,15 +5182,17 @@ ______________________________________________________________________
 - Consumes: nothing.
 
 - Produces: `vpt_domain::time::{UtcInstant { pub secs: i64 }, UtcOffset { pub secs: i32 },`
-  `FileTime { pub secs: i64, pub nanos: u32 }, Civil { year, month, day, hour, minute,` `second }}` with
-  `UtcInstant::rfc3339(&self) -> String`, `UtcInstant::rfc3339_with(&self, offset: UtcOffset) -> String`,
-  `UtcInstant::civil(&self, offset: UtcOffset) -> Civil`, `UtcOffset::label(&self) -> String`,
+  `FileTime { pub secs: i64, pub nanos: u32 }, Civil { pub year: i64, pub month: u32, pub day: u32,`
+  `pub hour: u32, pub minute: u32, pub second: u32 }}` with `UtcInstant::rfc3339(self) -> String`,
+  `UtcInstant::rfc3339_with(self, offset: UtcOffset) -> String`,
+  `UtcInstant::civil(self, offset: UtcOffset) -> Civil`, `UtcOffset::label(self) -> String`,
   `Civil::instant(self, offset: UtcOffset) -> Option<UtcInstant>` (None when the instant leaves `i64`),
   `Civil::is_valid(self) -> bool` (Gregorian month, day and leap-year rules and the hour, minute and
   second bounds), `FileTime::age_secs(self, now: UtcInstant) -> i64` (whole seconds, nanoseconds counted,
-  saturating at the `i64` bounds); `vpt_domain::digest::Sha256Digest(pub [u8; 32])` with `hex()`,
-  `hash12()`, `hash8()`, `from_hex(&str) -> Option<Sha256Digest>`. Civil arithmetic uses `i128`
-  intermediates, so every `i64` instant plus any offset converts.
+  saturating at the `i64` bounds); `vpt_domain::digest::Sha256Digest(pub [u8; 32])` with
+  `hex(&self) -> String`, `hash12(&self) -> String`, `hash8(&self) -> String`,
+  `from_hex(text: &str) -> Option<Sha256Digest>`. Civil arithmetic uses `i128` intermediates, so every
+  `i64` instant plus any offset converts.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -4698,12 +5479,16 @@ impl std::fmt::Debug for Sha256Digest {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-domain`
 
 Expected: the nine tests of `time` and `digest` PASS alongside the earlier domain tests. Run
 `cargo clippy -p vpt-domain --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates/vpt-domain
@@ -4730,7 +5515,7 @@ ______________________________________________________________________
   `RecordingId::derive(captured: UtcInstant, offset: UtcOffset, digest: &Sha256Digest) ->`
   `Result<RecordingId, IdentityError>` (`Unrepresentable` when the local year has no four-digit form),
   `RecordingId::parse(text: &str) -> Result<RecordingId, IdentityError>` (the shape, then the Gregorian
-  month, day and leap-year rules and the hour, minute and second bounds), `fn as_str(&self)`,
+  month, day and leap-year rules and the hour, minute and second bounds), `fn as_str(&self) -> &str`,
   `fn local_timestamp(&self) -> &str`, `fn capture_date(&self) -> &str`, `fn hash12(&self) -> &str`.
   Every call site uses the fallible `derive`; ingest maps an unrepresentable capture instant to the
   `invalid_container` deferral.
@@ -4923,12 +5708,16 @@ never lands inside a multi-byte character.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-domain identity`
 
 Expected: 6 tests PASS. Run `cargo clippy -p vpt-domain --all-targets -- -D warnings` and expect no
 warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates/vpt-domain
@@ -5317,12 +6106,16 @@ pub mod time;
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-domain --features fixtures container`
 
 Expected: 12 tests PASS. Run
 `cargo clippy -p vpt-domain --all-targets --features fixtures -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates/vpt-domain
@@ -5551,12 +6344,16 @@ at rest under a 30 second quiet period.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-domain sweep`
 
 Expected: 6 tests PASS. Run `cargo clippy -p vpt-domain --all-targets -- -D warnings` and expect no
 warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates/vpt-domain
@@ -5586,7 +6383,9 @@ substitutes the empty memory ledger of Task 12.
 - Create: `crates/vpt-application/src/ports/ledger.rs` (the error type only in this task)
 - Modify: `crates/vpt-application/src/ports/mod.rs`
 - Create: `crates/vpt-adapters/src/ledger/mod.rs`, `crates/vpt-adapters/src/ledger/sqlite/mod.rs`,
-  `crates/vpt-adapters/src/ledger/sqlite/migrations.rs`
+  `crates/vpt-adapters/src/ledger/sqlite/migrations.rs`,
+  `crates/vpt-adapters/src/ledger/sqlite/connection.rs`,
+  `crates/vpt-adapters/src/ledger/sqlite/boundary_tests.rs`
 - Modify: `crates/vpt-adapters/src/lib.rs`
 
 **Interfaces:**
@@ -5594,10 +6393,10 @@ substitutes the empty memory ledger of Task 12.
 - Consumes: `vpt_adapters::{Access, ContainedError, Kind, RootDir}`.
 
 - Produces: `vpt_application::ports::LedgerError::{Busy, UnsupportedSchema(u32), Conflict(String),`
-  `Corrupt(String), Io(String)}`; `vpt_adapters::{SqliteLedger, OpenError, SCHEMA_VERSION}`
-  (`ledger/mod.rs` keeps `sqlite` private and re-exports these) with
-  `OpenError::{Contained(ContainedError), Ledger(LedgerError)}` (`From` both ways in),
-  `SqliteLedger::BUSY_TIMEOUT: Duration = Duration::from_secs(5)`,
+  `Corrupt(String), Io(String), PathEscape(PathBuf)}`;
+  `vpt_adapters::{SqliteLedger, OpenError, SCHEMA_VERSION}` (`ledger/mod.rs` keeps `sqlite` private and
+  re-exports these) with `OpenError::{Contained(ContainedError), Ledger(LedgerError)}` (`From` both ways
+  in), `SqliteLedger::BUSY_TIMEOUT: Duration = Duration::from_secs(5)`,
   `SqliteLedger::open(state: &RootDir) -> Result<SqliteLedger, OpenError>`,
   `SqliteLedger::open_with_timeout(state: &RootDir, busy: Duration) -> Result<SqliteLedger, OpenError>`,
   `SqliteLedger::open_read_only(state_dir: &Path) -> Result<Option<SqliteLedger>, OpenError>`,
@@ -5612,8 +6411,7 @@ substitutes the empty memory ledger of Task 12.
 
 Declare the modules first. `crates/vpt-application/src/ports/mod.rs` gains `mod ledger;` and
 `pub use ledger::LedgerError;`. `crates/vpt-adapters/src/lib.rs` gains `mod ledger;` and
-`pub use ledger::{OpenError, SCHEMA_VERSION, SqliteLedger};`;
-`crates/vpt-adapters/src/ledger/mod.rs` is:
+`pub use ledger::{OpenError, SCHEMA_VERSION, SqliteLedger};`; `crates/vpt-adapters/src/ledger/mod.rs` is:
 
 ```rust
 //! The ledger: one SQLite type implementing every repository, and an
@@ -5742,6 +6540,159 @@ mod tests {
 }
 ```
 
+Add `#[cfg(test)] mod boundary_tests;` at the end of `ledger/sqlite/mod.rs` before the red run.
+`crates/vpt-adapters/src/ledger/sqlite/boundary_tests.rs`:
+
+```rust
+use super::*;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+fn fixture() -> (tempfile::TempDir, RootDir) {
+    let temp = tempfile::tempdir().expect("temp");
+    let path = temp.path().canonicalize().expect("canonical").join("state");
+    std::fs::create_dir(&path).expect("state");
+    let root = RootDir::open(&path).expect("root");
+    (temp, root)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct SnapshotRow {
+    path: PathBuf,
+    mode: u32,
+    mtime_secs: i64,
+    mtime_nanos: i64,
+    bytes: Vec<u8>,
+}
+
+fn snapshot(root: &RootDir) -> Vec<SnapshotRow> {
+    let mut paths = vec![root.path().to_path_buf()];
+    paths.extend(
+        root.names()
+            .expect("names")
+            .into_iter()
+            .map(|name| root.path().join(name)),
+    );
+    paths.sort();
+    paths
+        .into_iter()
+        .map(|path| {
+            let metadata = path.symlink_metadata().expect("metadata");
+            assert!(!metadata.file_type().is_symlink());
+            let bytes = if metadata.is_file() {
+                std::fs::read(&path).expect("bytes")
+            } else {
+                Vec::new()
+            };
+            SnapshotRow {
+                path,
+                mode: metadata.permissions().mode() & 0o777,
+                mtime_secs: metadata.mtime(),
+                mtime_nanos: metadata.mtime_nsec(),
+                bytes,
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn reconnect_refuses_a_replaced_state_root() {
+    let (temp, root) = fixture();
+    let ledger = SqliteLedger::open(&root).expect("ledger");
+    std::fs::rename(root.path(), temp.path().join("held")).expect("move");
+    std::fs::create_dir(root.path()).expect("replacement");
+    let replacement = root.path().join(DATABASE);
+    std::fs::write(&replacement, b"replacement").expect("replacement db");
+
+    assert_eq!(
+        ledger.schema_version(),
+        Err(LedgerError::PathEscape(root.path().to_path_buf()))
+    );
+    assert_eq!(
+        std::fs::read(replacement).expect("unchanged"),
+        b"replacement"
+    );
+}
+
+#[test]
+fn reconnect_refuses_a_database_link_added_after_open() {
+    let (temp, root) = fixture();
+    let ledger = SqliteLedger::open(&root).expect("ledger");
+    let path = root.path().join(DATABASE);
+    std::fs::rename(&path, temp.path().join("held.db")).expect("move database");
+    let target = temp.path().join("target");
+    std::fs::write(&target, b"keep").expect("target");
+    std::os::unix::fs::symlink(&target, &path).expect("link");
+
+    assert_eq!(ledger.schema_version(), Err(LedgerError::PathEscape(path)));
+    assert_eq!(std::fs::read(target).expect("unchanged"), b"keep");
+}
+
+#[test]
+fn read_only_queries_preserve_files_while_open_and_after_close() {
+    let (_temp, root) = fixture();
+    drop(SqliteLedger::open(&root).expect("ledger"));
+    let before = snapshot(&root);
+    let ledger = SqliteLedger::open_read_only(root.path())
+        .expect("read-only")
+        .expect("present");
+    ledger
+        .read(|connection| {
+            let version: u32 = connection
+                .pragma_query_value(None, "user_version", |row| row.get(0))
+                .map_err(map)?;
+            assert_eq!(version, 1);
+            assert!(snapshot(&root) == before, "the state changed while open");
+            Ok(())
+        })
+        .expect("query");
+    drop(ledger);
+    assert!(snapshot(&root) == before, "the state changed after close");
+}
+
+#[test]
+fn read_only_open_refuses_a_missing_wal_without_creating_it() {
+    let (temp, root) = fixture();
+    drop(SqliteLedger::open(&root).expect("ledger"));
+    let wal = root.path().join("vpt.db-wal");
+    std::fs::rename(&wal, temp.path().join("held.wal")).expect("move WAL");
+    let before = snapshot(&root);
+
+    assert!(matches!(
+        SqliteLedger::open_read_only(root.path()),
+        Err(OpenError::Ledger(LedgerError::Io(_)))
+    ));
+    assert_eq!(snapshot(&root), before);
+    assert!(!wal.exists());
+}
+
+#[test]
+fn read_only_queries_see_committed_rows_still_in_a_live_wal() {
+    let (_temp, root) = fixture();
+    let writer = SqliteLedger::open(&root).expect("ledger");
+    let connection = writer.connect().expect("writer connection");
+    connection
+        .pragma_update(None, "wal_autocheckpoint", 0)
+        .expect("disable checkpoint");
+    connection
+        .execute_batch(
+            "CREATE TABLE read_probe(value INTEGER NOT NULL);
+             INSERT INTO read_probe(value) VALUES (42);",
+        )
+        .expect("committed WAL row");
+    let reader = SqliteLedger::open_read_only(root.path())
+        .expect("read-only")
+        .expect("present");
+    let value: i64 = reader
+        .read(|connection| {
+            connection
+                .query_row("SELECT value FROM read_probe", [], |row| row.get(0))
+                .map_err(map)
+        })
+        .expect("WAL row");
+    assert_eq!(value, 42);
+}
+```
+
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-adapters ledger`
@@ -5760,6 +6711,7 @@ selects zero tests does not satisfy this step.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LedgerError {
     Busy,
+    PathEscape(std::path::PathBuf),
     UnsupportedSchema(u32),
     Conflict(String),
     Corrupt(String),
@@ -5930,13 +6882,13 @@ pub fn current(connection: &Connection) -> Result<u32, LedgerError> {
 
 ```rust
 //! One SQLite database: WAL, a bounded busy timeout, restrictive modes, and
-//! versioned migrations at open. Every file it touches is reached through
-//! the state root's descriptor.
+//! versioned migrations at open. The retained state root is checked at each connection.
 
+mod connection;
 mod migrations;
 
 use crate::contained::{Access, ContainedError, Kind, RootDir};
-use rusqlite::{Connection, ErrorCode, OpenFlags, Transaction, TransactionBehavior};
+use rusqlite::{Connection, ErrorCode, Transaction, TransactionBehavior};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -5967,6 +6919,7 @@ impl From<LedgerError> for OpenError {
 
 #[derive(Debug)]
 pub struct SqliteLedger {
+    state: RootDir,
     path: PathBuf,
     busy_timeout: Duration,
     read_only: bool,
@@ -5982,18 +6935,33 @@ impl SqliteLedger {
     /// Writable: the file is created at 0600 when absent, repaired to 0600 when
     /// present, refused when a link or a non-file stands at its name, then
     /// switched to WAL and migrated.
-    pub fn open_with_timeout(state: &RootDir, busy_timeout: Duration) -> Result<SqliteLedger, OpenError> {
+    pub fn open_with_timeout(
+        state: &RootDir,
+        busy_timeout: Duration,
+    ) -> Result<SqliteLedger, OpenError> {
+        state.revalidate()?;
         let database = match state.open_file(Path::new(DATABASE), Access::ReadWrite) {
             Ok(file) => file,
-            Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => state.create_file(Path::new(DATABASE), 0o600)?,
+            Err(ContainedError::Io {
+                kind: std::io::ErrorKind::NotFound,
+                ..
+            }) => state.create_file(Path::new(DATABASE), 0o600)?,
             Err(error) => return Err(error.into()),
         };
-        database.set_permissions(std::fs::Permissions::from_mode(0o600)).map_err(|error| LedgerError::Io(error.to_string()))?;
+        database
+            .set_permissions(std::fs::Permissions::from_mode(0o600))
+            .map_err(|error| LedgerError::Io(error.to_string()))?;
         drop(database);
         no_link_beside(state)?;
-        let ledger = SqliteLedger { path: state.path().join(DATABASE), busy_timeout, read_only: false };
+        let ledger = SqliteLedger {
+            state: state.try_clone()?,
+            path: state.path().join(DATABASE),
+            busy_timeout,
+            read_only: false,
+        };
         let mut connection = ledger.connect()?;
         migrations::migrate(&mut connection)?;
+        ledger.state.revalidate()?;
         Ok(ledger)
     }
 
@@ -6002,16 +6970,30 @@ impl SqliteLedger {
     pub fn open_read_only(state_dir: &Path) -> Result<Option<SqliteLedger>, OpenError> {
         let state = match RootDir::open(state_dir) {
             Ok(state) => state,
-            Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => return Ok(None),
+            Err(ContainedError::Io {
+                kind: std::io::ErrorKind::NotFound,
+                ..
+            }) => return Ok(None),
             Err(error) => return Err(error.into()),
         };
         let path = match state.regular(Path::new(DATABASE)) {
             Ok(path) => path,
-            Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => return Ok(None),
+            Err(ContainedError::Io {
+                kind: std::io::ErrorKind::NotFound,
+                ..
+            }) => return Ok(None),
             Err(error) => return Err(error.into()),
         };
         no_link_beside(&state)?;
-        let ledger = SqliteLedger { path, busy_timeout: Self::BUSY_TIMEOUT, read_only: true };
+        if state.stat(Path::new(DATABASE))?.size == 0 {
+            return Ok(None);
+        }
+        let ledger = SqliteLedger {
+            state,
+            path,
+            busy_timeout: Self::BUSY_TIMEOUT,
+            read_only: true,
+        };
         match ledger.read(migrations::current)? {
             0 => Ok(None),
             _ => Ok(Some(ledger)),
@@ -6023,31 +7005,41 @@ impl SqliteLedger {
     }
 
     pub fn schema_version(&self) -> Result<u32, LedgerError> {
-        self.read(|c| c.pragma_query_value(None, "user_version", |row| row.get(0)).map_err(map))
+        self.read(|c| {
+            c.pragma_query_value(None, "user_version", |row| row.get(0))
+                .map_err(map)
+        })
     }
 
     fn connect(&self) -> Result<Connection, LedgerError> {
-        let access = if self.read_only { OpenFlags::SQLITE_OPEN_READ_ONLY } else { OpenFlags::SQLITE_OPEN_READ_WRITE };
-        let connection = Connection::open_with_flags(&self.path, access | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(map)?;
-        connection.busy_timeout(self.busy_timeout).map_err(map)?;
-        if !self.read_only {
-            connection.pragma_update(None, "journal_mode", "WAL").map_err(map)?;
-        }
-        connection.pragma_update(None, "foreign_keys", "ON").map_err(map)?;
-        Ok(connection)
+        connection::open(&self.state, self.busy_timeout, self.read_only)
     }
 
-    pub(crate) fn transaction<T>(&self, operation: impl FnOnce(&Transaction<'_>) -> Result<T, LedgerError>) -> Result<T, LedgerError> {
+    pub(crate) fn transaction<T>(
+        &self,
+        operation: impl FnOnce(&Transaction<'_>) -> Result<T, LedgerError>,
+    ) -> Result<T, LedgerError> {
+        if self.read_only {
+            return Err(LedgerError::Io("the ledger is read-only".into()));
+        }
         let mut connection = self.connect()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate).map_err(map)?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(map)?;
         let value = operation(&transaction)?;
+        connection::check(&self.state, false)?;
         transaction.commit().map_err(map)?;
         Ok(value)
     }
 
-    pub(crate) fn read<T>(&self, operation: impl FnOnce(&Connection) -> Result<T, LedgerError>) -> Result<T, LedgerError> {
+    pub(crate) fn read<T>(
+        &self,
+        operation: impl FnOnce(&Connection) -> Result<T, LedgerError>,
+    ) -> Result<T, LedgerError> {
         let connection = self.connect()?;
-        operation(&connection)
+        let value = operation(&connection)?;
+        connection::check(&self.state, self.read_only)?;
+        Ok(value)
     }
 }
 
@@ -6056,8 +7048,14 @@ impl SqliteLedger {
 fn no_link_beside(state: &RootDir) -> Result<(), ContainedError> {
     for name in SIDE_FILES {
         match state.stat(Path::new(name)) {
-            Ok(stat) if stat.kind != Kind::File => return Err(ContainedError::NotRegular(state.path().join(name))),
-            Ok(_) | Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => {}
+            Ok(stat) if stat.kind != Kind::File => {
+                return Err(ContainedError::NotRegular(state.path().join(name)));
+            }
+            Ok(_)
+            | Err(ContainedError::Io {
+                kind: std::io::ErrorKind::NotFound,
+                ..
+            }) => {}
             Err(error) => return Err(error),
         }
     }
@@ -6066,12 +7064,17 @@ fn no_link_beside(state: &RootDir) -> Result<(), ContainedError> {
 
 pub(crate) fn map(error: rusqlite::Error) -> LedgerError {
     match &error {
-        rusqlite::Error::SqliteFailure(failure, _) if failure.code == ErrorCode::DatabaseBusy => LedgerError::Busy,
-        rusqlite::Error::SqliteFailure(failure, _) if failure.code == ErrorCode::ConstraintViolation => {
+        rusqlite::Error::SqliteFailure(failure, _) if failure.code == ErrorCode::DatabaseBusy => {
+            LedgerError::Busy
+        }
+        rusqlite::Error::SqliteFailure(failure, _)
+            if failure.code == ErrorCode::ConstraintViolation =>
+        {
             LedgerError::Conflict(error.to_string())
         }
         rusqlite::Error::SqliteFailure(failure, _)
-            if failure.code == ErrorCode::DatabaseCorrupt || failure.code == ErrorCode::NotADatabase =>
+            if failure.code == ErrorCode::DatabaseCorrupt
+                || failure.code == ErrorCode::NotADatabase =>
         {
             LedgerError::Corrupt(error.to_string())
         }
@@ -6080,19 +7083,154 @@ pub(crate) fn map(error: rusqlite::Error) -> LedgerError {
 }
 ```
 
-A zero-length file is an empty SQLite database, so exclusive creation through the descriptor and the
-later connection are two steps with no window in which a link could be followed. The read-only path opens
-the database with `SQLITE_OPEN_READ_ONLY` and sets no journal mode; SQLite creates its own shared-memory
-file beside a WAL database on first read, which is the one file that path can add.
+`crates/vpt-adapters/src/ledger/sqlite/connection.rs`:
+
+```rust
+use super::{DATABASE, SIDE_FILES, map, no_link_beside};
+use crate::contained::{ContainedError, RootDir};
+use rusqlite::{Connection, OpenFlags};
+use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
+use std::time::Duration;
+use vpt_application::ports::LedgerError;
+
+pub(super) fn open(
+    state: &RootDir,
+    busy_timeout: Duration,
+    read_only: bool,
+) -> Result<Connection, LedgerError> {
+    check(state, read_only)?;
+    let path = state.path().join(DATABASE);
+    let common = OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_NOFOLLOW;
+    let opened = if read_only {
+        Connection::open_with_flags(
+            read_only_uri(&path),
+            common | OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
+        )
+    } else {
+        Connection::open_with_flags(&path, common | OpenFlags::SQLITE_OPEN_READ_WRITE)
+    };
+    let connection = match opened {
+        Ok(connection) => connection,
+        Err(error) => {
+            check(state, read_only)?;
+            return Err(open_error(error, &path));
+        }
+    };
+    check(state, read_only)?;
+    persist_wal(&connection)?;
+    connection.busy_timeout(busy_timeout).map_err(map)?;
+    if !read_only {
+        connection
+            .pragma_update(None, "journal_mode", "WAL")
+            .map_err(map)?;
+    }
+    connection
+        .pragma_update(None, "foreign_keys", "ON")
+        .map_err(map)?;
+    check(state, read_only)?;
+    Ok(connection)
+}
+
+pub(super) fn check(state: &RootDir, require_sidecars: bool) -> Result<(), LedgerError> {
+    state.revalidate().map_err(contained)?;
+    state.regular(Path::new(DATABASE)).map_err(contained)?;
+    no_link_beside(state).map_err(contained)?;
+    if require_sidecars {
+        for name in SIDE_FILES {
+            match state.regular(Path::new(name)) {
+                Ok(_) => {}
+                Err(ContainedError::Io {
+                    kind: std::io::ErrorKind::NotFound,
+                    ..
+                }) => {
+                    return Err(LedgerError::Io(format!(
+                        "read-only ledger requires existing {name}"
+                    )));
+                }
+                Err(error) => return Err(contained(error)),
+            }
+        }
+    }
+    Ok(())
+}
+
+fn persist_wal(connection: &Connection) -> Result<(), LedgerError> {
+    let mut enabled: std::ffi::c_int = 1;
+    // SAFETY: the connection and integer outlive this synchronous call.
+    let result = unsafe {
+        rusqlite::ffi::sqlite3_file_control(
+            connection.handle(),
+            c"main".as_ptr(),
+            rusqlite::ffi::SQLITE_FCNTL_PERSIST_WAL,
+            (&mut enabled as *mut std::ffi::c_int).cast(),
+        )
+    };
+    if result == rusqlite::ffi::SQLITE_OK {
+        Ok(())
+    } else {
+        Err(LedgerError::Io(format!(
+            "could not preserve SQLite sidecars: code {result}"
+        )))
+    }
+}
+
+fn read_only_uri(path: &Path) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut uri = String::from("file:");
+    for &byte in path.as_os_str().as_bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'-' | b'.' | b'_' | b'~') {
+            uri.push(char::from(byte));
+        } else {
+            uri.push('%');
+            uri.push(char::from(HEX[usize::from(byte >> 4)]));
+            uri.push(char::from(HEX[usize::from(byte & 15)]));
+        }
+    }
+    uri.push_str("?mode=ro&readonly_shm=1");
+    uri
+}
+
+fn contained(error: ContainedError) -> LedgerError {
+    match error {
+        ContainedError::Escape { path, .. }
+        | ContainedError::NotRegular(path)
+        | ContainedError::NotADirectory(path) => LedgerError::PathEscape(path),
+        ContainedError::Io { path, kind } => {
+            LedgerError::Io(format!("{kind} at {}", path.display()))
+        }
+    }
+}
+
+fn open_error(error: rusqlite::Error, path: &Path) -> LedgerError {
+    match &error {
+        rusqlite::Error::SqliteFailure(failure, _)
+            if failure.extended_code == rusqlite::ffi::SQLITE_CANTOPEN_SYMLINK =>
+        {
+            LedgerError::PathEscape(path.to_path_buf())
+        }
+        _ => map(error),
+    }
+}
+```
+
+Every connection revalidates the retained root and all database leaves. Writable connections preserve the
+write-ahead log and shared-memory sidecars; read-only connections require those regular files and use
+`readonly_shm=1`, so observation creates or changes no durable file. Missing sidecars fail without
+repair. A zero-length database returns `None` before SQLite opens it.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters ledger`
 
-Expected: 7 tests PASS. The busy test finishes in well under a second: the wait is 50 ms. Run
+Expected: 12 tests PASS. The busy test finishes in well under a second: the wait is 50 ms. Run
 `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -6132,11 +7270,13 @@ of those to roll back.
     `pub deferral_count: u32, pub deferral_reason: Option<DeferralReason>,`
     `pub deferred_size: Option<u64>, pub source_gone_at: Option<UtcInstant>,`
     `pub recording: Option<RecordingId> }` (`flags` is the source's whole `st_flags` word).
-  - `StageState::{Pending, Succeeded, Failed, Disabled, Expired}` with `as_str`/`parse`;
+  - `StageState::{Pending, Succeeded, Failed, Disabled, Expired}` with `as_str(self) -> &'static str`,
+    `parse(text: &str) -> Option<StageState>`;
     `StageStates { pub transcribe: StageState, pub note: StageState, pub synthesis: StageState }` with
-    `StageStates::fresh()` (all `Pending`).
-  - `TitleOrigin::{VoiceMemos, Unavailable}` with `as_str`/`parse` (named apart from the recorder port's
-    `TitleLookup` of Task 15).
+    `StageStates::fresh() -> StageStates` (all `Pending`).
+  - `TitleOrigin::{VoiceMemos, Unavailable}` with `as_str(self) -> &'static str`,
+    `parse(text: &str) -> Option<TitleOrigin>` (named apart from the recorder port's `TitleLookup` of
+    Task 15).
   - `RecordingRecord { pub id: RecordingId, pub source_path: Option<PathBuf>,`
     `pub digest: Sha256Digest, pub captured_at: UtcInstant, pub captured_offset: UtcOffset,`
     `pub duration_secs: u64, pub title: Option<String>, pub title_source: TitleOrigin,`
@@ -6178,13 +7318,14 @@ Declare the modules first. `crates/vpt-adapters/src/ledger/mod.rs` becomes:
 //! The ledger: one SQLite type implementing every repository, and an
 //! in-memory twin that runs the same contract.
 
-#[cfg(test)]
-pub(crate) mod contract;
 mod memory;
 mod sqlite;
 
 pub use memory::MemoryLedger;
 pub use sqlite::{OpenError, SCHEMA_VERSION, SqliteLedger};
+
+#[cfg(test)]
+pub(crate) mod contract;
 ```
 
 `crates/vpt-adapters/src/lib.rs` adds `pub use ledger::MemoryLedger;`.
@@ -7127,12 +8268,16 @@ from the database.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters ledger`
 
-Expected: the seven open tests plus twelve contract tests per implementation, 31 in all, PASS. Run
+Expected: the twelve open tests plus twelve contract tests per implementation, 36 in all, PASS. Run
 `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -7152,16 +8297,15 @@ ______________________________________________________________________
 
 - Consumes: `vpt_adapters::{Access, ContainedError, RootDir}`.
 
-- Produces: `vpt_adapters::{WriteLock, LockError::{Busy, Contained(ContainedError), Io(String)}}`
-  with `WriteLock::acquire(state: &RootDir, wait: Duration) -> Result<WriteLock, LockError>`; the lock
-  file is `write.lock` below the state root, created at mode 0600 and opened without following a link;
-  dropping the value releases the lock.
+- Produces: `vpt_adapters::{WriteLock, LockError::{Busy, Contained(ContainedError), Io(String)}}` with
+  `WriteLock::acquire(state: &RootDir, wait: Duration) -> Result<WriteLock, LockError>`; the lock file is
+  `write.lock` below the state root, created at mode 0600 and opened without following a link; dropping
+  the value releases the lock.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-adapters/src/lib.rs` gains `mod lock;` and
-`pub use lock::{LockError, WriteLock};`. `crates/vpt-adapters/src/lock.rs` starts as its
-test module alone:
+`crates/vpt-adapters/src/lib.rs` gains `mod lock;` and `pub use lock::{LockError, WriteLock};`.
+`crates/vpt-adapters/src/lock.rs` starts as its test module alone:
 
 ```rust
 #[cfg(test)]
@@ -7291,12 +8435,16 @@ opening what it created.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters lock`
 
 Expected: 3 tests PASS, none waiting longer than the 30 ms it asks for. Run
 `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates/vpt-adapters
@@ -7340,15 +8488,15 @@ tested here; the journal rows and their one-transaction commit arrived in Task 1
     `pub republished: Vec<PathBuf> }`, `RepairError::{TargetModified(PathBuf),`
     `RenderedDigestMismatch(PathBuf), Sync { path: PathBuf, cause: StoreError }, Render(PathBuf),`
     `Ledger(LedgerError), Stores(StoreError)}`.
-  - `vpt_adapters::{FilesystemStores, digest_open(file: &mut File) ->`
-    `std::io::Result<Sha256Digest>,` `BUFFER: usize = 64 * 1024}` with
+  - `vpt_adapters::{FilesystemStores, digest_open(file: &mut File) ->` `std::io::Result<Sha256Digest>,`
+    `BUFFER: usize = 64 * 1024}` with
     `FilesystemStores::open(roots: &[PathBuf]) -> Result<FilesystemStores, ContainedError>` and
     `FilesystemStores::open_read_only(roots: &[PathBuf]) -> Result<FilesystemStores, ContainedError>`
     (held `RootDir` handles; read-only construction tolerates absent configured roots and creates
-    nothing), implementing `Stores` (and, from Task 28 on, its `entries`). A publication
-    writes a private temporary name below the target's own root, `.<name>.vpt-<pid>-<sequence>` with a
-    per-instance sequence and exclusive creation, retrying only `AlreadyExists`; a temporary name
-    abandoned by a failure is left for the owned cleanup and never reused.
+    nothing), implementing `Stores` (and, from Task 28 on, its `entries`). A publication writes a private
+    temporary name below the target's own root, `.<name>.vpt-<pid>-<sequence>` with a per-instance
+    sequence and exclusive creation, retrying only `AlreadyExists`; a temporary name abandoned by a
+    failure is left for the owned cleanup and never reused.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -7356,8 +8504,7 @@ Declare the modules first: `crates/vpt-application/src/ports/mod.rs` gains `mod 
 `pub use stores::{StoreError, Stores};`; `crates/vpt-application/src/lib.rs` gains `mod publication;` and
 `pub use publication::{RepairError, RepairReport, repair_publications};`;
 `crates/vpt-adapters/src/lib.rs` gains `mod stores;` and
-`pub use stores::{FilesystemStores, digest_open};`. The three new files start as their test
-modules.
+`pub use stores::{FilesystemStores, digest_open};`. The three new files start as their test modules.
 
 `crates/vpt-application/src/publication.rs`:
 
@@ -7605,7 +8752,11 @@ mod tests {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p vpt-application publication && cargo test -p vpt-adapters stores`
+Run independently, including the second command after the first expected failure:
+
+Run: `cargo test -p vpt-application publication`
+
+Run: `cargo test -p vpt-adapters stores`
 
 Expected: the first build fails with `unresolved import` for `StoreError`, `Stores`,
 `repair_publications`, `RepairReport` and `RepairError`; the second (run it after the first is green)
@@ -7844,12 +8995,16 @@ renders over a link; `rename_over` replaces the name itself, never what a link p
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test --workspace --features dev-tools`
 
 Expected: all PASS, the seven repair tests and the five store tests included. Run
 `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -7868,15 +9023,21 @@ it before anything is opened.
 
 **Files:**
 
+- Create: `crates/vpt-adapters/src/voice_memos/store/tests.rs`
+
 - Create: `crates/vpt-application/src/ports/recorder.rs`
+
 - Modify: `crates/vpt-application/src/ports/mod.rs`
+
 - Create: `crates/vpt-adapters/src/voice_memos/mod.rs`, `crates/vpt-adapters/src/voice_memos/store.rs`
+
 - Modify: `crates/vpt-adapters/src/lib.rs`
 
 **Interfaces:**
 
 - Consumes: `vpt_domain::container::ReadFailure`, `vpt_domain::time::FileTime`,
-  `vpt_adapters::{Access, ContainedError, Kind, RootDir}`.
+  `vpt_adapters::{Access, ContainedError, Kind, RootDir}` and
+  `RootDir::identity(&self) -> Result<(u64, u64), ContainedError>` (device and inode).
 
 - Produces, in `vpt_application::ports` (from the private file `ports/recorder.rs`):
 
@@ -7884,22 +9045,23 @@ it before anything is opened.
     `pub flags: u32 }` (the whole `st_flags` word);
     `SourceMetadata { pub device: u64, pub inode: u64, pub size: u64, pub mtime: FileTime }`;
     `RecorderError::{Unreadable(String), NotRegular(PathBuf), NotFound(PathBuf), Escape(PathBuf),`
-    `Io(String)}`; `CloneKind::{CopyOnWrite, ByteCopy}`; `CloneError::{NoSpace, Exists, Io(String)}`
-    (`Exists` when the destination name was already taken, so nothing of it is the caller's).
+    `Io(String)}`; `CloneKind::{CopyOnWrite, ByteCopy}`;
+    `CloneError::{NoSpace, Exists, Escape(PathBuf), Io(String)}` (`Exists` when the destination name was
+    already taken, so nothing of it is the caller's).
   - `trait RecorderStore { type Handle; fn candidates(&self) -> Result<Vec<Candidate>, RecorderError>;`
     `fn candidate(&self, path: &Path) -> Result<Candidate, RecorderError>;`
     `fn open(&self, path: &Path) -> Result<Self::Handle, RecorderError>;`
     `fn metadata(&self, handle: &Self::Handle) -> Result<SourceMetadata, RecorderError>;`
     `fn read_at(&self, handle: &Self::Handle, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure>;`
-    `fn clone_into(&self, handle: &Self::Handle, directory: &Path, name: &str) -> Result<CloneKind,`
+    `fn clone_into(&self, handle: &Self::Handle, directory: &Path, directory_identity: (u64, u64), name: &str) -> Result<CloneKind,`
     `CloneError>; fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)>; }`. `clone_into` clones
     the open descriptor to `<directory>/<name>` relative to that directory's own descriptor, with the
     byte-copy fallback on `EXDEV` only; Task 16 adds `title`.
 
 - `vpt_adapters::VoiceMemosStore::open(recordings_dir: &Path) ->`
   `Result<VoiceMemosStore, ContainedError>` with `type Handle = std::fs::File`, and
-  `vpt_adapters::APPLE_SUBDIRECTORIES: [&str; 4]` (`voice_memos/mod.rs` keeps `store`
-  private and re-exports both).
+  `vpt_adapters::APPLE_SUBDIRECTORIES: [&str; 4]` (`voice_memos/mod.rs` keeps `store` private and
+  re-exports both).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -7918,123 +9080,155 @@ mod store;
 pub use store::{APPLE_SUBDIRECTORIES, VoiceMemosStore};
 ```
 
-`crates/vpt-adapters/src/voice_memos/store.rs` starts as its test module alone:
+`crates/vpt-adapters/src/voice_memos/store.rs` starts with the registered test child below. Create the
+child before the red run:
 
 ```rust
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::os::unix::fs::PermissionsExt;
-    use std::path::PathBuf;
-    use vpt_domain::fixtures::m4a;
-    use vpt_domain::sweep::SF_DATALESS;
+mod tests;
+```
 
-    fn store_with(files: &[(&str, &[u8])]) -> (tempfile::TempDir, PathBuf, VoiceMemosStore) {
-        let temp = tempfile::tempdir().expect("temp");
-        let recordings = temp.path().canonicalize().expect("canonical").join("Recordings");
-        std::fs::create_dir_all(&recordings).expect("recordings");
-        for subdirectory in APPLE_SUBDIRECTORIES {
-            std::fs::create_dir_all(recordings.join(subdirectory)).expect("subdirectory");
-            std::fs::write(recordings.join(subdirectory).join("inner.m4a"), b"never listed").expect("inner");
-        }
-        for (name, bytes) in files {
-            std::fs::write(recordings.join(name), bytes).expect("fixture");
-        }
-        let store = VoiceMemosStore::open(&recordings).expect("opens");
-        (temp, recordings, store)
-    }
+`crates/vpt-adapters/src/voice_memos/store/tests.rs`:
 
-    #[test]
-    fn candidates_are_the_m4a_files_at_depth_one_and_nothing_else() {
-        let (_temp, recordings, store) = store_with(&[("a.m4a", b"aaa"), ("b.M4A", b"bbb"), ("a.waveform", b"w"), ("notes.txt", b"n")]);
-        std::os::unix::fs::symlink(recordings.join("a.m4a"), recordings.join("link.m4a")).expect("link");
-        let names: Vec<String> = store.candidates().expect("list").into_iter().map(|c| c.file_name).collect();
-        assert_eq!(names, vec!["a.m4a"]);
-    }
+```rust
+use super::*;
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use vpt_domain::fixtures::m4a;
+use vpt_domain::sweep::SF_DATALESS;
 
-    #[test]
-    fn a_candidate_carries_size_mtime_and_its_flags_word() {
-        let (_temp, recordings, store) = store_with(&[("a.m4a", b"aaaa")]);
-        let candidate = store.candidates().expect("list").remove(0);
-        assert_eq!(candidate.path, recordings.join("a.m4a"));
-        assert_eq!(candidate.size, 4);
-        assert!(candidate.mtime.secs > 0 && candidate.mtime.nanos < 1_000_000_000);
-        assert_eq!(candidate.flags & SF_DATALESS, 0);
-        assert_eq!(store.candidate(&recordings.join("a.m4a")).expect("one"), candidate);
+fn store_with(files: &[(&str, &[u8])]) -> (tempfile::TempDir, PathBuf, VoiceMemosStore) {
+    let temp = tempfile::tempdir().expect("temp");
+    let recordings = temp.path().canonicalize().expect("canonical").join("Recordings");
+    std::fs::create_dir_all(&recordings).expect("recordings");
+    for subdirectory in APPLE_SUBDIRECTORIES {
+        std::fs::create_dir_all(recordings.join(subdirectory)).expect("subdirectory");
+        std::fs::write(recordings.join(subdirectory).join("inner.m4a"), b"never listed").expect("inner");
     }
-
-    #[test]
-    fn a_candidate_is_refused_when_absent_a_link_a_directory_or_outside_the_root() {
-        let (temp, recordings, store) = store_with(&[("a.m4a", b"aaaa")]);
-        std::os::unix::fs::symlink(recordings.join("a.m4a"), recordings.join("link.m4a")).expect("link");
-        let absent = recordings.join("absent.m4a");
-        assert_eq!(store.candidate(&absent), Err(RecorderError::NotFound(absent)));
-        assert_eq!(store.candidate(&recordings.join("link.m4a")), Err(RecorderError::NotRegular(recordings.join("link.m4a"))));
-        assert_eq!(store.candidate(&recordings.join("Capture")), Err(RecorderError::NotFound(recordings.join("Capture"))));
-        let outside = temp.path().canonicalize().expect("canonical").join("a.m4a");
-        assert_eq!(store.candidate(&outside), Err(RecorderError::Escape(outside.clone())));
-        assert_eq!(store.open(&outside).err(), Some(RecorderError::Escape(outside)));
-        let nested = recordings.join("Capture/inner.m4a");
-        assert_eq!(store.open(&nested).err(), Some(RecorderError::Escape(nested)));
+    for (name, bytes) in files {
+        std::fs::write(recordings.join(name), bytes).expect("fixture");
     }
-
-    #[test]
-    fn open_refuses_a_link_and_reads_a_regular_file_by_descriptor() {
-        let (_temp, recordings, store) = store_with(&[("a.m4a", b"hello world")]);
-        std::os::unix::fs::symlink(recordings.join("a.m4a"), recordings.join("link.m4a")).expect("link");
-        assert_eq!(store.open(&recordings.join("link.m4a")).err(), Some(RecorderError::NotRegular(recordings.join("link.m4a"))));
-        let handle = store.open(&recordings.join("a.m4a")).expect("open");
-        let mut buffer = [0u8; 5];
-        store.read_at(&handle, 6, &mut buffer).expect("read");
-        assert_eq!(&buffer, b"world");
-        assert!(store.read_at(&handle, 7, &mut buffer).is_err());
-        let metadata = store.metadata(&handle).expect("metadata");
-        assert_eq!(metadata.size, 11);
-        assert!(metadata.inode > 0);
-    }
-
-    #[test]
-    fn clone_into_reproduces_the_bytes_and_reports_copy_on_write_on_the_same_volume() {
-        let (temp, recordings, store) = store_with(&[("a.m4a", &m4a(1_787_604_456, 3, b"payload"))]);
-        let audio = temp.path().canonicalize().expect("canonical").join("audio");
-        std::fs::create_dir(&audio).expect("audio");
-        let handle = store.open(&recordings.join("a.m4a")).expect("open");
-        let kind = store.clone_into(&handle, &audio, ".vpt-staging-1.m4a").expect("clone");
-        assert_eq!(std::fs::read(audio.join(".vpt-staging-1.m4a")).expect("read"), m4a(1_787_604_456, 3, b"payload"));
-        assert_eq!(kind, CloneKind::CopyOnWrite);
-        assert_eq!(store.clone_into(&handle, &audio, ".vpt-staging-1.m4a"), Err(CloneError::Exists));
-        assert!(matches!(store.clone_into(&handle, &audio, "sub/x.m4a"), Err(CloneError::Io(_))));
-    }
-
-    #[test]
-    fn the_byte_copy_reproduces_the_bytes_privately_and_reports_itself() {
-        let (temp, recordings, store) = store_with(&[("a.m4a", &[7u8; 200_000])]);
-        let audio = temp.path().canonicalize().expect("canonical").join("audio");
-        std::fs::create_dir(&audio).expect("audio");
-        let handle = store.open(&recordings.join("a.m4a")).expect("open");
-        let directory = RootDir::open(&audio).expect("root");
-        assert_eq!(byte_copy(&handle, &directory, Path::new("copy.m4a")), Ok(CloneKind::ByteCopy));
-        assert_eq!(std::fs::read(audio.join("copy.m4a")).expect("read"), vec![7u8; 200_000]);
-        assert_eq!(std::fs::metadata(audio.join("copy.m4a")).expect("meta").permissions().mode() & 0o777, 0o600);
-    }
-
-    #[test]
-    fn subdirectory_counts_report_each_apple_directory_without_listing_it_as_candidates() {
-        let (_temp, _recordings, store) = store_with(&[]);
-        let counts = store.subdirectory_counts();
-        assert_eq!(counts.len(), 4);
-        assert!(counts.iter().all(|(_, count)| *count == Some(1)), "{counts:?}");
-        assert!(store.candidates().expect("list").is_empty());
-    }
-
-    #[test]
-    fn a_missing_recordings_directory_is_refused_at_open() {
-        let temp = tempfile::tempdir().expect("temp");
-        let absent = temp.path().canonicalize().expect("canonical").join("Recordings");
-        let outcome = VoiceMemosStore::open(&absent);
-        assert!(matches!(outcome, Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. })), "{outcome:?}");
-    }
+    let store = VoiceMemosStore::open(&recordings).expect("opens");
+    (temp, recordings, store)
 }
+
+#[test]
+fn candidates_are_the_m4a_files_at_depth_one_and_nothing_else() {
+    let (_temp, recordings, store) = store_with(&[("a.m4a", b"aaa"), ("b.M4A", b"bbb"), ("a.waveform", b"w"), ("notes.txt", b"n")]);
+    std::os::unix::fs::symlink(recordings.join("a.m4a"), recordings.join("link.m4a")).expect("link");
+    let names: Vec<String> = store.candidates().expect("list").into_iter().map(|c| c.file_name).collect();
+    assert_eq!(names, vec!["a.m4a"]);
+}
+
+#[test]
+fn a_candidate_carries_size_mtime_and_its_flags_word() {
+    let (_temp, recordings, store) = store_with(&[("a.m4a", b"aaaa")]);
+    let candidate = store.candidates().expect("list").remove(0);
+    assert_eq!(candidate.path, recordings.join("a.m4a"));
+    assert_eq!(candidate.size, 4);
+    assert!(candidate.mtime.secs > 0 && candidate.mtime.nanos < 1_000_000_000);
+    assert_eq!(candidate.flags & SF_DATALESS, 0);
+    assert_eq!(store.candidate(&recordings.join("a.m4a")).expect("one"), candidate);
+}
+
+#[test]
+fn a_candidate_is_refused_when_absent_a_link_a_directory_or_outside_the_root() {
+    let (temp, recordings, store) = store_with(&[("a.m4a", b"aaaa")]);
+    std::os::unix::fs::symlink(recordings.join("a.m4a"), recordings.join("link.m4a")).expect("link");
+    let absent = recordings.join("absent.m4a");
+    assert_eq!(store.candidate(&absent), Err(RecorderError::NotFound(absent)));
+    assert_eq!(store.candidate(&recordings.join("link.m4a")), Err(RecorderError::NotRegular(recordings.join("link.m4a"))));
+    assert_eq!(store.candidate(&recordings.join("Capture")), Err(RecorderError::NotFound(recordings.join("Capture"))));
+    let outside = temp.path().canonicalize().expect("canonical").join("a.m4a");
+    assert_eq!(store.candidate(&outside), Err(RecorderError::Escape(outside.clone())));
+    assert_eq!(store.open(&outside).err(), Some(RecorderError::Escape(outside)));
+    let nested = recordings.join("Capture/inner.m4a");
+    assert_eq!(store.open(&nested).err(), Some(RecorderError::Escape(nested)));
+}
+
+#[test]
+fn open_refuses_a_link_and_reads_a_regular_file_by_descriptor() {
+    let (_temp, recordings, store) = store_with(&[("a.m4a", b"hello world")]);
+    std::os::unix::fs::symlink(recordings.join("a.m4a"), recordings.join("link.m4a")).expect("link");
+    assert_eq!(store.open(&recordings.join("link.m4a")).err(), Some(RecorderError::NotRegular(recordings.join("link.m4a"))));
+    let handle = store.open(&recordings.join("a.m4a")).expect("open");
+    let mut buffer = [0u8; 5];
+    store.read_at(&handle, 6, &mut buffer).expect("read");
+    assert_eq!(&buffer, b"world");
+    assert!(store.read_at(&handle, 7, &mut buffer).is_err());
+    let metadata = store.metadata(&handle).expect("metadata");
+    assert_eq!(metadata.size, 11);
+    assert!(metadata.inode > 0);
+}
+
+#[test]
+fn clone_into_reproduces_the_bytes_and_reports_copy_on_write_on_the_same_volume() {
+    let (temp, recordings, store) = store_with(&[("a.m4a", &m4a(1_787_604_456, 3, b"payload"))]);
+    let audio = temp.path().canonicalize().expect("canonical").join("audio");
+    std::fs::create_dir(&audio).expect("audio");
+    let handle = store.open(&recordings.join("a.m4a")).expect("open");
+    let kind = store.clone_into(&handle, &audio, RootDir::open(&audio).expect("root").identity().expect("identity"), ".vpt-staging-1.m4a").expect("clone");
+    assert_eq!(std::fs::read(audio.join(".vpt-staging-1.m4a")).expect("read"), m4a(1_787_604_456, 3, b"payload"));
+    assert_eq!(kind, CloneKind::CopyOnWrite);
+    assert_eq!(store.clone_into(&handle, &audio, RootDir::open(&audio).expect("root").identity().expect("identity"), ".vpt-staging-1.m4a"), Err(CloneError::Exists));
+    assert!(matches!(store.clone_into(&handle, &audio, RootDir::open(&audio).expect("root").identity().expect("identity"), "sub/x.m4a"), Err(CloneError::Escape(_))));
+}
+
+#[test]
+fn the_byte_copy_reproduces_the_bytes_privately_and_reports_itself() {
+    let (temp, recordings, store) = store_with(&[("a.m4a", &[7u8; 200_000])]);
+    let audio = temp.path().canonicalize().expect("canonical").join("audio");
+    std::fs::create_dir(&audio).expect("audio");
+    let handle = store.open(&recordings.join("a.m4a")).expect("open");
+    let directory = RootDir::open(&audio).expect("root");
+    assert_eq!(byte_copy(&handle, &directory, Path::new("copy.m4a")), Ok(CloneKind::ByteCopy));
+    assert_eq!(std::fs::read(audio.join("copy.m4a")).expect("read"), vec![7u8; 200_000]);
+    assert_eq!(std::fs::metadata(audio.join("copy.m4a")).expect("meta").permissions().mode() & 0o777, 0o600);
+}
+
+#[test]
+fn subdirectory_counts_report_each_apple_directory_without_listing_it_as_candidates() {
+    let (_temp, _recordings, store) = store_with(&[]);
+    let counts = store.subdirectory_counts();
+    assert_eq!(counts.len(), 4);
+    assert!(counts.iter().all(|(_, count)| *count == Some(1)), "{counts:?}");
+    assert!(store.candidates().expect("list").is_empty());
+}
+
+#[test]
+fn a_missing_recordings_directory_is_refused_at_open() {
+    let temp = tempfile::tempdir().expect("temp");
+    let absent = temp.path().canonicalize().expect("canonical").join("Recordings");
+    let outcome = VoiceMemosStore::open(&absent);
+    assert!(matches!(outcome, Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. })));
+}
+#[test]
+fn cloning_refuses_a_replacement_destination_root_before_creating_a_file() {
+    let (temp, recordings, store) = store_with(&[("a.m4a", b"audio")]);
+    let audio = temp.path().canonicalize().expect("canonical").join("audio");
+    std::fs::create_dir(&audio).expect("audio");
+    let held = RootDir::open(&audio).expect("root");
+    let identity = held.identity().expect("identity");
+    std::fs::rename(&audio, audio.with_extension("saved")).expect("move root");
+    std::fs::create_dir(&audio).expect("replacement");
+    let source = store.open(&recordings.join("a.m4a")).expect("source");
+    assert_eq!(store.clone_into(&source, &audio, identity, "stage.m4a"), Err(CloneError::Escape(audio.clone())));
+    assert!(std::fs::read_dir(&audio).expect("replacement").next().is_none());
+}
+
+#[test]
+fn subdirectory_counts_never_follow_a_link_below_the_source_root() {
+    let (temp, recordings, store) = store_with(&[]);
+    let outside = temp.path().join("outside");
+    std::fs::create_dir(&outside).expect("outside");
+    std::fs::write(outside.join("one"), b"one").expect("outside entry");
+    std::fs::rename(recordings.join("Capture"), recordings.join("old-capture")).expect("move child");
+    std::os::unix::fs::symlink(&outside, recordings.join("Capture")).expect("link");
+    let counts = store.subdirectory_counts();
+    assert_eq!(counts.iter().find(|(name, _)| name == "Capture").expect("count").1, None);
+    assert_eq!(std::fs::read(outside.join("one")).expect("untouched"), b"one");
+}
+
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -8093,6 +9287,7 @@ pub enum CloneError {
     NoSpace,
     /// The destination name was already taken; nothing there is the caller's.
     Exists,
+    Escape(PathBuf),
     Io(String),
 }
 
@@ -8108,7 +9303,7 @@ pub trait RecorderStore {
     fn read_at(&self, handle: &Self::Handle, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure>;
     /// Clone the descriptor to `<directory>/<name>`, relative to that directory's
     /// own descriptor; a byte copy on `EXDEV` only.
-    fn clone_into(&self, handle: &Self::Handle, directory: &Path, name: &str) -> Result<CloneKind, CloneError>;
+    fn clone_into(&self, handle: &Self::Handle, directory: &Path, directory_identity: (u64, u64), name: &str) -> Result<CloneKind, CloneError>;
     fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)>;
 }
 ```
@@ -8185,7 +9380,10 @@ impl RecorderStore for VoiceMemosStore {
     type Handle = File;
 
     fn candidates(&self) -> Result<Vec<Candidate>, RecorderError> {
-        let names = self.recordings.names().map_err(|error| RecorderError::Unreadable(format!("{error:?}")))?;
+        let names = self.recordings.names().map_err(|error| match error {
+            ContainedError::Escape { .. } | ContainedError::NotADirectory(_) | ContainedError::NotRegular(_) => RecorderError::Escape(self.recordings.path().to_path_buf()),
+            other => RecorderError::Unreadable(format!("{other:?}")),
+        })?;
         let mut candidates = Vec::new();
         for name in names {
             match self.candidate_named(&name) {
@@ -8221,9 +9419,14 @@ impl RecorderStore for VoiceMemosStore {
         handle.read_exact_at(buf, offset).map_err(|_| ReadFailure)
     }
 
-    fn clone_into(&self, handle: &File, directory: &Path, name: &str) -> Result<CloneKind, CloneError> {
-        let directory = RootDir::open(directory).map_err(|error| CloneError::Io(format!("{error:?}")))?;
-        let target = directory.c_name(Path::new(name)).map_err(|error| CloneError::Io(format!("{error:?}")))?;
+    fn clone_into(&self, handle: &File, directory: &Path, directory_identity: (u64, u64), name: &str) -> Result<CloneKind, CloneError> {
+        let expected_path = directory.to_path_buf();
+        let directory = RootDir::open(directory).map_err(|error| clone_path_error(&expected_path, error))?;
+        let observed = directory.identity().map_err(|error| clone_path_error(&expected_path, error))?;
+        if observed != directory_identity {
+            return Err(CloneError::Escape(expected_path));
+        }
+        let target = directory.c_name(Path::new(name)).map_err(|error| clone_path_error(&expected_path.join(name), error))?;
         // SAFETY: `target` is NUL-terminated and outlives the call; both descriptors
         // stay open for the lifetime of their owners.
         let outcome = unsafe { libc::fclonefileat(handle.as_raw_fd(), directory.as_fd().as_raw_fd(), target.as_ptr(), 0) };
@@ -8243,10 +9446,17 @@ impl RecorderStore for VoiceMemosStore {
         APPLE_SUBDIRECTORIES
             .iter()
             .map(|name| {
-                let count = std::fs::read_dir(self.recordings.path().join(name)).ok().map(|entries| entries.count() as u64);
+                let count = self.recordings.open_subdirectory(name).ok().and_then(|directory| directory.names().ok()).map(|entries| entries.len() as u64);
                 ((*name).to_owned(), count)
             })
             .collect()
+    }
+}
+
+fn clone_path_error(path: &Path, error: ContainedError) -> CloneError {
+    match error {
+        ContainedError::Escape { .. } | ContainedError::NotRegular(_) | ContainedError::NotADirectory(_) => CloneError::Escape(path.to_path_buf()),
+        ContainedError::Io { kind, .. } => CloneError::Io(kind.to_string()),
     }
 }
 
@@ -8256,7 +9466,7 @@ fn byte_copy(source: &File, directory: &RootDir, name: &Path) -> Result<CloneKin
     let mut out = directory.create_file(name, 0o600).map_err(|error| match error {
         ContainedError::Io { kind: std::io::ErrorKind::StorageFull, .. } => CloneError::NoSpace,
         ContainedError::Io { kind: std::io::ErrorKind::AlreadyExists, .. } => CloneError::Exists,
-        other => CloneError::Io(format!("{other:?}")),
+        other => clone_path_error(&directory.path().join(name), other),
     })?;
     let total = source.metadata().map_err(|error| CloneError::Io(error.kind().to_string()))?.len();
     let mut buffer = vec![0u8; BUFFER];
@@ -8274,19 +9484,23 @@ fn byte_copy(source: &File, directory: &RootDir, name: &Path) -> Result<CloneKin
 ```
 
 `read_exact_at` is `std::os::unix::fs::FileExt`, whose offset arithmetic is checked in the standard
-library. The destination directory is opened as its own descriptor for the clone, so `fclonefileat` names
-the new file relative to it and never through a path that could have changed since the archive resolved
-it. A byte-copy destination that runs out of space at creation or during a write is `NoSpace`; every
-other failure keeps its kind and no raw path text reaches the error.
+library. The destination directory is opened as its own descriptor and compared with the archive's
+retained device and inode before cloning. `fclonefileat` names the new file relative to that checked
+descriptor. A byte-copy destination that runs out of space at creation or during a write is `NoSpace`;
+every other failure keeps its kind and no raw path text reaches the error.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters voice_memos`
 
-Expected: 8 tests PASS. Run `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no
-warnings.
+Expected: 10 store tests PASS. Run `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect
+no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -8299,23 +9513,33 @@ ______________________________________________________________________
 
 **Files:**
 
+- Create: `crates/vpt-adapters/src/voice_memos/titles/tests.rs`
+
 - Create: `crates/vpt-adapters/src/voice_memos/titles.rs`
+
 - Modify: `crates/vpt-adapters/src/voice_memos/mod.rs`, `crates/vpt-adapters/src/voice_memos/store.rs`,
   `crates/vpt-application/src/ports/recorder.rs`, `crates/vpt-application/src/ports/mod.rs`
 
 **Interfaces:**
 
-- Consumes: `RecorderStore`, `vpt_adapters::{Access, ContainedError, RootDir}`.
+- Consumes: `RecorderStore`, `vpt_adapters::{Access, ContainedError, RootDir}`,
+  `RootDir::try_clone(&self) -> Result<RootDir, ContainedError>`, and
+  `RootDir::revalidate(&self) -> Result<(), ContainedError>`.
 
 - Produces: `vpt_application::ports::TitleLookup::{Titled(String), Unavailable}` and, on `RecorderStore`,
   `fn title(&self, file_name: &str) -> TitleLookup`;
-  `vpt_adapters::{TitleCopy, COPY_DIRECTORY}` with
-  `TitleCopy::refresh(container: &Path, state_dir: &Path) -> TitleCopy` (copies the live database and its
-  side files into `<state_dir>/title-copy`, then opens the copy),
+  `fn refresh_titles(&self) -> Result<(), RecorderError>`; `vpt_adapters::{TitleCopy, COPY_DIRECTORY}`
+  with `TitleCopy::refresh(container: &Path, state_dir: &Path) -> TitleCopy` (copies the live database
+  and its side files into `<state_dir>/title-copy`, then opens the copy),
   `TitleCopy::existing(state_dir: &Path) -> TitleCopy` (opens a copy already there, touching nothing),
   `fn title(&self, file_name: &str) -> TitleLookup`, `COPY_DIRECTORY: &str = "title-copy"`;
-  `VoiceMemosStore::with_titles(self, state_dir: PathBuf, refresh: bool) -> VoiceMemosStore` (the copy is
-  made or opened on the first `title` call; a store built without it answers `Unavailable`).
+  `VoiceMemosStore::with_titles(self, state_dir: PathBuf, refresh: bool) -> VoiceMemosStore` (the state
+  capability is retained at construction; `refresh_titles` replaces the copy once per non-dry sweep, and
+  `title` reads that copy);
+  `VoiceMemosStore::with_titles_root(self, state: &RootDir, refresh: bool) -> VoiceMemosStore` retains
+  the same checked state root as the runtime lock and ledger. Ordinary copy and schema failures yield
+  `Unavailable`. Containment failures during refresh return `RecorderError::Escape`; title lookup refuses
+  an invalid copy as `Unavailable`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -8327,150 +9551,208 @@ test module alone:
 
 ```rust
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::voice_memos::VoiceMemosStore;
-    use std::os::unix::fs::PermissionsExt;
-    use std::path::PathBuf;
-    use vpt_application::ports::RecorderStore;
+mod tests;
+```
 
-    fn apple_store(rows: &[(&str, &str)], with_columns: bool) -> (tempfile::TempDir, PathBuf, rusqlite::Connection) {
-        let temp = tempfile::tempdir().expect("temp");
-        let container = temp.path().canonicalize().expect("canonical");
-        std::fs::create_dir_all(container.join("Recordings")).expect("recordings");
-        let database = rusqlite::Connection::open(container.join("CloudRecordings.db")).expect("db");
-        database.pragma_update(None, "journal_mode", "WAL").expect("wal");
-        if with_columns {
+`crates/vpt-adapters/src/voice_memos/titles/tests.rs`:
+
+```rust
+use super::*;
+use crate::voice_memos::VoiceMemosStore;
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use vpt_application::ports::RecorderStore;
+
+fn apple_store(rows: &[(&str, &str)], with_columns: bool) -> (tempfile::TempDir, PathBuf, rusqlite::Connection) {
+    let temp = tempfile::tempdir().expect("temp");
+    let container = temp.path().canonicalize().expect("canonical");
+    std::fs::create_dir_all(container.join("Recordings")).expect("recordings");
+    let database = rusqlite::Connection::open(container.join("CloudRecordings.db")).expect("db");
+    database.pragma_update(None, "journal_mode", "WAL").expect("wal");
+    if with_columns {
+        database
+            .execute_batch("CREATE TABLE ZCLOUDRECORDING (Z_PK INTEGER PRIMARY KEY, ZPATH TEXT, ZCUSTOMLABEL TEXT)")
+            .expect("schema");
+        for (path, label) in rows {
             database
-                .execute_batch("CREATE TABLE ZCLOUDRECORDING (Z_PK INTEGER PRIMARY KEY, ZPATH TEXT, ZCUSTOMLABEL TEXT)")
-                .expect("schema");
-            for (path, label) in rows {
-                database
-                    .execute("INSERT INTO ZCLOUDRECORDING (ZPATH, ZCUSTOMLABEL) VALUES (?1, ?2)", [path, label])
-                    .expect("row");
-            }
-        } else {
-            database.execute_batch("CREATE TABLE ZSOMETHING (Z_PK INTEGER PRIMARY KEY, ZNAME TEXT)").expect("schema");
+                .execute("INSERT INTO ZCLOUDRECORDING (ZPATH, ZCUSTOMLABEL) VALUES (?1, ?2)", [path, label])
+                .expect("row");
         }
-        (temp, container, database)
+    } else {
+        database.execute_batch("CREATE TABLE ZSOMETHING (Z_PK INTEGER PRIMARY KEY, ZNAME TEXT)").expect("schema");
     }
+    (temp, container, database)
+}
 
-    fn state() -> (tempfile::TempDir, PathBuf) {
-        let temp = tempfile::tempdir().expect("state temp");
-        let state = temp.path().canonicalize().expect("canonical").join("state");
-        std::fs::create_dir(&state).expect("state dir");
-        (temp, state)
-    }
+fn state() -> (tempfile::TempDir, PathBuf) {
+    let temp = tempfile::tempdir().expect("state temp");
+    let state = temp.path().canonicalize().expect("canonical").join("state");
+    std::fs::create_dir(&state).expect("state dir");
+    (temp, state)
+}
 
-    fn names_in(directory: &Path) -> Vec<std::ffi::OsString> {
-        let mut names: Vec<_> = std::fs::read_dir(directory).expect("dir").map(|e| e.expect("entry").file_name()).collect();
-        names.sort();
-        names
-    }
+fn names_in(directory: &Path) -> Vec<std::ffi::OsString> {
+    let mut names: Vec<_> = std::fs::read_dir(directory).expect("dir").map(|e| e.expect("entry").file_name()).collect();
+    names.sort();
+    names
+}
 
-    #[test]
-    fn the_title_is_read_from_the_copy_by_file_name_including_rows_still_in_the_live_wal() {
-        let (_temp, container, _database) = apple_store(&[("20260824 144736-4F3AB19C.m4a", "Invoice call")], true);
-        let (_state_temp, state) = state();
-        let wal = std::fs::metadata(container.join("CloudRecordings.db-wal")).expect("live wal");
-        assert!(wal.len() > 0, "the fixture rows must still sit in the WAL");
-        let titles = TitleCopy::refresh(&container, &state);
-        assert_eq!(titles.title("20260824 144736-4F3AB19C.m4a"), TitleLookup::Titled("Invoice call".into()));
-        assert_eq!(titles.title("other.m4a"), TitleLookup::Unavailable);
-    }
+#[test]
+fn the_title_is_read_from_the_copy_by_file_name_including_rows_still_in_the_live_wal() {
+    let (_temp, container, _database) = apple_store(&[("20260824 144736-4F3AB19C.m4a", "Invoice call")], true);
+    let (_state_temp, state) = state();
+    let wal = std::fs::metadata(container.join("CloudRecordings.db-wal")).expect("live wal");
+    assert!(wal.len() > 0, "the fixture rows must still sit in the WAL");
+    let titles = TitleCopy::refresh(&container, &state);
+    assert_eq!(titles.title("20260824 144736-4F3AB19C.m4a"), TitleLookup::Titled("Invoice call".into()));
+    assert_eq!(titles.title("other.m4a"), TitleLookup::Unavailable);
+}
 
-    #[test]
-    fn the_copy_lives_under_the_state_directory_with_restrictive_modes() {
-        let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
-        let (_state_temp, state) = state();
-        TitleCopy::refresh(&container, &state);
-        let copy_dir = state.join(COPY_DIRECTORY);
-        assert_eq!(std::fs::metadata(&copy_dir).expect("dir").permissions().mode() & 0o777, 0o700);
-        for name in ["CloudRecordings.db", "CloudRecordings.db-wal", "CloudRecordings.db-shm"] {
-            let path = copy_dir.join(name);
-            assert!(path.exists(), "{name} missing");
-            assert_eq!(std::fs::metadata(&path).expect("file").permissions().mode() & 0o777, 0o600);
-        }
-    }
-
-    #[test]
-    fn a_second_refresh_overwrites_the_copy_in_place_and_removes_nothing() {
-        let (_temp, container, database) = apple_store(&[("a.m4a", "A")], true);
-        let (_state_temp, state) = state();
-        assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Titled("A".into()));
-        database.execute("UPDATE ZCLOUDRECORDING SET ZCUSTOMLABEL = 'B'", []).expect("update");
-        std::fs::write(state.join(COPY_DIRECTORY).join("stray"), b"kept").expect("stray");
-        assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Titled("B".into()));
-        assert_eq!(std::fs::read(state.join(COPY_DIRECTORY).join("stray")).expect("kept"), b"kept");
-    }
-
-    #[test]
-    fn an_existing_copy_is_read_without_refreshing_and_an_absent_one_is_unavailable() {
-        let (_temp, container, database) = apple_store(&[("a.m4a", "A")], true);
-        let (_state_temp, state) = state();
-        TitleCopy::refresh(&container, &state);
-        database.execute("UPDATE ZCLOUDRECORDING SET ZCUSTOMLABEL = 'B'", []).expect("update");
-        assert_eq!(TitleCopy::existing(&state).title("a.m4a"), TitleLookup::Titled("A".into()));
-        let (_fresh_temp, fresh) = state();
-        assert_eq!(TitleCopy::existing(&fresh).title("a.m4a"), TitleLookup::Unavailable);
-        assert_eq!(names_in(&fresh), Vec::<std::ffi::OsString>::new());
-    }
-
-    #[test]
-    fn a_changed_schema_yields_unavailable() {
-        let (_temp, container, _database) = apple_store(&[], false);
-        let (_state_temp, state) = state();
-        assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Unavailable);
-    }
-
-    #[test]
-    fn a_missing_live_database_yields_unavailable_and_makes_no_copy() {
-        let temp = tempfile::tempdir().expect("temp");
-        let container = temp.path().canonicalize().expect("canonical");
-        std::fs::create_dir_all(container.join("Recordings")).expect("recordings");
-        let (_state_temp, state) = state();
-        assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Unavailable);
-        assert!(!state.join(COPY_DIRECTORY).exists());
-    }
-
-    #[test]
-    fn the_live_container_is_left_with_no_new_entries() {
-        let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
-        let (_state_temp, state) = state();
-        let before = names_in(&container);
-        TitleCopy::refresh(&container, &state);
-        assert_eq!(names_in(&container), before);
-    }
-
-    #[test]
-    fn like_metacharacters_in_a_file_name_match_only_that_name() {
-        let rows = [
-            ("dir/axb.m4a", "x"),
-            ("dir/a_b.m4a", "underscore"),
-            ("dir/100x.m4a", "x too"),
-            ("dir/100%.m4a", "percent"),
-            ("dir/a\\b.m4a", "backslash"),
-        ];
-        let (_temp, container, _database) = apple_store(&rows, true);
-        let (_state_temp, state) = state();
-        let titles = TitleCopy::refresh(&container, &state);
-        assert_eq!(titles.title("a_b.m4a"), TitleLookup::Titled("underscore".into()));
-        assert_eq!(titles.title("100%.m4a"), TitleLookup::Titled("percent".into()));
-        assert_eq!(titles.title("a\\b.m4a"), TitleLookup::Titled("backslash".into()));
-        assert_eq!(titles.title("b.m4a"), TitleLookup::Unavailable);
-    }
-
-    #[test]
-    fn the_store_answers_through_its_port_and_unavailable_without_titles() {
-        let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
-        let (_state_temp, state) = state();
-        let store = VoiceMemosStore::open(&container.join("Recordings")).expect("store");
-        assert_eq!(store.title("a.m4a"), TitleLookup::Unavailable);
-        let titled = VoiceMemosStore::open(&container.join("Recordings")).expect("store").with_titles(state.clone(), true);
-        assert_eq!(titled.title("a.m4a"), TitleLookup::Titled("A".into()));
-        assert!(state.join(COPY_DIRECTORY).join("CloudRecordings.db").exists());
+#[test]
+fn the_copy_lives_under_the_state_directory_with_restrictive_modes() {
+    let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+    let (_state_temp, state) = state();
+    TitleCopy::refresh(&container, &state);
+    let copy_dir = state.join(COPY_DIRECTORY);
+    assert_eq!(std::fs::metadata(&copy_dir).expect("dir").permissions().mode() & 0o777, 0o700);
+    for name in ["CloudRecordings.db", "CloudRecordings.db-wal", "CloudRecordings.db-shm"] {
+        let path = copy_dir.join(name);
+        assert!(path.exists(), "{name} missing");
+        assert_eq!(std::fs::metadata(&path).expect("file").permissions().mode() & 0o777, 0o600);
     }
 }
+
+#[test]
+fn a_second_refresh_overwrites_the_copy_in_place_and_removes_nothing() {
+    let (_temp, container, database) = apple_store(&[("a.m4a", "A")], true);
+    let (_state_temp, state) = state();
+    assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Titled("A".into()));
+    database.execute("UPDATE ZCLOUDRECORDING SET ZCUSTOMLABEL = 'B'", []).expect("update");
+    std::fs::write(state.join(COPY_DIRECTORY).join("stray"), b"kept").expect("stray");
+    assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Titled("B".into()));
+    assert_eq!(std::fs::read(state.join(COPY_DIRECTORY).join("stray")).expect("kept"), b"kept");
+}
+
+#[test]
+fn an_existing_copy_is_read_without_refreshing_and_an_absent_one_is_unavailable() {
+    let (_temp, container, database) = apple_store(&[("a.m4a", "A")], true);
+    let (_state_temp, state) = state();
+    TitleCopy::refresh(&container, &state);
+    database.execute("UPDATE ZCLOUDRECORDING SET ZCUSTOMLABEL = 'B'", []).expect("update");
+    assert_eq!(TitleCopy::existing(&state).title("a.m4a"), TitleLookup::Titled("A".into()));
+    let (_fresh_temp, fresh) = self::state();
+    assert_eq!(TitleCopy::existing(&fresh).title("a.m4a"), TitleLookup::Unavailable);
+    assert_eq!(names_in(&fresh), Vec::<std::ffi::OsString>::new());
+}
+
+#[test]
+fn a_changed_schema_yields_unavailable() {
+    let (_temp, container, _database) = apple_store(&[], false);
+    let (_state_temp, state) = state();
+    assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Unavailable);
+}
+
+#[test]
+fn a_missing_live_database_yields_unavailable_and_makes_no_copy() {
+    let temp = tempfile::tempdir().expect("temp");
+    let container = temp.path().canonicalize().expect("canonical");
+    std::fs::create_dir_all(container.join("Recordings")).expect("recordings");
+    let (_state_temp, state) = state();
+    assert_eq!(TitleCopy::refresh(&container, &state).title("a.m4a"), TitleLookup::Unavailable);
+    assert!(!state.join(COPY_DIRECTORY).exists());
+}
+
+#[test]
+fn the_live_container_is_left_with_no_new_entries() {
+    let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+    let (_state_temp, state) = state();
+    let before = names_in(&container);
+    TitleCopy::refresh(&container, &state);
+    assert_eq!(names_in(&container), before);
+}
+
+#[test]
+fn like_metacharacters_in_a_file_name_match_only_that_name() {
+    let rows = [
+        ("dir/axb.m4a", "x"),
+        ("dir/a_b.m4a", "underscore"),
+        ("dir/100x.m4a", "x too"),
+        ("dir/100%.m4a", "percent"),
+        ("dir/a\\b.m4a", "backslash"),
+    ];
+    let (_temp, container, _database) = apple_store(&rows, true);
+    let (_state_temp, state) = state();
+    let titles = TitleCopy::refresh(&container, &state);
+    assert_eq!(titles.title("a_b.m4a"), TitleLookup::Titled("underscore".into()));
+    assert_eq!(titles.title("100%.m4a"), TitleLookup::Titled("percent".into()));
+    assert_eq!(titles.title("a\\b.m4a"), TitleLookup::Titled("backslash".into()));
+    assert_eq!(titles.title("b.m4a"), TitleLookup::Unavailable);
+}
+
+#[test]
+fn the_store_answers_through_its_port_and_unavailable_without_titles() {
+    let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+    let (_state_temp, state) = state();
+    let store = VoiceMemosStore::open(&container.join("Recordings")).expect("store");
+    assert_eq!(store.title("a.m4a"), TitleLookup::Unavailable);
+    let titled = VoiceMemosStore::open(&container.join("Recordings")).expect("store").with_titles(state.clone(), true);
+    titled.refresh_titles().expect("refresh");
+    assert_eq!(titled.title("a.m4a"), TitleLookup::Titled("A".into()));
+    assert!(state.join(COPY_DIRECTORY).join("CloudRecordings.db").exists());
+}
+#[test]
+fn a_missing_title_state_is_unavailable_without_refusing_the_recorder() {
+    let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+    let (_state_temp, state) = state();
+    let store = VoiceMemosStore::open(&container.join("Recordings")).expect("store")
+        .with_titles(state.join("absent"), true);
+    assert_eq!(store.refresh_titles(), Ok(()));
+    assert_eq!(store.title("a.m4a"), TitleLookup::Unavailable);
+    assert!(names_in(&state).is_empty());
+}
+
+#[test]
+fn retained_title_state_refuses_replacement_before_writing_a_copy() {
+    let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+    let (_state_temp, state) = state();
+    let root = RootDir::open(&state).expect("root");
+    let store = VoiceMemosStore::open(&container.join("Recordings")).expect("store").with_titles_root(&root, true);
+    std::fs::rename(&state, state.with_extension("saved")).expect("move state");
+    std::fs::create_dir(&state).expect("replacement state");
+    assert_eq!(store.refresh_titles(), Err(vpt_application::ports::RecorderError::Escape(state.clone())));
+    assert!(names_in(&state).is_empty());
+}
+
+#[test]
+fn every_copied_database_leaf_is_checked_before_refresh_or_query() {
+    for name in SIDE_FILES {
+        let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+        let (state_temp, state) = state();
+        let root = RootDir::open(&state).expect("root");
+        let store = VoiceMemosStore::open(&container.join("Recordings")).expect("store").with_titles_root(&root, true);
+        store.refresh_titles().expect("first refresh");
+        let copy = state.join(COPY_DIRECTORY);
+        let target = state_temp.path().join("outside");
+        std::fs::write(&target, b"private outside data").expect("outside");
+        std::fs::rename(copy.join(name), copy.join(format!("{name}.saved"))).expect("move leaf");
+        std::os::unix::fs::symlink(&target, copy.join(name)).expect("link leaf");
+        assert_eq!(store.title("a.m4a"), TitleLookup::Unavailable);
+        assert_eq!(store.refresh_titles(), Err(vpt_application::ports::RecorderError::Escape(state.clone())));
+        assert_eq!(std::fs::read(&target).expect("outside untouched"), b"private outside data");
+    }
+}
+
+#[test]
+fn an_open_title_copy_refuses_a_replaced_copy_directory() {
+    let (_temp, container, _database) = apple_store(&[("a.m4a", "A")], true);
+    let (_state_temp, state) = state();
+    let titles = TitleCopy::refresh(&container, &state);
+    let copy = state.join(COPY_DIRECTORY);
+    std::fs::rename(&copy, state.join("saved-copy")).expect("move copy");
+    std::fs::create_dir(&copy).expect("replacement");
+    assert_eq!(titles.title("a.m4a"), TitleLookup::Unavailable);
+}
+
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -8498,6 +9780,7 @@ and add to `RecorderStore`:
     /// The human title from the private database copy; a copy that cannot be
     /// made or read answers `Unavailable`.
     fn title(&self, file_name: &str) -> TitleLookup;
+    fn refresh_titles(&self) -> Result<(), RecorderError>;
 ```
 
 `crates/vpt-adapters/src/voice_memos/titles.rs`, above its test module:
@@ -8511,7 +9794,7 @@ use crate::contained::{Access, ContainedError, RootDir};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use std::fs::File;
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use vpt_application::ports::TitleLookup;
 
 pub const COPY_DIRECTORY: &str = "title-copy";
@@ -8521,27 +9804,45 @@ const SIDE_FILES: [&str; 3] = ["CloudRecordings.db", "CloudRecordings.db-wal", "
 pub struct TitleCopy {
     connection: Option<Connection>,
     table: Option<String>,
+    root: Option<RootDir>,
 }
 
 impl TitleCopy {
-    /// Copy the live database and its side files below the state root, then open the copy.
+    fn unavailable() -> TitleCopy {
+        TitleCopy { connection: None, table: None, root: None }
+    }
+
     pub fn refresh(container: &Path, state_dir: &Path) -> TitleCopy {
-        match copy_database(container, state_dir) {
-            Ok(()) => TitleCopy::existing(state_dir),
-            Err(_) => TitleCopy { connection: None, table: None },
+        RootDir::open(state_dir).and_then(|state| Self::refresh_at(container, &state))
+            .unwrap_or_else(|_| Self::unavailable())
+    }
+
+    pub(crate) fn refresh_at(container: &Path, state: &RootDir) -> Result<TitleCopy, ContainedError> {
+        let result = state.revalidate().and_then(|()| copy_database(container, state)).and_then(Self::open_copy);
+        match result {
+            Ok(copy) => Ok(copy),
+            Err(error @ (ContainedError::Escape { .. } | ContainedError::NotRegular(_) | ContainedError::NotADirectory(_))) => Err(error),
+            Err(_) => Ok(Self::unavailable()),
         }
     }
 
-    /// Open the copy already below the state root, creating and changing nothing.
     pub fn existing(state_dir: &Path) -> TitleCopy {
-        let database = RootDir::open(&state_dir.join(COPY_DIRECTORY)).and_then(|copy| copy.regular(Path::new(DATABASE)));
-        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX;
-        let connection = database.ok().and_then(|path| Connection::open_with_flags(path, flags).ok());
+        RootDir::open(state_dir).and_then(|state| state.open_subdirectory(COPY_DIRECTORY))
+            .and_then(Self::open_copy).unwrap_or_else(|_| Self::unavailable())
+    }
+
+    fn open_copy(copy: RootDir) -> Result<TitleCopy, ContainedError> {
+        let database = checked_database(&copy)?;
+        let flags = OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_NOFOLLOW;
+        let connection = Connection::open_with_flags(database, flags).ok();
         let table = connection.as_ref().and_then(table_with_title_columns);
-        TitleCopy { connection, table }
+        Ok(TitleCopy { connection, table, root: Some(copy) })
     }
 
     pub fn title(&self, file_name: &str) -> TitleLookup {
+        if self.root.as_ref().is_none_or(|root| checked_database(root).is_err()) {
+            return TitleLookup::Unavailable;
+        }
         let (Some(connection), Some(table)) = (&self.connection, &self.table) else {
             return TitleLookup::Unavailable;
         };
@@ -8562,10 +9863,29 @@ impl TitleCopy {
     }
 }
 
-fn copy_database(container: &Path, state_dir: &Path) -> Result<(), ContainedError> {
+fn checked_database(copy: &RootDir) -> Result<PathBuf, ContainedError> {
+    copy.revalidate()?;
+    let database = copy.regular(Path::new(DATABASE))?;
+    for name in ["CloudRecordings.db-wal", "CloudRecordings.db-shm"] {
+        match copy.regular(Path::new(name)) {
+            Ok(_) | Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(database)
+}
+
+fn copy_database(container: &Path, state: &RootDir) -> Result<RootDir, ContainedError> {
     let live = RootDir::open(container)?;
     live.regular(Path::new(DATABASE))?;
-    let copy = RootDir::open(state_dir)?.subdirectory(COPY_DIRECTORY)?;
+    state.revalidate()?;
+    let copy = state.subdirectory(COPY_DIRECTORY)?;
+    for name in SIDE_FILES {
+        match copy.regular(Path::new(name)) {
+            Ok(_) | Err(ContainedError::Io { kind: std::io::ErrorKind::NotFound, .. }) => {}
+            Err(error) => return Err(error),
+        }
+    }
     for name in SIDE_FILES {
         let mut target = overwrite(&copy, name)?;
         match live.open_file(Path::new(name), Access::Read) {
@@ -8577,7 +9897,8 @@ fn copy_database(container: &Path, state_dir: &Path) -> Result<(), ContainedErro
             Err(error) => return Err(error),
         }
     }
-    Ok(())
+    copy.revalidate()?;
+    Ok(copy)
 }
 
 /// The copy's file at `name`: created privately, or truncated in place and
@@ -8622,15 +9943,16 @@ In `crates/vpt-adapters/src/voice_memos/store.rs`, the store gains its titles:
 
 ```rust
 use super::titles::TitleCopy;
-use std::cell::OnceCell;
+use std::cell::RefCell;
 use std::path::PathBuf;
 use vpt_application::ports::TitleLookup;
 
 /// Where the private copy lives and whether this run may refresh it.
 struct Titles {
     state_dir: PathBuf,
+    state: Result<RootDir, ContainedError>,
     refresh: bool,
-    copy: OnceCell<TitleCopy>,
+    copy: RefCell<Option<TitleCopy>>,
 }
 
 pub struct VoiceMemosStore {
@@ -8642,10 +9964,17 @@ pub struct VoiceMemosStore {
 with `open` setting `titles: None`, this builder:
 
 ```rust
-    /// Read titles from the private copy below `state_dir`, refreshing it on
-    /// first use when `refresh` is set; a dry run passes `false`.
     pub fn with_titles(mut self, state_dir: PathBuf, refresh: bool) -> VoiceMemosStore {
-        self.titles = Some(Titles { state_dir, refresh, copy: OnceCell::new() });
+        let state = RootDir::open(&state_dir);
+        self.titles = Some(Titles { state_dir, state, refresh, copy: RefCell::new(None) });
+        self
+    }
+
+    pub fn with_titles_root(mut self, state: &RootDir, refresh: bool) -> VoiceMemosStore {
+        self.titles = Some(Titles {
+            state_dir: state.path().to_path_buf(), state: state.try_clone(),
+            refresh, copy: RefCell::new(None),
+        });
         self
     }
 ```
@@ -8654,25 +9983,42 @@ and the port method in `impl RecorderStore for VoiceMemosStore`:
 
 ```rust
     fn title(&self, file_name: &str) -> TitleLookup {
-        let Some(titles) = &self.titles else {
-            return TitleLookup::Unavailable;
+        self.titles.as_ref().and_then(|titles| titles.copy.borrow().as_ref().map(|copy| copy.title(file_name)))
+            .unwrap_or(TitleLookup::Unavailable)
+    }
+
+    fn refresh_titles(&self) -> Result<(), RecorderError> {
+        let Some(titles) = &self.titles else { return Ok(()); };
+        if !titles.refresh { return Ok(()); }
+        *titles.copy.borrow_mut() = None;
+        let state = match &titles.state {
+            Ok(state) => state,
+            Err(ContainedError::Escape { .. } | ContainedError::NotRegular(_) | ContainedError::NotADirectory(_)) => {
+                return Err(RecorderError::Escape(titles.state_dir.clone()));
+            }
+            Err(_) => return Ok(()),
         };
-        let copy = titles.copy.get_or_init(|| {
-            let container = self.recordings.path().parent().unwrap_or(self.recordings.path());
-            if titles.refresh { TitleCopy::refresh(container, &titles.state_dir) } else { TitleCopy::existing(&titles.state_dir) }
-        });
-        copy.title(file_name)
+        self.recordings.revalidate().map_err(|error| recorder_error(self.recordings.path(), error))?;
+        let container = self.recordings.path().parent().unwrap_or(self.recordings.path());
+        let copy = TitleCopy::refresh_at(container, state)
+            .map_err(|_| RecorderError::Escape(titles.state_dir.clone()))?;
+        *titles.copy.borrow_mut() = Some(copy);
+        Ok(())
     }
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters voice_memos`
 
-Expected: the 8 store tests and the 9 title tests PASS. Run
+Expected: the 10 store tests and the 13 title tests PASS. Run
 `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -8684,22 +10030,26 @@ ______________________________________________________________________
 ### Task 17: The archive: staging clones and digests
 
 The archive holds the `audio` store as a root descriptor. Staging is the archive's operation: it chooses
-a private name below its root and hands the root's path and that name to a clone closure the use case
-builds from the recorder port, so the archive port never names the recorder's handle type and neither
-port names a file type. A staging failure says whether this invocation created the staged file, because
-every ingest exit before publication trashes what it owns and nothing else.
+a private name below its root and hands the root's path, device/inode identity and that name to a clone
+closure the use case builds from the recorder port, so the archive port never names the recorder's handle
+type and neither port names a file type. A staging failure says whether this invocation created the
+staged file, because every ingest exit before publication trashes what it owns and nothing else.
 
 **Files:**
 
+- Create: `crates/vpt-adapters/src/archive/tests.rs`
+
 - Create: `crates/vpt-application/src/ports/archive.rs`
+
 - Modify: `crates/vpt-application/src/ports/mod.rs`
+
 - Create: `crates/vpt-adapters/src/archive/mod.rs`
+
 - Modify: `crates/vpt-adapters/src/lib.rs`
 
 **Interfaces:**
 
-- Consumes: `CloneKind`, `CloneError`, `vpt_domain::container::ReadFailure`,
-  `vpt_adapters::digest_open`,
+- Consumes: `CloneKind`, `CloneError`, `vpt_domain::container::ReadFailure`, `vpt_adapters::digest_open`,
   `vpt_adapters::{Access, ContainedError, Kind, RootDir}`.
 
 - Produces, in `vpt_application::ports` (from the private file `ports/archive.rs`):
@@ -8710,156 +10060,195 @@ every ingest exit before publication trashes what it owns and nothing else.
   `StageFailure { pub cause: ArchiveError, pub owned_staging: Option<PathBuf> }` (`owned_staging` is set
   only when this invocation created the staged file; a name that was already taken is never claimed);
   `trait Archive { type Handle; fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>`
-  `where C: FnOnce(&Path, &str) -> Result<CloneKind, CloneError>;`
+  `where C: FnOnce(&Path, (u64, u64), &str) -> Result<CloneKind, CloneError>;`
   `fn open(&self, path: &Path) -> Result<Self::Handle, ArchiveError>;`
   `fn size(&self, handle: &Self::Handle) -> Result<u64, ArchiveError>;`
   `fn read_at(&self, handle: &Self::Handle, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure>;`
+  `fn validate_trash_path(&self, path: &Path) -> Result<(), ArchiveError>;`
   `fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError>; fn target(&self, name: &str)`
   `-> PathBuf; fn archived(&self) -> Result<Vec<PathBuf>, ArchiveError>;`
   `fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError>; }` (Task 18 adds `publish` and
   `sync_existing`); `vpt_adapters::{ClonefileArchive, STAGING_PREFIX}` with
   `ClonefileArchive::open(audio_store: &Path) -> Result<ClonefileArchive, ContainedError>`,
-  `ClonefileArchive::open_read_only(audio_store: &Path) -> Result<ClonefileArchive, ContainedError>`
-  (an absent root yields empty listings and stays absent),
-  `type Handle = std::fs::File`, `STAGING_PREFIX: &str = ".vpt-staging-"`.
+  `ClonefileArchive::open_read_only(audio_store: &Path) -> Result<ClonefileArchive, ContainedError>` (an
+  absent root yields empty listings and stays absent), `type Handle = std::fs::File`,
+  `STAGING_PREFIX: &str = ".vpt-staging-"`.
 
 - [ ] **Step 1: Write the failing tests**
 
 Declare first: `crates/vpt-application/src/ports/mod.rs` gains `mod archive;` and
 `pub use archive::{Archive, ArchiveError, StageFailure, Staged};`; `crates/vpt-adapters/src/lib.rs` gains
-`mod archive;` and
-`pub use archive::{ClonefileArchive, STAGING_PREFIX};`. `crates/vpt-adapters/src/archive/mod.rs` starts as its test module alone:
+`mod archive;` and `pub use archive::{ClonefileArchive, STAGING_PREFIX};`.
+`crates/vpt-adapters/src/archive/mod.rs` starts with the registered test child below. Create the child
+before the red run:
 
 ```rust
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::voice_memos::VoiceMemosStore;
-    use std::os::unix::fs::PermissionsExt;
-    use std::path::PathBuf;
-    use vpt_application::ports::{CloneError, RecorderStore};
-    use vpt_domain::container::inspect;
-    use vpt_domain::fixtures::m4a;
+mod tests;
+```
 
-    fn source(bytes: &[u8]) -> (tempfile::TempDir, PathBuf, VoiceMemosStore, File) {
-        let temp = tempfile::tempdir().expect("temp");
-        let base = temp.path().canonicalize().expect("canonical");
-        std::fs::create_dir_all(base.join("Recordings")).expect("recordings");
-        std::fs::create_dir_all(base.join("audio")).expect("audio");
-        std::fs::write(base.join("Recordings/a.m4a"), bytes).expect("fixture");
-        let store = VoiceMemosStore::open(&base.join("Recordings")).expect("store");
-        let handle = store.open(&base.join("Recordings/a.m4a")).expect("open");
-        (temp, base.join("audio"), store, handle)
-    }
+`crates/vpt-adapters/src/archive/tests.rs`:
 
-    #[test]
-    fn staging_produces_a_0600_private_copy_with_the_bytes_digest_and_size() {
-        let bytes = m4a(1_787_604_456, 5, b"payload");
-        let (_temp, audio, store, handle) = source(&bytes);
-        let archive = ClonefileArchive::open(&audio).expect("archive");
+```rust
+use super::*;
+use crate::voice_memos::VoiceMemosStore;
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use vpt_application::ports::{CloneError, RecorderStore};
+use vpt_domain::container::inspect;
+use vpt_domain::fixtures::m4a;
 
-        let staged = archive.stage(|directory, name| store.clone_into(&handle, directory, name)).expect("staged");
-
-        assert_eq!(staged.path.parent(), Some(audio.as_path()));
-        assert!(staged.path.file_name().expect("name").to_string_lossy().starts_with(STAGING_PREFIX));
-        assert_eq!(std::fs::read(&staged.path).expect("read"), bytes);
-        assert_eq!(std::fs::metadata(&staged.path).expect("meta").permissions().mode() & 0o777, 0o600);
-        assert_eq!(staged.size, bytes.len() as u64);
-        assert_eq!(archive.digest(&staged.path).expect("digest"), staged.digest);
-        assert!(staged.copy_on_write);
-    }
-
-    #[test]
-    fn a_staged_file_can_be_opened_for_the_wholeness_gate() {
-        let (_temp, audio, store, handle) = source(&m4a(1_787_604_456, 5, b"payload"));
-        let archive = ClonefileArchive::open(&audio).expect("archive");
-        let staged = archive.stage(|directory, name| store.clone_into(&handle, directory, name)).expect("staged");
-        let opened = archive.open(&staged.path).expect("open");
-        let len = archive.size(&opened).expect("size");
-        let container = inspect(len, |offset, buf: &mut [u8]| archive.read_at(&opened, offset, buf)).expect("whole");
-        assert_eq!(container.duration_secs, 5);
-    }
-
-    #[test]
-    fn a_clone_that_created_nothing_owns_no_staging_name() {
-        let (_temp, audio, _store, _handle) = source(b"x");
-        let archive = ClonefileArchive::open(&audio).expect("archive");
-        let failure = archive.stage(|_directory, _name| Err(CloneError::Io("boom".into()))).unwrap_err();
-        assert_eq!(failure.cause, ArchiveError::Io("boom".into()));
-        assert_eq!(failure.owned_staging, None);
-        assert!(archive.staged_leftovers().expect("list").is_empty());
-    }
-
-    #[test]
-    fn a_failure_after_the_file_was_created_owns_it_at_mode_0600() {
-        let (_temp, audio, _store, _handle) = source(b"x");
-        let archive = ClonefileArchive::open(&audio).expect("archive");
-        let failure = archive
-            .stage(|directory, name| {
-                std::fs::write(directory.join(name), b"partial").expect("partial");
-                Err(CloneError::NoSpace)
-            })
-            .unwrap_err();
-        assert_eq!(failure.cause, ArchiveError::NoSpace);
-        let owned = failure.owned_staging.expect("owned");
-        assert_eq!(owned.parent(), Some(audio.as_path()));
-        assert_eq!(std::fs::metadata(&owned).expect("kept").permissions().mode() & 0o777, 0o600);
-        assert_eq!(archive.staged_leftovers().expect("list"), vec![owned]);
-    }
-
-    #[test]
-    fn a_name_that_was_already_taken_is_never_claimed() {
-        let (_temp, audio, _store, _handle) = source(b"x");
-        let archive = ClonefileArchive::open(&audio).expect("archive");
-        let failure = archive
-            .stage(|directory, name| {
-                std::fs::write(directory.join(name), b"someone else's").expect("collision");
-                Err(CloneError::Exists)
-            })
-            .unwrap_err();
-        assert_eq!(failure.owned_staging, None);
-        assert!(matches!(failure.cause, ArchiveError::Io(_)), "{:?}", failure.cause);
-    }
-
-    #[test]
-    fn archived_lists_only_m4a_files_and_leftovers_only_staging_names() {
-        let (_temp, audio, _store, _handle) = source(b"x");
-        std::fs::write(audio.join("2026-08-24T144736-4f3ab19c02de.m4a"), b"x").expect("archived");
-        std::fs::write(audio.join(format!("{STAGING_PREFIX}123.m4a")), b"y").expect("leftover");
-        std::fs::write(audio.join("notes.txt"), b"z").expect("other");
-        std::os::unix::fs::symlink(audio.join("notes.txt"), audio.join("link.m4a")).expect("link");
-        let archive = ClonefileArchive::open(&audio).expect("archive");
-        assert_eq!(archive.archived().expect("list"), vec![audio.join("2026-08-24T144736-4f3ab19c02de.m4a")]);
-        assert_eq!(archive.staged_leftovers().expect("list"), vec![audio.join(format!("{STAGING_PREFIX}123.m4a"))]);
-        assert_eq!(archive.target("abc.m4a"), audio.join("abc.m4a"));
-    }
-
-    #[test]
-    fn open_and_digest_refuse_a_link_and_a_path_outside_the_store() {
-        let (temp, audio, _store, _handle) = source(b"x");
-        std::fs::write(audio.join("real.m4a"), b"x").expect("real");
-        std::os::unix::fs::symlink(audio.join("real.m4a"), audio.join("link.m4a")).expect("link");
-        let archive = ClonefileArchive::open(&audio).expect("archive");
-        assert_eq!(archive.open(&audio.join("link.m4a")).err(), Some(ArchiveError::Escape(audio.join("link.m4a"))));
-        let outside = temp.path().canonicalize().expect("canonical").join("Recordings/a.m4a");
-        assert_eq!(archive.digest(&outside), Err(ArchiveError::Escape(outside)));
-        let absent = archive.open(&audio.join("absent.m4a"));
-        assert!(matches!(absent, Err(ArchiveError::Io(_))), "{absent:?}");
-    }
-
-    #[test]
-    fn reading_an_absent_archive_lists_nothing_and_never_creates_it() {
-        let temp = tempfile::tempdir().expect("temp");
-        let audio = temp.path().canonicalize().expect("canonical").join("audio");
-        let archive = ClonefileArchive::open_read_only(&audio).expect("read only");
-        assert!(archive.archived().expect("archives").is_empty());
-        assert!(archive.staged_leftovers().expect("staging").is_empty());
-        assert_eq!(archive.target("id.m4a"), audio.join("id.m4a"));
-        let result = archive.stage(|_, _| panic!("an absent root cannot stage"));
-        assert!(result.is_err());
-        assert!(!audio.exists());
-    }
+fn source(bytes: &[u8]) -> (tempfile::TempDir, PathBuf, VoiceMemosStore, File) {
+    let temp = tempfile::tempdir().expect("temp");
+    let base = temp.path().canonicalize().expect("canonical");
+    std::fs::create_dir_all(base.join("Recordings")).expect("recordings");
+    std::fs::create_dir_all(base.join("audio")).expect("audio");
+    std::fs::write(base.join("Recordings/a.m4a"), bytes).expect("fixture");
+    let store = VoiceMemosStore::open(&base.join("Recordings")).expect("store");
+    let handle = store.open(&base.join("Recordings/a.m4a")).expect("open");
+    (temp, base.join("audio"), store, handle)
 }
+
+#[test]
+fn staging_produces_a_0600_private_copy_with_the_bytes_digest_and_size() {
+    let bytes = m4a(1_787_604_456, 5, b"payload");
+    let (_temp, audio, store, handle) = source(&bytes);
+    let archive = ClonefileArchive::open(&audio).expect("archive");
+
+    let staged = archive.stage(|directory, directory_identity, name| store.clone_into(&handle, directory, directory_identity, name)).expect("staged");
+
+    assert_eq!(staged.path.parent(), Some(audio.as_path()));
+    assert!(staged.path.file_name().expect("name").to_string_lossy().starts_with(STAGING_PREFIX));
+    assert_eq!(std::fs::read(&staged.path).expect("read"), bytes);
+    assert_eq!(std::fs::metadata(&staged.path).expect("meta").permissions().mode() & 0o777, 0o600);
+    assert_eq!(staged.size, bytes.len() as u64);
+    assert_eq!(archive.digest(&staged.path).expect("digest"), staged.digest);
+    assert!(staged.copy_on_write);
+}
+
+#[test]
+fn a_staged_file_can_be_opened_for_the_wholeness_gate() {
+    let (_temp, audio, store, handle) = source(&m4a(1_787_604_456, 5, b"payload"));
+    let archive = ClonefileArchive::open(&audio).expect("archive");
+    let staged = archive.stage(|directory, directory_identity, name| store.clone_into(&handle, directory, directory_identity, name)).expect("staged");
+    let opened = archive.open(&staged.path).expect("open");
+    let len = archive.size(&opened).expect("size");
+    let container = inspect(len, |offset, buf: &mut [u8]| archive.read_at(&opened, offset, buf)).expect("whole");
+    assert_eq!(container.duration_secs, 5);
+}
+
+#[test]
+fn a_clone_that_created_nothing_owns_no_staging_name() {
+    let (_temp, audio, _store, _handle) = source(b"x");
+    let archive = ClonefileArchive::open(&audio).expect("archive");
+    let failure = archive.stage(|_directory, _directory_identity, _name| Err(CloneError::Io("boom".into()))).unwrap_err();
+    assert_eq!(failure.cause, ArchiveError::Io("boom".into()));
+    assert_eq!(failure.owned_staging, None);
+    assert!(archive.staged_leftovers().expect("list").is_empty());
+}
+
+#[test]
+fn a_failure_after_the_file_was_created_owns_it_at_mode_0600() {
+    let (_temp, audio, _store, _handle) = source(b"x");
+    let archive = ClonefileArchive::open(&audio).expect("archive");
+    let failure = archive
+        .stage(|directory, _directory_identity, name| {
+            std::fs::write(directory.join(name), b"partial").expect("partial");
+            Err(CloneError::NoSpace)
+        })
+        .unwrap_err();
+    assert_eq!(failure.cause, ArchiveError::NoSpace);
+    let owned = failure.owned_staging.expect("owned");
+    assert_eq!(owned.parent(), Some(audio.as_path()));
+    assert_eq!(std::fs::metadata(&owned).expect("kept").permissions().mode() & 0o777, 0o600);
+    assert_eq!(archive.staged_leftovers().expect("list"), vec![owned]);
+}
+
+#[test]
+fn a_name_that_was_already_taken_is_never_claimed() {
+    let (_temp, audio, _store, _handle) = source(b"x");
+    let archive = ClonefileArchive::open(&audio).expect("archive");
+    let failure = archive
+        .stage(|directory, _directory_identity, name| {
+            std::fs::write(directory.join(name), b"someone else's").expect("collision");
+            Err(CloneError::Exists)
+        })
+        .unwrap_err();
+    assert_eq!(failure.owned_staging, None);
+    assert!(matches!(failure.cause, ArchiveError::Io(_)), "{:?}", failure.cause);
+}
+
+#[test]
+fn archived_lists_only_m4a_files_and_leftovers_only_staging_names() {
+    let (_temp, audio, _store, _handle) = source(b"x");
+    std::fs::write(audio.join("2026-08-24T144736-4f3ab19c02de.m4a"), b"x").expect("archived");
+    std::fs::write(audio.join(format!("{STAGING_PREFIX}123.m4a")), b"y").expect("leftover");
+    std::fs::write(audio.join("notes.txt"), b"z").expect("other");
+    std::os::unix::fs::symlink(audio.join("notes.txt"), audio.join("link.m4a")).expect("link");
+    let archive = ClonefileArchive::open(&audio).expect("archive");
+    assert_eq!(archive.archived().expect("list"), vec![audio.join("2026-08-24T144736-4f3ab19c02de.m4a")]);
+    assert_eq!(archive.staged_leftovers().expect("list"), vec![audio.join(format!("{STAGING_PREFIX}123.m4a"))]);
+    assert_eq!(archive.target("abc.m4a"), audio.join("abc.m4a"));
+}
+
+#[test]
+fn open_and_digest_refuse_a_link_and_a_path_outside_the_store() {
+    let (temp, audio, _store, _handle) = source(b"x");
+    std::fs::write(audio.join("real.m4a"), b"x").expect("real");
+    std::os::unix::fs::symlink(audio.join("real.m4a"), audio.join("link.m4a")).expect("link");
+    let archive = ClonefileArchive::open(&audio).expect("archive");
+    assert_eq!(archive.open(&audio.join("link.m4a")).err(), Some(ArchiveError::Escape(audio.join("link.m4a"))));
+    let outside = temp.path().canonicalize().expect("canonical").join("Recordings/a.m4a");
+    assert_eq!(archive.digest(&outside), Err(ArchiveError::Escape(outside)));
+    let absent = archive.open(&audio.join("absent.m4a"));
+    assert!(matches!(absent, Err(ArchiveError::Io(_))), "{absent:?}");
+}
+
+#[test]
+fn reading_an_absent_archive_lists_nothing_and_never_creates_it() {
+    let temp = tempfile::tempdir().expect("temp");
+    let audio = temp.path().canonicalize().expect("canonical").join("audio");
+    let archive = ClonefileArchive::open_read_only(&audio).expect("read only");
+    assert!(archive.archived().expect("archives").is_empty());
+    assert!(archive.staged_leftovers().expect("staging").is_empty());
+    assert_eq!(archive.target("id.m4a"), audio.join("id.m4a"));
+    let result = archive.stage(|_, _, _| panic!("an absent root cannot stage"));
+    assert!(result.is_err());
+    assert!(!audio.exists());
+}
+#[test]
+fn a_root_replaced_during_staging_never_returns_a_cleanup_path() {
+    let (_temp, audio, store, handle) = source(b"audio");
+    let archive = ClonefileArchive::open(&audio).expect("archive");
+    let saved = audio.with_extension("saved");
+    let failure = archive.stage(|directory, identity, name| {
+        let kind = store.clone_into(&handle, directory, identity, name)?;
+        std::fs::rename(&audio, &saved).expect("move root");
+        std::fs::create_dir(&audio).expect("replacement");
+        std::fs::write(audio.join(name), b"unowned replacement").expect("unowned");
+        Ok(kind)
+    }).expect_err("root changed");
+    assert_eq!(failure.cause, ArchiveError::Escape(audio.clone()));
+    assert_eq!(failure.owned_staging, None);
+    assert_eq!(std::fs::read_dir(&saved).expect("saved").count(), 1);
+    assert_eq!(std::fs::read_dir(&audio).expect("replacement").count(), 1);
+}
+
+#[test]
+fn cleanup_validation_refuses_links_and_replaced_archive_roots() {
+    let (_temp, audio, _store, _handle) = source(b"audio");
+    let archive = ClonefileArchive::open(&audio).expect("archive");
+    let path = audio.join(".vpt-staging-test.m4a");
+    std::fs::write(audio.join("unowned.m4a"), b"kept").expect("unowned");
+    std::os::unix::fs::symlink(audio.join("unowned.m4a"), &path).expect("link");
+    assert_eq!(archive.validate_trash_path(&path), Err(ArchiveError::Escape(path.clone())));
+    std::fs::rename(&audio, audio.with_extension("saved")).expect("move root");
+    std::fs::create_dir(&audio).expect("replacement");
+    std::fs::write(&path, b"replacement").expect("replacement file");
+    assert_eq!(archive.validate_trash_path(&path), Err(ArchiveError::Escape(audio)));
+    assert_eq!(std::fs::read(path).expect("untouched"), b"replacement");
+}
+
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -8917,12 +10306,13 @@ pub trait Archive {
     /// path and the name and clones the source there.
     fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>
     where
-        C: FnOnce(&Path, &str) -> Result<CloneKind, CloneError>;
+        C: FnOnce(&Path, (u64, u64), &str) -> Result<CloneKind, CloneError>;
     fn open(&self, path: &Path) -> Result<Self::Handle, ArchiveError>;
     fn size(&self, handle: &Self::Handle) -> Result<u64, ArchiveError>;
     /// Fill `buf` from `offset`, or fail; the wholeness gate's read callback.
     fn read_at(&self, handle: &Self::Handle, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure>;
     fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError>;
+    fn validate_trash_path(&self, path: &Path) -> Result<(), ArchiveError>;
     fn target(&self, name: &str) -> PathBuf;
     fn archived(&self) -> Result<Vec<PathBuf>, ArchiveError>;
     fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError>;
@@ -8971,6 +10361,7 @@ fn clone_error(error: CloneError) -> ArchiveError {
     match error {
         CloneError::NoSpace => ArchiveError::NoSpace,
         CloneError::Exists => ArchiveError::Io("staging name already exists".into()),
+        CloneError::Escape(path) => ArchiveError::Escape(path),
         CloneError::Io(detail) => ArchiveError::Io(detail),
     }
 }
@@ -8991,7 +10382,9 @@ impl ClonefileArchive {
     }
 
     fn root(&self) -> Result<&RootDir, ArchiveError> {
-        self.root.as_ref().ok_or_else(|| ArchiveError::Io("the audio store is absent".into()))
+        let root = self.root.as_ref().ok_or_else(|| ArchiveError::Io("the audio store is absent".into()))?;
+        root.revalidate().map_err(|_| ArchiveError::Escape(self.directory.clone()))?;
+        Ok(root)
     }
 
     fn staging_name(&self) -> String {
@@ -9037,11 +10430,15 @@ impl Archive for ClonefileArchive {
 
     fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>
     where
-        C: FnOnce(&Path, &str) -> Result<CloneKind, CloneError>,
+        C: FnOnce(&Path, (u64, u64), &str) -> Result<CloneKind, CloneError>,
     {
         let root = self.root().map_err(|cause| StageFailure { cause, owned_staging: None })?;
+        let lost_root = || StageFailure { cause: ArchiveError::Escape(root.path().to_path_buf()), owned_staging: None };
         let name = self.staging_name();
-        match clone(root.path(), &name) {
+        let identity = root.identity().map_err(|error| StageFailure {
+            cause: archive_error(root.path(), error), owned_staging: None,
+        })?;
+        let result = match clone(root.path(), identity, &name) {
             Ok(kind) => self.finish(&name, kind).map_err(|cause| self.owned_failure(&name, cause)),
             Err(CloneError::Exists) => Err(StageFailure { cause: clone_error(CloneError::Exists), owned_staging: None }),
             Err(error) => {
@@ -9052,7 +10449,9 @@ impl Archive for ClonefileArchive {
                     Err(StageFailure { cause: clone_error(error), owned_staging: None })
                 }
             }
-        }
+        };
+        root.revalidate().map_err(|_| lost_root())?;
+        result
     }
 
     fn open(&self, path: &Path) -> Result<File, ArchiveError> {
@@ -9070,6 +10469,11 @@ impl Archive for ClonefileArchive {
     fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError> {
         let mut file = self.open(path)?;
         digest_open(&mut file).map_err(|error| io(&error))
+    }
+
+    fn validate_trash_path(&self, path: &Path) -> Result<(), ArchiveError> {
+        self.root()?.regular(path).map_err(|error| archive_error(path, error))?;
+        Ok(())
     }
 
     fn target(&self, name: &str) -> PathBuf {
@@ -9093,12 +10497,16 @@ unconditionally. Nothing here removes a file.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters archive`
 
-Expected: all eight staging tests PASS. Run `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no
-warnings.
+Expected: all 10 staging tests PASS. Run `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and
+expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -9208,6 +10616,20 @@ mod tests {
         assert_eq!(archive.sync_existing(&audio.join("id.m4a")), Ok(()));
         assert_eq!(archive.archived().expect("list"), vec![audio.join("id.m4a")]);
     }
+    #[test]
+    fn publication_refuses_a_replaced_root_before_returning_either_outcome() {
+        for already_exists in [false, true] {
+            let (_temp, audio, root) = audio();
+            let staged = audio.join(".vpt-staging-race.m4a");
+            std::fs::write(&staged, b"staged").expect("stage");
+            if already_exists { std::fs::write(audio.join("id.m4a"), b"original").expect("target"); }
+            std::fs::rename(&audio, audio.with_extension("saved")).expect("move root");
+            std::fs::create_dir(&audio).expect("replacement");
+            assert_eq!(exclusive(&root, &staged, "id.m4a"), Err(ArchiveError::Escape(audio.join("id.m4a"))));
+            assert!(std::fs::read_dir(&audio).expect("replacement").next().is_none());
+        }
+    }
+
 }
 ```
 
@@ -9258,9 +10680,11 @@ pub fn exclusive(root: &RootDir, staged: &Path, target_name: &str) -> Result<Pub
     sync_file(root, staged)?;
     let placed = root.rename_exclusive(staged, &target).map_err(|error| archive_error(&target, error))?;
     if !placed {
+        root.revalidate().map_err(|_| ArchiveError::Escape(target.clone()))?;
         return Ok(Published::Exists(target));
     }
     root.sync().map_err(|_| ArchiveError::PlacedUnsynced(target.clone()))?;
+    root.revalidate().map_err(|_| ArchiveError::Escape(target.clone()))?;
     Ok(Published::Placed(target))
 }
 
@@ -9294,12 +10718,16 @@ with `Published` added to that file's `vpt_application::ports` import.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters archive`
 
-Expected: the 8 staging tests and the 5 publication tests PASS. Run
+Expected: the 10 staging tests and the 6 publication tests PASS. Run
 `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -9324,12 +10752,15 @@ recorder's and the archive's `read_at`.
   `crates/vpt-application/src/ports/notifier.rs`, `crates/vpt-application/src/ingest/mod.rs`,
   `crates/vpt-application/src/ingest/candidate.rs`, `crates/vpt-application/src/ingest/publish.rs`
 - Modify: `crates/vpt-application/src/ports/mod.rs`, `crates/vpt-application/src/lib.rs`
-- Test: `crates/vpt-adapters/tests/support/mod.rs`, `crates/vpt-adapters/tests/ingest_sweep.rs`
+- Test: `crates/vpt-adapters/tests/support/mod.rs`, `crates/vpt-adapters/tests/ingest_sweep.rs`,
+  `crates/vpt-adapters/tests/ingest_titles.rs`
 
 **Interfaces:**
 
 - Consumes: every port so far, `RecordingLedger::{seen, record_seen, commit}`, the domain gates and
-  `inspect`.
+  `inspect`; `RecorderStore::refresh_titles(&self) -> Result<(), RecorderError>` before each non-dry
+  sweep, and `Archive::validate_trash_path(&self, path: &Path) -> Result<(), ArchiveError>` before
+  cleanup.
 
 - Produces:
 
@@ -9364,23 +10795,24 @@ recorder's and the archive's `read_at`.
     `WouldIngest { pub path: PathBuf, pub title: Option<String>, pub title_source: TitleOrigin }`;
     `IngestFailure::{StoreUnreadable(String), EmptyStore, NoSpace, Sync(String),`
     `ArchiveCollision { target: PathBuf, staged: Sha256Digest, existing: Sha256Digest },`
-    `PathEscape(PathBuf), HelperVersion { found: u32 }, Ledger(LedgerError), Archive(String), Recorder(String)}` with
-    `fn message(&self) -> String`; `IngestError { pub failure: IngestFailure,`
+    `OnceMissing(PathBuf), PathEscape(PathBuf), HelperVersion { found: u32 }, Ledger(LedgerError), Archive(String), Recorder(String)}`
+    with `fn message(&self) -> String`; `IngestError { pub failure: IngestFailure,`
     `pub completed: Vec<RecordingId>, pub log: Vec<String> }` (`completed` holds every identity the run
     recovered or ingested, deduplicated; `log` is the run's log up to the failure);
-    `Ingest::run(&self, mode: &Mode) -> Result<IngestReport, Box<IngestError>>`. This task supports the full
-    sweep and `once`; Task 20 adds the gates, Task 21 the duplicates, Task 22 recovery, Task 23 the dry
-    run and the aborts.
+    `Ingest::run(&self, mode: &Mode) -> Result<IngestReport, Box<IngestError>>`. This task supports the
+    full sweep and `once`; Task 20 adds the gates, Task 21 the duplicates, Task 22 recovery, Task 23 the
+    dry run and the aborts.
   - Test support in `crates/vpt-adapters/tests/support/mod.rs`: `Fixture::new() -> Fixture` with the
     public fields `temp`, `container` (a canonical `voice-memos` directory holding `Recordings/`, the
     four Apple subdirectories each with one inner file, and a live `CloudRecordings.db` in WAL mode whose
     connection the fixture keeps open), `recordings`, `audio`, `state`; methods
     `add_recording(&self, name: &str, bytes: &[u8]) -> PathBuf` (mtime 60 s before the fixed clock),
     `set_mtime(&self, path: &Path, secs: i64)`, `add_title(&self, path: &str, label: &str)`,
-    `store(&self) -> VoiceMemosStore`, `titled_store(&self, refresh: bool) -> VoiceMemosStore`,
-    `archive(&self) -> ClonefileArchive`, `ledger(&self) -> SqliteLedger`,
-    `settings(&self) -> SourceSettings`, `parts(&self) -> Parts`, `entries(&self) -> Vec<Entry>` (every
-    entry below the container, recursively: relative path, size, mtime seconds and nanoseconds, flags);
+    `replace_title(&self, label: &str)`, `store(&self) -> VoiceMemosStore`,
+    `titled_store(&self, refresh: bool) -> VoiceMemosStore`, `archive(&self) -> ClonefileArchive`,
+    `ledger(&self) -> SqliteLedger`, `settings(&self) -> SourceSettings`, `parts(&self) -> Parts`,
+    `entries(&self) -> Vec<Entry>` (every entry below the container, recursively: relative path, size,
+    mtime seconds and nanoseconds, flags);
     `Parts { store, archive, ledger, clock, trash, notifier, settings }` with
     `fn ingest(&self) -> RealIngest<'_>` and `fn events(&self) -> Vec<EventKind>`;
     `FixedClock { pub now: UtcInstant, pub offset: UtcOffset }` (`Copy`) and `clock() -> FixedClock` (an
@@ -9471,6 +10903,10 @@ impl Fixture {
         self.live_database
             .execute("INSERT INTO ZCLOUDRECORDING (ZPATH, ZCUSTOMLABEL) VALUES (?1, ?2)", [path, label])
             .expect("title row");
+    }
+
+    pub fn replace_title(&self, label: &str) {
+        self.live_database.execute("UPDATE ZCLOUDRECORDING SET ZCUSTOMLABEL = ?1", [label]).expect("update title");
     }
 
     pub fn store(&self) -> VoiceMemosStore {
@@ -9717,12 +11153,53 @@ fn once_ingests_exactly_the_named_file() {
 }
 ```
 
+`crates/vpt-adapters/tests/ingest_titles.rs`:
+
+```rust
+mod support;
+
+use support::{CAPTURED, Fixture};
+use vpt_adapters::TitleCopy;
+use vpt_application::Mode;
+use vpt_application::ports::TitleLookup;
+use vpt_domain::fixtures::m4a;
+
+#[test]
+fn every_non_dry_sweep_refreshes_titles_before_candidate_work() {
+    for source in [Some(m4a(CAPTURED, 1, b"audio")), Some(b"broken".to_vec()), None] {
+        let fixture = Fixture::new();
+        if let Some(bytes) = source { fixture.add_recording("a.m4a", &bytes); }
+        fixture.add_title("a.m4a", "Alpha");
+        let mut parts = fixture.parts();
+        parts.store = fixture.titled_store(true);
+        let _ = parts.ingest().run(&Mode::default());
+        assert_eq!(TitleCopy::existing(&fixture.state).title("a.m4a"), TitleLookup::Titled("Alpha".into()));
+        fixture.replace_title("Beta");
+        let _ = parts.ingest().run(&Mode::default());
+        assert_eq!(TitleCopy::existing(&fixture.state).title("a.m4a"), TitleLookup::Titled("Beta".into()));
+    }
+}
+
+#[test]
+fn ordinary_title_copy_failure_still_ingests_untitled() {
+    let fixture = Fixture::new();
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"audio"));
+    let mut parts = fixture.parts();
+    parts.store = fixture.store().with_titles(fixture.state.join("absent"), true);
+    let report = parts.ingest().run(&Mode::default()).expect("ingested");
+    assert_eq!(report.ingested.len(), 1);
+    assert_eq!(report.ingested[0].title, None);
+    assert!(parts.events().is_empty());
+}
+
+```
+
 `Parts` is a plain struct, so the third test rebuilds it around a later clock with struct update syntax
 over a fresh `fixture.parts()`.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p vpt-adapters --test ingest_sweep`
+Run: `cargo test -p vpt-adapters --test ingest_sweep --test ingest_titles`
 
 Expected: the build fails with `unresolved import` for `vpt_application::Ingest` and the three new ports.
 
@@ -10010,9 +11487,12 @@ where
     }
 
     fn sweep(&self, mode: &Mode, report: &mut IngestReport) -> Result<(), IngestFailure> {
+        if !mode.dry_run {
+            self.recorder.refresh_titles().map_err(candidate::recorder_failure)?;
+        }
         let candidates = match &mode.once {
             Some(path) => vec![self.recorder.candidate(path).map_err(candidate::recorder_failure)?],
-            None => self.recorder.candidates().map_err(|error| IngestFailure::StoreUnreadable(format!("{error:?}")))?,
+            None => self.recorder.candidates().map_err(candidate::recorder_failure)?,
         };
         for candidate in &candidates {
             self.process(candidate, mode, report)?;
@@ -10143,7 +11623,7 @@ where
         mode: &Mode,
         report: &mut IngestReport,
     ) -> Result<(), IngestFailure> {
-        let staged = match self.archive.stage(|directory, name| self.recorder.clone_into(handle, directory, name)) {
+        let staged = match self.archive.stage(|directory, directory_identity, name| self.recorder.clone_into(handle, directory, directory_identity, name)) {
             Ok(staged) => staged,
             Err(failure) => return Err(self.abandon(failure.owned_staging.as_deref(), archive_failure(failure.cause), report)),
         };
@@ -10228,6 +11708,7 @@ where
     /// Move a staged file to the Trash; when that cannot happen the file
     /// stays at mode 0600 and the log says cleanup is pending.
     pub(super) fn discard(&self, staged: &Path, report: &mut IngestReport) -> Result<(), IngestFailure> {
+        self.archive.validate_trash_path(staged).map_err(archive_failure)?;
         let result = self.trash.trash(staged);
         report.log.extend(self.trash.take_diagnostics());
         if let Err(error) = result {
@@ -10285,12 +11766,16 @@ final name, where the next sweep's recovery (Task 22) finds it, so nothing is tr
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cargo test -p vpt-adapters --test ingest_sweep`
+Run: `cargo fmt --all`
 
-Expected: 4 tests PASS. Run `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`
-and expect no warnings.
+Run: `cargo test -p vpt-adapters --test ingest_sweep --test ingest_titles`
+
+Expected: 4 sweep tests and 2 title-sweep tests PASS. Run
+`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -10436,9 +11921,9 @@ impl RecorderStore for ProbeStore<'_> {
         self.inner.read_at(handle, offset, buf)
     }
 
-    fn clone_into(&self, handle: &File, directory: &Path, name: &str) -> Result<CloneKind, CloneError> {
+    fn clone_into(&self, handle: &File, directory: &Path, directory_identity: (u64, u64), name: &str) -> Result<CloneKind, CloneError> {
         match self.clone.get() {
-            CloneBehaviour::Real => self.inner.clone_into(handle, directory, name),
+            CloneBehaviour::Real => self.inner.clone_into(handle, directory, directory_identity, name),
             CloneBehaviour::ByteCopy => copy_bytes(handle, directory, name, 0).map(|()| CloneKind::ByteCopy),
             CloneBehaviour::Truncated => copy_bytes(handle, directory, name, 12).map(|()| CloneKind::CopyOnWrite),
             CloneBehaviour::Exists => Err(CloneError::Exists),
@@ -10447,6 +11932,10 @@ impl RecorderStore for ProbeStore<'_> {
 
     fn title(&self, file_name: &str) -> TitleLookup {
         self.inner.title(file_name)
+    }
+
+    fn refresh_titles(&self) -> Result<(), RecorderError> {
+        self.inner.refresh_titles()
     }
 
     fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)> {
@@ -10819,12 +12308,16 @@ capture instant whose local year has no four-digit form is the container's fault
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters --test ingest_gates --test ingest_sweep`
 
-Expected: all gate and cleanup tests PASS. Run `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`
-and expect no warnings.
+Expected: all gate and cleanup tests PASS. Run
+`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -10847,8 +12340,8 @@ ______________________________________________________________________
 
 - Produces: `Ingest::known_bytes` and `Ingest::resolve_existing` (private to the module). Test support in
   `support/fakes.rs`: `FaultyArchive<'a>::new(inner: &'a ClonefileArchive) -> FaultyArchive` implementing
-  `Archive` over the real archive with `pub fault: Cell<ArchiveFault>`,
-  `ArchiveFault::{None, NoSpaceAfterCreate, FileSync, DirectorySync}`.
+  `Archive` over the real archive with `pub fault: Cell<ArchiveFault>` and
+  `pub reject_trash: Cell<bool>`, `ArchiveFault::{None, NoSpaceAfterCreate, FileSync, DirectorySync}`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -10870,11 +12363,12 @@ pub enum ArchiveFault {
 pub struct FaultyArchive<'a> {
     inner: &'a ClonefileArchive,
     pub fault: Cell<ArchiveFault>,
+    pub reject_trash: Cell<bool>,
 }
 
 impl<'a> FaultyArchive<'a> {
     pub fn new(inner: &'a ClonefileArchive) -> FaultyArchive<'a> {
-        FaultyArchive { inner, fault: Cell::new(ArchiveFault::None) }
+        FaultyArchive { inner, fault: Cell::new(ArchiveFault::None), reject_trash: Cell::new(false) }
     }
 }
 
@@ -10883,7 +12377,7 @@ impl Archive for FaultyArchive<'_> {
 
     fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>
     where
-        C: FnOnce(&Path, &str) -> Result<CloneKind, CloneError>,
+        C: FnOnce(&Path, (u64, u64), &str) -> Result<CloneKind, CloneError>,
     {
         if self.fault.get() != ArchiveFault::NoSpaceAfterCreate {
             return self.inner.stage(clone);
@@ -10908,6 +12402,11 @@ impl Archive for FaultyArchive<'_> {
 
     fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError> {
         self.inner.digest(path)
+    }
+
+    fn validate_trash_path(&self, path: &Path) -> Result<(), ArchiveError> {
+        if self.reject_trash.get() { return Err(ArchiveError::Escape(path.to_path_buf())); }
+        self.inner.validate_trash_path(path)
     }
 
     fn target(&self, name: &str) -> std::path::PathBuf {
@@ -11109,6 +12608,43 @@ fn directory_sync_failure_commits_no_row() {
     assert!(parts.archive.staged_leftovers().expect("leftovers").is_empty());
     assert_eq!(parts.events(), vec![EventKind::IngestFailed]);
 }
+#[test]
+fn a_known_digest_keeps_its_identity_when_the_new_zone_cannot_form_an_id() {
+    let fixture = Fixture::new();
+    let mut bytes = vpt_domain::fixtures::box_of(b"ftyp", b"M4A ");
+    bytes.extend(vpt_domain::fixtures::box_of(b"mdat", b"audio"));
+    bytes.extend(vpt_domain::fixtures::box_of(b"moov", &vpt_domain::fixtures::mvhd_v1(253_402_300_800, 1)));
+    let source = fixture.add_recording("first.m4a", &bytes);
+    let mut parts = fixture.parts();
+    parts.clock.offset = vpt_domain::time::UtcOffset { secs: -3_600 };
+    let first = parts.ingest().run(&Mode::default()).expect("first");
+    let id = first.ingested[0].id.clone();
+    std::fs::rename(source, fixture.recordings.join("renamed.m4a")).expect("rename");
+    parts.clock.offset = vpt_domain::time::UtcOffset { secs: 0 };
+    let report = parts.ingest().run(&Mode::default()).expect("known bytes");
+    assert_eq!(report.already_ingested, vec![id]);
+    assert!(report.deferred.is_empty());
+    assert_eq!(parts.ledger.recordings().expect("list").len(), 1);
+}
+
+#[test]
+fn invalid_staging_is_never_sent_to_trash_when_archive_validation_refuses_it() {
+    let fixture = Fixture::new();
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"whole source"));
+    let parts = fixture.parts();
+    let probe = ProbeStore::new(&parts.store);
+    probe.clone.set(CloneBehaviour::Truncated);
+    let archive = FaultyArchive::new(&parts.archive);
+    archive.reject_trash.set(true);
+    let error = Ingest {
+        recorder: &probe, archive: &archive, ledger: &parts.ledger, clock: &parts.clock,
+        trash: &parts.trash, notifier: &parts.notifier, settings: &parts.settings,
+    }.run(&Mode::default()).expect_err("path refused");
+    assert!(matches!(error.failure, IngestFailure::PathEscape(_)));
+    assert!(parts.trash.moved.borrow().is_empty());
+    assert_eq!(parts.archive.staged_leftovers().expect("staging").len(), 1);
+}
+
 ```
 
 The recovery and collision tests delete database files, which the spec forbids vpt itself from doing; the
@@ -11125,14 +12661,20 @@ stay as regression guards.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-In `crates/vpt-application/src/ingest/publish.rs`, after the copy-on-write log line and before
-publishing:
+In `crates/vpt-application/src/ingest/publish.rs`, remove the earlier `let offset` and `let Ok(id)` block
+added by Task 20. Insert this complete block after the copy-on-write diagnostic and before
+`archive.publish`; known digests return before any timezone-dependent identity derivation:
 
 ```rust
         let existing = self.owned(&staged.path, self.ledger.by_digest(&staged.digest).map_err(ledger_failure), report)?;
         if let Some(existing) = existing {
             return self.known_bytes(candidate, existing, &staged, seen, now, report);
         }
+        let offset = self.clock.offset_at(container.creation_time);
+        let Ok(id) = RecordingId::derive(container.creation_time, offset, &staged.digest) else {
+            self.discard(&staged.path, report)?;
+            return self.defer(candidate, seen, DeferralReason::InvalidContainer, now, mode, report);
+        };
 ```
 
 Replace the `Published::Exists` arm:
@@ -11226,12 +12768,16 @@ with these imports added to `publish.rs`: `Staged` in the `crate::ports` list, `
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters --test ingest_duplicates`
 
-Expected: 7 tests PASS. Run `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`
-and expect no warnings.
+Expected: 9 duplicate and cleanup tests PASS. Run
+`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -11283,6 +12829,7 @@ fn a_recording_whose_source_disappeared_is_marked_gone_and_its_clone_stays() {
     let source = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
     let parts = fixture.parts();
     let first = parts.ingest().run(&Mode::default()).expect("first");
+    fixture.add_recording("survivor.m4a", &m4a(CAPTURED + 1, 1, b"survivor"));
     std::fs::remove_file(&source).expect("the operator deleted the memo; test setup only");
 
     parts.ingest().run(&Mode::default()).expect("second");
@@ -11456,11 +13003,14 @@ call both ends:
 ```rust
     fn sweep(&self, mode: &Mode, report: &mut IngestReport) -> Result<(), IngestFailure> {
         if !mode.dry_run {
+            self.recorder.refresh_titles().map_err(candidate::recorder_failure)?;
+        }
+        if !mode.dry_run {
             self.recover_orphans(report)?;
         }
         let candidates = match &mode.once {
             Some(path) => vec![self.recorder.candidate(path).map_err(candidate::recorder_failure)?],
-            None => self.recorder.candidates().map_err(|error| IngestFailure::StoreUnreadable(format!("{error:?}")))?,
+            None => self.recorder.candidates().map_err(candidate::recorder_failure)?,
         };
         for candidate in &candidates {
             self.process(candidate, mode, report)?;
@@ -11476,12 +13026,16 @@ call both ends:
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters --test 'ingest_*'`
 
 Expected: all PASS. Run `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings` and
 expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -11494,17 +13048,24 @@ ______________________________________________________________________
 
 **Files:**
 
-- Modify: `crates/vpt-application/src/ingest/mod.rs`, `crates/vpt-application/src/ingest/candidate.rs`
+- Modify: `crates/vpt-application/src/ingest/mod.rs`, `crates/vpt-application/src/ingest/candidate.rs`,
+  `crates/vpt-application/src/ports/recorder.rs`, `crates/vpt-adapters/src/voice_memos/store.rs`,
+  `crates/vpt-adapters/tests/support/fakes.rs`
 - Test: `crates/vpt-adapters/tests/ingest_modes.rs`
 
 **Interfaces:**
 
-- Consumes: `Mode { dry_run, once }` from Task 19, `RecordingLedger::{seen_all, by_id}`.
+- Produces on `RecorderStore`:
+  `fn digest(&self, handle: &Self::Handle) -> Result<Sha256Digest, RecorderError>`; dry-run hashes the
+  validated source descriptor, rechecks its metadata, and looks up its current digest. Extend
+  `ports/recorder.rs`, `voice_memos/store.rs` and the existing `ProbeStore` forwarding implementation.
 
-- Produces: `Ingest::would_ingest(&self, candidate: &Candidate, seen: Option<SeenRow>,`
+- Consumes: `Mode { dry_run, once }` from Task 19, `RecordingLedger::{seen_all, by_digest}`.
+
+- Produces: `Ingest::would_ingest(&self, candidate: &Candidate, digest: &Sha256Digest,`
   `report: &mut IngestReport) -> Result<(), IngestFailure>` (private); the empty-store abort; the dry
   run's rule set: every gate runs, nothing is staged, recorded, refreshed or notified, a known
-  recording's title comes from the ledger through `by_id` and a ledger failure there fails the run.
+  recording's title comes from the ledger through `by_digest` and a ledger failure there fails the run.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -11567,7 +13128,7 @@ fn a_dry_run_runs_every_gate_and_writes_nothing_durable() {
 }
 
 #[test]
-fn a_dry_run_reports_a_known_title_from_the_ledger_and_leaves_the_title_copy_untouched() {
+fn a_dry_run_does_not_apply_the_previous_recording_title_to_edited_bytes() {
     let fixture = Fixture::new();
     let source = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"a"));
     fixture.add_title("a.m4a", "Alpha");
@@ -11583,8 +13144,8 @@ fn a_dry_run_reports_a_known_title_from_the_ledger_and_leaves_the_title_copy_unt
     let report = dry.ingest().run(&DRY).expect("dry run");
 
     assert_eq!(report.would_ingest.len(), 1);
-    assert_eq!(report.would_ingest[0].title.as_deref(), Some("Alpha"));
-    assert_eq!(report.would_ingest[0].title_source, TitleOrigin::VoiceMemos);
+    assert_eq!(report.would_ingest[0].title, None);
+    assert_eq!(report.would_ingest[0].title_source, TitleOrigin::Unavailable);
     assert_eq!(copy_snapshot(&fixture), before);
     assert_eq!(dry.ledger.recordings().expect("list").len(), 1);
     assert!(dry.events().is_empty());
@@ -11692,16 +13253,54 @@ fn a_recovery_before_a_failing_candidate_stays_in_completed() {
     assert_eq!(error.completed, vec![orphan_id.clone()]);
     assert!(parts.ledger.by_id(&orphan_id).expect("read").is_some());
 }
+#[test]
+fn dry_run_finds_the_stored_title_for_known_bytes_at_a_new_path() {
+    let fixture = Fixture::new();
+    let source = fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"audio"));
+    fixture.add_title("a.m4a", "Alpha");
+    let mut parts = fixture.parts();
+    parts.store = fixture.titled_store(true);
+    parts.ingest().run(&Mode::default()).expect("first");
+    let renamed = fixture.recordings.join("renamed.m4a");
+    std::fs::rename(source, &renamed).expect("rename");
+    let before = copy_snapshot(&fixture);
+    let dry = Parts { store: fixture.titled_store(false), ..fixture.parts() };
+    let report = dry.ingest().run(&DRY).expect("dry");
+    assert_eq!(report.would_ingest.len(), 1);
+    assert_eq!(report.would_ingest[0].path, renamed);
+    assert_eq!(report.would_ingest[0].title.as_deref(), Some("Alpha"));
+    assert_eq!(report.would_ingest[0].title_source, TitleOrigin::VoiceMemos);
+    assert_eq!(copy_snapshot(&fixture), before);
+    assert!(dry.events().is_empty());
+}
+
+#[test]
+fn dry_run_defers_a_descriptor_that_changes_while_hashing() {
+    let fixture = Fixture::new();
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"audio"));
+    let parts = fixture.parts();
+    let probe = support::fakes::ProbeStore::new(&parts.store);
+    probe.grow_after_open.set(true);
+    let report = vpt_application::Ingest {
+        recorder: &probe, archive: &parts.archive, ledger: &parts.ledger, clock: &parts.clock,
+        trash: &parts.trash, notifier: &parts.notifier, settings: &parts.settings,
+    }.run(&DRY).expect("dry");
+    assert!(report.would_ingest.is_empty());
+    assert_eq!(report.deferred[0].reason, vpt_domain::sweep::DeferralReason::ChangedDuringRead);
+    assert!(parts.ledger.seen_all().expect("seen").is_empty());
+    assert!(parts.archive.staged_leftovers().expect("staging").is_empty());
+    assert!(parts.events().is_empty());
+}
+
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-adapters --test ingest_modes`
 
-Expected: the first two dry-run tests FAIL (the sweep stages and records as if it were real, and
-`would_ingest` stays empty); the dry-run source test FAILS with an event delivered; the once test FAILS
-on the dry once; the empty-store test FAILS with `Ok`; the unreadable, fresh-store and both `completed`
-tests PASS already and stay as regression guards.
+Expected: the unreadable dry-run event test is an existing regression guard; the new once, empty-store
+and current-digest dry-run cases establish this task's red result. Run every command independently so one
+expected failure cannot skip the next command.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -11710,11 +13309,14 @@ In `crates/vpt-application/src/ingest/mod.rs`, `sweep` becomes:
 ```rust
     fn sweep(&self, mode: &Mode, report: &mut IngestReport) -> Result<(), IngestFailure> {
         if !mode.dry_run {
+            self.recorder.refresh_titles().map_err(candidate::recorder_failure)?;
+        }
+        if !mode.dry_run {
             self.recover_orphans(report)?;
         }
         let candidates = match &mode.once {
             Some(path) => vec![self.recorder.candidate(path).map_err(candidate::recorder_failure)?],
-            None => self.recorder.candidates().map_err(|error| IngestFailure::StoreUnreadable(format!("{error:?}")))?,
+            None => self.recorder.candidates().map_err(candidate::recorder_failure)?,
         };
         let full_sweep = mode.once.is_none();
         if full_sweep && candidates.is_empty() && !self.ledger.seen_all().map_err(IngestFailure::Ledger)?.is_empty() {
@@ -11733,6 +13335,31 @@ In `crates/vpt-application/src/ingest/mod.rs`, `sweep` becomes:
     }
 ```
 
+Add `use vpt_domain::digest::Sha256Digest;` to `ports/recorder.rs`, `voice_memos/store.rs`, and
+`ingest/candidate.rs`. The Task 21 fake already imports it. Add this method to `RecorderStore`:
+
+```rust
+fn digest(&self, handle: &Self::Handle) -> Result<Sha256Digest, RecorderError>;
+```
+
+In `impl RecorderStore for VoiceMemosStore`:
+
+```rust
+fn digest(&self, handle: &File) -> Result<Sha256Digest, RecorderError> {
+    let mut file = handle.try_clone().map_err(|error| RecorderError::Io(error.kind().to_string()))?;
+    std::io::Seek::rewind(&mut file).map_err(|error| RecorderError::Io(error.kind().to_string()))?;
+    crate::digest_open(&mut file).map_err(|error| RecorderError::Io(error.kind().to_string()))
+}
+```
+
+In `impl RecorderStore for ProbeStore<'_>`:
+
+```rust
+fn digest(&self, handle: &File) -> Result<Sha256Digest, RecorderError> {
+    self.inner.digest(handle)
+}
+```
+
 In `crates/vpt-application/src/ingest/candidate.rs`, `process` gains the dry-run exit between the rest
 gate and staging:
 
@@ -11741,7 +13368,12 @@ gate and staging:
             return self.defer(candidate, seen, reason, now, mode, report);
         }
         if mode.dry_run {
-            return self.would_ingest(candidate, seen, report);
+            let digest = self.recorder.digest(&handle).map_err(recorder_failure)?;
+            let after = self.recorder.metadata(&handle).map_err(recorder_failure)?;
+            if after != metadata {
+                return self.defer(candidate, seen, DeferralReason::ChangedDuringRead, now, mode, report);
+            }
+            return self.would_ingest(candidate, &digest, report);
         }
         self.stage_and_publish(candidate, &handle, &metadata, seen, now, mode, report)
 ```
@@ -11749,13 +13381,9 @@ gate and staging:
 and the `impl` block gains:
 
 ```rust
-    /// What a real sweep would ingest: the title is the ledger's when the
-    /// recording is already known, and never a fresh database read.
-    pub(super) fn would_ingest(&self, candidate: &Candidate, seen: Option<SeenRow>, report: &mut IngestReport) -> Result<(), IngestFailure> {
-        let known = match seen.as_ref().and_then(|row| row.recording.as_ref()) {
-            Some(id) => self.ledger.by_id(id).map_err(IngestFailure::Ledger)?,
-            None => None,
-        };
+    /// Titles belong to the current content digest, regardless of its source path.
+    pub(super) fn would_ingest(&self, candidate: &Candidate, digest: &Sha256Digest, report: &mut IngestReport) -> Result<(), IngestFailure> {
+        let known = self.ledger.by_digest(digest).map_err(IngestFailure::Ledger)?;
         report.would_ingest.push(super::WouldIngest {
             path: candidate.path.clone(),
             title: known.as_ref().and_then(|record| record.title.clone()),
@@ -11767,10 +13395,12 @@ and the `impl` block gains:
 
 with `TitleOrigin` added to the `crate::ports` import of `candidate.rs`. `defer` and `unchanged` already
 honour `mode.dry_run` (Tasks 19 and 20), `run` already withholds the failure event on a dry run (Task
-19), and the composition root (Task 27) builds the store with `with_titles(state, false)` for a dry run,
-which is what keeps the private copy untouched.
+19). The composition root (Task 27) attaches no title-copy capability during a dry run; titles come only
+from the existing ledger by the current digest, leaving the private copy untouched.
 
 - [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `cargo fmt --all`
 
 Run: `cargo test -p vpt-adapters`
 
@@ -11778,6 +13408,8 @@ Expected: all PASS, every earlier ingest test included. Run
 `cargo clippy --workspace --all-targets --features dev-tools -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -11793,12 +13425,16 @@ stderr handled concurrently under one deadline; at the deadline or on interrupti
 terminated, force-killed after the grace period and reaped. The private executor takes its cancellation,
 clock, waiting and grace as controls: production hands it the process-wide interrupt flag, the monotonic
 clock, a real sleep and the one-second grace; each test hands it its own, so no test touches the
-production flag or asserts elapsed wall time, and group-cleanup tests use zero grace. The fake engine is
-the child every later test spawns.
+production flag or asserts elapsed wall time. A readiness marker gates each virtual deadline or
+interrupt. Group-cleanup tests use zero grace; the grace-specific test advances a private clock through
+one second without sleeping. Every test child has a cleared environment and temporary HOME,
+XDG_STATE_HOME and VPT_CONFIG. The 750 ms watchdog only bounds a broken fixture and fails the test if
+used. The fake engine is the child every later integration test spawns.
 
 **Files:**
 
-- Create: `crates/vpt-adapters/src/spawn.rs`
+- Create: `crates/vpt-adapters/src/spawn.rs`, `crates/vpt-adapters/src/spawn/tests.rs`,
+  `crates/vpt-adapters/src/spawn/tests/support.rs`
 - Modify: `crates/vpt-adapters/src/lib.rs`
 - Create: `crates/vpt/src/bin/vpt-fake-engine.rs` (replacing the stand-in)
 
@@ -11806,21 +13442,21 @@ the child every later test spawns.
 
 - Consumes: nothing.
 
-- Produces, in the private adapters module `spawn` (only `install_interrupt_handlers` is
-  re-exported from `vpt_adapters`):
+- Produces, through curated root reexports from the private adapters module `spawn`:
   `run(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize) ->`
   `Result<Outcome, SpawnError>`,
   `run_with_env(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize,`
   `env: &[(&str, &str)]) -> Result<Outcome, SpawnError>`,
   `Outcome { pub status: Status, pub stdout: Vec<u8>, pub stderr: Vec<u8>, pub group: libc::pid_t }`,
   `Status::{Exited(i32), Signaled(i32), DeadlineExceeded, Interrupted}`,
-  `SpawnError::{NotFound(String), Io(String)}`, `install_interrupt_handlers()`, `note_interrupt()`,
-  `interrupted() -> bool`, `OUTPUT_LIMIT: usize = 65_536`, `GRACE: Duration = 1 s`; privately,
+  `SpawnError::{NotFound(String), Io(String)}`, `install_interrupt_handlers()`,
+  `OUTPUT_LIMIT: usize = 65_536`, `GRACE: Duration = 1 s`; privately,
   `Controls<I, K, W> { interrupted: I, now: K, wait: W, grace: Duration }` and
-  `execute(argv, stdin, deadline, output_limit, env, controls)`. The direct child's own status is
-  retained once known; the deadline and the interrupt keep being checked until the stdin writer and both
-  drains finish; on every return path the remaining members of the owned process group are terminated and
-  the direct child is reaped, a wait error included.
+  `execute(command: Command, stdin, deadline, output_limit, controls)` and `interrupted() -> bool`. The
+  direct child's status is provisional until the stdin writer and both drains finish. A deadline or
+  interruption before that point overrides the recorded exit status. Termination reaps the leader while
+  checking the whole group: only group disappearance ends grace early. Remaining members receive KILL
+  after grace, and the direct child is reaped on every return path, including a wait error.
 
 - The fake engine `vpt-fake-engine`: `--version` prints
   `{"schema":"vpt.helper/1","version":"<VPT_FAKE_VERSION or 1.0.0>"}`; `notify --title <t> --body <b>`
@@ -11832,106 +13468,385 @@ the child every later test spawns.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-adapters/src/lib.rs` gains `mod spawn;` and
-`pub use spawn::{install_interrupt_handlers};`. `crates/vpt-adapters/src/spawn.rs` starts as its
-test module alone (children are `/bin/sh` and `/bin/cat`, which every macOS runner has; vpt itself never
-spawns a shell):
+`crates/vpt-adapters/src/lib.rs` gains these curated reexports; `spawn` remains private:
+
+```rust
+mod spawn;
+pub use spawn::{
+    GRACE, OUTPUT_LIMIT, Outcome, SpawnError, Status, install_interrupt_handlers, run, run_with_env,
+};
+```
+
+Create `crates/vpt-adapters/src/spawn.rs` with this registration before running red:
 
 ```rust
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::time::Instant;
+mod tests;
+```
 
-    fn argv(words: &[&str]) -> Vec<String> {
-        words.iter().map(|w| (*w).to_owned()).collect()
+`crates/vpt-adapters/src/spawn/tests.rs`:
+
+```rust
+mod support;
+use super::*;
+use std::cell::Cell;
+use support::{OwnedGroup, command, controls, group_is_gone, pending, wait_for_leader};
+
+#[test]
+fn the_exit_code_and_both_streams_are_returned() {
+    let temp = tempfile::tempdir().expect("temp");
+    let child = command(
+        temp.path(),
+        "/bin/sh",
+        &["-c", "printf out; printf err >&2; exit 3"],
+    );
+    let outcome = execute(
+        child,
+        b"",
+        Duration::from_millis(750),
+        OUTPUT_LIMIT,
+        controls(),
+    )
+    .expect("ran");
+    assert_eq!(outcome.status, Status::Exited(3));
+    assert_eq!(outcome.stdout, b"out");
+    assert_eq!(outcome.stderr, b"err");
+    assert!(group_is_gone(outcome.group));
+}
+
+#[test]
+fn stdin_is_written_and_a_missing_executable_is_not_found() {
+    let temp = tempfile::tempdir().expect("temp");
+    let child = command(temp.path(), "/bin/cat", &[]);
+    let outcome = execute(
+        child,
+        b"hello",
+        Duration::from_millis(750),
+        OUTPUT_LIMIT,
+        controls(),
+    )
+    .expect("ran");
+    assert_eq!(outcome.stdout, b"hello");
+    let missing = temp.path().join("missing-program");
+    let child = command(temp.path(), missing.to_str().expect("path"), &[]);
+    assert!(matches!(
+        execute(child, b"", Duration::ZERO, OUTPUT_LIMIT, controls()),
+        Err(SpawnError::NotFound(_))
+    ));
+}
+
+#[test]
+fn output_is_bounded_while_the_child_is_still_drained_to_completion() {
+    let temp = tempfile::tempdir().expect("temp");
+    let child = command(
+        temp.path(),
+        "/bin/sh",
+        &["-c", "/usr/bin/yes | /usr/bin/head -c 200000"],
+    );
+    let outcome = execute(child, b"", Duration::from_millis(750), 1_000, controls()).expect("ran");
+    assert_eq!(outcome.stdout.len(), 1_000);
+    assert_eq!(outcome.status, Status::Exited(0));
+}
+
+#[test]
+fn the_deadline_terminates_the_whole_process_group_and_reaps_it() {
+    assert_eq!(pending(false, false).status, Status::DeadlineExceeded);
+}
+
+#[test]
+fn an_interrupt_terminates_the_child_and_reports_interrupted() {
+    assert_eq!(pending(false, true).status, Status::Interrupted);
+}
+
+#[test]
+fn a_descendant_holding_stdout_does_not_outlive_the_deadline() {
+    let outcome = pending(true, false);
+    assert_eq!(outcome.status, Status::DeadlineExceeded);
+    assert_eq!(outcome.stdout, b"{}");
+}
+
+#[test]
+fn interruption_overrides_an_exited_leader_while_a_descendant_holds_stdout() {
+    assert_eq!(pending(true, true).status, Status::Interrupted);
+}
+
+#[test]
+fn a_descendant_that_closed_every_stream_lets_the_run_finish_with_the_child() {
+    let temp = tempfile::tempdir().expect("temp");
+    let child = command(
+        temp.path(),
+        "/bin/sh",
+        &[
+            "-c",
+            "(exec >/dev/null 2>&1 </dev/null; exec /bin/sleep 30) & printf done",
+        ],
+    );
+    let outcome = execute(
+        child,
+        b"",
+        Duration::from_millis(750),
+        OUTPUT_LIMIT,
+        controls(),
+    )
+    .expect("ran");
+    assert_eq!(outcome.status, Status::Exited(0));
+    assert_eq!(outcome.stdout, b"done");
+    assert!(group_is_gone(outcome.group));
+}
+
+#[test]
+fn a_surviving_descendant_receives_the_full_grace_after_the_leader_exits() {
+    let temp = tempfile::tempdir().expect("temp");
+    let mut builder = command(
+        temp.path(),
+        "/bin/sh",
+        &["-c", "trap '' TERM; /bin/sleep 30 &"],
+    );
+    let mut child = OwnedGroup(
+        builder
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0)
+            .spawn()
+            .expect("fixture group"),
+    );
+    wait_for_leader(&mut child.0);
+    let group = child.0.id() as libc::pid_t;
+    let start = Instant::now();
+    let elapsed = Cell::new(Duration::ZERO);
+    let controls = Controls {
+        interrupted: || false,
+        now: || start + elapsed.get(),
+        wait: |duration| {
+            elapsed.set(elapsed.get() + duration);
+            std::thread::yield_now();
+        },
+        grace: GRACE,
+    };
+    terminate(group, &mut child.0, &controls);
+    assert_eq!(elapsed.get(), GRACE);
+    assert!(group_is_gone(group));
+}
+
+#[test]
+fn test_children_receive_only_the_fixture_environment() {
+    let temp = tempfile::tempdir().expect("temp");
+    let child = command(temp.path(), "/usr/bin/env", &[]);
+    let outcome = execute(
+        child,
+        b"",
+        Duration::from_millis(750),
+        OUTPUT_LIMIT,
+        controls(),
+    )
+    .expect("ran");
+    let text = String::from_utf8(outcome.stdout).expect("environment");
+    let mut names: Vec<_> = text
+        .lines()
+        .map(|line| line.split_once('=').expect("entry").0)
+        .collect();
+    names.sort_unstable();
+    assert_eq!(
+        names,
+        [
+            "HOME",
+            "PATH",
+            "VPT_CONFIG",
+            "XDG_CONFIG_HOME",
+            "XDG_DATA_HOME",
+            "XDG_STATE_HOME"
+        ]
+    );
+    assert!(text.contains(&format!("HOME={}\n", temp.path().display())));
+}
+```
+
+`crates/vpt-adapters/src/spawn/tests/support.rs`:
+
+```rust
+use super::super::*;
+use std::cell::Cell;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, atomic::AtomicBool, mpsc};
+
+const WATCHDOG: Duration = Duration::from_millis(750);
+
+pub(super) fn command(temp: &Path, program: &str, arguments: &[&str]) -> Command {
+    let mut command = Command::new(program);
+    command
+        .args(arguments)
+        .env_clear()
+        .current_dir(temp)
+        .env("HOME", temp)
+        .env("XDG_CONFIG_HOME", temp.join("config"))
+        .env("XDG_DATA_HOME", temp.join("data"))
+        .env("XDG_STATE_HOME", temp.join("state"))
+        .env("VPT_CONFIG", temp.join("config.toml"))
+        .env("PATH", "/usr/bin:/bin");
+    command
+}
+
+pub(super) fn controls() -> Controls<impl Fn() -> bool, impl Fn() -> Instant, impl Fn(Duration)> {
+    Controls {
+        interrupted: || false,
+        now: Instant::now,
+        wait: |_| std::thread::yield_now(),
+        grace: Duration::ZERO,
     }
+}
 
-    /// Real clock and sleep, a private never-set interrupt, zero grace.
-    fn controls(interrupted: fn() -> bool) -> Controls<fn() -> bool, fn() -> Instant, fn(Duration)> {
-        Controls { interrupted, now: Instant::now, wait: std::thread::sleep, grace: Duration::ZERO }
+pub(super) fn group_is_gone(group: libc::pid_t) -> bool {
+    let until = Instant::now() + WATCHDOG;
+    loop {
+        // SAFETY: signal zero checks existence without delivering a signal.
+        if unsafe { libc::killpg(group, 0) } == -1
+            && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
+        {
+            return true;
+        }
+        if Instant::now() >= until {
+            return false;
+        }
+        std::thread::yield_now();
     }
+}
 
-    fn calm() -> bool {
-        false
+pub(super) struct Watchdog {
+    stop: Option<mpsc::Sender<()>>,
+    worker: Option<std::thread::JoinHandle<()>>,
+    pub fired: Arc<AtomicBool>,
+}
+
+impl Watchdog {
+    pub fn start(group_file: PathBuf) -> Self {
+        let (stop, receiver) = mpsc::channel();
+        let fired = Arc::new(AtomicBool::new(false));
+        let flag = fired.clone();
+        let worker = std::thread::spawn(move || {
+            if receiver.recv_timeout(WATCHDOG) == Err(mpsc::RecvTimeoutError::Timeout) {
+                flag.store(true, Ordering::SeqCst);
+                if let Some(group) = std::fs::read_to_string(group_file)
+                    .ok()
+                    .and_then(|text| text.parse::<libc::pid_t>().ok())
+                    .filter(|group| *group > 1)
+                {
+                    // SAFETY: the fixture writes its own newly created process group.
+                    unsafe {
+                        libc::killpg(group, libc::SIGKILL);
+                    }
+                }
+            }
+        });
+        Self {
+            stop: Some(stop),
+            worker: Some(worker),
+            fired,
+        }
     }
+}
 
-    fn cancelled() -> bool {
-        true
+impl Drop for Watchdog {
+    fn drop(&mut self) {
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        if let Some(worker) = self.worker.take() {
+            worker.join().expect("watchdog");
+        }
     }
+}
 
-    fn run_test(argv: &[String], stdin: &[u8], deadline: Duration, limit: usize, interrupted: fn() -> bool) -> Outcome {
-        execute(argv, stdin, deadline, limit, &[], controls(interrupted)).expect("ran")
+pub(super) fn pending(leader_exits: bool, interrupt: bool) -> Outcome {
+    let temp = tempfile::tempdir().expect("temp");
+    let ready = temp.path().join("ready");
+    let group_file = temp.path().join("group");
+    let script = if leader_exits {
+        "printf '%s' \"$$\" > \"$VPT_TEST_GROUP\"; parent=$$; \
+        (while kill -0 \"$parent\" 2>/dev/null; do :; done; \
+        printf ready > \"$VPT_TEST_READY\"; exec /bin/sleep 30) & printf '{}'; exit 0"
+    } else {
+        "printf '%s' \"$$\" > \"$VPT_TEST_GROUP\"; /bin/sleep 30 & \
+        printf ready > \"$VPT_TEST_READY\"; wait"
+    };
+    let mut child = command(temp.path(), "/bin/sh", &["-c", script]);
+    child
+        .env("VPT_TEST_READY", &ready)
+        .env("VPT_TEST_GROUP", &group_file);
+    let start = Instant::now();
+    let elapsed = Cell::new(Duration::ZERO);
+    let cancelled = Cell::new(false);
+    let watchdog = Watchdog::start(group_file);
+    let controls = Controls {
+        interrupted: || cancelled.get(),
+        now: || start + elapsed.get(),
+        wait: |_| {
+            if ready.exists() {
+                if interrupt {
+                    cancelled.set(true);
+                } else {
+                    elapsed.set(Duration::from_secs(1));
+                }
+            }
+            if watchdog.fired.load(Ordering::SeqCst) {
+                elapsed.set(Duration::from_secs(1));
+            }
+            std::thread::yield_now();
+        },
+        grace: Duration::ZERO,
+    };
+    let outcome = execute(child, b"", Duration::from_secs(1), OUTPUT_LIMIT, controls).expect("ran");
+    assert!(
+        !watchdog.fired.load(Ordering::SeqCst),
+        "process fixture exceeded its watchdog: group={} ready={} status={:?}",
+        outcome.group,
+        ready.exists(),
+        outcome.status
+    );
+    assert!(ready.exists(), "fixture readiness was not observed");
+    assert!(
+        group_is_gone(outcome.group),
+        "fixture group survived cleanup"
+    );
+    outcome
+}
+
+pub(super) struct OwnedGroup(pub Child);
+
+impl Drop for OwnedGroup {
+    fn drop(&mut self) {
+        let group = self.0.id() as libc::pid_t;
+        // SAFETY: this guard owns the fixture's process group.
+        unsafe {
+            libc::killpg(group, libc::SIGKILL);
+        }
+        let _ = self.0.wait();
     }
+}
 
-    fn group_is_gone(group: libc::pid_t) -> bool {
-        // SAFETY: signal 0 probes for the group's existence and delivers nothing.
-        unsafe { libc::killpg(group, 0) == -1 }
-    }
-
-    #[test]
-    fn the_exit_code_and_both_streams_are_returned() {
-        let outcome = run_test(&argv(&["/bin/sh", "-c", "echo out; echo err 1>&2; exit 3"]), b"", Duration::from_secs(5), OUTPUT_LIMIT, calm);
-        assert_eq!(outcome.status, Status::Exited(3));
-        assert_eq!(outcome.stdout, b"out\n");
-        assert_eq!(outcome.stderr, b"err\n");
-        assert!(group_is_gone(outcome.group));
-    }
-
-    #[test]
-    fn stdin_is_written_and_a_missing_executable_is_not_found() {
-        let outcome = run_test(&argv(&["/bin/cat"]), b"hello", Duration::from_secs(5), OUTPUT_LIMIT, calm);
-        assert_eq!(outcome.stdout, b"hello");
-        let missing = execute(&argv(&["/nonexistent/vpt-missing"]), b"", Duration::from_secs(1), OUTPUT_LIMIT, &[], controls(calm));
-        assert!(matches!(missing, Err(SpawnError::NotFound(_))));
-    }
-
-    #[test]
-    fn output_is_bounded_while_the_child_is_still_drained_to_completion() {
-        let outcome = run_test(&argv(&["/bin/sh", "-c", "yes | head -c 200000"]), b"", Duration::from_secs(5), 1_000, calm);
-        assert_eq!(outcome.stdout.len(), 1_000);
-        assert_eq!(outcome.status, Status::Exited(0));
-    }
-
-    #[test]
-    fn the_deadline_terminates_the_whole_process_group_and_reaps_it() {
-        let outcome = run_test(&argv(&["/bin/sh", "-c", "sleep 30 & sleep 30"]), b"", Duration::from_millis(50), OUTPUT_LIMIT, calm);
-        assert_eq!(outcome.status, Status::DeadlineExceeded);
-        assert!(group_is_gone(outcome.group), "the process group still exists");
-    }
-
-    #[test]
-    fn an_interrupt_terminates_the_child_and_reports_interrupted() {
-        let outcome = run_test(&argv(&["/bin/sh", "-c", "sleep 30"]), b"", Duration::from_secs(5), OUTPUT_LIMIT, cancelled);
-        assert_eq!(outcome.status, Status::Interrupted);
-        assert!(group_is_gone(outcome.group));
-        assert!(!interrupted(), "the production flag is never touched by a test");
-    }
-
-    #[test]
-    fn a_descendant_holding_stdout_does_not_outlive_the_deadline() {
-        let outcome = run_test(&argv(&["/bin/sh", "-c", "sleep 30 & exit 0"]), b"", Duration::from_millis(100), OUTPUT_LIMIT, calm);
-        assert!(matches!(outcome.status, Status::Exited(0) | Status::DeadlineExceeded), "{:?}", outcome.status);
-        assert!(group_is_gone(outcome.group), "the descendant kept the group alive");
-    }
-
-    #[test]
-    fn a_descendant_that_closed_every_stream_lets_the_run_finish_with_the_child() {
-        let script = "(exec >/dev/null 2>&1 </dev/null; sleep 30) & echo done";
-        let outcome = run_test(&argv(&["/bin/sh", "-c", script]), b"", Duration::from_secs(5), OUTPUT_LIMIT, calm);
-        assert_eq!(outcome.status, Status::Exited(0));
-        assert_eq!(outcome.stdout, b"done\n");
-        assert!(group_is_gone(outcome.group), "the group is cleaned on the way out");
+pub(super) fn wait_for_leader(child: &mut Child) {
+    let until = Instant::now() + WATCHDOG;
+    loop {
+        if child.try_wait().expect("leader status").is_some() {
+            return;
+        }
+        assert!(Instant::now() < until, "fixture leader did not exit");
+        std::thread::yield_now();
     }
 }
 ```
+
+The shell fixtures are confined to the tests. Descendants use `exec` after publishing readiness, so
+termination cannot race another fork of a pipe-holding child. The group-existence assertion polls to
+allow asynchronous reaping; it never equates any arbitrary signal error with group disappearance.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-adapters spawn`
 
 Expected: the build fails with `cannot find` for `execute`, `Controls`, `Outcome`, `Status`,
-`SpawnError`, `OUTPUT_LIMIT` and `interrupted`.
+`SpawnError`, `OUTPUT_LIMIT` and the imported process types. Confirm the private child test module is
+registered before accepting this compile failure.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -11993,20 +13908,24 @@ pub fn install_interrupt_handlers() {
     for signal in [libc::SIGINT, libc::SIGTERM, libc::SIGHUP] {
         // SAFETY: the handler only stores into an atomic, which is async-signal-safe.
         unsafe {
-            libc::signal(signal, on_signal as extern "C" fn(libc::c_int) as libc::sighandler_t);
+            libc::signal(
+                signal,
+                on_signal as extern "C" fn(libc::c_int) as libc::sighandler_t,
+            );
         }
     }
 }
 
-pub fn note_interrupt() {
-    INTERRUPTED.store(true, Ordering::SeqCst);
-}
-
-pub fn interrupted() -> bool {
+fn interrupted() -> bool {
     INTERRUPTED.load(Ordering::SeqCst)
 }
 
-pub fn run(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize) -> Result<Outcome, SpawnError> {
+pub fn run(
+    argv: &[String],
+    stdin: &[u8],
+    deadline: Duration,
+    output_limit: usize,
+) -> Result<Outcome, SpawnError> {
     run_with_env(argv, stdin, deadline, output_limit, &[])
 }
 
@@ -12018,16 +13937,25 @@ pub fn run_with_env(
     output_limit: usize,
     env: &[(&str, &str)],
 ) -> Result<Outcome, SpawnError> {
-    let controls = Controls { interrupted, now: Instant::now, wait: std::thread::sleep, grace: GRACE };
-    execute(argv, stdin, deadline, output_limit, env, controls)
+    let controls = Controls {
+        interrupted,
+        now: Instant::now,
+        wait: std::thread::sleep,
+        grace: GRACE,
+    };
+    let (program, arguments) = argv
+        .split_first()
+        .ok_or_else(|| SpawnError::Io("empty argv".into()))?;
+    let mut command = Command::new(program);
+    command.args(arguments).envs(env.iter().copied());
+    execute(command, stdin, deadline, output_limit, controls)
 }
 
 fn execute<I, K, W>(
-    argv: &[String],
+    mut command: Command,
     stdin: &[u8],
     deadline: Duration,
     output_limit: usize,
-    env: &[(&str, &str)],
     controls: Controls<I, K, W>,
 ) -> Result<Outcome, SpawnError>
 where
@@ -12035,17 +13963,15 @@ where
     K: Fn() -> Instant,
     W: Fn(Duration),
 {
-    let (program, arguments) = argv.split_first().ok_or_else(|| SpawnError::Io("empty argv".into()))?;
-    let mut child = Command::new(program)
-        .args(arguments)
-        .envs(env.iter().copied())
+    let program = command.get_program().to_string_lossy().into_owned();
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .process_group(0)
         .spawn()
         .map_err(|error| match error.kind() {
-            std::io::ErrorKind::NotFound => SpawnError::NotFound(program.clone()),
+            std::io::ErrorKind::NotFound => SpawnError::NotFound(program),
             _ => SpawnError::Io(error.kind().to_string()),
         })?;
     let group = child.id() as libc::pid_t;
@@ -12075,11 +14001,11 @@ where
             break Ok(());
         }
         if (controls.interrupted)() {
-            status.get_or_insert(Status::Interrupted);
+            status = Some(Status::Interrupted);
             break Ok(());
         }
         if (controls.now)().duration_since(started) >= deadline {
-            status.get_or_insert(Status::DeadlineExceeded);
+            status = Some(Status::DeadlineExceeded);
             break Ok(());
         }
         (controls.wait)(TICK);
@@ -12088,7 +14014,12 @@ where
     let _ = writer.join();
     let stdout = out.join().unwrap_or_default();
     let stderr = err.join().unwrap_or_default();
-    result.map(|()| Outcome { status: status.unwrap_or(Status::Exited(-1)), stdout, stderr, group })
+    result.map(|()| Outcome {
+        status: status.unwrap_or(Status::Exited(-1)),
+        stdout,
+        stderr,
+        group,
+    })
 }
 
 fn status_of(exit: std::process::ExitStatus) -> Status {
@@ -12100,7 +14031,9 @@ fn status_of(exit: std::process::ExitStatus) -> Status {
 }
 
 fn drain(pipe: Option<impl Read>, limit: usize) -> Vec<u8> {
-    let Some(mut pipe) = pipe else { return Vec::new() };
+    let Some(mut pipe) = pipe else {
+        return Vec::new();
+    };
     let mut kept = Vec::new();
     let mut buffer = [0u8; 8_192];
     while let Ok(read) = pipe.read(&mut buffer) {
@@ -12126,7 +14059,11 @@ where
     }
     let started = (controls.now)();
     while (controls.now)().duration_since(started) < controls.grace {
-        if matches!(child.try_wait(), Ok(Some(_))) {
+        let _ = child.try_wait();
+        // SAFETY: signal zero checks the owned process group's existence.
+        if unsafe { libc::killpg(group, 0) } == -1
+            && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
+        {
             break;
         }
         (controls.wait)(TICK);
@@ -12137,13 +14074,12 @@ where
     }
     let _ = child.wait();
 }
+
 ```
 
-The loop breaks in four ways: the child exited and every worker finished; the child was interrupted; the
-deadline passed; or `try_wait` failed. Every way reaches `terminate`, which signals the group (empty by
-then in the first case), reaps the direct child, and only then are the workers joined, so a descendant
-that kept a pipe open cannot block the return. A child that had already exited when the deadline or the
-interrupt arrived keeps its own status.
+The recorded exit status remains provisional while any pipe worker is unfinished. Interruption and the
+deadline override that status; a complete child result keeps its own exit or signal. Every exit cleans
+the owned process group. Reaping the leader does not end a surviving descendant's grace.
 
 `crates/vpt/src/bin/vpt-fake-engine.rs`:
 
@@ -12215,12 +14151,21 @@ fn command_sink(args: &[String]) -> i32 {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test -p vpt-adapters spawn && cargo build -p vpt --features dev-tools`
 
-Expected: 7 tests PASS, none waiting on a child longer than its own deadline; the fake engine builds. Run
-`cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
+Expected: 10 tests PASS; the fake engine builds. Run `cargo fmt --all`, then `cargo fmt --all -- --check`
+and `cargo clippy -p vpt-adapters --all-targets -- -D warnings`.
+
+Run `cargo +nightly test -p vpt-adapters spawn -- -Z unstable-options --report-time` and record each test
+below one second. Restore each of these mutants after its named test fails: retain `Exited(0)` on
+deadline, retain it on interruption, break grace when only the leader exits, or signal only the child pid
+instead of its process group. Rerun the unmutated stable suite after all four.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -12233,14 +14178,19 @@ ______________________________________________________________________
 
 **Files:**
 
-- Create: `crates/vpt-protocol/src/limits.rs`, `crates/vpt-protocol/src/limits/visitor.rs`, `crates/vpt-protocol/src/limits/tests.rs`, `crates/vpt-protocol/src/helper.rs`.
-- Create: `crates/vpt-adapters/src/helper.rs`, `crates/vpt-adapters/src/helper/reply.rs`, `crates/vpt-adapters/src/helper/tests.rs`.
-- Modify: `crates/vpt-protocol/src/lib.rs`, `crates/vpt-adapters/src/lib.rs`, `crates/vpt-adapters/Cargo.toml`, `crates/vpt/src/lib.rs`, `crates/vpt/src/commands/version.rs`.
-- Test: `crates/vpt/tests/helper_client.rs`, `crates/vpt/tests/version.rs`, `crates/vpt/tests/support/mod.rs`.
+- Create: `crates/vpt-protocol/src/limits.rs`, `crates/vpt-protocol/src/limits/visitor.rs`,
+  `crates/vpt-protocol/src/limits/tests.rs`, `crates/vpt-protocol/src/helper.rs`.
+- Create: `crates/vpt-adapters/src/helper.rs`, `crates/vpt-adapters/src/helper/reply.rs`,
+  `crates/vpt-adapters/src/helper/tests.rs`.
+- Modify: `crates/vpt-protocol/src/lib.rs`, `crates/vpt-adapters/src/lib.rs`,
+  `crates/vpt-adapters/Cargo.toml`, `crates/vpt/src/lib.rs`, `crates/vpt/src/commands/version.rs`.
+- Test: `crates/vpt/tests/helper_client.rs`, `crates/vpt/tests/version.rs`,
+  `crates/vpt/tests/support/mod.rs`.
 
 **Interfaces:**
 
-- Consumes: `spawn::run_with_env(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize, env: &[(&str, &str)]) -> Result<spawn::Outcome, spawn::SpawnError>`;
+- Consumes:
+  `spawn::run_with_env(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize, env: &[(&str, &str)]) -> Result<spawn::Outcome, spawn::SpawnError>`;
   `Outcome { status: Status, stdout: Vec<u8>, stderr: Vec<u8>, group: libc::pid_t }`;
   `Status::{Exited(i32), Signaled(i32), DeadlineExceeded, Interrupted}`;
   `SpawnError::{NotFound(String), Io(String)}`;
@@ -12254,15 +14204,18 @@ ______________________________________________________________________
   `Environment::{config_path(&self) -> PathBuf, home_dir(&self) -> PathBuf}`;
   `Invocation::config: Option<PathBuf>`.
 
-- Produces protocol root exports: `Limits { pub bytes: usize, pub depth: usize, pub text_chars: usize, pub array_len: usize }`,
-  `Limits::incoming() -> Limits`, `LimitViolation::{Bytes(usize), Depth(usize), Text(usize), Array(usize), Syntax(String)}`,
-  `read_bounded(bytes: &[u8], limits: &Limits) -> Result<serde_json::Value, LimitViolation>`.
-  Check depth before descending; refuse array entry `array_len + 1` before decoding or appending it;
-  validate decoded strings and keys before retaining them; finish with `Deserializer::end()`.
+- Produces protocol root exports:
+  `Limits { pub bytes: usize, pub depth: usize, pub text_chars: usize, pub array_len: usize }`,
+  `Limits::incoming() -> Limits`,
+  `LimitViolation::{Bytes(usize), Depth(usize), Text(usize), Array(usize), Syntax(String)}`,
+  `read_bounded(bytes: &[u8], limits: &Limits) -> Result<serde_json::Value, LimitViolation>`. Check depth
+  before descending; refuse array entry `array_len + 1` before decoding or appending it; validate decoded
+  strings and keys before retaining them; finish with `Deserializer::end()`.
 
 - Produces protocol root exports: `HELPER_SCHEMA: &str = "vpt.helper/1"`,
-  `HelperVersion { pub schema: String, pub version: String }`, `HelperVersion::major(&self) -> Option<u32>`,
-  `Posted { pub posted: bool }`, `Trashed { pub trashed: String }`, each reply implementing `Deserialize`.
+  `HelperVersion { pub schema: String, pub version: String }`,
+  `HelperVersion::major(&self) -> Option<u32>`, `Posted { pub posted: bool }`,
+  `Trashed { pub trashed: String }`, each reply implementing `Deserialize`.
 
 - Produces adapter root exports: `HelperClient::new(path: PathBuf) -> HelperClient`,
   `HelperClient::with_deadline(self, deadline: Duration) -> HelperClient`,
@@ -12273,23 +14226,25 @@ ______________________________________________________________________
   `HelperClient::trash_with_env(&self, path: &Path, env: &[(&str, &str)]) -> Result<PathBuf, TrashError>`,
   `HelperClient::take_diagnostics(&self) -> Vec<String>`, `impl Trash for HelperClient`,
   `CALL_DEADLINE: Duration = Duration::from_secs(5)`, `BUILT_AGAINST_MAJOR: u32 = 1`,
-  `HelperError::{Absent, MajorMismatch { found: u32 }, Failed(String), Unknown(String)}`.
-  The first notify or Trash request validates the configured helper. Only successful compatibility is
-  cached. Unknown additive field names enter the drainable diagnostics queue; values never do.
-  A caller keeps the client and test environment fixed for one command.
+  `HelperError::{Absent, MajorMismatch { found: u32 }, Failed(String), Unknown(String)}`. The first
+  notify or Trash request validates the configured helper. Only successful compatibility is cached.
+  Unknown additive field names enter the drainable diagnostics queue; values never do. A caller keeps the
+  client and test environment fixed for one command.
 
-- Produces `commands::version::{run(environment: &Environment, config: Option<&Path>) -> Outcome, document(helper_version: Option<&str>) -> serde_json::Value, human(helper_version: Option<&str>) -> String}`.
+- Produces
+  `commands::version::{run(environment: &Environment, config: Option<&Path>) -> Outcome, document(helper_version: Option<&str>) -> serde_json::Value, human(helper_version: Option<&str>) -> String}`.
   Version uses the selected configuration, including `--config` and `VPT_CONFIG`; only an absent
-  configuration permits the default `vpt-macos`. An unreadable or invalid existing configuration, or
-  an unidentified selected helper, produces `helper_version: null` with exit 0.
+  configuration permits the default `vpt-macos`. An unreadable or invalid existing configuration, or an
+  unidentified selected helper, produces `helper_version: null` with exit 0.
 
 - Test support: `FAKE_ENGINE: &str`, `Sandbox::install_fake_helper(&self)`,
-  `Sandbox::fake_log(&self) -> PathBuf`. Every integration call selects the fake or a missing sandbox path.
+  `Sandbox::fake_log(&self) -> PathBuf`. Every integration call selects the fake or a missing sandbox
+  path.
 
 - [ ] **Step 1: Register and write the failing tests**
 
-Add `serde = "1.0.229"` under `[dependencies]` in `crates/vpt-adapters/Cargo.toml`.
-The helper decoder names serde's deserialization trait directly.
+Add `serde = "1.0.229"` under `[dependencies]` in `crates/vpt-adapters/Cargo.toml`. The helper decoder
+names serde's deserialization trait directly.
 
 Add these private modules and curated exports to `crates/vpt-protocol/src/lib.rs`:
 
@@ -12307,14 +14262,16 @@ mod helper;
 pub use helper::{BUILT_AGAINST_MAJOR, CALL_DEADLINE, HelperClient, HelperError};
 ```
 
-Create `crates/vpt-protocol/src/limits.rs` and `crates/vpt-adapters/src/helper.rs` with this test declaration in each:
+Create `crates/vpt-protocol/src/limits.rs` and `crates/vpt-adapters/src/helper.rs` with this test
+declaration in each:
 
 ```rust
 #[cfg(test)]
 mod tests;
 ```
 
-Create `crates/vpt-protocol/src/helper.rs` as an empty file. The unresolved reply exports participate in the red build.
+Create `crates/vpt-protocol/src/helper.rs` as an empty file. The unresolved reply exports participate in
+the red build.
 
 `crates/vpt-protocol/src/limits/tests.rs`:
 
@@ -12679,7 +14636,8 @@ fn mismatched_helper_does_not_move_a_file() {
 }
 ```
 
-Append these tests to `crates/vpt/tests/version.rs`, whose existing imports provide `Sandbox`, `run` and `stdout`:
+Append these tests to `crates/vpt/tests/version.rs`, whose existing imports provide `Sandbox`, `run` and
+`stdout`:
 
 ```rust
 #[test]
@@ -13394,23 +15352,33 @@ In `crates/vpt/src/lib.rs`, use this dispatch arm with its existing `environment
         Verb::Version => commands::version::run(&environment, invocation.config.as_deref()),
 ```
 
-Keep the interrupt-handler installation at the start of `run()`. Commands collect
-`Trash::take_diagnostics` after cleanup or reconciliation. `HelperVersion { found }` remains typed
-through the application and maps to exit 3, rule `helper_version`, when Trash is required.
+In `crates/vpt/src/lib.rs`, insert this as the first statement of `pub fn run() -> !`, before reading
+arguments or constructing the environment. Retain it in every later replacement of that function:
+
+```rust
+    vpt_adapters::install_interrupt_handlers();
+```
+
+Commands collect `Trash::take_diagnostics` after cleanup or reconciliation. `HelperVersion { found }`
+remains typed through the application and maps to exit 3, rule `helper_version`, when Trash is required.
 
 - [ ] **Step 4: Verify green and the guards**
 
+Run: `cargo fmt --all`
+
 Run `cargo test --workspace --features dev-tools`, `cargo fmt --all -- --check` and
-`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`.
-Expected: all tests pass. Reader and client unit tests use private injected operations; integration
-tests spawn only the development fake. No helper test uses wall-clock assertions or a real helper.
+`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`. Expected: all tests pass.
+Reader and client unit tests use private injected operations; integration tests spawn only the
+development fake. No helper test uses wall-clock assertions or a real helper.
 
 Mutation-check the array overflow guard, the depth guard, the extra stdout byte, the compatibility
-preflight and the returned Trash path check. Verify each changed line before running its named test;
-each mutant must fail, then restore the implementation and rerun green. Count physical lines after
-rustfmt; the private child files keep every handwritten Rust file below 500 lines.
+preflight and the returned Trash path check. Verify each changed line before running its named test; each
+mutant must fail, then restore the implementation and rerun green. Count physical lines after rustfmt;
+the private child files keep every handwritten Rust file below 500 lines.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -13424,13 +15392,15 @@ ______________________________________________________________________
 **Files:**
 
 - Create: `crates/vpt-protocol/src/event.rs`.
-- Create: `crates/vpt-adapters/src/notify/mod.rs`, `crates/vpt-adapters/src/notify/tests.rs`, `crates/vpt-adapters/src/notify/delivery.rs`, `crates/vpt-adapters/src/notify/delivery/tests.rs`.
+- Create: `crates/vpt-adapters/src/notify/mod.rs`, `crates/vpt-adapters/src/notify/tests.rs`,
+  `crates/vpt-adapters/src/notify/delivery.rs`, `crates/vpt-adapters/src/notify/delivery/tests.rs`.
 - Modify: `crates/vpt-protocol/src/lib.rs`, `crates/vpt-adapters/src/lib.rs`.
 - Test: `crates/vpt/tests/notify.rs`.
 
 **Interfaces:**
 
-- Consumes: `Notification { pub event: EventKind, pub state: EventState, pub recording: Option<RecordingId>, pub detail: String, pub counts: Vec<(String, u64)>, pub paths: Vec<(String, PathBuf)>, pub occurred_at: UtcInstant }`;
+- Consumes:
+  `Notification { pub event: EventKind, pub state: EventState, pub recording: Option<RecordingId>, pub detail: String, pub counts: Vec<(String, u64)>, pub paths: Vec<(String, PathBuf)>, pub occurred_at: UtcInstant }`;
   `EventKind::as_str(self) -> &'static str`, `EventState::as_str(self) -> &'static str`,
   `RecordingId::as_str(&self) -> &str`, `UtcInstant::rfc3339(self) -> String`.
 
@@ -13442,21 +15412,21 @@ ______________________________________________________________________
   `spawn::run_with_env(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize, env: &[(&str, &str)]) -> Result<spawn::Outcome, spawn::SpawnError>`.
 
 - Produces protocol root exports: `EVENT_SCHEMA: &str = "vpt.event/1"`,
-  `EventDocument { pub schema: String, pub event: String, pub state: String, pub recording: Option<String>, pub detail: String, pub counts: serde_json::Map<String, serde_json::Value>, pub paths: serde_json::Map<String, serde_json::Value>, pub occurred_at: String }`, implementing `Serialize`.
+  `EventDocument { pub schema: String, pub event: String, pub state: String, pub recording: Option<String>, pub detail: String, pub counts: serde_json::Map<String, serde_json::Value>, pub paths: serde_json::Map<String, serde_json::Value>, pub occurred_at: String }`,
+  implementing `Serialize`.
 
-- Produces adapter root exports:
-  `notification_document(notification: &Notification) -> EventDocument`,
+- Produces adapter root exports: `notification_document(notification: &Notification) -> EventDocument`,
   `notification_tokens(notification: &Notification, argv: &[String]) -> Vec<String>`,
   `DesktopNotifier::new(helper: HelperClient) -> DesktopNotifier`,
   `DesktopNotifier::with_env(self, env: Vec<(String, String)>) -> DesktopNotifier`,
   `CommandNotifier::new(argv: Vec<String>, fallback: DesktopNotifier) -> CommandNotifier`,
-  `CommandNotifier::with_env(self, env: Vec<(String, String)>) -> CommandNotifier`,
-  `OffNotifier`, `NOTIFY_DEADLINE: Duration = Duration::from_secs(5)`.
-  All three implement `Notifier`. The desktop and command implementations retain diagnostics until
-  drained. An absent desktop helper disables subsequent attempts for that command and records exactly
-  `desktop notifications disabled: helper absent` once. Command failure is recorded before one
-  fallback attempt, including its exit code when available. Delivery never changes the work's exit.
-  Production command paths drain diagnostics on success and failure into their final result or error.
+  `CommandNotifier::with_env(self, env: Vec<(String, String)>) -> CommandNotifier`, `OffNotifier`,
+  `NOTIFY_DEADLINE: Duration = Duration::from_secs(5)`. All three implement `Notifier`. The desktop and
+  command implementations retain diagnostics until drained. An absent desktop helper disables subsequent
+  attempts for that command and records exactly `desktop notifications disabled: helper absent` once.
+  Command failure is recorded before one fallback attempt, including its exit code when available.
+  Delivery never changes the work's exit. Production command paths drain diagnostics on success and
+  failure into their final result or error.
 
 - [ ] **Step 1: Register and write the failing tests**
 
@@ -13787,9 +15757,9 @@ fn command_gets_tokens_and_json_and_nonzero_falls_back_once() {
 
 `cargo test -p vpt --features dev-tools --test notify`
 
-Expected: compile errors name the absent document conversion, token substitution and notifier types.
-The new test modules must be compiled and selected. Zero selected tests or a successful command does
-not satisfy this step.
+Expected: compile errors name the absent document conversion, token substitution and notifier types. The
+new test modules must be compiled and selected. Zero selected tests or a successful command does not
+satisfy this step.
 
 - [ ] **Step 3: Implement event encoding, token substitution and delivery**
 
@@ -14089,21 +16059,25 @@ impl Notifier for OffNotifier {
 mod tests;
 ```
 
-The diagnostic queue records the command failure before fallback; the command layer emits those
-messages in its final document or run log. This preserves the single-document JSON output contract.
-All consumers, including config refusal, ingest and retention, drain `take_diagnostics`; the returned
-`DeliveryOutcome` does not replace the work's result.
+The diagnostic queue records the command failure before fallback; the command layer emits those messages
+in its final document or run log. This preserves the single-document JSON output contract. All consumers,
+including config refusal, ingest and retention, drain `take_diagnostics`; the returned `DeliveryOutcome`
+does not replace the work's result.
 
 - [ ] **Step 4: Verify green and diagnostic retention**
 
+Run: `cargo fmt --all`
+
 Run `cargo test --workspace --features dev-tools`, `cargo fmt --all -- --check` and
-`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`.
-Expected: all tests pass. Mutate substitution to rescan an inserted `{count}`, disable the missing-helper
-suppression, and drop the queued command error in turn; each corresponding test must fail. Restore
-the source between mutants and rerun green. Production composition tests in Tasks 27 and 32 assert
-that these diagnostics reach output while the underlying work keeps its own exit status.
+`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`. Expected: all tests pass.
+Mutate substitution to rescan an inserted `{count}`, disable the missing-helper suppression, and drop the
+queued command error in turn; each corresponding test must fail. Restore the source between mutants and
+rerun green. Production composition tests in Tasks 27 and 32 assert that these diagnostics reach output
+while the underlying work keeps its own exit status.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -14120,7 +16094,8 @@ ______________________________________________________________________
 - Modify: `crates/vpt-adapters/src/lib.rs`
 - Modify: `crates/vpt/src/compose.rs`, `crates/vpt/Cargo.toml`
 - Create: `crates/vpt/src/compose/clock.rs`, `crates/vpt/src/compose/errors.rs`,
-  `crates/vpt/src/compose/ledger.rs`, `crates/vpt/src/compose/tests.rs`
+  `crates/vpt/src/compose/ledger.rs`, `crates/vpt/src/compose/runtime.rs`,
+  `crates/vpt/src/compose/tests.rs`
 - Create: `crates/vpt/src/commands/ingest.rs`, `crates/vpt/src/documents/mod.rs`,
   `crates/vpt/src/documents/record.rs`
 - Modify: `crates/vpt/src/lib.rs`, `crates/vpt/src/commands/mod.rs`
@@ -14135,10 +16110,14 @@ ______________________________________________________________________
   `RootDir::open(path: &Path) -> Result<RootDir, ContainedError>`;
   `WriteLock::acquire(state: &RootDir, wait: Duration) -> Result<WriteLock, LockError>`;
   `SqliteLedger::{open(state: &RootDir) -> Result<SqliteLedger, OpenError>, open_read_only(state: &Path) -> Result<Option<SqliteLedger>, OpenError>}`;
-  `VoiceMemosStore::{open(path: &Path) -> Result<VoiceMemosStore, ContainedError>, with_titles(self, state: PathBuf, refresh: bool) -> VoiceMemosStore}`;
+  `VoiceMemosStore::{open(path: &Path) -> Result<VoiceMemosStore, ContainedError>, with_titles_root(self, state: &RootDir, refresh: bool) -> VoiceMemosStore}`;
   `ClonefileArchive::open_read_only(path: &Path) -> Result<ClonefileArchive, ContainedError>`;
   `FilesystemStores::open_read_only(paths: &[PathBuf]) -> Result<FilesystemStores, ContainedError>`;
   `HelperClient::{new(path: PathBuf) -> HelperClient, take_diagnostics(&self) -> Vec<String>}`.
+
+- Consumes `ConfigError::PathEscape(String)` and `LedgerError::PathEscape(PathBuf)`; produces
+  `compose::errors::{config_error(error: &ConfigError, path: &Path) -> ErrorDocument, ledger_error(error: LedgerError) -> ErrorDocument}`
+  with exit 3 `path_escape` preserved.
 
 - Consumes application capabilities:
   `repair_publications<J: PublicationJournal, S: Stores>(journal: &J, stores: &S, render: impl Fn(&Path) -> Option<Vec<u8>>) -> Result<RepairReport, RepairError>`;
@@ -14146,17 +16125,18 @@ ______________________________________________________________________
   `Mode { pub dry_run: bool, pub once: Option<PathBuf> }`;
   `Notifier::{deliver(&self, notification: &Notification) -> DeliveryOutcome, take_diagnostics(&self) -> Vec<String>}`.
 
-- Produces crate-private composition:
-  `AccessMode::{ReadOnly, Mutating}`;
-  `Runtime::load(environment: &Environment, config: Option<&Path>, access: AccessMode) -> Result<Runtime, Box<ErrorDocument>>`;
+- Produces crate-private composition: `AccessMode::{ReadOnly, Mutating}`;
+  `Operation::{Ingest, Retention}`;
+  `Runtime::load(environment: &Environment, config: Option<&Path>, access: AccessMode, operation: Operation) -> Result<Runtime, Box<ErrorDocument>>`;
   `Runtime::mutating(&self) -> Result<RepairReport, Box<ErrorDocument>>`;
-  `Runtime::trash(&self) -> &dyn Trash`;
-  `Runtime::diagnostics(&self) -> Vec<String>`;
-  `WRITE_LOCK_WAIT: Duration = Duration::from_secs(5)`.
-  Runtime fields: `settings: Settings, roots: Roots, ledger: RuntimeLedger, recorder: VoiceMemosStore, archive: ClonefileArchive, stores: FilesystemStores, clock: RuntimeClock, helper: HelperClient, notifier: Box<dyn Notifier>`, all `pub(crate)`;
-  `_lock: Option<WriteLock>` is private and retained for the runtime lifetime.
-  `RuntimeLedger::{Sqlite(SqliteLedger), Empty(MemoryLedger)}` implements
-  `RecordingLedger` and `PublicationJournal`;
+  `Runtime::trash(&self) -> &dyn Trash`; `Runtime::diagnostics(&self) -> Vec<String>`;
+  `WRITE_LOCK_WAIT: Duration = Duration::from_secs(5)`. Runtime fields:
+  `settings: Settings, roots: Roots, ledger: RuntimeLedger, recorder: Option<VoiceMemosStore>, archive: ClonefileArchive, stores: FilesystemStores, clock: RuntimeClock, helper: HelperClient, notifier: Box<dyn Notifier>`,
+  all `pub(crate)`; `_lock: Option<WriteLock>` is private and retained for the runtime lifetime. Only
+  `Operation::Ingest` opens the recorder. Writable composition passes one opened state `RootDir` to the
+  lock, ledger, and title builder; neither ledger nor title setup reopens its path.
+  `RuntimeLedger::{Sqlite(SqliteLedger), Empty(MemoryLedger)}` implements `RecordingLedger` and
+  `PublicationJournal`;
   `RuntimeLedger::read_only(path: &Path) -> Result<RuntimeLedger, Box<ErrorDocument>>`.
   `RuntimeClock::from_environment(environment: &Environment) -> Result<RuntimeClock, Box<ErrorDocument>>`
   implements `Clock`; only `dev-tools` reads `VPT_TEST_NOW_SECS`.
@@ -14164,8 +16144,7 @@ ______________________________________________________________________
 - Produces adapter root export `SystemClock`, implementing
   `Clock::{now(&self) -> UtcInstant, offset_at(&self, at: UtcInstant) -> UtcOffset}`.
 
-- Produces command-private
-  `documents::record_json(record: &RecordingRecord) -> serde_json::Value`;
+- Produces command-private `documents::record_json(record: &RecordingRecord) -> serde_json::Value`;
   `commands::ingest::run(runtime: &Runtime, dry_run: bool, once: Option<PathBuf>) -> Outcome`.
 
 - Test support adds `FIXED_NOW_SECS: i64 = 1_787_690_916`,
@@ -14175,10 +16154,10 @@ ______________________________________________________________________
 
 - [ ] **Step 1: Write the failing tests**
 
-Add `tempfile = "3.27.0"` under the existing `[dev-dependencies]` in `crates/vpt/Cargo.toml`.
-Add `pub(crate) mod ingest;` to `commands/mod.rs` and create `commands/ingest.rs` empty.
-Integration files under `tests/` are auto-discovered by Cargo. The compose unit registration and test
-source below are part of this step, before either red command.
+Add `tempfile = "3.27.0"` under the existing `[dev-dependencies]` in `crates/vpt/Cargo.toml`. Add
+`pub(crate) mod ingest;` to `commands/mod.rs` and create `commands/ingest.rs` empty. Integration files
+under `tests/` are auto-discovered by Cargo. The compose unit registration and test source below are part
+of this step, before either red command.
 
 `crates/vpt/tests/ingest.rs`:
 
@@ -14360,6 +16339,59 @@ fn dry_run_root_and_source_failures_never_send_a_notification() {
     }
 }
 
+#[test]
+fn unreadable_source_startup_reports_one_ingest_failure_and_dry_run_reports_none() {
+    use std::os::unix::fs::PermissionsExt;
+    for (ancestor, dry_run) in [(false, false), (true, false), (false, true), (true, true)] {
+        let sandbox = Sandbox::new("source-startup-failure");
+        sandbox.install_fake_helper();
+        sandbox.write_config("");
+        let helper = sandbox.path().join("bin/vpt-macos");
+        let config = std::fs::read_to_string(sandbox.config_path()).expect("config").replace(
+            "mode = \"off\"",
+            &format!("mode = \"command\"\ncommand = [{helper:?}, \"command-sink\", \"{{event}}\"]"),
+        );
+        std::fs::write(sandbox.config_path(), config).expect("command notifier");
+        let denied = sandbox.path().join(if ancestor { "voice-memos" } else { "voice-memos/Recordings" });
+        std::fs::set_permissions(&denied, std::fs::Permissions::from_mode(0o000)).expect("deny source");
+        let mut command = sandbox.vpt();
+        command.args(["ingest", "--json"]);
+        if dry_run { command.arg("--dry-run"); }
+        let output = run(&mut command);
+        std::fs::set_permissions(&denied, std::fs::Permissions::from_mode(0o700)).expect("restore fixture");
+        assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+        assert!(stdout(&output).is_empty());
+        let error: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("one error");
+        assert_eq!(error["error"]["kind"], "store");
+        let log = std::fs::read_to_string(sandbox.fake_log()).unwrap_or_default();
+        if dry_run {
+            assert!(log.is_empty(), "{log}");
+        } else {
+            let lines: Vec<_> = log.lines().collect();
+            assert_eq!(lines.len(), 1, "{log}");
+            assert!(lines[0].starts_with("command-sink\tingest_failed\t"), "{log}");
+        }
+        assert!(!sandbox.path().join("state/vpt").exists());
+    }
+}
+
+#[test]
+fn a_configuration_leaf_link_is_a_path_escape_at_the_command_boundary() {
+    let sandbox = Sandbox::new("config-leaf-link");
+    sandbox.write_config("");
+    let selected = sandbox.config_path();
+    let held = selected.with_file_name("held.toml");
+    std::fs::rename(&selected, &held).expect("hold config");
+    let before = std::fs::read(&held).expect("bytes");
+    std::os::unix::fs::symlink(&held, &selected).expect("config link");
+    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
+    let error: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("error");
+    assert_eq!(error["error"]["rule"], "path_escape");
+    assert_eq!(std::fs::read(held).expect("unchanged"), before);
+    assert!(!sandbox.path().join("state/vpt").exists());
+}
+
 ```
 
 Support additions in `crates/vpt/tests/support/mod.rs`:
@@ -14392,7 +16424,17 @@ impl Sandbox {
     }
 
     pub fn ledger(&self) -> rusqlite::Connection {
-        rusqlite::Connection::open(self.root.join("state/vpt/vpt.db")).expect("ledger")
+        let connection = rusqlite::Connection::open(self.root.join("state/vpt/vpt.db")).expect("ledger");
+        let mut enabled: std::ffi::c_int = 1;
+        // SAFETY: the connection and integer outlive this synchronous call.
+        let result = unsafe {
+            rusqlite::ffi::sqlite3_file_control(
+                connection.handle(), c"main".as_ptr(), rusqlite::ffi::SQLITE_FCNTL_PERSIST_WAL,
+                (&mut enabled as *mut std::ffi::c_int).cast(),
+            )
+        };
+        assert_eq!(result, rusqlite::ffi::SQLITE_OK, "preserve fixture sidecars");
+        connection
     }
 }
 ```
@@ -14403,16 +16445,19 @@ Add this environment entry to the existing `Sandbox::vpt()` chain in Step 1:
             .env("VPT_TEST_NOW_SECS", FIXED_NOW_SECS.to_string())
 ```
 
-Register `mod clock;` with its `SystemClock` re-export in the adapter root before the red run.
-Create `compose/clock.rs`, `compose/errors.rs` and `compose/ledger.rs` empty, add their private
-`mod` declarations in `compose.rs`, and add `#[cfg(test)] mod tests;` at the end of `compose.rs`. The source modules
-start with the tests and imports below; their missing production symbols make this a compiled red.
+Register `mod clock;` with its `SystemClock` re-export in the adapter root before the red run. Create
+`compose/clock.rs`, `compose/errors.rs`, `compose/ledger.rs` and `compose/runtime.rs` empty, add their
+private `mod` declarations in `compose.rs`, and add `#[cfg(test)] mod tests;` at the end of `compose.rs`.
+The source modules start with the tests and imports below; their missing production symbols make this a
+compiled red.
 
 `crates/vpt/src/compose/tests.rs`:
 
 ```rust
 use super::*;
 use std::os::unix::fs::PermissionsExt;
+use vpt_adapters::{LockError, RootDir};
+use vpt_application::ports::Clock;
 
 fn configured() -> (tempfile::TempDir, Environment) {
     let temp = tempfile::tempdir().expect("temp");
@@ -14436,7 +16481,7 @@ fn configured() -> (tempfile::TempDir, Environment) {
 #[test]
 fn read_only_composition_creates_no_state_or_store_leaf() {
     let (_temp, environment) = configured();
-    let runtime = Runtime::load(&environment, None, AccessMode::ReadOnly).expect("read only");
+    let runtime = Runtime::load(&environment, None, AccessMode::ReadOnly, Operation::Ingest).expect("read only");
     assert!(!runtime.roots.state_dir.exists());
     assert!(!runtime.roots.home.exists());
     assert!(runtime._lock.is_none());
@@ -14452,7 +16497,7 @@ fn lock_contention_precedes_database_open_mode_changes_and_store_creation() {
     let database = settings.state_dir.join("vpt.db");
     std::fs::write(&database, b"not yet opened").expect("database");
     std::fs::set_permissions(&database, std::fs::Permissions::from_mode(0o644)).expect("mode");
-    let outcome = Runtime::load_with_wait(&environment, None, AccessMode::Mutating, Duration::ZERO);
+    let outcome = Runtime::load_with_wait(&environment, None, AccessMode::Mutating, Operation::Ingest, Duration::ZERO);
     assert_eq!(outcome.err().expect("locked").exit_code(), 1);
     assert_eq!(std::fs::read(&database).expect("same bytes"), b"not yet opened");
     assert_eq!(std::fs::metadata(&database).expect("metadata").permissions().mode() & 0o777, 0o644);
@@ -14462,7 +16507,7 @@ fn lock_contention_precedes_database_open_mode_changes_and_store_creation() {
 #[test]
 fn mutating_composition_retains_the_lock_until_runtime_is_dropped() {
     let (_temp, environment) = configured();
-    let runtime = Runtime::load(&environment, None, AccessMode::Mutating).expect("mutable");
+    let runtime = Runtime::load(&environment, None, AccessMode::Mutating, Operation::Ingest).expect("mutable");
     let state = RootDir::open(&runtime.roots.state_dir).expect("state");
     assert!(matches!(WriteLock::acquire(&state, Duration::ZERO), Err(LockError::Busy)));
     drop(runtime);
@@ -14485,6 +16530,46 @@ fn production_clock_does_not_read_the_test_environment_value() {
     assert!(RuntimeClock::from_environment(&environment).is_ok());
 }
 
+#[test]
+fn configuration_and_ledger_path_escapes_keep_the_refusal_rule() {
+    use vpt_adapters::config::ConfigError;
+    use vpt_application::ports::LedgerError;
+    for error in [
+        errors::config_error(&ConfigError::PathEscape("/config/config.toml".into()), Path::new("/config/config.toml")),
+        errors::ledger_error(LedgerError::PathEscape(PathBuf::from("/state/vpt.db"))),
+    ] {
+        assert_eq!(error.exit_code(), 3);
+        assert_eq!(error.rule.as_deref(), Some("path_escape"));
+    }
+}
+
+#[test]
+fn retention_composition_does_not_open_the_recording_source() {
+    let (_temp, environment) = configured();
+    let settings = settings_from(&environment, None).expect("settings");
+    std::fs::rename(&settings.source.recordings_dir, settings.source.recordings_dir.with_file_name("held")).expect("hide source");
+    let runtime = Runtime::load(&environment, None, AccessMode::ReadOnly, Operation::Retention).expect("retention");
+    assert!(runtime.recorder.is_none());
+    assert!(!runtime.roots.state_dir.exists());
+}
+
+#[test]
+fn locked_runtime_refuses_replacement_state_for_ledger_and_title_refresh() {
+    use vpt_application::ports::{LedgerError, RecorderError, RecorderStore, RecordingLedger};
+    let (_temp, environment) = configured();
+    let runtime = Runtime::load(&environment, None, AccessMode::Mutating, Operation::Ingest).expect("runtime");
+    let state = &runtime.roots.state_dir;
+    let held = state.with_file_name("held-state");
+    std::fs::rename(state, &held).expect("hold original state");
+    std::fs::create_dir(state).expect("replacement state");
+    assert!(matches!(runtime.ledger.recordings(), Err(LedgerError::PathEscape(path)) if path == *state));
+    let recorder = runtime.recorder.as_ref().expect("source");
+    assert!(matches!(recorder.refresh_titles(), Err(RecorderError::Escape(path)) if path == *state));
+    assert!(std::fs::read_dir(state).expect("replacement").next().is_none());
+    let original = RootDir::open(&held).expect("original state");
+    assert!(matches!(WriteLock::acquire(&original, Duration::ZERO), Err(LockError::Busy)));
+}
+
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -14492,8 +16577,8 @@ fn production_clock_does_not_read_the_test_environment_value() {
 Run separately: `cargo test -p vpt --features dev-tools --lib compose` and
 `cargo test -p vpt --features dev-tools --test ingest`.
 
-Expected: the compiled compose tests fail on missing implementation, and ingest fails with exit 2
-and "verb not implemented yet". Zero selected tests or a successful command does not satisfy this step.
+Expected: the compiled compose tests fail on missing implementation, and ingest fails with exit 2 and
+"verb not implemented yet". Zero selected tests or a successful command does not satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -14532,23 +16617,22 @@ impl Clock for SystemClock {
 mod clock;
 pub(crate) mod errors;
 mod ledger;
+mod runtime;
 
 pub(crate) use clock::RuntimeClock;
-pub(crate) use errors::{config_error, contained_error, repair_error, root_error};
+use errors::config_error;
 pub(crate) use ledger::RuntimeLedger;
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use vpt_adapters::{
     ClonefileArchive, CommandNotifier, DesktopNotifier, FilesystemStores, HelperClient,
-    LockError, OffNotifier, RootDir, Roots, SqliteLedger, VoiceMemosStore,
-    WriteLock,
+    OffNotifier, Roots, VoiceMemosStore, WriteLock,
 };
-use vpt_adapters::config::{config_path, default_state_dir, from_table, load_file, resolve};
-use vpt_application::ports::{Clock, Notifier, Trash};
-use vpt_application::{NotifyMode, RepairReport, Settings, repair_publications};
-use vpt_domain::notification::{EventKind, Notification};
-use vpt_protocol::error::{ErrorDocument, ErrorKind};
+use vpt_adapters::config::{config_path, default_state_dir, from_table, load_file};
+use vpt_application::ports::Notifier;
+use vpt_application::{NotifyMode, Settings};
+use vpt_protocol::error::ErrorDocument;
 
 pub(crate) const WRITE_LOCK_WAIT: Duration = Duration::from_secs(5);
 
@@ -14588,11 +16672,17 @@ pub(crate) enum AccessMode {
     Mutating,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Operation {
+    Ingest,
+    Retention,
+}
+
 pub(crate) struct Runtime {
     pub(crate) settings: Settings,
     pub(crate) roots: Roots,
     pub(crate) ledger: RuntimeLedger,
-    pub(crate) recorder: VoiceMemosStore,
+    pub(crate) recorder: Option<VoiceMemosStore>,
     pub(crate) archive: ClonefileArchive,
     pub(crate) stores: FilesystemStores,
     pub(crate) clock: RuntimeClock,
@@ -14616,48 +16706,88 @@ pub(crate) fn notifier_for(settings: &Settings) -> Box<dyn Notifier> {
     }
 }
 
+
+#[cfg(test)]
+mod tests;
+
+```
+
+`crates/vpt/src/compose/runtime.rs`:
+
+```rust
+use super::{AccessMode, Environment, Operation, Runtime, RuntimeClock, RuntimeLedger, WRITE_LOCK_WAIT, notifier_for, settings_from};
+use super::errors::{contained_error, open_error, repair_error, root_error};
+use std::path::Path;
+use std::time::Duration;
+use vpt_adapters::{ClonefileArchive, FilesystemStores, HelperClient, LockError, RootDir, RootError, SqliteLedger, VoiceMemosStore, WriteLock};
+use vpt_adapters::config::resolve;
+use vpt_application::ports::{Clock, Trash};
+use vpt_application::{RepairReport, repair_publications};
+use vpt_domain::notification::{EventKind, Notification};
+use vpt_protocol::error::{ErrorDocument, ErrorKind};
+
 impl Runtime {
-    pub(crate) fn load(environment: &Environment, config: Option<&Path>, access: AccessMode) -> Result<Self, Box<ErrorDocument>> {
-        Self::load_with_wait(environment, config, access, WRITE_LOCK_WAIT)
+    pub(crate) fn load(environment: &Environment, config: Option<&Path>, access: AccessMode, operation: Operation) -> Result<Self, Box<ErrorDocument>> {
+        Self::load_with_wait(environment, config, access, operation, WRITE_LOCK_WAIT)
     }
 
-    fn load_with_wait(environment: &Environment, config: Option<&Path>, access: AccessMode, wait: Duration) -> Result<Self, Box<ErrorDocument>> {
+    pub(super) fn load_with_wait(environment: &Environment, config: Option<&Path>, access: AccessMode, operation: Operation, wait: Duration) -> Result<Self, Box<ErrorDocument>> {
         let settings = settings_from(environment, config)?;
         let notifier = notifier_for(&settings);
         let clock = RuntimeClock::from_environment(environment)?;
         let config_path = environment.selected_config(config);
         let config_dir = config_path.parent().filter(|path| !path.as_os_str().is_empty()).unwrap_or(Path::new("."));
         let roots = resolve(&settings, config_dir).map_err(|error| {
-            let mut document = root_error(&error);
+            let source_io = matches!(&error, RootError::Io { key, .. } if key == "source.recordings_dir");
+            let ingest_failure = operation == Operation::Ingest && source_io;
+            let mut document = if ingest_failure {
+                ErrorDocument::new(ErrorKind::Store, format!("{error:?}"))
+            } else {
+                root_error(&error)
+            };
             if access == AccessMode::Mutating {
-                let _ = notifier.deliver(&Notification::failed(EventKind::ConfigRefused, document.message.clone(), clock.now()));
+                let _ = notifier.deliver(&Notification::failed(
+                    if ingest_failure { EventKind::IngestFailed } else { EventKind::ConfigRefused },
+                    document.message.clone(), clock.now(),
+                ));
                 document = document.diagnostics(notifier.take_diagnostics());
             }
             document
         })?;
-        let lock = if access == AccessMode::Mutating {
+        let mut recorder = if operation == Operation::Retention {
+            None
+        } else {
+            Some(VoiceMemosStore::open(&roots.recordings_dir).map_err(contained_error).map_err(|mut document| {
+                if access == AccessMode::Mutating {
+                    let _ = notifier.deliver(&Notification::failed(
+                        EventKind::IngestFailed, document.message.clone(), clock.now(),
+                    ));
+                    document = document.diagnostics(notifier.take_diagnostics());
+                }
+                document
+            })?)
+        };
+        let (lock, ledger, state) = if access == AccessMode::Mutating {
             roots.create_state_dir().map_err(|error| root_error(&error))?;
             let state = RootDir::open(&roots.state_dir).map_err(contained_error)?;
-            Some(WriteLock::acquire(&state, wait).map_err(|error| match error {
+            let lock = WriteLock::acquire(&state, wait).map_err(|error| match error {
                 LockError::Busy => ErrorDocument::new(ErrorKind::Ledger, "another vpt command holds the write lock"),
                 LockError::Contained(error) => contained_error(error),
                 LockError::Io(detail) => ErrorDocument::new(ErrorKind::Ledger, detail),
-            })?)
+            })?;
+            let ledger = SqliteLedger::open(&state).map_err(open_error)?;
+            (Some(lock), RuntimeLedger::Sqlite(ledger), Some(state))
         } else {
-            None
-        };
-        let ledger = if lock.is_some() {
-            let state = RootDir::open(&roots.state_dir).map_err(contained_error)?;
-            RuntimeLedger::Sqlite(SqliteLedger::open(&state).map_err(errors::open_error)?)
-        } else {
-            RuntimeLedger::read_only(&roots.state_dir)?
+            (None, RuntimeLedger::read_only(&roots.state_dir)?, None)
         };
         if lock.is_some() {
             roots.create_leaves().map_err(|error| root_error(&error))?;
         }
-        let mut recorder = VoiceMemosStore::open(&roots.recordings_dir).map_err(contained_error)?;
         if settings.source.read_titles {
-            recorder = recorder.with_titles(roots.state_dir.clone(), lock.is_some());
+            recorder = match (recorder, state.as_ref()) {
+                (Some(store), Some(state)) => Some(store.with_titles_root(state, true)),
+                (recorder, _) => recorder,
+            };
         }
         let paths = vpt_domain::layout::StoreKey::all().map(|key| roots.stores.get(key).to_path_buf());
         let archive = ClonefileArchive::open_read_only(&roots.stores.audio).map_err(contained_error)?;
@@ -14686,9 +16816,6 @@ impl Runtime {
     }
 }
 
-#[cfg(test)]
-mod tests;
-
 ```
 
 `crates/vpt/src/compose/errors.rs`:
@@ -14698,11 +16825,14 @@ use std::path::Path;
 use vpt_adapters::{ContainedError, OpenError, RootError};
 use vpt_adapters::config::ConfigError;
 use vpt_application::RepairError;
-use vpt_application::ports::StoreError;
+use vpt_application::ports::{LedgerError, StoreError};
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
 pub(crate) fn config_error(error: &ConfigError, path: &Path) -> ErrorDocument {
     let message = match error {
+        ConfigError::PathEscape(path) => return ErrorDocument::new(
+            ErrorKind::Refused, format!("{path} escapes the configuration root"),
+        ).rule("path_escape"),
         ConfigError::Missing(_) => format!("no configuration at {}; run `vpt setup`", path.display()),
         ConfigError::Unreadable { detail, .. } => format!("configuration unreadable: {detail}"),
         ConfigError::Unparseable(_) => "configuration does not parse".into(),
@@ -14737,7 +16867,16 @@ pub(crate) fn contained_error(error: ContainedError) -> ErrorDocument {
 pub(crate) fn open_error(error: OpenError) -> ErrorDocument {
     match error {
         OpenError::Contained(error) => contained_error(error),
-        OpenError::Ledger(error) => ErrorDocument::new(ErrorKind::Ledger, format!("{error:?}")),
+        OpenError::Ledger(error) => ledger_error(error),
+    }
+}
+
+pub(crate) fn ledger_error(error: LedgerError) -> ErrorDocument {
+    match error {
+        LedgerError::PathEscape(path) => ErrorDocument::new(
+            ErrorKind::Refused, format!("{} escapes the retained state root", path.display()),
+        ).rule("path_escape"),
+        error => ErrorDocument::new(ErrorKind::Ledger, format!("{error:?}")),
     }
 }
 
@@ -14753,7 +16892,7 @@ pub(crate) fn repair_error(error: RepairError) -> ErrorDocument {
         RepairError::TargetModified(path) | RepairError::Render(path) | RepairError::RenderedDigestMismatch(path) =>
             ErrorDocument::new(ErrorKind::Refused, format!("{} cannot be repaired safely", path.display())).rule("target_modified"),
         RepairError::Sync { cause, .. } | RepairError::Stores(cause) => store_error(cause),
-        RepairError::Ledger(error) => ErrorDocument::new(ErrorKind::Ledger, format!("{error:?}")),
+        RepairError::Ledger(error) => ledger_error(error),
     }
 }
 ```
@@ -14866,7 +17005,8 @@ impl PublicationJournal for RuntimeLedger {
 }
 ```
 
-`crates/vpt/src/documents/mod.rs`: `mod record; pub(crate) use record::record_json;`. `crates/vpt/src/documents/record.rs`:
+`crates/vpt/src/documents/mod.rs`: `mod record; pub(crate) use record::record_json;`.
+`crates/vpt/src/documents/record.rs`:
 
 ```rust
 //! A recording's record as `vpt show` and `vpt list` print it.
@@ -14911,13 +17051,16 @@ use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
 pub fn run(runtime: &Runtime, dry_run: bool, once: Option<PathBuf>) -> Outcome {
+    let Some(recorder) = runtime.recorder.as_ref() else {
+        return Outcome::Failure(ErrorDocument::new(ErrorKind::Config, "ingest composition has no recording source"));
+    };
     if !dry_run {
         if let Err(error) = runtime.mutating() {
             return Outcome::Failure((*error).diagnostics(runtime.diagnostics()));
         }
     }
     let ingest = Ingest {
-        recorder: &runtime.recorder,
+        recorder,
         archive: &runtime.archive,
         ledger: &runtime.ledger,
         clock: &runtime.clock,
@@ -14981,7 +17124,7 @@ fn failure(error: IngestError) -> ErrorDocument {
         IngestFailure::ArchiveCollision { .. } => ErrorDocument::new(ErrorKind::Refused, message).rule("archive_collision"),
         IngestFailure::PathEscape(_) => ErrorDocument::new(ErrorKind::Refused, message).rule("path_escape"),
         IngestFailure::HelperVersion { .. } => ErrorDocument::new(ErrorKind::Refused, message).rule("helper_version"),
-        IngestFailure::Ledger(_) => ErrorDocument::new(ErrorKind::Ledger, message),
+        IngestFailure::Ledger(error) => crate::compose::errors::ledger_error(error),
         _ => ErrorDocument::new(ErrorKind::Store, message),
     };
     document.completed(completed).diagnostics(error.log)
@@ -14993,18 +17136,21 @@ In `crates/vpt/src/lib.rs`, `dispatch` gains:
 ```rust
         Verb::Ingest { dry_run, once } => {
             let access = if *dry_run { AccessMode::ReadOnly } else { AccessMode::Mutating };
-            match Runtime::load(&environment, invocation.config.as_deref(), access) {
+            match Runtime::load(&environment, invocation.config.as_deref(), access, Operation::Ingest) {
                 Ok(runtime) => commands::ingest::run(&runtime, *dry_run, once.clone()),
                 Err(error) => Outcome::Failure(*error),
             }
         }
 ```
 
-with `let environment = Environment::from_process();` at the top of `dispatch`, `mod documents;`, and
-the imports `use compose::{AccessMode, Environment, Runtime};`.
-`commands/mod.rs` lists `ingest`, `setup`, `version`. Add `mod clock;` and `pub use clock::SystemClock;` to the adapters `lib.rs` in Step 1.
+with `let environment = Environment::from_process();` at the top of `dispatch`, `mod documents;`, and the
+imports `use compose::{AccessMode, Environment, Operation, Runtime};`. `commands/mod.rs` lists `ingest`,
+`setup`, `version`. Add `mod clock;` and `pub use clock::SystemClock;` to the adapters `lib.rs` in Step
+1\.
 
 - [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `cargo fmt --all`
 
 Run: `cargo test --workspace --features dev-tools` and
 `cargo test -p vpt --lib compose --no-default-features`.
@@ -15013,6 +17159,8 @@ Expected: all PASS. Also run `cargo clippy --workspace --all-targets --features 
 and expect no warnings; `main.rs` stays at three lines and `lib.rs` under 150.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -15035,41 +17183,52 @@ any other stage word is a usage error.
 - Modify: `crates/vpt-adapters/src/stores.rs`
 - Create: `crates/vpt/src/commands/show.rs`, `crates/vpt/src/commands/list.rs`,
   `crates/vpt/src/commands/storage.rs`
-- Modify: `crates/vpt/src/commands/mod.rs`, `crates/vpt/src/lib.rs`
+- Modify: `crates/vpt/src/commands/mod.rs`, `crates/vpt/src/lib.rs`, `crates/vpt/src/compose.rs`
+- Create: `crates/vpt/src/compose/observations.rs`
 - Test: `crates/vpt/tests/show_list_storage.rs`
 
 **Interfaces:**
 
-- Consumes `RecordingLedger::{by_id(&self, id: &RecordingId) -> Result<Option<RecordingRecord>, LedgerError>, recordings(&self) -> Result<Vec<RecordingRecord>, LedgerError>}`;
+- Consumes
+  `RecordingLedger::{by_id(&self, id: &RecordingId) -> Result<Option<RecordingRecord>, LedgerError>, recordings(&self) -> Result<Vec<RecordingRecord>, LedgerError>}`;
   `record_json(record: &RecordingRecord) -> serde_json::Value`;
-  `Runtime::load(environment: &Environment, config: Option<&Path>, access: AccessMode) -> Result<Runtime, Box<ErrorDocument>>`;
+  `settings_from(environment: &Environment, config: Option<&Path>) -> Result<Settings, Box<ErrorDocument>>`;
+  `RuntimeLedger::read_only(path: &Path) -> Result<RuntimeLedger, Box<ErrorDocument>>`;
+  `planned_directory(path: &Path, key: &str) -> Result<PathBuf, RootError>`;
+  `resolve_stores(settings: &Settings) -> Result<StorePaths, RootError>`;
   `StoreKey::{all() -> [StoreKey; 7], key_name(self) -> &'static str}`;
-  `Runtime.stores: FilesystemStores`, with retained configured paths and opened root handles.
+  `FilesystemStores::open_read_only(paths: &[PathBuf]) -> Result<FilesystemStores, ContainedError>`.
 
 - Adds `StoreEntry { pub path: PathBuf, pub size: u64, pub mtime: FileTime }` to the
   `vpt_application::ports` exports and extends the existing `Stores` trait with
-  `fn entries(&self, root: &Path) -> Result<Vec<StoreEntry>, StoreError>`.
-  It lists regular files at depth one, refuses symbolic links, and treats an absent configured root
-  as empty. Unknown roots are `StoreError::Escape`.
+  `fn entries(&self, root: &Path) -> Result<Vec<StoreEntry>, StoreError>`. It lists regular files at
+  depth one, refuses symbolic links, and treats an absent configured root as empty. Unknown roots are
+  `StoreError::Escape`.
 
-- Exports `vpt_application::{StoreInventory { pub files: u64, pub bytes: u64, pub oldest: Option<FileTime>, pub newest: Option<FileTime> }, inventory(entries: &[StoreEntry]) -> StoreInventory}`.
+- Exports
+  `vpt_application::{StoreInventory { pub files: u64, pub bytes: u64, pub oldest: Option<FileTime>, pub newest: Option<FileTime> }, inventory(entries: &[StoreEntry]) -> Option<StoreInventory>}`.
 
-- Command-private functions:
-  `show::run(runtime: &Runtime, id: &str) -> Outcome`,
-  `list::run(runtime: &Runtime, stage: Option<&str>) -> Outcome`,
-  `storage::run(runtime: &Runtime) -> Outcome`;
-  `with_runtime(environment: &Environment, invocation: &Invocation, access: AccessMode, command: impl FnOnce(&Runtime) -> Outcome) -> Outcome`.
+- Produces composition
+  `ledger_from(environment: &Environment, config: Option<&Path>) -> Result<RuntimeLedger, Box<ErrorDocument>>`
+  and
+  `storage_from(environment: &Environment, config: Option<&Path>) -> Result<(StorePaths, FilesystemStores), Box<ErrorDocument>>`.
 
-- Acceptance support: `state_snapshot(sandbox: &Sandbox) -> Vec<(PathBuf, u32, Vec<u8>)>`
-  recursively captures sorted state and store paths, permission bits and file bytes.
+- Command-private functions: `show::run(ledger: &dyn RecordingLedger, id: &str) -> Outcome`,
+  `list::run(ledger: &dyn RecordingLedger, stage: Option<&str>) -> Outcome`,
+  `storage::run(paths: &StorePaths, source: &dyn Stores) -> Outcome`.
+
+- Acceptance support: `state_snapshot(sandbox: &Sandbox) -> Vec<(PathBuf, u32, i64, i64, Vec<u8>)>`
+  recursively captures sorted state and store paths, permission bits, modification time seconds and
+  nanoseconds, and file bytes.
 
 - [ ] **Step 1: Write the failing tests**
 
-Register `mod inventory;` and `pub use inventory::{StoreInventory, inventory};` in application
-`lib.rs` now. The file starts as the test module below. The adapter tests belong in the existing
-private stores test module. Add `pub(crate) mod show; pub(crate) mod list; pub(crate) mod storage;`
-in `commands/mod.rs`,
-with initially empty command files; Cargo discovers the integration test automatically.
+Register `mod inventory;` and `pub use inventory::{StoreInventory, inventory};` in application `lib.rs`
+now. The file starts as the test module below. The adapter tests belong in the existing private stores
+test module. Add `pub(crate) mod show; pub(crate) mod list; pub(crate) mod storage;` in
+`commands/mod.rs`, with initially empty command files; Cargo discovers the integration test
+automatically. Create `compose/observations.rs` empty and register `mod observations;` plus
+`pub(crate) use observations::{ledger_from, storage_from};` in `compose.rs` before the red run.
 
 `crates/vpt-application/src/inventory.rs`, test section:
 
@@ -15085,17 +17244,22 @@ mod tests {
 
     #[test]
     fn an_empty_store_has_no_oldest_or_newest() {
-        assert_eq!(inventory(&[]), StoreInventory { files: 0, bytes: 0, oldest: None, newest: None });
+        assert_eq!(inventory(&[]).expect("bounded inventory"), StoreInventory { files: 0, bytes: 0, oldest: None, newest: None });
     }
 
     #[test]
     fn files_and_bytes_are_summed_and_the_extremes_found() {
-        let report = inventory(&[entry(10, 300), entry(5, 100), entry(1, 200)]);
+        let report = inventory(&[entry(10, 300), entry(5, 100), entry(1, 200)]).expect("bounded inventory");
         assert_eq!(report.files, 3);
         assert_eq!(report.bytes, 16);
         assert_eq!(report.oldest, Some(FileTime { secs: 100, nanos: 0 }));
         assert_eq!(report.newest, Some(FileTime { secs: 300, nanos: 0 }));
     }
+    #[test]
+    fn an_unrepresentable_total_is_refused() {
+        assert_eq!(inventory(&[entry(u64::MAX, 100), entry(1, 200)]), None);
+    }
+
 }
 ```
 
@@ -15238,14 +17402,56 @@ fn observations_preserve_dirty_ledger_bytes_modes_and_store_contents() {
     }
 }
 
+#[test]
+fn show_and_list_need_neither_source_nor_valid_store_roots() {
+    let (sandbox, id) = ingested("ledger-only-observations");
+    std::fs::rename(sandbox.path().join("voice-memos"), sandbox.path().join("held-source")).expect("hide source");
+    sandbox.write_config(&format!("[stores]\naudio = {:?}\n", sandbox.path().join("missing/audio")));
+    for args in [vec!["show", &id, "--json"], vec!["list", "--json"]] {
+        let output = run(sandbox.vpt().args(args));
+        assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+        assert!(stdout(&output).contains(&id));
+    }
+}
+
+#[test]
+fn storage_needs_neither_source_nor_a_readable_ledger() {
+    let (sandbox, _) = ingested("stores-only-observation");
+    std::fs::rename(sandbox.path().join("voice-memos"), sandbox.path().join("held-source")).expect("hide source");
+    std::fs::write(sandbox.path().join("state/vpt/vpt.db"), b"corrupt ledger").expect("corrupt fixture");
+    let before = support::state_snapshot(&sandbox);
+    let output = run(sandbox.vpt().args(["storage", "--json"]));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("result");
+    assert_eq!(document["stores"]["audio"]["files"], 1);
+    assert_eq!(support::state_snapshot(&sandbox), before);
+}
+
+#[test]
+fn ledger_path_escapes_are_refused_by_show_and_list() {
+    let (sandbox, id) = ingested("ledger-path-escape");
+    let database = sandbox.path().join("state/vpt/vpt.db");
+    let held = sandbox.path().join("held.db");
+    std::fs::rename(&database, &held).expect("hold database");
+    let before = std::fs::read(&held).expect("database bytes");
+    std::os::unix::fs::symlink(&held, &database).expect("database link");
+    for args in [vec!["show", &id, "--json"], vec!["list", "--json"]] {
+        let output = run(sandbox.vpt().args(args));
+        assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
+        let error: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("error");
+        assert_eq!(error["error"]["rule"], "path_escape");
+    }
+    assert_eq!(std::fs::read(held).expect("unchanged"), before);
+}
+
 ```
 
 Append to `crates/vpt/tests/support/mod.rs` in Step 1:
 
 ```rust
-pub fn state_snapshot(sandbox: &Sandbox) -> Vec<(PathBuf, u32, Vec<u8>)> {
-    use std::os::unix::fs::PermissionsExt;
-    fn visit(path: &Path, rows: &mut Vec<(PathBuf, u32, Vec<u8>)>) {
+pub fn state_snapshot(sandbox: &Sandbox) -> Vec<(PathBuf, u32, i64, i64, Vec<u8>)> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    fn visit(path: &Path, rows: &mut Vec<(PathBuf, u32, i64, i64, Vec<u8>)>) {
         let metadata = match path.symlink_metadata() {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
@@ -15253,7 +17459,7 @@ pub fn state_snapshot(sandbox: &Sandbox) -> Vec<(PathBuf, u32, Vec<u8>)> {
         };
         assert!(!metadata.file_type().is_symlink(), "snapshot fixture contains a link");
         let bytes = if metadata.is_file() { std::fs::read(path).expect("read") } else { Vec::new() };
-        rows.push((path.to_path_buf(), metadata.permissions().mode() & 0o777, bytes));
+        rows.push((path.to_path_buf(), metadata.permissions().mode() & 0o777, metadata.mtime(), metadata.mtime_nsec(), bytes));
         if metadata.is_dir() {
             for entry in std::fs::read_dir(path).expect("directory") {
                 visit(&entry.expect("entry").path(), rows);
@@ -15274,13 +17480,13 @@ Run separately: `cargo test -p vpt-application inventory`, `cargo test -p vpt-ad
 `cargo test -p vpt --features dev-tools --test show_list_storage`.
 
 Expected: compile errors for `inventory` and `entries`; the three command tests FAIL with exit 2 "verb
-not implemented yet". The new modules must compile and be selected; zero selected tests or a
-successful command does not satisfy this step.
+not implemented yet". The new modules must compile and be selected; zero selected tests or a successful
+command does not satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-`crates/vpt-application/src/ports/stores.rs` retains all existing `StoreError` and `Stores`
-members. Add `use vpt_domain::time::FileTime;`, this declaration above `Stores`, and its method:
+`crates/vpt-application/src/ports/stores.rs` retains all existing `StoreError` and `Stores` members. Add
+`use vpt_domain::time::FileTime;`, this declaration above `Stores`, and its method:
 
 ```rust
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15321,20 +17527,20 @@ pub struct StoreInventory {
     pub newest: Option<FileTime>,
 }
 
-pub fn inventory(entries: &[StoreEntry]) -> StoreInventory {
+pub fn inventory(entries: &[StoreEntry]) -> Option<StoreInventory> {
     let key = |time: &FileTime| (time.secs, time.nanos);
-    StoreInventory {
-        files: entries.len() as u64,
-        bytes: entries.iter().map(|entry| entry.size).sum(),
+    Some(StoreInventory {
+        files: u64::try_from(entries.len()).ok()?,
+        bytes: entries.iter().try_fold(0_u64, |total, entry| total.checked_add(entry.size))?,
         oldest: entries.iter().map(|entry| entry.mtime).min_by_key(key),
         newest: entries.iter().map(|entry| entry.mtime).max_by_key(key),
-    }
+    })
 }
 ```
 
-`ports/mod.rs` adds `StoreEntry` to its existing `pub use stores::{StoreError, Stores};`.
-Register `mod inventory;` and `pub use inventory::{StoreInventory, inventory};` in application
-`lib.rs` during Step 1, before the red run. Extend the existing adapter `impl Stores`:
+`ports/mod.rs` adds `StoreEntry` to its existing `pub use stores::{StoreError, Stores};`. Register
+`mod inventory;` and `pub use inventory::{StoreInventory, inventory};` in application `lib.rs` during
+Step 1, before the red run. Extend the existing adapter `impl Stores`:
 
 ```rust
     fn entries(&self, path: &Path) -> Result<Vec<StoreEntry>, StoreError> {
@@ -15372,24 +17578,23 @@ Add `Kind` to the adapter's contained imports, `StoreEntry` to its port imports 
 //! `vpt show <id>`.
 
 use crate::cli::output::Outcome;
-use crate::compose::Runtime;
 use crate::documents::record_json;
 use vpt_application::ports::RecordingLedger;
 use vpt_domain::identity::RecordingId;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
-pub fn run(runtime: &Runtime, id: &str) -> Outcome {
+pub fn run(ledger: &dyn RecordingLedger, id: &str) -> Outcome {
     let Ok(identity) = RecordingId::parse(id) else {
         return Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, format!("{id} is not a recording id")));
     };
-    match runtime.ledger.by_id(&identity) {
+    match ledger.by_id(&identity) {
         Ok(Some(record)) => {
             let json = record_json(&record);
             Outcome::Success { human: format!("{}\n", serde_json::to_string_pretty(&json).unwrap_or_default()), document: document("show", json) }
         }
         Ok(None) => Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, format!("no recording {id}")).ids(vec![id.to_owned()])),
-        Err(error) => Outcome::Failure(ErrorDocument::new(ErrorKind::Ledger, format!("{error:?}"))),
+        Err(error) => Outcome::Failure(crate::compose::errors::ledger_error(error)),
     }
 }
 ```
@@ -15400,14 +17605,13 @@ pub fn run(runtime: &Runtime, id: &str) -> Outcome {
 //! `vpt list [--stage <stage>]`.
 
 use crate::cli::output::Outcome;
-use crate::compose::Runtime;
 use crate::documents::record_json;
 use serde_json::json;
 use vpt_application::ports::{RecordingLedger, RecordingRecord, StageState};
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
-pub fn run(runtime: &Runtime, stage: Option<&str>) -> Outcome {
+pub fn run(ledger: &dyn RecordingLedger, stage: Option<&str>) -> Outcome {
     let outstanding: fn(&RecordingRecord) -> StageState = match stage {
         None => |_| StageState::Pending,
         Some("transcribe") => |record| record.stages.transcribe,
@@ -15415,9 +17619,9 @@ pub fn run(runtime: &Runtime, stage: Option<&str>) -> Outcome {
         Some("synthesis") => |record| record.stages.synthesis,
         Some(other) => return Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, format!("{other} is not a stage"))),
     };
-    let records = match runtime.ledger.recordings() {
+    let records = match ledger.recordings() {
         Ok(records) => records,
-        Err(error) => return Outcome::Failure(ErrorDocument::new(ErrorKind::Ledger, format!("{error:?}"))),
+        Err(error) => return Outcome::Failure(crate::compose::errors::ledger_error(error)),
     };
     let selected: Vec<&RecordingRecord> = records.iter().filter(|record| outstanding(record) != StageState::Succeeded).collect();
     let human = selected.iter().map(|record| format!("{}  {}\n", record.id, record.title.as_deref().unwrap_or("(untitled)"))).collect::<String>();
@@ -15436,28 +17640,32 @@ With no `--stage`, every record's selector answers `Pending`, so every record is
 //! `vpt storage`.
 
 use crate::cli::output::Outcome;
-use crate::compose::Runtime;
 use serde_json::{Map, Value, json};
 use vpt_application::inventory;
 use vpt_application::ports::Stores;
 use vpt_domain::layout::StoreKey;
 use vpt_domain::time::{FileTime, UtcInstant};
+use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
 fn stamp(time: Option<FileTime>) -> Value {
     time.map_or(Value::Null, |t| Value::String(UtcInstant { secs: t.secs }.rfc3339()))
 }
 
-pub fn run(runtime: &Runtime) -> Outcome {
+pub fn run(paths: &vpt_application::StorePaths, source: &dyn Stores) -> Outcome {
     let mut stores = Map::new();
     let mut human = String::new();
     for key in StoreKey::all() {
-        let root = runtime.roots.stores.get(key);
-        let entries = match runtime.stores.entries(root) {
+        let root = paths.get(key);
+        let entries = match source.entries(root) {
             Ok(entries) => entries,
             Err(error) => return Outcome::Failure(crate::compose::errors::store_error(error)),
         };
-        let report = inventory(&entries);
+        let Some(report) = inventory(&entries) else {
+            return Outcome::Failure(ErrorDocument::new(
+                ErrorKind::Store, format!("{} exceeds the supported inventory total", root.display()),
+            ));
+        };
         human.push_str(&format!("{:<15} {:>6} files {:>12} bytes  {}\n", key.key_name(), report.files, report.bytes, root.display()));
         stores.insert(
             key.key_name().to_owned(),
@@ -15468,45 +17676,67 @@ pub fn run(runtime: &Runtime) -> Outcome {
 }
 ```
 
-The dispatch arms in `crates/vpt/src/lib.rs`:
+Add `mod observations;` and `pub(crate) use observations::{ledger_from, storage_from};` to `compose.rs`.
+The empty observations file and declarations are registered in Step 1, before the red run.
+
+`crates/vpt/src/compose/observations.rs`:
 
 ```rust
-        Verb::Show { id } => with_runtime(&environment, invocation, AccessMode::ReadOnly, |runtime| commands::show::run(runtime, id)),
-        Verb::List { stage } => {
-            with_runtime(&environment, invocation, AccessMode::ReadOnly, |runtime| commands::list::run(runtime, stage.as_deref()))
-        }
-        Verb::Storage => with_runtime(&environment, invocation, AccessMode::ReadOnly, |runtime| commands::storage::run(runtime)),
-```
+use super::{Environment, RuntimeLedger, settings_from};
+use super::errors::{contained_error, root_error};
+use std::path::Path;
+use vpt_adapters::FilesystemStores;
+use vpt_adapters::config::{planned_directory, resolve_stores};
+use vpt_application::StorePaths;
+use vpt_domain::layout::StoreKey;
+use vpt_protocol::error::ErrorDocument;
 
-with the helper, which the `Ingest` arm from Task 27 now also uses:
+pub(crate) fn ledger_from(environment: &Environment, config: Option<&Path>) -> Result<RuntimeLedger, Box<ErrorDocument>> {
+    let settings = settings_from(environment, config)?;
+    let state = planned_directory(&settings.state_dir, "home.state_dir").map_err(|error| root_error(&error))?;
+    RuntimeLedger::read_only(&state)
+}
 
-```rust
-fn with_runtime(environment: &Environment, invocation: &Invocation, access: AccessMode, command: impl FnOnce(&Runtime) -> Outcome) -> Outcome {
-    match Runtime::load(environment, invocation.config.as_deref(), access) {
-        Ok(runtime) => command(&runtime),
-        Err(error) => Outcome::Failure(*error),
-    }
+pub(crate) fn storage_from(environment: &Environment, config: Option<&Path>) -> Result<(StorePaths, FilesystemStores), Box<ErrorDocument>> {
+    let settings = settings_from(environment, config)?;
+    let paths = resolve_stores(&settings).map_err(|error| root_error(&error))?;
+    let configured = StoreKey::all().map(|key| paths.get(key).to_path_buf());
+    let stores = FilesystemStores::open_read_only(&configured).map_err(contained_error)?;
+    Ok((paths, stores))
 }
 ```
 
-The `Ingest` arm of Task 27 becomes:
+The dispatch arms in `crates/vpt/src/lib.rs`:
 
 ```rust
-        Verb::Ingest { dry_run, once } => {
-            let access = if *dry_run { AccessMode::ReadOnly } else { AccessMode::Mutating };
-            with_runtime(&environment, invocation, access, |runtime| commands::ingest::run(runtime, *dry_run, once.clone()))
-        }
+        Verb::Show { id } => match compose::ledger_from(&environment, invocation.config.as_deref()) {
+            Ok(ledger) => commands::show::run(&ledger, id),
+            Err(error) => Outcome::Failure(*error),
+        },
+        Verb::List { stage } => match compose::ledger_from(&environment, invocation.config.as_deref()) {
+            Ok(ledger) => commands::list::run(&ledger, stage.as_deref()),
+            Err(error) => Outcome::Failure(*error),
+        },
+        Verb::Storage => match compose::storage_from(&environment, invocation.config.as_deref()) {
+            Ok((paths, stores)) => commands::storage::run(&paths, &stores),
+            Err(error) => Outcome::Failure(*error),
+        },
 ```
 
-`commands/mod.rs` lists `ingest`, `list`, `setup`, `show`, `storage`, `version`.
+Retain the Task 27 ingest dispatch unchanged. These observations create only their named capability; show
+and list do not resolve or open stores or Voice Memos, and storage never opens the ledger.
 
 - [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `cargo fmt --all`
 
 Run: `cargo test --workspace --features dev-tools`
 
 Expected: all PASS.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -15527,26 +17757,27 @@ ______________________________________________________________________
 
 **Interfaces:**
 
-- Consumes `settings_from(environment: &Environment, config: Option<&Path>) -> Result<Settings, Box<ErrorDocument>>`, `Settings.home: PathBuf`,
-  `Settings.symlink_target: Option<PathBuf>`, `RootDir::open(path: &Path) -> Result<RootDir, ContainedError>`, and
+- Consumes
+  `settings_from(environment: &Environment, config: Option<&Path>) -> Result<Settings, Box<ErrorDocument>>`,
+  `Settings.home: PathBuf`, `Settings.symlink_target: Option<PathBuf>`,
+  `RootDir::open(path: &Path) -> Result<RootDir, ContainedError>`, and
   `RootDir::subdirectory(&self, name: &str) -> Result<RootDir, ContainedError>`.
 
-- Adapter root exports:
-  `LinkState::{Absent, LinkTo(PathBuf), Other(String), Unreadable(String)}`;
+- Adapter root exports: `LinkState::{Absent, LinkTo(PathBuf), Other(String), Unreadable(String)}`;
   `SymlinkError::{Occupied(String), TargetParentMissing, TargetNotDirectory, TargetMissing, Missing, WrongTarget(PathBuf), Io(String)}`;
   `inspect_symlink(link: &Path) -> LinkState`;
   `deploy_symlink(link: &Path, target: &Path) -> Result<(), SymlinkError>`;
   `verify_symlink(link: &Path, target: &Path) -> Result<(), SymlinkError>`.
 
-- Command-private functions
-  `deploy(environment: &Environment, config: Option<&Path>) -> Outcome` and
+- Command-private functions `deploy(environment: &Environment, config: Option<&Path>) -> Outcome` and
   `verify(environment: &Environment, config: Option<&Path>) -> Outcome`.
 
 - [ ] **Step 1: Write the failing tests**
 
 In adapter `lib.rs`, register `mod symlink;` and
-`pub use symlink::{LinkState, SymlinkError, deploy as deploy_symlink, inspect as inspect_symlink, verify as verify_symlink};`. The file starts with the test module.
-Register `pub(crate) mod symlink;` in `commands/mod.rs` and create that command file empty.
+`pub use symlink::{LinkState, SymlinkError, deploy as deploy_symlink, inspect as inspect_symlink, verify as verify_symlink};`.
+The file starts with the test module. Register `pub(crate) mod symlink;` in `commands/mod.rs` and create
+that command file empty.
 
 `crates/vpt-adapters/src/symlink.rs`, test section:
 
@@ -15706,8 +17937,8 @@ fn without_a_symlink_target_both_verbs_are_usage_errors() {
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run separately: `cargo test -p vpt-adapters symlink` and
-`cargo test -p vpt --features dev-tools --test symlink`.
-Expected: compile errors naming `deploy` and `verify`; the command tests FAIL with exit 2. Both new test modules must be compiled and selected; zero
+`cargo test -p vpt --features dev-tools --test symlink`. Expected: compile errors naming `deploy` and
+`verify`; the command tests FAIL with exit 2. Both new test modules must be compiled and selected; zero
 selected tests or a successful command does not satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
@@ -15830,7 +18061,9 @@ pub fn verify(link: &Path, target: &Path) -> Result<(), SymlinkError> {
 }
 ```
 
-Add `mod symlink;` and `pub use symlink::{LinkState, SymlinkError, deploy as deploy_symlink, inspect as inspect_symlink, verify as verify_symlink};` to the adapters `lib.rs` in Step 1. `crates/vpt/src/commands/symlink.rs`:
+Add `mod symlink;` and
+`pub use symlink::{LinkState, SymlinkError, deploy as deploy_symlink, inspect as inspect_symlink, verify as verify_symlink};`
+to the adapters `lib.rs` in Step 1. `crates/vpt/src/commands/symlink.rs`:
 
 ```rust
 //! `vpt symlink deploy` and `vpt symlink verify`.
@@ -15902,11 +18135,15 @@ and `commands/mod.rs` gains `symlink`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test --workspace --features dev-tools`
 
 Expected: all PASS.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -15934,8 +18171,10 @@ subdirectory, cleanup pending and source gone.
 
 **Interfaces:**
 
-- Consumes `settings_from(environment: &Environment, config: Option<&Path>) -> Result<Settings, Box<ErrorDocument>>`;
+- Consumes
+  `settings_from(environment: &Environment, config: Option<&Path>) -> Result<Settings, Box<ErrorDocument>>`;
   `resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootError>`;
+  `planned_directory(path: &Path, key: &str) -> Result<PathBuf, RootError>`;
   `HelperClient::version(&self) -> Result<String, HelperError>`;
   `VoiceMemosStore::open(path: &Path) -> Result<VoiceMemosStore, ContainedError>`;
   `RecorderStore::candidates(&self) -> Result<Vec<Candidate>, RecorderError>`;
@@ -15947,25 +18186,24 @@ subdirectory, cleanup pending and source gone.
   `Check { pub name: String, pub ok: bool, pub detail: String }`;
   `ErrorDocument::{checks(self, checks: Vec<Check>) -> Self, diagnostics(self, diagnostics: Vec<String>) -> Self}`.
 
-- Adapter root export `enclosing_git_tree(path: &Path) -> Option<PathBuf>` returns the nearest
-  ancestor, including the path itself, with a `.git` entry of any type.
+- Adapter root export `enclosing_git_tree(path: &Path) -> Option<PathBuf>` returns the nearest ancestor,
+  including the path itself, with a `.git` entry of any type.
 
 - `Outcome::FailedReport { error: ErrorDocument, human: String }`;
   `emit(outcome: Outcome, json: bool) -> i32` preserves stdout write failures as exit 1.
 
 - Command-private `doctor::run(environment: &Environment, config: Option<&Path>) -> Outcome`;
-  `checks::all(environment: &Environment, config: Option<&Path>) -> Vec<Check>`
-  is `pub(super)` inside private `doctor::checks`.
+  `checks::all(environment: &Environment, config: Option<&Path>) -> Vec<Check>` is `pub(super)` inside
+  private `doctor::checks`.
 
-- `INSTALL_HINT: &str` names the two install commands from spec section 13.
-  Every invocation emits exactly 18 named Stage 1 checks, including failures and explicit dependent
-  checks that could not run.
+- `INSTALL_HINT: &str` names the two install commands from spec section 13. Every invocation emits
+  exactly 18 named Stage 1 checks, including failures and explicit dependent checks that could not run.
 
 - [ ] **Step 1: Write the failing tests**
 
-In adapter `lib.rs`, add `mod git_tree;` and `pub use git_tree::enclosing_git_tree;` now.
-The file starts with the test module below. The output tests are appended inside the existing
-`#[cfg(test)] mod tests` in `cli/output.rs`. Cargo discovers `tests/doctor.rs` automatically.
+In adapter `lib.rs`, add `mod git_tree;` and `pub use git_tree::enclosing_git_tree;` now. The file starts
+with the test module below. The output tests are appended inside the existing `#[cfg(test)] mod tests` in
+`cli/output.rs`. Cargo discovers `tests/doctor.rs` automatically.
 
 `crates/vpt-adapters/src/git_tree.rs`, test section:
 
@@ -16224,15 +18462,41 @@ fn doctor_and_ingest_dry_run_preserve_existing_state() {
     }
 }
 
+#[test]
+fn doctor_reports_git_ancestry_through_home_links_even_when_another_root_fails() {
+    for bad_root in [false, true] {
+        let sandbox = Sandbox::new("doctor-resolved-git");
+        sandbox.install_fake_helper();
+        sandbox.write_config("");
+        let repository = sandbox.path().join("repository");
+        std::fs::create_dir_all(repository.join(".git")).expect("repository");
+        std::fs::rename(sandbox.path().join("home/.vpt"), repository.join("vault")).expect("move home");
+        std::os::unix::fs::symlink(repository.join("vault"), sandbox.path().join("home/.vpt")).expect("home link");
+        if bad_root {
+            sandbox.write_config(&format!("[stores]\nreleased = {:?}\n", sandbox.path().join("missing/released")));
+        }
+        let output = run(sandbox.vpt().args(["doctor", "--json"]));
+        assert_eq!(output.status.code(), Some(if bad_root { 3 } else { 0 }), "{}", stderr(&output));
+        let text = if bad_root { stderr(&output) } else { stdout(&output) };
+        let document: serde_json::Value = serde_json::from_str(&text).expect("document");
+        let list = checks(if bad_root { &document["error"] } else { &document }, "checks");
+        for key in ["audio", "drafts", "engine_outputs"] {
+            assert!(check(&list, &format!("git_tree:{key}")).2.contains(&repository.display().to_string()));
+        }
+        assert_eq!(check(&list, "stores").1, !bad_root);
+        assert!(!sandbox.path().join("state/vpt").exists());
+    }
+}
+
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run each command separately: `cargo test -p vpt-adapters git_tree`,
 `cargo test -p vpt --features dev-tools --lib cli::output`, and
-`cargo test -p vpt --features dev-tools --test doctor`.
-Expected: each new module is compiled and selected and fails on the missing implementation. Zero
-selected tests or a successful command does not satisfy this step.
+`cargo test -p vpt --features dev-tools --test doctor`. Expected: each new module is compiled and
+selected and fails on the missing implementation. Zero selected tests or a successful command does not
+satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -16248,8 +18512,8 @@ pub fn enclosing_git_tree(path: &Path) -> Option<PathBuf> {
 }
 ```
 
-In Step 1 add `mod git_tree;` and `pub use git_tree::enclosing_git_tree;` to the adapters `lib.rs`. In `crates/vpt/src/cli/output.rs` the enum and `emit`
-become:
+In Step 1 add `mod git_tree;` and `pub use git_tree::enclosing_git_tree;` to the adapters `lib.rs`. In
+`crates/vpt/src/cli/output.rs` the enum and `emit` become:
 
 ```rust
 pub enum Outcome {
@@ -16325,7 +18589,7 @@ use super::probes::{cleanup_pending, git_tree, helper, source_gone, subdirectory
 use crate::compose::{Environment, settings_from};
 use std::path::Path;
 use vpt_adapters::VoiceMemosStore;
-use vpt_adapters::config::resolve;
+use vpt_adapters::config::{planned_directory, resolve};
 use vpt_application::ports::RecorderStore;
 use vpt_domain::layout::StoreKey;
 use vpt_protocol::error::Check;
@@ -16361,7 +18625,16 @@ pub(super) fn all(environment: &Environment, config: Option<&Path>) -> Vec<Check
         Ok(roots) => check("stores", true, format!("home {}", roots.home.display())),
         Err(error) => check("stores", false, format!("{error:?}")),
     });
-    checks.extend(StoreKey::all().map(|key| git_tree(key, settings.stores.get(key))));
+    checks.extend(StoreKey::all().map(|key| {
+        let path = match &roots {
+            Ok(roots) => Ok(roots.stores.get(key).to_path_buf()),
+            Err(_) => planned_directory(settings.stores.get(key), &format!("stores.{}", key.key_name())),
+        };
+        match path {
+            Ok(path) => git_tree(key, &path),
+            Err(error) => check(format!("git_tree:{}", key.key_name()), false, format!("{error:?}")),
+        }
+    }));
     checks.push(helper(&settings));
     let source = if settings.source.recordings_dir.is_absolute() {
         settings.source.recordings_dir.canonicalize()
@@ -16489,9 +18762,7 @@ pub(super) fn cleanup_pending(audio: &Path) -> Check {
 pub(super) fn source_gone(state: &Path) -> Check {
     if !state.is_absolute() { return check("source_gone", false, "home.state_dir must be absolute"); }
     let rows = RuntimeLedger::read_only(state).and_then(|ledger| {
-        ledger.seen_all().map_err(|error| Box::new(vpt_protocol::error::ErrorDocument::new(
-            vpt_protocol::error::ErrorKind::Ledger, format!("{error:?}"),
-        )))
+        ledger.seen_all().map_err(|error| Box::new(crate::compose::errors::ledger_error(error)))
     });
     match rows {
         Ok(rows) => check("source_gone", true, format!("{} recordings whose source is gone", rows.iter().filter(|row| row.source_gone_at.is_some()).count())),
@@ -16504,10 +18775,12 @@ Every configured invocation emits the same 18 check names. Root resolution failu
 helper, source, symlink, git-tree or ledger checks. Only cleanup depends on the whole store-root
 validation. An absent archive and ledger are empty observations. No doctor path creates or repairs state.
 
-Dispatch: `Verb::Doctor => doctor::run(&environment, invocation.config.as_deref()),` with
-`mod doctor;` in `lib.rs`.
+Dispatch: `Verb::Doctor => doctor::run(&environment, invocation.config.as_deref()),` with `mod doctor;`
+in `lib.rs`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `cargo fmt --all`
 
 Run: `cargo test --workspace --features dev-tools`
 
@@ -16515,6 +18788,8 @@ Expected: all PASS. Format before counting: `checks.rs` owns the census, `probes
 adapter observations, and both remain below 200 implementation lines.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -16550,8 +18825,8 @@ ledgers behind it, under one contract, like the two before it.
     `NewIntent { pub kind: ArtifactKind, pub recording: RecordingId, pub path: PathBuf,`
     `pub expected: Sha256Digest, pub recorded_at: UtcInstant },`
     `RetentionIntent { pub id: i64, pub kind: ArtifactKind, pub recording: RecordingId,`
-    `pub path: PathBuf, pub expected: Sha256Digest, pub recorded_at: UtcInstant }, RetentionJournal}` with
-    `fn record_intent(&self, intent: &NewIntent) -> Result<i64, LedgerError>`,
+    `pub path: PathBuf, pub expected: Sha256Digest, pub recorded_at: UtcInstant }, RetentionJournal}`
+    with `fn record_intent(&self, intent: &NewIntent) -> Result<i64, LedgerError>`,
     `fn pending_intents(&self) -> Result<Vec<RetentionIntent>, LedgerError>`,
     `fn complete_intent(&self, id: i64, at: UtcInstant) -> Result<(), LedgerError>`.
   - `retention_journal_contract!` and the two implementations.
@@ -16562,9 +18837,9 @@ records the digest hex, the only ownership proof an audio clone has.
 - [ ] **Step 1: Write the failing tests**
 
 The existing `retention` domain module already compiles. Register `mod retention;` in the application
-ports module and `pub use retention::{ArtifactKind, NewIntent, RetentionIntent, RetentionJournal};`
-in Step 1, with the new file containing only the tests until Step 3. Register `mod retention;` in the
-SQLite module before the red run. Keep `contract` and both ledgers' test modules private.
+ports module and `pub use retention::{ArtifactKind, NewIntent, RetentionIntent, RetentionJournal};` in
+Step 1, with the new file containing only the tests until Step 3. Register `mod retention;` in the SQLite
+module before the red run. Keep `contract` and both ledgers' test modules private.
 
 `crates/vpt-domain/src/retention.rs`, test section:
 
@@ -16684,14 +18959,19 @@ and, in the `tests` modules of `sqlite/mod.rs` and `memory.rs`, beside the two e
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p vpt-domain retention && cargo test -p vpt-adapters ledger`
+Run independently, including the second command after the first expected failure:
 
-Expected: compile errors naming `expired`, `NewIntent`, `RetentionJournal`. The new test modules must
-be compiled and selected. Zero selected tests or a successful command does not satisfy this step.
+Run: `cargo test -p vpt-domain retention`
+
+Run: `cargo test -p vpt-adapters ledger`
+
+Expected: compile errors naming `expired`, `NewIntent`, `RetentionJournal`. The new test modules must be
+compiled and selected. Zero selected tests or a successful command does not satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-Append to `crates/vpt-domain/src/retention.rs`:
+Insert the imports and `expired` function before the existing test module in
+`crates/vpt-domain/src/retention.rs`. Keep the test module last:
 
 ```rust
 use crate::time::{FileTime, UtcInstant};
@@ -16759,7 +19039,8 @@ pub trait RetentionJournal {
 }
 ```
 
-Keep the private module and curated exports registered in Step 1. `crates/vpt-adapters/src/ledger/sqlite/retention.rs`:
+Keep the private module and curated exports registered in Step 1.
+`crates/vpt-adapters/src/ledger/sqlite/retention.rs`:
 
 ```rust
 //! `retention_intents` behind the journal port.
@@ -16893,11 +19174,15 @@ The existing imports in that file supply `LedgerError` and `UtcInstant`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
+Run: `cargo fmt --all`
+
 Run: `cargo test --workspace --features dev-tools`
 
 Expected: all PASS, four new contract tests among them.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -16914,16 +19199,16 @@ ______________________________________________________________________
 - Modify: `crates/vpt-application/src/lib.rs`.
 - Create: `crates/vpt-adapters/tests/retention_reconcile.rs`.
 - Create: `crates/vpt/src/compose/recovery.rs`, `crates/vpt/src/commands/retention.rs`.
-- Modify: `crates/vpt/src/compose.rs`, `crates/vpt/src/commands/{mod,ingest}.rs`,
-  `crates/vpt/src/lib.rs`.
-- Test: `crates/vpt/tests/{retention,retention_startup}.rs`;
-  `crates/vpt/tests/support/mod.rs` gains `set_mtime`.
+- Modify: `crates/vpt/src/compose.rs`, `crates/vpt/src/compose/runtime.rs`,
+  `crates/vpt/src/commands/{mod,ingest}.rs`, `crates/vpt/src/lib.rs`.
+- Test: `crates/vpt/tests/{retention,retention_startup}.rs`; `crates/vpt/tests/support/mod.rs` gains
+  `set_mtime`.
 
 **Interfaces:**
 
 - Consumes `RecordingLedger::{recordings,by_id,set_audio_trashed}`, `RetentionJournal`,
-  `Stores::{entries,validate_path,digest_of}`, `Trash::trash`, `Clock::now`,
-  `RetentionSettings::hold`, `StorePaths::get`, `HelperClient::version`.
+  `Stores::{entries,validate_path,digest_of}`, `Trash::trash`, `Clock::now`, `RetentionSettings::hold`,
+  `StorePaths::get`, `HelperClient::version`.
 - Produces curated application exports:
   - `Retention<'a,L,J,S,T,C> { pub ledger:&'a L, pub journal:&'a J, pub stores:&'a S,`
     `pub trash:&'a T, pub clock:&'a C, pub settings:&'a RetentionSettings, pub paths:&'a StorePaths }`,
@@ -16934,14 +19219,18 @@ ______________________________________________________________________
     `Kept { pub path:PathBuf, pub reason:KeptReason }`.
   - `ReconcileProgress { pub moved:Vec<Moved>, pub completed:Vec<RecordingId> }`;
     `ReconcileFailure { pub error:RetentionError, pub progress:ReconcileProgress }`.
-  - `RetentionReport { pub moved:Vec<Moved>, pub kept:Vec<Kept>,`
-    `pub completed:Vec<RecordingId> }` and `RetentionFailure { pub error:RetentionError,`
-    `pub report:RetentionReport }`.
+  - `RetentionReport { pub moved:Vec<Moved>, pub kept:Vec<Kept>,` `pub completed:Vec<RecordingId> }` and
+    `RetentionFailure { pub error:RetentionError,` `pub report:RetentionReport }`.
   - `RetentionError::{Disabled,TargetModified(PathBuf),Ledger(LedgerError),Stores(StoreError),Trash(TrashError)}`.
   - `reconcile_intents<J:RetentionJournal,L:RecordingLedger,S:Stores,T:Trash,C:Clock>(`
     `journal:&J,ledger:&L,stores:&S,trash:&T,clock:&C,audio:&Path)`
     `->Result<ReconcileProgress,ReconcileFailure>`.
 - Command composition:
+  - `Operation::{Ingest,Retention}` and `AccessMode::{ReadOnly,Mutating}`.
+  - `Runtime::load(environment:&Environment,config:Option<&Path>,access:AccessMode,operation:Operation)->Result<Runtime,Box<ErrorDocument>>`.
+  - `Runtime.recorder:Option<VoiceMemosStore>`; only `Operation::Ingest` opens it.
+  - `compose::errors::ledger_error(error:LedgerError)->ErrorDocument` maps
+    `LedgerError::PathEscape(PathBuf)` to exit 3 `path_escape`.
   - `StartupFailure { pub error:ErrorDocument, pub progress:ReconcileProgress }`.
   - `Runtime::mutating(&self)->Result<ReconcileProgress,Box<StartupFailure>>`.
   - `Runtime::retention_notice(&self,moved:&[Moved])`.
@@ -16956,9 +19245,9 @@ reconcile.
 
 - [ ] **Step 1: Write the failing tests**
 
-Register the private `retention` application module and its curated exports before the red run.
-Register `mod report; mod reconcile;` in `retention/mod.rs` and create those files before importing
-their types. Integration tests are automatically selected by their explicit `--test` names.
+Register the private `retention` application module and its curated exports before the red run. Register
+`mod report; mod reconcile;` in `retention/mod.rs` and create those files before importing their types.
+Integration tests are automatically selected by their explicit `--test` names.
 
 `crates/vpt-adapters/tests/retention_reconcile.rs`:
 
@@ -17283,6 +19572,23 @@ fn disabled_absent_and_unvalidated_helpers_refuse_before_moves() {
     assert_eq!(document["error"]["rule"], "no_trash");
     assert!(clone.exists());
 }
+#[test]
+fn retention_does_not_open_the_voice_memos_source() {
+    let (sandbox, _, clone) = ingested("retention-without-source", ENABLED);
+    sandbox.set_mtime(&clone, 2 * 86_400);
+    std::fs::rename(sandbox.path().join("voice-memos"), sandbox.path().join("held-source")).expect("hide source");
+    let before = support::state_snapshot(&sandbox);
+    let dry = run(sandbox.vpt().args(["retention", "run", "--dry-run", "--json"]));
+    assert_eq!(dry.status.code(), Some(0), "{}", stderr(&dry));
+    let document: serde_json::Value = serde_json::from_str(&stdout(&dry)).expect("proposal");
+    assert_eq!(document["moved"][0]["path"], clone.to_string_lossy().as_ref());
+    assert_eq!(support::state_snapshot(&sandbox), before);
+    assert!(!sandbox.fake_log().exists());
+    let moved = run(sandbox.vpt().args(["retention", "run", "--json"]));
+    assert_eq!(moved.status.code(), Some(0), "{}", stderr(&moved));
+    assert!(!clone.exists());
+}
+
 ```
 
 `crates/vpt/tests/retention_startup.rs`:
@@ -17432,8 +19738,8 @@ cargo test -p vpt --features dev-tools --test retention --test retention_startup
 ```
 
 Expected: missing retention exports cause the new test modules to fail compilation; once connected, the
-new command cases fail behaviorally. Zero selected tests or a successful command does not satisfy the
-red step. Record the leaf names selected.
+new command cases fail behaviorally. Zero selected tests or a successful command does not satisfy the red
+step. Record the leaf names selected.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -17668,11 +19974,11 @@ pub use retention::{
 ```
 
 `Stores::validate_path` is Task 14's checked-root operation: it reopens the canonical root with
-`O_NOFOLLOW_ANY`, compares device and inode to its held descriptor, and checks the leaf without
-following a symbolic link. A journal path is checked against the audio root and the recording's
-pinned path before any content open, and checked again immediately before the helper call.
+`O_NOFOLLOW_ANY`, compares device and inode to its held descriptor, and checks the leaf without following
+a symbolic link. A journal path is checked against the audio root and the recording's pinned path before
+any content open, and checked again immediately before the helper call.
 
-Replace `Runtime::mutating` in `compose.rs` and remove its now-unused `RepairReport` import:
+Replace `Runtime::mutating` in `compose/runtime.rs` and remove its now-unused `RepairReport` import:
 
 ```rust
     pub(crate) fn mutating(&self) -> Result<ReconcileProgress, Box<StartupFailure>> {
@@ -17693,12 +19999,18 @@ Replace `Runtime::mutating` in `compose.rs` and remove its now-unused `RepairRep
     }
 ```
 
-Add these imports and the private composition module:
+Add the private composition module and curated imports to `compose.rs`:
 
 ```rust
 mod recovery;
 pub(crate) use recovery::{StartupFailure, retention_error};
-use vpt_application::{ReconcileProgress, reconcile_intents};
+```
+
+In `compose/runtime.rs`, add `use super::{StartupFailure, retention_error};` and replace its application
+import with:
+
+```rust
+use vpt_application::{ReconcileProgress, reconcile_intents, repair_publications};
 ```
 
 `crates/vpt/src/compose/recovery.rs`:
@@ -17723,7 +20035,7 @@ pub(crate) fn retention_error(error: RetentionError) -> ErrorDocument {
         RetentionError::TargetModified(path) => ErrorDocument::new(
             ErrorKind::Refused, format!("{} changed since its retention intent was recorded", path.display()),
         ).rule("retention_target_modified"),
-        RetentionError::Ledger(error) => ErrorDocument::new(ErrorKind::Ledger, format!("{error:?}")),
+        RetentionError::Ledger(error) => crate::compose::errors::ledger_error(error),
         RetentionError::Stores(StoreError::Escape(path)) => ErrorDocument::new(
             ErrorKind::Refused, format!("{} escapes its store root", path.display()),
         ).rule("path_escape"),
@@ -17785,11 +20097,14 @@ impl Runtime {
 }
 ```
 
-Replace only `run` in `crates/vpt/src/commands/ingest.rs`; retain its Task 27 output functions and
-add `use vpt_application::ReconcileProgress;`:
+Replace only `run` in `crates/vpt/src/commands/ingest.rs`; retain its Task 27 output functions and add
+`use vpt_application::ReconcileProgress;`:
 
 ```rust
 pub fn run(runtime: &Runtime, dry_run: bool, once: Option<PathBuf>) -> Outcome {
+    let Some(recorder) = runtime.recorder.as_ref() else {
+        return Outcome::Failure(ErrorDocument::new(ErrorKind::Config, "ingest composition has no recording source"));
+    };
     let progress = if dry_run {
         ReconcileProgress::default()
     } else {
@@ -17799,7 +20114,7 @@ pub fn run(runtime: &Runtime, dry_run: bool, once: Option<PathBuf>) -> Outcome {
         }
     };
     let ingest = Ingest {
-        recorder: &runtime.recorder,
+        recorder,
         archive: &runtime.archive,
         ledger: &runtime.ledger,
         clock: &runtime.clock,
@@ -17907,16 +20222,21 @@ Dispatch in `crates/vpt/src/lib.rs`:
 ```rust
         Verb::RetentionRun { dry_run } => {
             let access = if *dry_run { AccessMode::ReadOnly } else { AccessMode::Mutating };
-            with_runtime(&environment, invocation, access, |runtime| commands::retention::run(runtime, *dry_run))
+            match Runtime::load(&environment, invocation.config.as_deref(), access, Operation::Retention) {
+                Ok(runtime) => commands::retention::run(&runtime, *dry_run),
+                Err(error) => Outcome::Failure(*error),
+            }
         }
 ```
 
-Add `pub(crate) mod retention;` to `commands/mod.rs`. The runtime's private lock remains owned until
-the command returns; retention obtains no second lock. A helper version failure ends the command
-before reconciliation or new moves. The helper also validates its version on its first Trash call,
-covering recovery entered through ingest.
+Add `pub(crate) mod retention;` to `commands/mod.rs`. The runtime's private lock remains owned until the
+command returns; retention obtains no second lock. A helper version failure ends the command before
+reconciliation or new moves. The helper also validates its version on its first Trash call, covering
+recovery entered through ingest.
 
 - [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `cargo fmt --all`
 
 ```bash
 cargo test -p vpt-adapters --test retention_reconcile
@@ -17926,10 +20246,12 @@ cargo clippy --workspace --all-targets --features dev-tools -- -D warnings
 just file-size
 ```
 
-Expected: the named recovery cases, command cases and ingest regressions pass; no warnings and no
-file over its hard limit. Record test names and measured results, not a predicted count.
+Expected: the named recovery cases, command cases and ingest regressions pass; no warnings and no file
+over its hard limit. Record test names and measured results, not a predicted count.
 
 - [ ] **Step 5: Commit**
+
+Run: `cargo fmt --all`
 
 ```bash
 git add crates
@@ -17984,32 +20306,68 @@ let package = Package(
     targets: [
         .target(name: "VptMacos"),
         .executableTarget(name: "vpt-macos", dependencies: ["VptMacos"]),
-        .testTarget(name: "VptMacosTests", dependencies: ["VptMacos"]),
+        .testTarget(name: "VptMacosTests", dependencies: ["VptMacos"])
     ]
 )
 ```
 
+Create both source targets before the red run so Swift Package Manager reaches the test compiler.
+`helper/vpt-macos/Sources/VptMacos/Arguments.swift` starts with:
+
+```swift
+import Foundation
+```
+
+`helper/vpt-macos/Sources/vpt-macos/main.swift` starts with:
+
+```swift
+import VptMacos
+```
+
+Step 3 replaces both files in full.
+
 `helper/vpt-macos/Tests/VptMacosTests/ArgumentsTests.swift`:
 
 ```swift
-import XCTest
 @testable import VptMacos
+import XCTest
 
 final class ArgumentsTests: XCTestCase {
     func testVersionNotifyAndTrashParse() {
         XCTAssertEqual(parse(["--version"]), .success(.version))
-        XCTAssertEqual(parse(["notify", "--title", "t", "--body", "b"]), .success(.notify(title: "t", body: "b")))
-        XCTAssertEqual(parse(["notify", "--body", "b", "--title", "t"]), .success(.notify(title: "t", body: "b")))
+        XCTAssertEqual(
+            parse(["notify", "--title", "t", "--body", "b"]),
+            .success(.notify(title: "t", body: "b"))
+        )
+        XCTAssertEqual(
+            parse(["notify", "--body", "b", "--title", "t"]),
+            .success(.notify(title: "t", body: "b"))
+        )
         XCTAssertEqual(parse(["trash", "/tmp/x"]), .success(.trash(path: "/tmp/x")))
     }
 
     func testUnknownAndIncompleteArgumentsAreUsageErrors() {
         XCTAssertEqual(parse([]), .failure(UsageError(message: "unknown subcommand")))
-        XCTAssertEqual(parse(["transcribe", "x"]), .failure(UsageError(message: "unknown subcommand")))
-        XCTAssertEqual(parse(["--version", "extra"]), .failure(UsageError(message: "--version takes no arguments")))
-        XCTAssertEqual(parse(["notify", "--title"]), .failure(UsageError(message: "--title needs a value")))
-        XCTAssertEqual(parse(["notify", "--title", "t"]), .failure(UsageError(message: "notify needs --title and --body")))
-        XCTAssertEqual(parse(["trash"]), .failure(UsageError(message: "trash takes exactly one path")))
+        XCTAssertEqual(
+            parse(["transcribe", "x"]),
+            .failure(UsageError(message: "unknown subcommand"))
+        )
+        XCTAssertEqual(
+            parse(["--version", "extra"]),
+            .failure(UsageError(message: "--version takes no arguments"))
+        )
+        XCTAssertEqual(
+            parse(["notify", "--title"]),
+            .failure(UsageError(message: "--title needs a value"))
+        )
+        XCTAssertEqual(
+            parse(["notify", "--title", "t"]),
+            .failure(UsageError(message: "notify needs --title and --body"))
+        )
+        XCTAssertEqual(
+            parse(["trash"]),
+            .failure(UsageError(message: "trash takes exactly one path"))
+        )
     }
 }
 ```
@@ -18017,15 +20375,17 @@ final class ArgumentsTests: XCTestCase {
 `helper/vpt-macos/Tests/VptMacosTests/RunTests.swift`:
 
 ```swift
-import XCTest
 @testable import VptMacos
+import XCTest
 
 final class RecordingPoster: NotificationPoster {
     var posted: [(title: String, body: String)] = []
     var failure: PostFailure?
 
     func post(title: String, body: String) throws {
-        if let failure { throw failure }
+        if let failure {
+            throw failure
+        }
         posted.append((title, body))
     }
 }
@@ -18033,29 +20393,47 @@ final class RecordingPoster: NotificationPoster {
 final class TemporaryTrasher: Trasher {
     let directory: URL
 
-    init(directory: URL) { self.directory = directory }
+    init(directory: URL) {
+        self.directory = directory
+    }
 
     func trash(_ url: URL) throws {
-        try FileManager.default.moveItem(at: url, to: directory.appendingPathComponent(url.lastPathComponent))
+        try FileManager.default.moveItem(
+            at: url,
+            to: directory.appendingPathComponent(url.lastPathComponent)
+        )
     }
 }
 
 final class RunTests: XCTestCase {
     private func scratch() throws -> URL {
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent("vpt-macos-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: base.appendingPathComponent("trash"), withIntermediateDirectories: true)
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vpt-macos-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: base.appendingPathComponent("trash"),
+            withIntermediateDirectories: true
+        )
+        addTeardownBlock { try FileManager.default.removeItem(at: base) }
         return base
     }
 
     func testVersionPrintsTheHelperDocument() throws {
-        let outcome = run(.version, poster: RecordingPoster(), trasher: TemporaryTrasher(directory: try scratch()))
+        let outcome = try VptMacos.run(
+            .version,
+            poster: RecordingPoster(),
+            trasher: TemporaryTrasher(directory: scratch())
+        )
         XCTAssertEqual(outcome.exitCode, 0)
         XCTAssertEqual(outcome.stdout, "{\"schema\":\"vpt.helper/1\",\"version\":\"1.0.0\"}")
     }
 
     func testNotifyPostsThroughTheProtocolAndPrintsPosted() throws {
         let poster = RecordingPoster()
-        let outcome = run(.notify(title: "vpt: deferred", body: "3 waiting"), poster: poster, trasher: TemporaryTrasher(directory: try scratch()))
+        let outcome = try VptMacos.run(
+            .notify(title: "vpt: deferred", body: "3 waiting"),
+            poster: poster,
+            trasher: TemporaryTrasher(directory: scratch())
+        )
         XCTAssertEqual(outcome.exitCode, 0)
         XCTAssertEqual(outcome.stdout, "{\"posted\":true}")
         XCTAssertEqual(poster.posted.count, 1)
@@ -18066,7 +20444,11 @@ final class RunTests: XCTestCase {
     func testAFailedPostIsExit1WithNothingOnStdout() throws {
         let poster = RecordingPoster()
         poster.failure = PostFailure(detail: "no session")
-        let outcome = run(.notify(title: "t", body: "b"), poster: poster, trasher: TemporaryTrasher(directory: try scratch()))
+        let outcome = try VptMacos.run(
+            .notify(title: "t", body: "b"),
+            poster: poster,
+            trasher: TemporaryTrasher(directory: scratch())
+        )
         XCTAssertEqual(outcome.exitCode, 1)
         XCTAssertEqual(outcome.stdout, "")
         XCTAssertTrue(outcome.stderr.contains("no session"), outcome.stderr)
@@ -18076,18 +20458,27 @@ final class RunTests: XCTestCase {
         let base = try scratch()
         let victim = base.appendingPathComponent("victim.txt")
         try Data("bye".utf8).write(to: victim)
-        let outcome = run(.trash(path: victim.path), poster: RecordingPoster(), trasher: TemporaryTrasher(directory: base.appendingPathComponent("trash")))
+        let outcome = VptMacos.run(
+            .trash(path: victim.path),
+            poster: RecordingPoster(),
+            trasher: TemporaryTrasher(directory: base.appendingPathComponent("trash"))
+        )
         XCTAssertEqual(outcome.exitCode, 0)
         XCTAssertEqual(outcome.stdout, "{\"trashed\":\"\(victim.path)\"}")
         XCTAssertFalse(FileManager.default.fileExists(atPath: victim.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: base.appendingPathComponent("trash/victim.txt").path))
+        XCTAssertTrue(FileManager.default
+            .fileExists(atPath: base.appendingPathComponent("trash/victim.txt").path))
     }
 
     func testAFailedTrashIsExit1AndTheFileStays() throws {
         let base = try scratch()
         let victim = base.appendingPathComponent("victim.txt")
         try Data("bye".utf8).write(to: victim)
-        let outcome = run(.trash(path: victim.path), poster: RecordingPoster(), trasher: TemporaryTrasher(directory: base.appendingPathComponent("missing")))
+        let outcome = VptMacos.run(
+            .trash(path: victim.path),
+            poster: RecordingPoster(),
+            trasher: TemporaryTrasher(directory: base.appendingPathComponent("missing"))
+        )
         XCTAssertEqual(outcome.exitCode, 1)
         XCTAssertEqual(outcome.stdout, "")
         XCTAssertTrue(FileManager.default.fileExists(atPath: victim.path))
@@ -18103,7 +20494,9 @@ final class RunTests: XCTestCase {
 
 Run: `cd helper/vpt-macos && swift test`
 
-Expected: the build fails, `parse`, `run`, `NotificationPoster` and the rest undefined.
+Expected: Swift discovers both source targets, then the test compilation fails with undefined `parse`,
+`VptMacos.run`, `NotificationPoster`, `Trasher` and `PostFailure`. An empty-target error does not
+establish this red step. The test calls qualify `VptMacos.run` because `XCTestCase` also defines `run`.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -18120,7 +20513,9 @@ public enum Command: Equatable {
 public struct UsageError: Error, Equatable {
     public let message: String
 
-    public init(message: String) { self.message = message }
+    public init(message: String) {
+        self.message = message
+    }
 }
 
 public let usage = "usage: vpt-macos --version | notify --title <t> --body <b> | trash <path>"
@@ -18128,11 +20523,14 @@ public let usage = "usage: vpt-macos --version | notify --title <t> --body <b> |
 public func parse(_ arguments: [String]) -> Result<Command, UsageError> {
     switch arguments.first {
     case "--version":
-        return arguments.count == 1 ? .success(.version) : .failure(UsageError(message: "--version takes no arguments"))
+        return arguments
+            .count == 1 ? .success(.version) :
+            .failure(UsageError(message: "--version takes no arguments"))
     case "notify":
         return parseNotify(Array(arguments.dropFirst()))
     case "trash":
-        guard arguments.count == 2 else { return .failure(UsageError(message: "trash takes exactly one path")) }
+        guard arguments.count == 2
+        else { return .failure(UsageError(message: "trash takes exactly one path")) }
         return .success(.trash(path: arguments[1]))
     default:
         return .failure(UsageError(message: "unknown subcommand"))
@@ -18144,7 +20542,8 @@ private func parseNotify(_ words: [String]) -> Result<Command, UsageError> {
     var body: String?
     var index = 0
     while index < words.count {
-        guard index + 1 < words.count else { return .failure(UsageError(message: "\(words[index]) needs a value")) }
+        guard index + 1 < words.count
+        else { return .failure(UsageError(message: "\(words[index]) needs a value")) }
         switch words[index] {
         case "--title": title = words[index + 1]
         case "--body": body = words[index + 1]
@@ -18152,7 +20551,8 @@ private func parseNotify(_ words: [String]) -> Result<Command, UsageError> {
         }
         index += 2
     }
-    guard let title, let body else { return .failure(UsageError(message: "notify needs --title and --body")) }
+    guard let title,
+          let body else { return .failure(UsageError(message: "notify needs --title and --body")) }
     return .success(.notify(title: title, body: body))
 }
 ```
@@ -18175,20 +20575,26 @@ public struct VersionDocument: Codable, Equatable {
 public struct PostedDocument: Codable, Equatable {
     public let posted: Bool
 
-    public init(posted: Bool) { self.posted = posted }
+    public init(posted: Bool) {
+        self.posted = posted
+    }
 }
 
 public struct TrashedDocument: Codable, Equatable {
     public let trashed: String
 
-    public init(trashed: String) { self.trashed = trashed }
+    public init(trashed: String) {
+        self.trashed = trashed
+    }
 }
 
 /// One line of JSON with sorted keys and no escaped slashes.
-public func encode<Document: Encodable>(_ document: Document) -> String {
+public func encode(_ document: some Encodable) -> String {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    guard let data = try? encoder.encode(document), let text = String(data: data, encoding: .utf8) else {
+    guard let data = try? encoder.encode(document),
+          let text = String(data: data, encoding: .utf8)
+    else {
         return "{}"
     }
     return text
@@ -18207,7 +20613,9 @@ public protocol NotificationPoster {
 public struct PostFailure: Error, Equatable {
     public let detail: String
 
-    public init(detail: String) { self.detail = detail }
+    public init(detail: String) {
+        self.detail = detail
+    }
 }
 
 /// `display notification` through NSAppleScript, in-process, no signed bundle.
@@ -18244,7 +20652,9 @@ public protocol Trasher {
 public struct TrashFailure: Error, Equatable {
     public let detail: String
 
-    public init(detail: String) { self.detail = detail }
+    public init(detail: String) {
+        self.detail = detail
+    }
 }
 
 /// The system Trash through FileManager; nothing here unlinks.
@@ -18312,8 +20722,12 @@ case let .failure(error):
     exit(2)
 case let .success(command):
     let outcome = run(command, poster: AppleScriptPoster(), trasher: FileManagerTrasher())
-    if !outcome.stdout.isEmpty { print(outcome.stdout) }
-    if !outcome.stderr.isEmpty { FileHandle.standardError.write(Data((outcome.stderr + "\n").utf8)) }
+    if !outcome.stdout.isEmpty {
+        print(outcome.stdout)
+    }
+    if !outcome.stderr.isEmpty {
+        FileHandle.standardError.write(Data((outcome.stderr + "\n").utf8))
+    }
     exit(outcome.exitCode)
 }
 ```
@@ -18322,7 +20736,7 @@ case let .success(command):
 
 ```just
 swift-build:
-  cd helper/vpt-macos && swift build -c release
+  cd helper/vpt-macos && swift build -c release --explicit-target-dependency-import-check error
 
 swift-test:
   cd helper/vpt-macos && swift test
@@ -18367,7 +20781,21 @@ Append to the `file-size` recipe body, before its `exit "$status"`:
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cd helper/vpt-macos && swift test && swift build -c release && .build/release/vpt-macos --version`
+Run: `cargo fmt --all`
+
+Run from `helper/vpt-macos`:
+
+```bash
+swiftformat Sources Tests Package.swift --cache ignore --swift-version 6.0 --max-width 100 --trailing-commas never
+swiftformat --lint Sources --cache ignore --swift-version 6.0 --max-width 100 --trailing-commas never
+swiftformat --lint Tests --cache ignore --swift-version 6.0 --max-width 100 --trailing-commas never
+swiftformat --lint Package.swift --cache ignore --swift-version 6.0 --max-width 100 --trailing-commas never
+swiftlint lint Sources Tests Package.swift --no-cache
+swift test --explicit-target-dependency-import-check error
+swift build -c release --explicit-target-dependency-import-check error
+.build/release/vpt-macos --version
+```
+
 Expected: 8 tests pass; the release build prints `{"schema":"vpt.helper/1","version":"1.0.0"}`.
 
 Run: `just file-size`
@@ -18380,11 +20808,10 @@ Run: `just ship`
 
 Expected: each stable gate passes. Record its command, exit code and selected leaf test names.
 
-Run `cargo +nightly test --workspace --features dev-tools -- -Z unstable-options --report-time`
-using the installed nightly. Record per-test durations and reject any test reaching one second.
-Run the required stable suite separately. Do not infer duration from subprocess counts. If the
-installed nightly cannot run this command, record the blocker and stop delivery until equivalent
-per-test measurements exist.
+Run `cargo +nightly test --workspace --features dev-tools -- -Z unstable-options --report-time` using the
+installed nightly. Record per-test durations and reject any test reaching one second. Run the required
+stable suite separately. Do not infer duration from subprocess counts. If the installed nightly cannot
+run this command, record the blocker and stop delivery until equivalent per-test measurements exist.
 
 Record the file-size table:
 
@@ -18402,34 +20829,37 @@ Verify the mutants by hand and record the table:
 For each row, apply the mutation to a scratch copy of the working tree, run the named test, confirm it
 fails, then run the unmutated control and confirm it passes. The table goes in the pull request body.
 
-| Behavior                              | Mutation                                                       | Test that must go red                                                                 |
-| ------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| the wholeness gate                    | `inspect` returns `Ok` when `moov` is missing                  | `a_file_without_moov_is_refused`                                                      |
-| the rest gate                         | `>=` becomes `>` on the quiet period                           | `the_rest_gate_needs_the_whole_quiet_period`                                          |
-| the size gate                         | the limit comparison drops one byte                            | `the_size_gate_defers_one_byte_over_the_limit_and_accepts_the_limit`                  |
-| the source stays read-only            | `open` drops `O_NOFOLLOW`                                      | `open_refuses_a_symbolic_link_and_reads_a_regular_file_by_descriptor`                 |
-| the source is unchanged after a sweep | staging writes back one byte to the source handle              | `a_full_sweep_with_titles_leaves_every_container_entry_with_its_size_mtime_and_flags` |
-| dry run touches no title copy         | `Mode::DryRun` refreshes the title copy                        | `dry_run_creates_no_state_directory_and_no_title_copy`                                |
-| exclusive publication                 | `exclusive` falls back to `rename` when the target exists      | `publish_never_replaces_an_existing_target_and_names_it`                              |
-| repair after rename, before clear     | `repair_publications` skips the directory sync before clearing | `a_failed_directory_sync_leaves_the_entry_pending`                                    |
-| target modified refuses               | the digest comparison in repair always matches                 | `any_other_bytes_are_refused_as_target_modified_and_nothing_is_overwritten`           |
-| a future schema is refused            | `migrate` accepts any `user_version`                           | `a_future_schema_version_is_refused_with_its_number`                                  |
-| the write lock                        | `acquire` returns before `flock` succeeds                      | `a_held_lock_makes_a_second_acquisition_busy_after_its_wait`                          |
-| the deadline kills the group          | `terminate` signals the child pid instead of the group         | `the_deadline_terminates_the_whole_process_group_and_reaps_it`                        |
-| the bounded reader                    | disable `Node::enter`'s depth guard                            | `depth_is_checked_before_reading_children`                                            |
-| helper major version                  | compatibility preflight accepts any major                      | `incompatible_version_never_receives_notify_or_trash`                                 |
-| command notify falls back once        | the fallback delivery is removed                               | `failed_command_is_recorded_before_one_fallback_and_keeps_its_status`                 |
-| an untracked file survives retention  | `Retention::run` trashes entries with no ledger owner          | `an_untracked_file_in_a_store_survives_and_is_reported_kept`                          |
-| retention target modified             | `reconcile_intents` moves a path whose digest differs          | `replaced_content_is_a_refusal_naming_the_path_and_stays_pending`                     |
-| audio excluded by default             | `include_audio` is ignored                                     | `audio_is_excluded_unless_include_audio_is_set`                                       |
-| doctor never refuses at startup       | `checks::all` returns early on a config error                  | `without_a_config_the_config_check_fails_and_the_rest_are_reported_as_not_run`        |
-| symlink verify writes nothing         | `verify` creates the target when missing                       | `verify_names_a_missing_link_and_a_wrong_target_and_writes_nothing`                   |
-| expiration arithmetic                 | cast the hold to `i64` or ignore nanoseconds                   | `a_large_hold_does_not_wrap_and_nanoseconds_delay_the_boundary`                       |
-| partial retention                     | append moves after ledger updates                              | `a_ledger_failure_after_the_move_still_reports_its_recording_id`                      |
-| partial recovery                      | drop progress when a later intent fails                        | `partial_startup_retains_completed_ids_and_one_event_on_retention_and_ingest`         |
-| single recovery event                 | emit recovery and new-move events separately                   | `retention_combines_recovery_and_new_moves_in_one_report_and_event`                   |
-| root substitution                     | skip root revalidation before the helper                       | `replacing_the_audio_root_with_a_symlink_never_reaches_trash`                         |
-| helper recovery compatibility         | skip the helper version check in Trash                         | `incompatible_helper_blocks_reconciliation_without_a_trash_request`                   |
+| Behavior                              | Mutation                                                         | Test that must go red                                                                 |
+| ------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| the wholeness gate                    | `inspect` returns `Ok` when `moov` is missing                    | `a_file_without_moov_is_refused`                                                      |
+| the rest gate                         | `>=` becomes `>` on the quiet period                             | `the_rest_gate_needs_the_whole_quiet_period`                                          |
+| the size gate                         | the limit comparison drops one byte                              | `the_size_gate_defers_one_byte_over_the_limit_and_accepts_the_limit`                  |
+| the source stays read-only            | `open` drops `O_NOFOLLOW`                                        | `open_refuses_a_symbolic_link_and_reads_a_regular_file_by_descriptor`                 |
+| the source is unchanged after a sweep | staging writes back one byte to the source handle                | `a_full_sweep_with_titles_leaves_every_container_entry_with_its_size_mtime_and_flags` |
+| dry run touches no title copy         | `Mode::DryRun` refreshes the title copy                          | `dry_run_creates_no_state_directory_and_no_title_copy`                                |
+| exclusive publication                 | `exclusive` falls back to `rename` when the target exists        | `publish_never_replaces_an_existing_target_and_names_it`                              |
+| repair after rename, before clear     | `repair_publications` skips the directory sync before clearing   | `a_failed_directory_sync_leaves_the_entry_pending`                                    |
+| target modified refuses               | the digest comparison in repair always matches                   | `any_other_bytes_are_refused_as_target_modified_and_nothing_is_overwritten`           |
+| a future schema is refused            | `migrate` accepts any `user_version`                             | `a_future_schema_version_is_refused_with_its_number`                                  |
+| the write lock                        | `acquire` returns before `flock` succeeds                        | `a_held_lock_makes_a_second_acquisition_busy_after_its_wait`                          |
+| the deadline kills the group          | `terminate` signals the child pid instead of the group           | `the_deadline_terminates_the_whole_process_group_and_reaps_it`                        |
+| descendant deadline overrides exit    | retain `Exited(0)` when a pipe-holding descendant times out      | `a_descendant_holding_stdout_does_not_outlive_the_deadline`                           |
+| descendant interrupt overrides exit   | retain `Exited(0)` when a pipe-holding descendant is interrupted | `interruption_overrides_an_exited_leader_while_a_descendant_holds_stdout`             |
+| surviving descendants get grace       | break the grace loop when only the leader exits                  | `a_surviving_descendant_receives_the_full_grace_after_the_leader_exits`               |
+| the bounded reader                    | disable `Node::enter`'s depth guard                              | `depth_is_checked_before_reading_children`                                            |
+| helper major version                  | compatibility preflight accepts any major                        | `incompatible_version_never_receives_notify_or_trash`                                 |
+| command notify falls back once        | the fallback delivery is removed                                 | `failed_command_is_recorded_before_one_fallback_and_keeps_its_status`                 |
+| an untracked file survives retention  | `Retention::run` trashes entries with no ledger owner            | `an_untracked_file_in_a_store_survives_and_is_reported_kept`                          |
+| retention target modified             | `reconcile_intents` moves a path whose digest differs            | `replaced_content_is_a_refusal_naming_the_path_and_stays_pending`                     |
+| audio excluded by default             | `include_audio` is ignored                                       | `audio_is_excluded_unless_include_audio_is_set`                                       |
+| doctor never refuses at startup       | `checks::all` returns early on a config error                    | `without_a_config_the_config_check_fails_and_the_rest_are_reported_as_not_run`        |
+| symlink verify writes nothing         | `verify` creates the target when missing                         | `verify_names_a_missing_link_and_a_wrong_target_and_writes_nothing`                   |
+| expiration arithmetic                 | cast the hold to `i64` or ignore nanoseconds                     | `a_large_hold_does_not_wrap_and_nanoseconds_delay_the_boundary`                       |
+| partial retention                     | append moves after ledger updates                                | `a_ledger_failure_after_the_move_still_reports_its_recording_id`                      |
+| partial recovery                      | drop progress when a later intent fails                          | `partial_startup_retains_completed_ids_and_one_event_on_retention_and_ingest`         |
+| single recovery event                 | emit recovery and new-move events separately                     | `retention_combines_recovery_and_new_moves_in_one_report_and_event`                   |
+| root substitution                     | skip root revalidation before the helper                         | `replacing_the_audio_root_with_a_symlink_never_reaches_trash`                         |
+| helper recovery compatibility         | skip the helper version check in Trash                           | `incompatible_helper_blocks_reconciliation_without_a_trash_request`                   |
 
 Confirm the README carries both install steps:
 
@@ -18440,144 +20870,11 @@ Expected: `1` and `1`.
 
 - [ ] **Step 5: Commit**
 
+Run: `cargo fmt --all`
+
 ```bash
 git add helper justfile .github .gitignore
 SKIP_AI_COMMIT=1 git commit -m "feat(helper): the vpt-macos package with version, notify and trash"
 ```
 
 ______________________________________________________________________
-
-## Delivery checklist
-
-- [ ] Confirm the branch contains one commit per implementation task, with Task 33 including the
-  final gate repairs it owns. Keep independent fixes in their owning task's commit.
-- [ ] Read the repository's pull request instructions and draft the gate summary, file-size table,
-  leaf-test results and mutation/control table from recorded outputs.
-- [ ] Open the pull request only when requested. Leave it unmerged for review unless the operator
-  explicitly authorized merging. The operator alone runs `just smoke` against the real helper.
-
-______________________________________________________________________
-
-## Self-review
-
-### Spec coverage, sections 4, 5 and 9 to 13 as they apply to stage 1
-
-These are implementation assignments. Execution must record the named test results and gate output
-before claiming the behavior is verified.
-
-| Spec requirement                                                                                                                                                                                       | Task                                                                                                                               |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 4.1 one home, default `~/.vpt`, seven stores with per-store overrides, `~` and `<home>/` expansion                                                                                                     | 3, 5                                                                                                                               |
-| 4.1 a root must be absolute after expansion; an invalid root is exit 2 naming the keys                                                                                                                 | 5, 27                                                                                                                              |
-| 4.1 setup creates the default store leaves; a store elsewhere needs an existing parent, leaf created                                                                                                   | 5, 6                                                                                                                               |
-| 4.1 every root resolved once at startup before any work                                                                                                                                                | 5, 27                                                                                                                              |
-| 4.1 stores pairwise disjoint, the home may contain them, no overlap with the Voice Memos container                                                                                                     | 5                                                                                                                                  |
-| 4.1 a release destination may not overlap a private store, the state directory or the config directory                                                                                                 | 5                                                                                                                                  |
-| 4.1 `path_escape` below a resolved root                                                                                                                                                                | 5a, 11, 13 to 18, 27 to 32: held root descriptors, no-follow leaves, journal validation, and root revalidation before helper calls |
-| 4.1 the ledger lives in `~/.local/state/vpt/` by default, never in a store                                                                                                                             | 5, 11                                                                                                                              |
-| 4.1 config at `~/.config/vpt/config.toml`, mode 0600                                                                                                                                                   | 5, 6                                                                                                                               |
-| 4.2 `symlink_target` with a non-default home is a startup refusal                                                                                                                                      | 5                                                                                                                                  |
-| 4.2 `vpt symlink deploy` and `verify`, the refusals, the leaf creation, verify writes nothing                                                                                                          | 29                                                                                                                                 |
-| 4.2 doctor runs verify; an unmanaged link is followed and reported, never removed                                                                                                                      | 30                                                                                                                                 |
-| 4.3 the identity: local capture timestamp without a colon plus twelve hex characters of the digest                                                                                                     | 7, 8                                                                                                                               |
-| 4.3 the archive name `<id>.m4a`                                                                                                                                                                        | 19                                                                                                                                 |
-| 4.4 SQLite in the state directory, 0600 in 0700, WAL, busy timeout, `user_version`, a future version refused                                                                                           | 11                                                                                                                                 |
-| 4.4 the eleven tables of version 1, columns for stages 2 to 4 anticipated                                                                                                                              | 11                                                                                                                                 |
-| 4.4 the in-memory twin under the same contract suites                                                                                                                                                  | 12, 14, 31                                                                                                                         |
-| 4.4 the write lock every mutating command holds                                                                                                                                                        | 13, 27                                                                                                                             |
-| 4.4 the dirty-publication protocol: record, publish, sync the directory, clear; repair before new work                                                                                                 | 14, 27                                                                                                                             |
-| 4.4 recovery clears nothing before the directory is durable (F19)                                                                                                                                      | 14                                                                                                                                 |
-| 4.4 `target_modified` refuses every mutating command                                                                                                                                                   | 14, 27                                                                                                                             |
-| 4.4 `vpt show <id> --json` and `vpt list --json`                                                                                                                                                       | 28                                                                                                                                 |
-| 4.5 off by default; holds per store from a file's own mtime; `0` means never                                                                                                                           | 3, 4, 31                                                                                                                           |
-| 4.5 rule 1: only ledger-owned artifacts, identity verified by digest, untracked files kept and reported                                                                                                | 32                                                                                                                                 |
-| 4.5 rule 2: journaled intents, reconciliation before new work, `retention_target_modified`                                                                                                             | 31, 32                                                                                                                             |
-| 4.5 rule 3: audio excluded unless `include_audio`; `audio_trashed_at` recorded                                                                                                                         | 32                                                                                                                                 |
-| 4.5 rule 4: nothing unlinked; helper absent is `no_trash`                                                                                                                                              | 32                                                                                                                                 |
-| 4.5 rule 5: the `retention` event with counts per store                                                                                                                                                | 32                                                                                                                                 |
-| 5.1 depth-one `*.m4a` candidates, the Apple subdirectories never entered, counts for doctor                                                                                                            | 15, 30                                                                                                                             |
-| 5.1 `SF_DATALESS` through the port, never opened                                                                                                                                                       | 10, 15, 20                                                                                                                         |
-| 5.1 read-only descriptors, `O_NOFOLLOW`, no write to the container ever                                                                                                                                | 15, 19                                                                                                                             |
-| 5.1 the private title copy under the state directory, read-only open, schema change is unavailable                                                                                                     | 16                                                                                                                                 |
-| 5.2 the seen triple skip, the size gate, the rest gate, the wholeness gate                                                                                                                             | 9, 10, 19, 20                                                                                                                      |
-| 5.2 deferral counts, the deferred page at the threshold, `--once`                                                                                                                                      | 20, 23                                                                                                                             |
-| 5.2 dry run: no title copy, no durable state                                                                                                                                                           | 23, 27                                                                                                                             |
-| 5.3 staging by clone, digest, exclusive publication, file and directory sync before commit                                                                                                             | 17, 18, 19                                                                                                                         |
-| 5.3 duplicates: same digest is skipped or recovered; a different file at the target is `archive_collision`                                                                                             | 21                                                                                                                                 |
-| 5.3 a failed staging goes to the Trash; helper absent leaves it and doctor reports `cleanup_pending`                                                                                                   | 19, 23, 30                                                                                                                         |
-| 5.4 a deleted source is `source_gone_at`, reported by doctor; a moved source is recovered by digest                                                                                                    | 21, 22, 30                                                                                                                         |
-| 5.4 an orphaned archive is recovered into the ledger                                                                                                                                                   | 22                                                                                                                                 |
-| 5.5 an unreadable or emptied store is exit 1 with `completed`; no space; the `ingest_failed` event                                                                                                     | 20, 23, 27                                                                                                                         |
-| 5.6 what stage 1 does not do                                                                                                                                                                           | nothing to build                                                                                                                   |
-| 9 `--json` withheld until the final status; error on stderr with `completed`; `vpt: <message>` otherwise                                                                                               | 2, 27                                                                                                                              |
-| 9 `--config` and `VPT_CONFIG`; unknown argument is usage exit 2                                                                                                                                        | 1, 2, 5                                                                                                                            |
-| 9 `vpt setup [--force]`                                                                                                                                                                                | 6                                                                                                                                  |
-| 9 `vpt doctor` and its two output shapes                                                                                                                                                               | 30                                                                                                                                 |
-| 9 `vpt ingest [--dry-run] [--once <path>]` and its shape                                                                                                                                               | 23, 27                                                                                                                             |
-| 9 `vpt show`, `vpt list [--stage]`, `vpt storage`                                                                                                                                                      | 28                                                                                                                                 |
-| 9 `vpt retention run [--dry-run]`                                                                                                                                                                      | 32                                                                                                                                 |
-| 9 `vpt symlink deploy` and `verify`                                                                                                                                                                    | 29                                                                                                                                 |
-| 9 `vpt --version` with `helper_version`                                                                                                                                                                | 1, 25                                                                                                                              |
-| 9 the exit code mapping and the error document fields                                                                                                                                                  | 2                                                                                                                                  |
-| 9 `--dry-run` opens existing state read-only, no migration, no write, no notification, no Trash                                                                                                        | 23, 27, 32                                                                                                                         |
-| 10 one key table with defaults, comments, secrets marked; `config_version = 1`; unknown keys refused                                                                                                   | 3                                                                                                                                  |
-| 10 value rules by kind, the duration syntax, dynamic engine tables                                                                                                                                     | 3, 4                                                                                                                               |
-| 10 the setup template with the main engine chosen and every other key at its default                                                                                                                   | 3, 6                                                                                                                               |
-| 10.2 a home inside a vault: a symlinked home, stores overlapping the home                                                                                                                              | 5                                                                                                                                  |
-| 11 the eight kinds and the rules stage 1 keeps: `archive_collision`, `target_modified`, `no_trash`, `retention_target_modified`, `doctor_checks`, `helper_version`, `symlink_deploy`, `symlink_verify` | 2, 21, 27, 29, 30, 32                                                                                                              |
-| 11 helper major mismatch is a refusal for the verbs that need the helper; doctor reports it                                                                                                            | 25, 30, 32                                                                                                                         |
-| 11 doctor never refuses at startup                                                                                                                                                                     | 30                                                                                                                                 |
-| 11 nothing deletes; the staged file with no helper stays 0600 and is `cleanup_pending`                                                                                                                 | 19, 30                                                                                                                             |
-| 12 test-first, one second per test, unit tests beside the code                                                                                                                                         | every task                                                                                                                         |
-| 12 the fake engine behind `dev-tools`: `--version`, `notify`, `trash`, a hang, a command sink                                                                                                          | 24                                                                                                                                 |
-| 12 the fake recorder store: assembled MPEG-4 bytes, the Apple subdirectories, the title database fixture                                                                                               | 9, 15, 16, 19                                                                                                                      |
-| 12 the fixed clock, the in-memory ledger under the contract, the temporary HOME with no real reads                                                                                                     | 1, 12, 19                                                                                                                          |
-| 12 the four stage 1 behaviors written first: source unchanged after a sweep, dry run leaves the title copy, repair after rename before clear, an untracked file survives retention                     | 19, 23, 14, 32                                                                                                                     |
-| 12 the Swift suite reaches no real destination; `just smoke` is operator-run                                                                                                                           | 33                                                                                                                                 |
-| 12 CI on macOS with the seven gates and `just ship`                                                                                                                                                    | 1, 33                                                                                                                              |
-| 13 the repository layout, `rust-toolchain.toml` pinning stable, `Cargo.lock` committed                                                                                                                 | 1                                                                                                                                  |
-| 13 `cargo install` installs `vpt` alone; the fake engine needs `dev-tools`                                                                                                                             | 1, 24                                                                                                                              |
-| 13 the helper built with `swift build -c release`; the README states both steps; doctor names them                                                                                                     | 1, 30, 33                                                                                                                          |
-| 13 the dotfiles builder and LaunchAgent                                                                                                                                                                | the dotfiles repository's, out of scope by the spec's own words                                                                    |
-| 13 `recordings_dir readable` reported by doctor                                                                                                                                                        | 30                                                                                                                                 |
-| 14 the Stage 1 entry, every item                                                                                                                                                                       | 1 to 33                                                                                                                            |
-
-### Placeholder scan
-
-The execution contract requires the printed code, module declarations, interfaces and test cases to
-agree before approval. Re-run the scan after any edit:
-
-```bash
-rg -n 'TBD|TODO|the same fields|similar to|fill in|add appropriate|implement the rest|the listing above shows the intent' docs/superpowers/plans/2026-09-21-vpt-stage-1-extract-plan.md
-```
-
-The scan command itself is a known match. Classify other matches by context and replace any missing
-implementation with complete code before execution.
-
-### Type consistency
-
-Cross-task contracts checked during this repair:
-
-- `RecordingRecord` (Task 12) carries `source_path: Option<PathBuf>` and `title_source: TitleOrigin`;
-  Tasks 19, 22, 27 and 28 read those fields with those types. `TitleOrigin` is the ledger's enum and
-  `TitleSource` the recorder port's trait; they never share a name.
-- `RecordingLedger` (Task 12) has `seen`, `seen_all`, `record_seen`, `by_digest`, `by_id`, `recordings`,
-  `commit`, `set_source_path`, `set_audio_trashed`; Tasks 19 to 22, 30 and 32
-  call only those.
-- `Outcome` (Task 2) gains `FailedReport` in Task 30; `emit` handles all three variants.
-- `Runtime` (Task 27) owns its write lock and selects `AccessMode::ReadOnly` or `Mutating` before
-  ledger open. Task 32 changes `mutating` to return `ReconcileProgress` or `StartupFailure` and
-  updates both ingest and retention callers. `with_runtime` takes `AccessMode`.
-- `Stores` is one port extended by Task 28 with `entries`; Task 32 uses its checked `validate_path`
-  and `digest_of` operations.
-- `RetentionFailure` carries `RetentionReport`; both it and `ReconcileProgress` retain completed
-  `RecordingId` values. `Moved` keeps a separate recording identity, store and path.
-- `HelperClient` (Task 25) has `version`, `version_with_env`, `notify`, `notify_with_env`,
-  `trash_with_env`, `with_deadline`, `take_diagnostics`; Tasks 26, 27, 30 and 32 call those. Its first notify or Trash operation validates and caches a compatible version.
-- `Sandbox` (Task 1) gains `install_fake_helper` and `fake_log` in Task 25, `write_config`,
-  `add_recording` and `ledger` in Task 27, `set_mtime` in Task 32; `FAKE_ENGINE` is the constant Task 25
-  defines.
-- `spawn::run_with_env` (Task 24) is the one body; `run` calls it with no environment.
-- `Check` (Task 2) is `{ name, ok, detail }`; Task 30 builds every check through it.
-- `StoreKey::{all, key_name, default_leaf, from_key_name, is_private}` (Task 5) are the only store-key
-  methods later tasks call.
