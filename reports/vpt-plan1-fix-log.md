@@ -25,7 +25,7 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F20: applied (zero-length read is Closed)
 - F21: applied (set_permissions 0600 on the file and 0700 on directories, tests for both)
 - F22: applied (write_config takes force; create_new(!force); AlreadyExists is Exists)
-- F23: applied in part: 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 32c2f6e Task 19 (Task 26 pending)
+- F23: applied: 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 32c2f6e Task 19; Task 26 uses 2026-09-16T22:53:20Z for 1_789_599_200
 - F24: applied 633f045
 - F25: applied 633f045 Task 7 age_secs and the expected 29, e24d803 Task 10 nanosecond rest case
 - F26: applied 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 6dbfba7 Task 20 maps an unrepresentable capture to invalid_container
@@ -59,15 +59,15 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F54: applied 9405d1c (two new files, b's target prepopulated, exactly a's identity in completed)
 - F55: applied 9405d1c (by_id through ? in would_ingest)
 - F56: applied eb02c7e (status retained, deadline and interrupt checked until the workers finish, group terminated and child reaped on every return path including a wait error, two descendant regressions)
-- F57: pending
-- F58: pending
-- F59: pending
-- F60: pending
-- F61: pending
-- F62: pending
-- F63: applied in part: the Task 5 settings test (notify-command); Task 26 pending
-- F64: pending
-- F65: pending
+- F57: applied: Task 25 bounded deserialization checks depth and the next array entry before decoding children, checks text and keys before retention, and requires the end of the document
+- F58: applied: Task 25 captures the 65,537th byte so a valid oversized prefix is refused
+- F59: applied in part: Task 25 records escaped additive field names for all helper replies; command output drains are in the runtime and retention repair
+- F60: applied in part: Task 25 caches successful compatibility and preflights notify and Trash; 0f0e4eb carries the typed cleanup refusal, and command mappings are in the runtime and retention repair
+- F61: applied: Task 25 accepts Trash confirmation only for the exact requested path
+- F62: applied: Task 25 version dispatch honors the selected configuration and its helper path
+- F63: applied: Task 5 and Task 26 use notify-command, with no notification engine named
+- F64: applied: Task 26 substitutes tokens once without rescanning inserted text
+- F65: applied in part: Task 26 records command failure before one fallback and disables absent desktop delivery after one diagnostic; final output drains are in the runtime and retention repair
 - F66: applied in part: 67fd6db Task 11 open_read_only and the writable open through the held state root (Tasks 27, 28, 30, 32 pending)
 - F67: pending
 - F68: pending
@@ -87,7 +87,7 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F82: applied 32c2f6e whole-container snapshot under a titled sweep, 9405d1c the dry run keeps the prepopulated copy byte for byte with its mtime and mode
 - F83: applied 345453a (per-instance sequence, exclusive creation, only AlreadyExists retried, blockers kept)
 - F84: applied 32c2f6e IngestReport::completed and 9405d1c the recovery-then-failure test
-- F85: pending
+- F85: applied in part: Task 25 returns fixed structural messages and parsed unsupported majors, with wrong-type and wrong-schema canaries; doctor consumes those errors in the runtime repair
 - F86: applied in part: Tasks 1 to 24 now keep adapter implementation modules private and publish named root exports; config, domain and protocol modules remain capability APIs (Tasks 25 to 33 pending)
 - F87: applied 757b59f (EXDEV only; StorageFull at creation and on write is NoSpace)
 - F88: applied: e24d803 Task 10, 67fd6db Task 11 flags column, 48de0b7 Task 12 SeenRow.flags with checked codecs, 9242fcb Task 15, 32c2f6e Task 19 and 6dbfba7 Task 20 carry candidate.flags; this repair tests preservation of an additional flag alongside the dataless bit

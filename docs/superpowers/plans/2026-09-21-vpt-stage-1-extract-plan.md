@@ -12175,88 +12175,361 @@ ______________________________________________________________________
 
 **Files:**
 
-- Create: `crates/vpt-protocol/src/limits.rs`, `crates/vpt-protocol/src/helper.rs`
-- Modify: `crates/vpt-protocol/src/lib.rs`
-- Create: `crates/vpt-adapters/src/helper.rs`
-- Modify: `crates/vpt-adapters/src/lib.rs`, `crates/vpt/src/lib.rs`, `crates/vpt/src/commands/version.rs`
-- Test: `crates/vpt/tests/helper_client.rs`, and `crates/vpt/tests/version.rs` gains one test
+- Create: `crates/vpt-protocol/src/limits.rs`, `crates/vpt-protocol/src/limits/visitor.rs`, `crates/vpt-protocol/src/limits/tests.rs`, `crates/vpt-protocol/src/helper.rs`.
+- Create: `crates/vpt-adapters/src/helper.rs`, `crates/vpt-adapters/src/helper/reply.rs`, `crates/vpt-adapters/src/helper/tests.rs`.
+- Modify: `crates/vpt-protocol/src/lib.rs`, `crates/vpt-adapters/src/lib.rs`, `crates/vpt-adapters/Cargo.toml`, `crates/vpt/src/lib.rs`, `crates/vpt/src/commands/version.rs`.
+- Test: `crates/vpt/tests/helper_client.rs`, `crates/vpt/tests/version.rs`, `crates/vpt/tests/support/mod.rs`.
 
 **Interfaces:**
 
-- Consumes: `spawn::{run, Status, SpawnError}`, `Trash`, `TrashError`.
+- Consumes: `spawn::run_with_env(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize, env: &[(&str, &str)]) -> Result<spawn::Outcome, spawn::SpawnError>`;
+  `Outcome { status: Status, stdout: Vec<u8>, stderr: Vec<u8>, group: libc::pid_t }`;
+  `Status::{Exited(i32), Signaled(i32), DeadlineExceeded, Interrupted}`;
+  `SpawnError::{NotFound(String), Io(String)}`;
+  `Trash::trash(&self, path: &Path) -> Result<PathBuf, TrashError>` and
+  `Trash::take_diagnostics(&self) -> Vec<String>`;
+  `TrashError::{HelperAbsent, HelperVersion { found: u32 }, Failed(String), Unknown(String)}`.
+- Consumes: `config::load_file(path: &Path) -> Result<toml::Table, ConfigError>`,
+  `config::from_table(table: &toml::Table, home: &Path) -> Result<Settings, ConfigError>`;
+  `Settings::helper_path: PathBuf`;
+  `Environment::{config_path(&self) -> PathBuf, home_dir(&self) -> PathBuf}`;
+  `Invocation::config: Option<PathBuf>`.
+- Produces protocol root exports: `Limits { pub bytes: usize, pub depth: usize, pub text_chars: usize, pub array_len: usize }`,
+  `Limits::incoming() -> Limits`, `LimitViolation::{Bytes(usize), Depth(usize), Text(usize), Array(usize), Syntax(String)}`,
+  `read_bounded(bytes: &[u8], limits: &Limits) -> Result<serde_json::Value, LimitViolation>`.
+  Check depth before descending; refuse array entry `array_len + 1` before decoding or appending it;
+  validate decoded strings and keys before retaining them; finish with `Deserializer::end()`.
+- Produces protocol root exports: `HELPER_SCHEMA: &str = "vpt.helper/1"`,
+  `HelperVersion { pub schema: String, pub version: String }`, `HelperVersion::major(&self) -> Option<u32>`,
+  `Posted { pub posted: bool }`, `Trashed { pub trashed: String }`, each reply implementing `Deserialize`.
+- Produces adapter root exports: `HelperClient::new(path: PathBuf) -> HelperClient`,
+  `HelperClient::with_deadline(self, deadline: Duration) -> HelperClient`,
+  `HelperClient::version(&self) -> Result<String, HelperError>`,
+  `HelperClient::version_with_env(&self, env: &[(&str, &str)]) -> Result<String, HelperError>`,
+  `HelperClient::notify(&self, title: &str, body: &str) -> Result<(), HelperError>`,
+  `HelperClient::notify_with_env(&self, title: &str, body: &str, env: &[(&str, &str)]) -> Result<(), HelperError>`,
+  `HelperClient::trash_with_env(&self, path: &Path, env: &[(&str, &str)]) -> Result<PathBuf, TrashError>`,
+  `HelperClient::take_diagnostics(&self) -> Vec<String>`, `impl Trash for HelperClient`,
+  `CALL_DEADLINE: Duration = Duration::from_secs(5)`, `BUILT_AGAINST_MAJOR: u32 = 1`,
+  `HelperError::{Absent, MajorMismatch { found: u32 }, Failed(String), Unknown(String)}`.
+  The first notify or Trash request validates the configured helper. Only successful compatibility is
+  cached. Unknown additive field names enter the drainable diagnostics queue; values never do.
+  A caller keeps the client and test environment fixed for one command.
+- Produces `commands::version::{run(environment: &Environment, config: Option<&Path>) -> Outcome, document(helper_version: Option<&str>) -> serde_json::Value, human(helper_version: Option<&str>) -> String}`.
+  Version uses the selected configuration, including `--config` and `VPT_CONFIG`; only an absent
+  configuration permits the default `vpt-macos`. An unreadable or invalid existing configuration, or
+  an unidentified selected helper, produces `helper_version: null` with exit 0.
+- Test support: `FAKE_ENGINE: &str`, `Sandbox::install_fake_helper(&self)`,
+  `Sandbox::fake_log(&self) -> PathBuf`. Every integration call selects the fake or a missing sandbox path.
 
-- Produces:
+- [ ] **Step 1: Register and write the failing tests**
 
-  - `vpt_protocol::limits::{Limits { pub bytes: usize, pub depth: usize,`
-    `pub text_chars: usize, pub array_len: usize }, Limits::incoming() -> Limits,`
-    `LimitViolation::{Bytes(usize), Depth(usize), Text(usize), Array(usize),`
-    `Syntax(String)}, read_bounded(bytes: &[u8], limits: &Limits) ->`
-    `Result<serde_json::Value, LimitViolation>}`.
-  - `vpt_protocol::helper::{HELPER_SCHEMA: &str = "vpt.helper/1",`
-    `HelperVersion { pub schema: String, pub version: String },`
-    `HelperVersion::major(&self) -> Option<u32>, Posted { pub posted: bool },`
-    `Trashed { pub trashed: String }}` (serde `Deserialize`).
-  - `vpt_adapters::helper::{HelperClient::new(path: PathBuf) -> HelperClient,`
-    `CALL_DEADLINE: Duration = 5 s, BUILT_AGAINST_MAJOR: u32 = 1, HelperError::{Absent,`
-    `MajorMismatch { found: u32 }, Failed(String), Unknown(String)}}` with
-    `fn version(&self) -> Result<String, HelperError>`,
-    `fn notify(&self, title: &str, body: &str) -> Result<(), HelperError>`, the `version_with_env`,
-    `notify_with_env` and `trash_with_env` variants taking `env: &[(&str, &str)]`, and
-    `impl Trash for HelperClient`.
-  - Test support: `Sandbox::install_fake_helper(&self)` links `bin/vpt-macos` to the fake engine and
-    creates `trash/` in the sandbox; `Sandbox::fake_log(&self) -> PathBuf`;
-    `Sandbox::fake_engine() -> &'static str`.
+Add `serde = "1.0.229"` under `[dependencies]` in `crates/vpt-adapters/Cargo.toml`.
+The helper decoder names serde's deserialization trait directly.
 
-- [ ] **Step 1: Write the failing tests**
+Add these private modules and curated exports to `crates/vpt-protocol/src/lib.rs`:
 
-`crates/vpt-protocol/src/limits.rs`, test section:
+```rust
+mod limits;
+mod helper;
+pub use limits::{LimitViolation, Limits, read_bounded};
+pub use helper::{HELPER_SCHEMA, HelperVersion, Posted, Trashed};
+```
+
+Add to `crates/vpt-adapters/src/lib.rs`:
+
+```rust
+mod helper;
+pub use helper::{BUILT_AGAINST_MAJOR, CALL_DEADLINE, HelperClient, HelperError};
+```
+
+Create `crates/vpt-protocol/src/limits.rs` and `crates/vpt-adapters/src/helper.rs` with this test declaration in each:
 
 ```rust
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests;
+```
 
-    #[test]
-    fn a_document_within_every_limit_parses() {
-        let value = read_bounded(br#"{"schema":"vpt.helper/1","version":"1.0.0"}"#, &Limits::incoming()).expect("parses");
-        assert_eq!(value["version"], "1.0.0");
-    }
+Create `crates/vpt-protocol/src/helper.rs` as an empty file. The unresolved reply exports participate in the red build.
 
-    #[test]
-    fn one_byte_over_the_byte_limit_is_refused_before_parsing() {
-        let limits = Limits { bytes: 10, ..Limits::incoming() };
-        assert_eq!(read_bounded(b"{\"a\":\"bcd\"}", &limits), Err(LimitViolation::Bytes(11)));
-    }
+`crates/vpt-protocol/src/limits/tests.rs`:
 
-    #[test]
-    fn nesting_past_the_depth_limit_is_refused_without_allocating_the_tree() {
-        let deep = format!("{}1{}", "[".repeat(9), "]".repeat(9));
-        assert_eq!(read_bounded(deep.as_bytes(), &Limits::incoming()), Err(LimitViolation::Depth(9)));
-        let ok = format!("{}1{}", "[".repeat(8), "]".repeat(8));
-        assert!(read_bounded(ok.as_bytes(), &Limits::incoming()).is_ok());
-    }
+```rust
+use super::*;
 
-    #[test]
-    fn brackets_inside_strings_do_not_count_as_nesting() {
-        assert!(read_bounded(br#"{"text":"[[[[[[[[[[[["}"#, &Limits::incoming()).is_ok());
-    }
+#[test]
+fn valid_document_and_unicode_text_at_the_limit_parse() {
+    assert_eq!(
+        read_bounded(br#"{"version":"1.0.0"}"#, &Limits::incoming()).expect("document")["version"],
+        "1.0.0"
+    );
+    let limits = Limits {
+        text_chars: 2,
+        ..Limits::incoming()
+    };
+    assert!(read_bounded(br#"["\u00e9\u00e9"]"#, &limits).is_ok());
+}
 
-    #[test]
-    fn a_text_value_past_the_character_limit_is_refused() {
-        let limits = Limits { text_chars: 3, ..Limits::incoming() };
-        assert_eq!(read_bounded(br#"{"t":"abcd"}"#, &limits), Err(LimitViolation::Text(4)));
-    }
+#[test]
+fn byte_limit_includes_the_sentinel_and_trailing_whitespace() {
+    let limits = Limits {
+        bytes: 2,
+        ..Limits::incoming()
+    };
+    assert!(read_bounded(b"{}", &limits).is_ok());
+    assert_eq!(read_bounded(b"{} ", &limits), Err(LimitViolation::Bytes(3)));
+}
 
-    #[test]
-    fn an_array_past_the_entry_limit_is_refused() {
-        let limits = Limits { array_len: 2, ..Limits::incoming() };
-        assert_eq!(read_bounded(b"[1,2,3]", &limits), Err(LimitViolation::Array(3)));
-    }
+#[test]
+fn depth_is_checked_before_reading_children() {
+    let limits = Limits {
+        depth: 1,
+        ..Limits::incoming()
+    };
+    assert!(read_bounded(b"[1]", &limits).is_ok());
+    assert_eq!(
+        read_bounded(b"[[broken", &limits),
+        Err(LimitViolation::Depth(2))
+    );
+    assert!(read_bounded(br#"{"t":"[[[[[[[[[[[["}"#, &limits).is_ok());
+}
 
-    #[test]
-    fn malformed_json_is_a_syntax_violation() {
-        assert!(matches!(read_bounded(b"{", &Limits::incoming()), Err(LimitViolation::Syntax(_))));
+#[test]
+fn decoded_text_and_keys_are_checked_before_retaining_them() {
+    let limits = Limits {
+        text_chars: 2,
+        ..Limits::incoming()
+    };
+    assert_eq!(
+        read_bounded(br#"["\u00e9\u00e9\u00e9"]"#, &limits),
+        Err(LimitViolation::Text(3))
+    );
+    assert_eq!(
+        read_bounded(br#"{"abc":null}"#, &limits),
+        Err(LimitViolation::Text(3))
+    );
+}
+
+#[test]
+fn array_overflow_is_refused_before_decoding_the_extra_element() {
+    let limits = Limits {
+        array_len: 2,
+        ..Limits::incoming()
+    };
+    assert!(read_bounded(b"[1,2]", &limits).is_ok());
+    assert_eq!(
+        read_bounded(b"[1,2,{broken", &limits),
+        Err(LimitViolation::Array(3))
+    );
+    let zero = Limits {
+        array_len: 0,
+        ..Limits::incoming()
+    };
+    assert!(read_bounded(b"[]", &zero).is_ok());
+    assert_eq!(
+        read_bounded(b"[true]", &zero),
+        Err(LimitViolation::Array(1))
+    );
+}
+
+#[test]
+fn malformed_and_trailing_documents_have_fixed_diagnostics() {
+    for bytes in [b"{".as_slice(), b"{} {}", b"CANARY-RAW-JSON"] {
+        assert_eq!(
+            read_bounded(bytes, &Limits::incoming()),
+            Err(LimitViolation::Syntax("invalid JSON document".into()))
+        );
     }
+}
+```
+
+`crates/vpt-adapters/src/helper/tests.rs`:
+
+```rust
+use super::*;
+use serde_json::json;
+
+fn client() -> HelperClient {
+    HelperClient::new(PathBuf::from("/sandbox/fake-helper"))
+}
+
+fn version() -> Value {
+    json!({"schema":"vpt.helper/1", "version":"1.0.0"})
+}
+
+#[test]
+fn compatibility_is_checked_once_before_notify_and_trash() {
+    let client = client();
+    let calls = RefCell::new(Vec::new());
+    let call = |argv: &[String]| {
+        calls.borrow_mut().push(argv[0].clone());
+        Ok(match argv[0].as_str() {
+            "--version" => version(),
+            "notify" => json!({"posted":true}),
+            "trash" => json!({"trashed":argv[1]}),
+            _ => panic!("unexpected operation"),
+        })
+    };
+    assert_eq!(client.notify_using("title", "body", &call), Ok(()));
+    let path = Path::new("/sandbox/file");
+    assert_eq!(client.trash_using(path, &call), Ok(path.into()));
+    assert_eq!(*calls.borrow(), ["--version", "notify", "trash"]);
+}
+
+#[test]
+fn incompatible_version_never_receives_notify_or_trash() {
+    let client = client();
+    let calls = RefCell::new(Vec::new());
+    let call = |argv: &[String]| {
+        calls.borrow_mut().push(argv[0].clone());
+        Ok(json!({"schema":"vpt.helper/1", "version":"2.3.0"}))
+    };
+    assert_eq!(
+        client.notify_using("title", "body", &call),
+        Err(HelperError::MajorMismatch { found: 2 })
+    );
+    assert_eq!(
+        client.trash_using(Path::new("/sandbox/file"), &call),
+        Err(TrashError::HelperVersion { found: 2 })
+    );
+    assert_eq!(*calls.borrow(), ["--version", "--version"]);
+}
+
+#[test]
+fn trash_confirms_the_exact_requested_path() {
+    let client = client();
+    let call = |argv: &[String]| {
+        Ok(if argv[0] == "--version" {
+            version()
+        } else {
+            json!({"trashed":"/sandbox/another"})
+        })
+    };
+    assert_eq!(
+        client.trash_using(Path::new("/sandbox/file"), &call),
+        Err(TrashError::Unknown(
+            "the helper trash reply names another path".into()
+        ))
+    );
+}
+
+#[test]
+fn additive_names_survive_all_replies_without_their_values() {
+    let client = client();
+    let call = |argv: &[String]| {
+        let mut value = match argv[0].as_str() {
+            "--version" => version(),
+            "notify" => json!({"posted":true}),
+            _ => json!({"trashed":argv[1]}),
+        };
+        value["capabilities"] = json!("CANARY-ADDITIVE-VALUE");
+        Ok(value)
+    };
+    client.notify_using("title", "body", &call).expect("notify");
+    client
+        .trash_using(Path::new("/sandbox/file"), &call)
+        .expect("trash");
+    assert_eq!(
+        client.take_diagnostics(),
+        vec!["unknown additive helper field: capabilities"; 3]
+    );
+    assert!(client.take_diagnostics().is_empty());
+}
+
+#[test]
+fn wrong_types_and_schemas_never_quote_child_values() {
+    let client = client();
+    for schema in [json!("CANARY-SCHEMA"), json!({"private":"CANARY-SCHEMA"})] {
+        let value = json!({"schema":schema, "version":"1.0.0"});
+        assert_eq!(
+            client.version_using(&|_| Ok(value.clone())),
+            Err(HelperError::Unknown("invalid helper schema".into()))
+        );
+    }
+    assert_eq!(
+        client.version_using(&|_| Ok(json!({"schema":"vpt.helper/9", "version":"CANARY"}))),
+        Err(HelperError::Unknown(
+            "unsupported helper schema major 9".into()
+        ))
+    );
+    for value in [json!("1.0.0+CANARY\nSECRET"), json!({"private":"CANARY"})] {
+        assert_eq!(
+            client.version_using(&|_| Ok(json!({"schema":"vpt.helper/1", "version":value}))),
+            Err(HelperError::Unknown(
+                "invalid helper version document".into()
+            ))
+        );
+    }
+    let notify = |argv: &[String]| {
+        Ok(if argv[0] == "--version" {
+            version()
+        } else {
+            json!({"posted":"CANARY-NOTIFY"})
+        })
+    };
+    assert_eq!(
+        client.notify_using("title", "body", &notify),
+        Err(HelperError::Unknown(
+            "invalid helper notify document".into()
+        ))
+    );
+    assert_eq!(
+        client.trash_using(Path::new("/sandbox/file"), &|_| Ok(
+            json!({"trashed":["CANARY-TRASH"]})
+        )),
+        Err(TrashError::Unknown("invalid helper trash document".into()))
+    );
+}
+
+#[test]
+fn oversized_valid_prefix_retains_the_rejection_sentinel() {
+    let client = client();
+    let result = client.call_using(&["--version".into()], &[], |_, _, _, limit, _| {
+        assert_eq!(limit, 65_537);
+        let mut stdout = serde_json::to_vec(&version()).expect("json");
+        stdout.resize(65_540, b' ');
+        stdout.truncate(limit);
+        Ok(spawn::Outcome {
+            status: Status::Exited(0),
+            stdout,
+            stderr: vec![],
+            group: 0,
+        })
+    });
+    assert_eq!(
+        result,
+        Err(HelperError::Unknown(
+            "invalid or oversized helper document".into()
+        ))
+    );
+}
+
+#[test]
+fn spawn_and_timeout_errors_are_fixed_and_absence_is_typed() {
+    let client = client();
+    assert_eq!(
+        client.call_using(&[], &[], |_, _, _, _, _| Err(SpawnError::Io(
+            "CANARY".into()
+        ))),
+        Err(HelperError::Failed("the helper could not start".into()))
+    );
+    assert_eq!(
+        client.call_using(&[], &[], |_, _, _, _, _| Err(SpawnError::NotFound(
+            "CANARY".into()
+        ))),
+        Err(HelperError::Absent)
+    );
+    assert_eq!(
+        client.call_using(&[], &[], |_, _, _, _, _| Ok(spawn::Outcome {
+            status: Status::DeadlineExceeded,
+            stdout: b"CANARY".to_vec(),
+            stderr: vec![],
+            group: 0,
+        })),
+        Err(HelperError::Unknown(
+            "the helper exceeded its deadline".into()
+        ))
+    );
 }
 ```
 
@@ -12265,86 +12538,154 @@ mod tests {
 ```rust
 mod support;
 
-use std::path::PathBuf;
-use std::time::Instant;
 use support::Sandbox;
-use vpt_adapters::helper::{BUILT_AGAINST_MAJOR, HelperClient, HelperError};
-use vpt_application::ports::trash::{Trash, TrashError};
+use vpt_adapters::{BUILT_AGAINST_MAJOR, HelperClient, HelperError};
+use vpt_application::ports::{Trash, TrashError};
 
 #[test]
-fn the_helper_version_is_read_from_the_fake() {
+fn helper_version_and_major_refusal_are_read_from_the_fake() {
     let sandbox = Sandbox::new("helper-version");
     sandbox.install_fake_helper();
-    let client = HelperClient::new(sandbox.path().join("bin/vpt-macos"));
-    assert_eq!(client.version().expect("version"), "1.0.0");
+    let path = sandbox.path().join("bin/vpt-macos");
+    assert_eq!(
+        HelperClient::new(path.clone()).version().expect("version"),
+        "1.0.0"
+    );
     assert_eq!(BUILT_AGAINST_MAJOR, 1);
+    assert_eq!(
+        HelperClient::new(path).version_with_env(&[("VPT_FAKE_VERSION", "2.3.0")]),
+        Err(HelperError::MajorMismatch { found: 2 })
+    );
 }
 
 #[test]
-fn a_helper_of_another_major_version_is_refused_naming_it() {
-    let sandbox = Sandbox::new("helper-major");
-    sandbox.install_fake_helper();
-    let client = HelperClient::new(sandbox.path().join("bin/vpt-macos"));
-    let outcome = client.version_with_env(&[("VPT_FAKE_VERSION", "2.3.0")]);
-    assert_eq!(outcome, Err(HelperError::MajorMismatch { found: 2 }));
-}
-
-#[test]
-fn an_absent_helper_is_absent_not_a_failure() {
-    let client = HelperClient::new(PathBuf::from("/nonexistent/vpt-macos"));
+fn absent_helper_has_a_typed_error_without_touching_the_target() {
+    let sandbox = Sandbox::new("helper-absent");
+    let client = HelperClient::new(sandbox.path().join("missing-helper"));
     assert_eq!(client.version(), Err(HelperError::Absent));
-    assert_eq!(client.trash(std::path::Path::new("/tmp/x")), Err(TrashError::HelperAbsent));
+    assert_eq!(
+        client.trash(&sandbox.path().join("victim")),
+        Err(TrashError::HelperAbsent)
+    );
+    assert!(!sandbox.fake_log().exists());
 }
 
 #[test]
-fn trash_moves_the_file_through_the_helper_and_returns_the_reply_path() {
+fn trash_uses_the_fake_and_confirms_the_same_requested_path() {
     let sandbox = Sandbox::new("helper-trash");
     sandbox.install_fake_helper();
     let victim = sandbox.path().join("victim.txt");
-    std::fs::write(&victim, b"bye").expect("victim");
+    std::fs::write(&victim, b"fixture").expect("victim");
     let client = HelperClient::new(sandbox.path().join("bin/vpt-macos"));
-    let trashed = client.trash_with_env(&victim, &[("VPT_FAKE_TRASH", sandbox.path().join("trash").to_str().expect("utf8"))]).expect("trashed");
-    assert_eq!(trashed, victim);
+    let trash = sandbox.path().join("trash");
+    assert_eq!(
+        client.trash_with_env(
+            &victim,
+            &[("VPT_FAKE_TRASH", trash.to_str().expect("utf8"))]
+        ),
+        Ok(victim.clone())
+    );
     assert!(!victim.exists());
-    assert!(sandbox.path().join("trash/victim.txt").exists());
+    assert_eq!(
+        std::fs::read(trash.join("victim.txt")).expect("fake trash"),
+        b"fixture"
+    );
 }
 
 #[test]
-fn a_hung_helper_is_an_unknown_outcome_within_the_call_deadline() {
-    let sandbox = Sandbox::new("helper-hang");
+fn mismatched_helper_does_not_move_a_file() {
+    let sandbox = Sandbox::new("helper-refused-trash");
     sandbox.install_fake_helper();
-    let client = HelperClient::new(sandbox.path().join("bin/vpt-macos")).with_deadline(std::time::Duration::from_millis(200));
-    let started = Instant::now();
-    let outcome = client.trash_with_env(std::path::Path::new("/tmp/x"), &[("VPT_FAKE_HANG", "1")]);
-    assert!(matches!(outcome, Err(TrashError::Unknown(_))), "{outcome:?}");
-    assert!(started.elapsed() < std::time::Duration::from_secs(2));
+    let victim = sandbox.path().join("victim.txt");
+    std::fs::write(&victim, b"fixture").expect("victim");
+    let client = HelperClient::new(sandbox.path().join("bin/vpt-macos"));
+    let trash = sandbox.path().join("trash");
+    assert_eq!(
+        client.trash_with_env(
+            &victim,
+            &[
+                ("VPT_FAKE_VERSION", "2.0.0"),
+                ("VPT_FAKE_TRASH", trash.to_str().expect("utf8"))
+            ]
+        ),
+        Err(TrashError::HelperVersion { found: 2 })
+    );
+    assert_eq!(std::fs::read(&victim).expect("unmoved"), b"fixture");
+    assert!(!trash.join("victim.txt").exists());
 }
 ```
 
-The `_with_env` variants exist so a test can vary the fake's behavior per call; production calls the
-plain forms, which pass no extra environment. Append to `crates/vpt/tests/version.rs`:
+Append these tests to `crates/vpt/tests/version.rs`, whose existing imports provide `Sandbox`, `run` and `stdout`:
 
 ```rust
 #[test]
-fn version_reports_the_helper_when_one_answers_on_path() {
-    let sandbox = Sandbox::new("version-helper");
+fn version_uses_path_only_when_the_selected_configuration_is_absent() {
+    let sandbox = Sandbox::new("version-fallback");
     sandbox.install_fake_helper();
-
     let output = run(sandbox.vpt().args(["--version", "--json"]));
-
+    assert_eq!(output.status.code(), Some(0));
     let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
     assert_eq!(document["helper_version"], "1.0.0");
 }
+
+#[test]
+fn version_honours_environment_config_and_explicit_override() {
+    let sandbox = Sandbox::new("version-selected");
+    sandbox.install_fake_helper();
+    std::fs::create_dir_all(sandbox.config_path().parent().expect("parent")).expect("config dir");
+    let missing = sandbox.path().join("missing-helper");
+    let settings = format!(
+        "config_version = 1\n[helper]\npath = {}\n",
+        serde_json::to_string(&missing.to_str().expect("utf8")).expect("path")
+    );
+    std::fs::write(sandbox.config_path(), settings).expect("selected config");
+    let configured = run(sandbox.vpt().args(["--version", "--json"]));
+    assert_eq!(configured.status.code(), Some(0));
+    let document: serde_json::Value = serde_json::from_str(&stdout(&configured)).expect("json");
+    assert!(
+        document["helper_version"].is_null(),
+        "the configured helper must win over PATH"
+    );
+
+    let alternate = sandbox.path().join("alternate.toml");
+    let helper = sandbox.path().join("bin/vpt-macos");
+    let settings = format!(
+        "config_version = 1\n[helper]\npath = {}\n",
+        serde_json::to_string(&helper.to_str().expect("utf8")).expect("path")
+    );
+    std::fs::write(&alternate, settings).expect("alternate config");
+    let output = run(sandbox
+        .vpt()
+        .args(["--version", "--json", "--config"])
+        .arg(&alternate));
+    assert_eq!(output.status.code(), Some(0));
+    let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
+    assert_eq!(document["helper_version"], "1.0.0");
+}
+
+#[test]
+fn invalid_existing_configuration_keeps_version_success_without_a_path_fallback() {
+    let sandbox = Sandbox::new("version-invalid-config");
+    sandbox.install_fake_helper();
+    std::fs::create_dir_all(sandbox.config_path().parent().expect("parent")).expect("config dir");
+    std::fs::write(sandbox.config_path(), "CANARY-INVALID-CONFIG\n[").expect("invalid config");
+    let output = run(sandbox.vpt().args(["--version", "--json"]));
+    assert_eq!(output.status.code(), Some(0));
+    let text = stdout(&output);
+    let document: serde_json::Value = serde_json::from_str(&text).expect("json");
+    assert!(document["helper_version"].is_null());
+    assert!(!text.contains("CANARY"));
+}
 ```
 
-and to `support/mod.rs`:
+Add this support to `crates/vpt/tests/support/mod.rs`:
 
 ```rust
 pub const FAKE_ENGINE: &str = env!("CARGO_BIN_EXE_vpt-fake-engine");
 
 impl Sandbox {
     pub fn install_fake_helper(&self) {
-        std::os::unix::fs::symlink(FAKE_ENGINE, self.root.join("bin/vpt-macos")).expect("fake helper on PATH");
+        std::os::unix::fs::symlink(FAKE_ENGINE, self.root.join("bin/vpt-macos")).expect("fake helper");
         std::fs::create_dir_all(self.root.join("trash")).expect("fake trash");
     }
 
@@ -12354,25 +12695,38 @@ impl Sandbox {
 }
 ```
 
-and `vpt()` additionally sets `VPT_FAKE_TRASH` to `<root>/trash` and `VPT_FAKE_LOG` to `fake_log()`.
+In `Sandbox::vpt`, replace the final `.env("PATH", self.root.join("bin"));` with these chained calls,
+keeping its existing session isolation and cleared environment:
 
-- [ ] **Step 2: Run the tests to verify they fail**
+```rust
+            .env("PATH", self.root.join("bin"))
+            .env("VPT_FAKE_TRASH", self.root.join("trash"))
+            .env("VPT_FAKE_LOG", self.fake_log());
+```
 
-Run: `cargo test -p vpt-protocol limits &&`
+- [ ] **Step 2: Run each red command**
+
+`cargo test -p vpt-protocol limits`
+
+`cargo test -p vpt-adapters helper`
+
 `cargo test -p vpt --features dev-tools --test helper_client --test version`
 
-Expected: compile errors naming `read_bounded`, `HelperClient`; after stubs, the version test FAILS with
-`helper_version` null.
+Expected: the registered tests fail to compile because the bounded reader and helper client are absent.
+After the client exists, the version selection tests remain red until the command uses the selected
+configuration. The new test modules must be compiled and selected. Zero selected tests or a successful
+command does not satisfy this step.
 
-- [ ] **Step 3: Write the minimal implementation**
+- [ ] **Step 3: Implement the bounded reader, helper client and version command**
 
 `crates/vpt-protocol/src/limits.rs`:
 
 ```rust
-//! Byte, depth, text-length and array-length limits, enforced while a
-//! document is read and before it is fully allocated.
+mod visitor;
 
+use serde::de::DeserializeSeed;
 use serde_json::Value;
+use std::cell::RefCell;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
@@ -12383,9 +12737,13 @@ pub struct Limits {
 }
 
 impl Limits {
-    /// Every incoming document other than `vpt.engine/1` and `vpt.proposal/1`.
-    pub fn incoming() -> Limits {
-        Limits { bytes: 65_536, depth: 8, text_chars: 65_536, array_len: 256 }
+    pub fn incoming() -> Self {
+        Self {
+            bytes: 65_536,
+            depth: 8,
+            text_chars: 65_536,
+            array_len: 256,
+        }
     }
 }
 
@@ -12402,56 +12760,178 @@ pub fn read_bounded(bytes: &[u8], limits: &Limits) -> Result<Value, LimitViolati
     if bytes.len() > limits.bytes {
         return Err(LimitViolation::Bytes(bytes.len()));
     }
-    check_depth(bytes, limits.depth)?;
-    let value: Value = serde_json::from_slice(bytes).map_err(|error| LimitViolation::Syntax(error.to_string()))?;
-    check_sizes(&value, limits)?;
-    Ok(value)
+    let context = visitor::Context {
+        limits,
+        violation: RefCell::new(None),
+    };
+    let mut decoder = serde_json::Deserializer::from_slice(bytes);
+    let value = visitor::Node {
+        context: &context,
+        depth: 0,
+        overflow: None,
+    }
+    .deserialize(&mut decoder)
+    .and_then(|value| decoder.end().map(|()| value));
+    value.map_err(|_| {
+        context
+            .violation
+            .into_inner()
+            .unwrap_or_else(|| LimitViolation::Syntax("invalid JSON document".into()))
+    })
 }
 
-/// Count nesting over the raw bytes, ignoring brackets inside strings.
-fn check_depth(bytes: &[u8], limit: usize) -> Result<(), LimitViolation> {
-    let mut depth = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
-    for byte in bytes {
-        if in_string {
-            match (escaped, byte) {
-                (true, _) => escaped = false,
-                (false, b'\\') => escaped = true,
-                (false, b'"') => in_string = false,
-                _ => {}
-            }
-            continue;
+#[cfg(test)]
+mod tests;
+```
+
+`crates/vpt-protocol/src/limits/visitor.rs`:
+
+```rust
+use super::{LimitViolation, Limits};
+use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
+use serde_json::{Map, Number, Value};
+use std::cell::RefCell;
+use std::fmt;
+
+pub(super) struct Context<'a> {
+    pub limits: &'a Limits,
+    pub violation: RefCell<Option<LimitViolation>>,
+}
+
+impl Context<'_> {
+    fn reject<E: de::Error>(&self, violation: LimitViolation) -> E {
+        *self.violation.borrow_mut() = Some(violation);
+        E::custom("document limit exceeded")
+    }
+
+    fn text<E: de::Error>(&self, value: &str) -> Result<(), E> {
+        let length = value.chars().count();
+        if length > self.limits.text_chars {
+            return Err(self.reject(LimitViolation::Text(length)));
         }
-        match byte {
-            b'"' => in_string = true,
-            b'{' | b'[' => {
-                depth += 1;
-                if depth > limit {
-                    return Err(LimitViolation::Depth(depth));
-                }
+        Ok(())
+    }
+}
+
+pub(super) struct Node<'a, 'b> {
+    pub context: &'a Context<'b>,
+    pub depth: usize,
+    pub overflow: Option<usize>,
+}
+
+impl<'de> DeserializeSeed<'de> for Node<'_, '_> {
+    type Value = Value;
+
+    fn deserialize<D: de::Deserializer<'de>>(self, decoder: D) -> Result<Value, D::Error> {
+        if let Some(length) = self.overflow {
+            return Err(self.context.reject(LimitViolation::Array(length)));
+        }
+        decoder.deserialize_any(self)
+    }
+}
+
+impl Node<'_, '_> {
+    fn enter<E: de::Error>(&self) -> Result<usize, E> {
+        let depth = self.depth + 1;
+        if depth > self.context.limits.depth {
+            return Err(self.context.reject(LimitViolation::Depth(depth)));
+        }
+        Ok(depth)
+    }
+}
+
+impl<'de> Visitor<'de> for Node<'_, '_> {
+    type Value = Value;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a bounded JSON value")
+    }
+
+    fn visit_bool<E: de::Error>(self, value: bool) -> Result<Value, E> {
+        Ok(Value::Bool(value))
+    }
+
+    fn visit_i64<E: de::Error>(self, value: i64) -> Result<Value, E> {
+        Ok(Value::Number(value.into()))
+    }
+
+    fn visit_u64<E: de::Error>(self, value: u64) -> Result<Value, E> {
+        Ok(Value::Number(value.into()))
+    }
+
+    fn visit_f64<E: de::Error>(self, value: f64) -> Result<Value, E> {
+        Number::from_f64(value)
+            .map(Value::Number)
+            .ok_or_else(|| E::custom("invalid JSON number"))
+    }
+
+    fn visit_unit<E: de::Error>(self) -> Result<Value, E> {
+        Ok(Value::Null)
+    }
+
+    fn visit_str<E: de::Error>(self, value: &str) -> Result<Value, E> {
+        self.context.text(value)?;
+        Ok(Value::String(value.to_owned()))
+    }
+
+    fn visit_string<E: de::Error>(self, value: String) -> Result<Value, E> {
+        self.context.text(&value)?;
+        Ok(Value::String(value))
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
+        let depth = self.enter()?;
+        let mut items = Vec::new();
+        loop {
+            let overflow =
+                (items.len() >= self.context.limits.array_len).then_some(items.len() + 1);
+            let next = sequence.next_element_seed(Node {
+                context: self.context,
+                depth,
+                overflow,
+            })?;
+            match next {
+                Some(value) => items.push(value),
+                None => return Ok(Value::Array(items)),
             }
-            b'}' | b']' => depth = depth.saturating_sub(1),
-            _ => {}
         }
     }
-    Ok(())
+
+    fn visit_map<A: MapAccess<'de>>(self, mut object: A) -> Result<Value, A::Error> {
+        let depth = self.enter()?;
+        let mut fields = Map::new();
+        while let Some(key) = object.next_key_seed(Key(self.context))? {
+            let value = object.next_value_seed(Node {
+                context: self.context,
+                depth,
+                overflow: None,
+            })?;
+            fields.insert(key, value);
+        }
+        Ok(Value::Object(fields))
+    }
 }
 
-fn check_sizes(value: &Value, limits: &Limits) -> Result<(), LimitViolation> {
-    match value {
-        Value::String(text) => {
-            let chars = text.chars().count();
-            if chars > limits.text_chars { Err(LimitViolation::Text(chars)) } else { Ok(()) }
-        }
-        Value::Array(items) => {
-            if items.len() > limits.array_len {
-                return Err(LimitViolation::Array(items.len()));
-            }
-            items.iter().try_for_each(|item| check_sizes(item, limits))
-        }
-        Value::Object(fields) => fields.values().try_for_each(|item| check_sizes(item, limits)),
-        _ => Ok(()),
+struct Key<'a, 'b>(&'a Context<'b>);
+
+impl<'de> DeserializeSeed<'de> for Key<'_, '_> {
+    type Value = String;
+
+    fn deserialize<D: de::Deserializer<'de>>(self, decoder: D) -> Result<String, D::Error> {
+        decoder.deserialize_str(self)
+    }
+}
+
+impl<'de> Visitor<'de> for Key<'_, '_> {
+    type Value = String;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a bounded object key")
+    }
+
+    fn visit_str<E: de::Error>(self, value: &str) -> Result<String, E> {
+        self.0.text(value)?;
+        Ok(value.to_owned())
     }
 }
 ```
@@ -12459,8 +12939,6 @@ fn check_sizes(value: &Value, limits: &Limits) -> Result<(), LimitViolation> {
 `crates/vpt-protocol/src/helper.rs`:
 
 ```rust
-//! What the macOS helper prints: its version document and the two replies.
-
 use serde::Deserialize;
 
 pub const HELPER_SCHEMA: &str = "vpt.helper/1";
@@ -12473,8 +12951,44 @@ pub struct HelperVersion {
 
 impl HelperVersion {
     pub fn major(&self) -> Option<u32> {
-        self.version.split('.').next()?.parse().ok()
+        let mut core = self.version.as_str();
+        if let Some((prefix, build)) = core.split_once('+') {
+            if !identifiers(build, false) {
+                return None;
+            }
+            core = prefix;
+        }
+        if let Some((prefix, pre)) = core.split_once('-') {
+            if !identifiers(pre, true) {
+                return None;
+            }
+            core = prefix;
+        }
+        let parts: Vec<_> = core.split('.').collect();
+        if parts.len() != 3
+            || parts.iter().any(|part| {
+                part.is_empty()
+                    || !part.bytes().all(|byte| byte.is_ascii_digit())
+                    || (part.len() > 1 && part.starts_with('0'))
+            })
+        {
+            return None;
+        }
+        parts[0].parse().ok()
     }
+}
+
+fn identifiers(value: &str, prerelease: bool) -> bool {
+    value.split('.').all(|part| {
+        !part.is_empty()
+            && part
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+            && !(prerelease
+                && part.len() > 1
+                && part.starts_with('0')
+                && part.bytes().all(|byte| byte.is_ascii_digit()))
+    })
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -12488,20 +13002,18 @@ pub struct Trashed {
 }
 ```
 
-`lib.rs` of the protocol crate lists `error`, `helper`, `limits`, `result`.
-
 `crates/vpt-adapters/src/helper.rs`:
 
 ```rust
-//! The macOS helper as a client: `--version`, `notify`, `trash`, each a
-//! bounded spawn reading one bounded document.
-
+mod reply;
 use crate::spawn::{self, SpawnError, Status};
+use serde::de::DeserializeOwned;
+use serde_json::Value;
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use vpt_application::ports::trash::{Trash, TrashError};
-use vpt_protocol::helper::{HELPER_SCHEMA, HelperVersion, Posted, Trashed};
-use vpt_protocol::limits::{Limits, read_bounded};
+use vpt_application::ports::{Trash, TrashError};
+use vpt_protocol::{HelperVersion, Limits, Posted, Trashed, read_bounded};
 
 pub const CALL_DEADLINE: Duration = Duration::from_secs(5);
 pub const BUILT_AGAINST_MAJOR: u32 = 1;
@@ -12517,16 +13029,27 @@ pub enum HelperError {
 pub struct HelperClient {
     path: PathBuf,
     deadline: Duration,
+    version: RefCell<Option<String>>,
+    diagnostics: RefCell<Vec<String>>,
 }
 
 impl HelperClient {
-    pub fn new(path: PathBuf) -> HelperClient {
-        HelperClient { path, deadline: CALL_DEADLINE }
+    pub fn new(path: PathBuf) -> Self {
+        Self {
+            path,
+            deadline: CALL_DEADLINE,
+            version: RefCell::new(None),
+            diagnostics: RefCell::new(vec![]),
+        }
     }
 
-    pub fn with_deadline(mut self, deadline: Duration) -> HelperClient {
+    pub fn with_deadline(mut self, deadline: Duration) -> Self {
         self.deadline = deadline;
         self
+    }
+
+    pub fn take_diagnostics(&self) -> Vec<String> {
+        std::mem::take(&mut *self.diagnostics.borrow_mut())
     }
 
     pub fn version(&self) -> Result<String, HelperError> {
@@ -12534,52 +13057,161 @@ impl HelperClient {
     }
 
     pub fn version_with_env(&self, env: &[(&str, &str)]) -> Result<String, HelperError> {
-        let value = self.call(&["--version".to_owned()], env)?;
-        let document: HelperVersion = serde_json::from_value(value).map_err(|error| HelperError::Unknown(error.to_string()))?;
-        if document.schema != HELPER_SCHEMA {
-            return Err(HelperError::Unknown(format!("unexpected schema {}", document.schema)));
+        self.version_using(&|argv| self.call(argv, env))
+    }
+
+    fn version_using(
+        &self,
+        call: &impl Fn(&[String]) -> Result<Value, HelperError>,
+    ) -> Result<String, HelperError> {
+        if let Some(version) = self.version.borrow().clone() {
+            return Ok(version);
         }
-        match document.major() {
-            Some(major) if major == BUILT_AGAINST_MAJOR => Ok(document.version),
-            Some(found) => Err(HelperError::MajorMismatch { found }),
-            None => Err(HelperError::Unknown("unparseable version".into())),
+        let value = call(&["--version".into()])?;
+        reply::schema(&value)?;
+        let document: HelperVersion = self.decode(
+            value,
+            &["schema", "version"],
+            "invalid helper version document",
+        )?;
+        let major = document
+            .major()
+            .ok_or_else(|| HelperError::Unknown("invalid helper version document".into()))?;
+        if major != BUILT_AGAINST_MAJOR {
+            return Err(HelperError::MajorMismatch { found: major });
         }
+        *self.version.borrow_mut() = Some(document.version.clone());
+        Ok(document.version)
     }
 
     pub fn notify(&self, title: &str, body: &str) -> Result<(), HelperError> {
         self.notify_with_env(title, body, &[])
     }
 
-    pub fn notify_with_env(&self, title: &str, body: &str, env: &[(&str, &str)]) -> Result<(), HelperError> {
+    pub fn notify_with_env(
+        &self,
+        title: &str,
+        body: &str,
+        env: &[(&str, &str)],
+    ) -> Result<(), HelperError> {
+        self.notify_using(title, body, &|argv| self.call(argv, env))
+    }
+
+    fn notify_using(
+        &self,
+        title: &str,
+        body: &str,
+        call: &impl Fn(&[String]) -> Result<Value, HelperError>,
+    ) -> Result<(), HelperError> {
+        self.version_using(call)?;
         let argv = ["notify", "--title", title, "--body", body].map(str::to_owned);
-        let value = self.call(&argv, env)?;
-        let reply: Posted = serde_json::from_value(value).map_err(|error| HelperError::Unknown(error.to_string()))?;
-        if reply.posted { Ok(()) } else { Err(HelperError::Failed("the helper did not post".into())) }
+        let reply: Posted =
+            self.decode(call(&argv)?, &["posted"], "invalid helper notify document")?;
+        if reply.posted {
+            Ok(())
+        } else {
+            Err(HelperError::Failed("the helper did not post".into()))
+        }
     }
 
     pub fn trash_with_env(&self, path: &Path, env: &[(&str, &str)]) -> Result<PathBuf, TrashError> {
-        let argv = ["trash".to_owned(), path.to_string_lossy().into_owned()];
-        let value = self.call(&argv, env).map_err(|error| match error {
-            HelperError::Absent => TrashError::HelperAbsent,
-            HelperError::Failed(detail) => TrashError::Failed(detail),
-            other => TrashError::Unknown(format!("{other:?}")),
-        })?;
-        let reply: Trashed = serde_json::from_value(value).map_err(|error| TrashError::Unknown(error.to_string()))?;
-        Ok(PathBuf::from(reply.trashed))
+        self.trash_using(path, &|argv| self.call(argv, env))
     }
 
-    fn call(&self, argv: &[String], env: &[(&str, &str)]) -> Result<serde_json::Value, HelperError> {
-        let mut full = vec![self.path.to_string_lossy().into_owned()];
-        full.extend(argv.iter().cloned());
-        let outcome = spawn::run_with_env(&full, b"", self.deadline, spawn::OUTPUT_LIMIT, env).map_err(|error| match error {
+    fn trash_using(
+        &self,
+        path: &Path,
+        call: &impl Fn(&[String]) -> Result<Value, HelperError>,
+    ) -> Result<PathBuf, TrashError> {
+        self.version_using(call).map_err(reply::trash_error)?;
+        let path_text = path
+            .to_str()
+            .ok_or_else(|| TrashError::Failed("the Trash path is not UTF-8".into()))?;
+        let argv = ["trash".to_owned(), path_text.to_owned()];
+        let reply: Trashed = self
+            .decode(
+                call(&argv).map_err(reply::trash_error)?,
+                &["trashed"],
+                "invalid helper trash document",
+            )
+            .map_err(reply::trash_error)?;
+        if Path::new(&reply.trashed) != path {
+            return Err(TrashError::Unknown(
+                "the helper trash reply names another path".into(),
+            ));
+        }
+        Ok(path.to_path_buf())
+    }
+
+    fn decode<T: DeserializeOwned>(
+        &self,
+        value: Value,
+        supported: &[&str],
+        invalid: &str,
+    ) -> Result<T, HelperError> {
+        let fields = value
+            .as_object()
+            .ok_or_else(|| HelperError::Unknown(invalid.into()))?;
+        self.diagnostics.borrow_mut().extend(
+            fields
+                .keys()
+                .filter(|key| !supported.contains(&key.as_str()))
+                .map(|key| {
+                    format!(
+                        "unknown additive helper field: {}",
+                        key.chars()
+                            .flat_map(char::escape_default)
+                            .collect::<String>()
+                    )
+                }),
+        );
+        serde_json::from_value(value).map_err(|_| HelperError::Unknown(invalid.into()))
+    }
+
+    fn call(&self, argv: &[String], env: &[(&str, &str)]) -> Result<Value, HelperError> {
+        self.call_using(argv, env, spawn::run_with_env)
+    }
+
+    fn call_using(
+        &self,
+        argv: &[String],
+        env: &[(&str, &str)],
+        run: impl FnOnce(
+            &[String],
+            &[u8],
+            Duration,
+            usize,
+            &[(&str, &str)],
+        ) -> Result<spawn::Outcome, SpawnError>,
+    ) -> Result<Value, HelperError> {
+        let path = self
+            .path
+            .to_str()
+            .ok_or_else(|| HelperError::Failed("the helper path is not UTF-8".into()))?;
+        let mut full = vec![path.to_owned()];
+        full.extend_from_slice(argv);
+        let limits = Limits::incoming();
+        let outcome = run(
+            &full,
+            b"",
+            self.deadline,
+            limits.bytes.saturating_add(1),
+            env,
+        )
+        .map_err(|error| match error {
             SpawnError::NotFound(_) => HelperError::Absent,
-            SpawnError::Io(detail) => HelperError::Failed(detail),
+            SpawnError::Io(_) => HelperError::Failed("the helper could not start".into()),
         })?;
         match outcome.status {
-            Status::Exited(0) => read_bounded(&outcome.stdout, &Limits::incoming()).map_err(|violation| HelperError::Unknown(format!("{violation:?}"))),
+            Status::Exited(0) => read_bounded(&outcome.stdout, &limits)
+                .map_err(|_| HelperError::Unknown("invalid or oversized helper document".into())),
             Status::Exited(code) => Err(HelperError::Failed(format!("the helper exited {code}"))),
-            Status::Signaled(signal) => Err(HelperError::Failed(format!("the helper died on signal {signal}"))),
-            Status::DeadlineExceeded => Err(HelperError::Unknown("the helper exceeded its deadline".into())),
+            Status::Signaled(signal) => Err(HelperError::Failed(format!(
+                "the helper died on signal {signal}"
+            ))),
+            Status::DeadlineExceeded => Err(HelperError::Unknown(
+                "the helper exceeded its deadline".into(),
+            )),
             Status::Interrupted => Err(HelperError::Unknown("interrupted".into())),
         }
     }
@@ -12589,40 +13221,136 @@ impl Trash for HelperClient {
     fn trash(&self, path: &Path) -> Result<PathBuf, TrashError> {
         self.trash_with_env(path, &[])
     }
+
+    fn take_diagnostics(&self) -> Vec<String> {
+        HelperClient::take_diagnostics(self)
+    }
+}
+
+#[cfg(test)]
+mod tests;
+```
+
+`crates/vpt-adapters/src/helper/reply.rs`:
+
+```rust
+use super::HelperError;
+use serde_json::Value;
+use vpt_application::ports::TrashError;
+use vpt_protocol::HELPER_SCHEMA;
+
+pub(super) fn schema(value: &Value) -> Result<(), HelperError> {
+    let Some(schema) = value.get("schema").and_then(Value::as_str) else {
+        return Err(HelperError::Unknown("invalid helper schema".into()));
+    };
+    if schema == HELPER_SCHEMA {
+        return Ok(());
+    }
+    let major = schema
+        .strip_prefix("vpt.helper/")
+        .filter(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+        .and_then(|part| part.parse::<u32>().ok());
+    match major {
+        Some(found) => Err(HelperError::Unknown(format!(
+            "unsupported helper schema major {found}"
+        ))),
+        None => Err(HelperError::Unknown("invalid helper schema".into())),
+    }
+}
+
+pub(super) fn trash_error(error: HelperError) -> TrashError {
+    match error {
+        HelperError::Absent => TrashError::HelperAbsent,
+        HelperError::MajorMismatch { found } => TrashError::HelperVersion { found },
+        HelperError::Failed(detail) => TrashError::Failed(detail),
+        HelperError::Unknown(detail) => TrashError::Unknown(detail),
+    }
 }
 ```
 
-Add `pub mod helper;` to the adapters `lib.rs`.
-
-`vpt --version` composes the client from the default helper path. In `crates/vpt/src/lib.rs` the
-`Verb::Version` arm becomes:
+`crates/vpt/src/commands/version.rs`:
 
 ```rust
-        Verb::Version => {
-            let helper = HelperClient::new(PathBuf::from("vpt-macos"));
-            let version = helper.version().ok();
-            Outcome::Success {
-                document: commands::version::document(version.as_deref()),
-                human: commands::version::human(version.as_deref()),
-            }
+use crate::cli::output::Outcome;
+use crate::compose::Environment;
+use serde_json::{Value, json};
+use std::path::{Path, PathBuf};
+use vpt_adapters::HelperClient;
+use vpt_adapters::config::{ConfigError, from_table, load_file};
+
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+pub fn document(helper_version: Option<&str>) -> Value {
+    json!({"schema":"vpt.result/1", "command":"version", "version":VERSION, "helper_version":helper_version})
+}
+
+pub fn human(helper_version: Option<&str>) -> String {
+    match helper_version {
+        Some(helper) => format!("vpt {VERSION} (helper {helper})\n"),
+        None => format!("vpt {VERSION} (helper absent)\n"),
+    }
+}
+
+pub fn run(environment: &Environment, config: Option<&Path>) -> Outcome {
+    let selected = config
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| environment.config_path());
+    let helper_path = match load_file(&selected) {
+        Ok(table) => from_table(&table, &environment.home_dir())
+            .ok()
+            .map(|settings| settings.helper_path),
+        Err(ConfigError::Missing(_)) => Some(PathBuf::from("vpt-macos")),
+        Err(_) => None,
+    };
+    let helper = helper_path.map(HelperClient::new);
+    let version = helper.as_ref().and_then(|helper| helper.version().ok());
+    let diagnostics = helper
+        .as_ref()
+        .map(HelperClient::take_diagnostics)
+        .unwrap_or_default();
+    let mut result = document(version.as_deref());
+    let mut text = human(version.as_deref());
+    if !diagnostics.is_empty() {
+        result["diagnostics"] = json!(diagnostics);
+        for diagnostic in &diagnostics {
+            text.push_str(diagnostic);
+            text.push('\n');
         }
+    }
+    Outcome::Success {
+        document: result,
+        human: text,
+    }
+}
 ```
 
-with `use std::path::PathBuf;` and `use vpt_adapters::helper::HelperClient;`. The default `"vpt-macos"`
-is the schema's `helper.path` default; Task 27's `Runtime` reads the configured value for every other
-verb. `run()` also calls `vpt_adapters::spawn::install_interrupt_handlers()` first.
+In `crates/vpt/src/lib.rs`, use this dispatch arm with its existing `environment`:
 
-- [ ] **Step 4: Run the tests to verify they pass**
+```rust
+        Verb::Version => commands::version::run(&environment, invocation.config.as_deref()),
+```
 
-Run: `cargo test --workspace --features dev-tools`
+Keep the interrupt-handler installation at the start of `run()`. Commands collect
+`Trash::take_diagnostics` after cleanup or reconciliation. `HelperVersion { found }` remains typed
+through the application and maps to exit 3, rule `helper_version`, when Trash is required.
 
-Expected: all PASS.
+- [ ] **Step 4: Verify green and the guards**
+
+Run `cargo test --workspace --features dev-tools`, `cargo fmt --all -- --check` and
+`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`.
+Expected: all tests pass. Reader and client unit tests use private injected operations; integration
+tests spawn only the development fake. No helper test uses wall-clock assertions or a real helper.
+
+Mutation-check the array overflow guard, the depth guard, the extra stdout byte, the compatibility
+preflight and the returned Trash path check. Verify each changed line before running its named test;
+each mutant must fail, then restore the implementation and rerun green. Count physical lines after
+rustfmt; the private child files keep every handwritten Rust file below 500 lines.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add crates
-SKIP_AI_COMMIT=1 git commit -m "feat(helper): the helper client, its version check and the bounded reader"
+SKIP_AI_COMMIT=1 git commit -m "feat(helper): validate replies and cache compatible helper versions"
 ```
 
 ______________________________________________________________________
@@ -12631,83 +13359,264 @@ ______________________________________________________________________
 
 **Files:**
 
-- Create: `crates/vpt-protocol/src/event.rs`
-- Modify: `crates/vpt-protocol/src/lib.rs`
-- Create: `crates/vpt-adapters/src/notify/mod.rs`
-- Modify: `crates/vpt-adapters/src/lib.rs`
-- Test: `crates/vpt/tests/notify.rs`
+- Create: `crates/vpt-protocol/src/event.rs`.
+- Create: `crates/vpt-adapters/src/notify/mod.rs`, `crates/vpt-adapters/src/notify/tests.rs`, `crates/vpt-adapters/src/notify/delivery.rs`, `crates/vpt-adapters/src/notify/delivery/tests.rs`.
+- Modify: `crates/vpt-protocol/src/lib.rs`, `crates/vpt-adapters/src/lib.rs`.
+- Test: `crates/vpt/tests/notify.rs`.
 
 **Interfaces:**
 
-- Consumes: `HelperClient::notify`, `spawn::run`, `Notification`, `Notifier`, `DeliveryOutcome`.
+- Consumes: `Notification { pub event: EventKind, pub state: EventState, pub recording: Option<RecordingId>, pub detail: String, pub counts: Vec<(String, u64)>, pub paths: Vec<(String, PathBuf)>, pub occurred_at: UtcInstant }`;
+  `EventKind::as_str(self) -> &'static str`, `EventState::as_str(self) -> &'static str`,
+  `RecordingId::as_str(&self) -> &str`, `UtcInstant::rfc3339(self) -> String`.
+- Consumes: `Notifier::deliver(&self, notification: &Notification) -> DeliveryOutcome`,
+  `Notifier::take_diagnostics(&self) -> Vec<String>`,
+  `DeliveryOutcome::{Delivered, Suppressed, Failed(String)}`;
+  `HelperClient::notify_with_env(&self, title: &str, body: &str, env: &[(&str, &str)]) -> Result<(), HelperError>`,
+  `HelperClient::take_diagnostics(&self) -> Vec<String>`;
+  `spawn::run_with_env(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize, env: &[(&str, &str)]) -> Result<spawn::Outcome, spawn::SpawnError>`.
+- Produces protocol root exports: `EVENT_SCHEMA: &str = "vpt.event/1"`,
+  `EventDocument { pub schema: String, pub event: String, pub state: String, pub recording: Option<String>, pub detail: String, pub counts: serde_json::Map<String, serde_json::Value>, pub paths: serde_json::Map<String, serde_json::Value>, pub occurred_at: String }`, implementing `Serialize`.
+- Produces adapter root exports:
+  `notification_document(notification: &Notification) -> EventDocument`,
+  `notification_tokens(notification: &Notification, argv: &[String]) -> Vec<String>`,
+  `DesktopNotifier::new(helper: HelperClient) -> DesktopNotifier`,
+  `DesktopNotifier::with_env(self, env: Vec<(String, String)>) -> DesktopNotifier`,
+  `CommandNotifier::new(argv: Vec<String>, fallback: DesktopNotifier) -> CommandNotifier`,
+  `CommandNotifier::with_env(self, env: Vec<(String, String)>) -> CommandNotifier`,
+  `OffNotifier`, `NOTIFY_DEADLINE: Duration = Duration::from_secs(5)`.
+  All three implement `Notifier`. The desktop and command implementations retain diagnostics until
+  drained. An absent desktop helper disables subsequent attempts for that command and records exactly
+  `desktop notifications disabled: helper absent` once. Command failure is recorded before one
+  fallback attempt, including its exit code when available. Delivery never changes the work's exit.
+  Production command paths drain diagnostics on success and failure into their final result or error.
 
-- Produces:
+- [ ] **Step 1: Register and write the failing tests**
 
-  - `vpt_protocol::event::EventDocument { pub schema: String, pub event: String,`
-    `pub state: String, pub recording: Option<String>, pub detail: String,`
-    `pub counts: serde_json::Map<String, serde_json::Value>,`
-    `pub paths: serde_json::Map<String, serde_json::Value>, pub occurred_at: String }` (serde
-    `Serialize`).
-  - `vpt_adapters::notify::{document(notification: &Notification) -> EventDocument,`
-    `tokens(notification: &Notification, argv: &[String]) -> Vec<String>,`
-    `DesktopNotifier::new(helper: HelperClient) -> DesktopNotifier,`
-    `CommandNotifier::new(argv: Vec<String>, fallback: DesktopNotifier) -> CommandNotifier,`
-    `OffNotifier, NOTIFY_DEADLINE: Duration = 5 s}`; all three implement `Notifier`.
+Add this private module and its curated exports to the adapters crate root:
 
-- [ ] **Step 1: Write the failing tests**
+```rust
+mod notify;
+pub use notify::{CommandNotifier, DesktopNotifier, NOTIFY_DEADLINE, OffNotifier,
+    document as notification_document, tokens as notification_tokens};
+```
 
-`crates/vpt-adapters/src/notify/mod.rs`, test section:
+Create `crates/vpt-adapters/src/notify/mod.rs` with:
+
+```rust
+mod delivery;
+pub use delivery::{CommandNotifier, DesktopNotifier, NOTIFY_DEADLINE, OffNotifier};
+
+#[cfg(test)]
+mod tests;
+```
+
+Create `crates/vpt-adapters/src/notify/delivery.rs` with:
 
 ```rust
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-    use vpt_domain::identity::RecordingId;
-    use vpt_domain::notification::{EventKind, Notification};
-    use vpt_domain::time::UtcInstant;
+mod tests;
+```
 
-    fn review_needed() -> Notification {
-        Notification::attention(
-            EventKind::ReviewNeeded,
-            Some(RecordingId::parse("2026-08-24T144736-4f3ab19c02de").expect("id")),
-            "6 spans to review".into(),
-            vec![("note".into(), PathBuf::from("/h/transcripts/a.md"))],
-            UtcInstant { secs: 1_789_599_200 },
-        )
-    }
+`crates/vpt-adapters/src/notify/tests.rs`:
 
-    #[test]
-    fn the_event_document_carries_the_spec_fields() {
-        let mut notification = review_needed();
-        notification.counts = vec![("numeric".into(), 3), ("diagnostics".into(), 0)];
-        let json = serde_json::to_value(document(&notification)).expect("json");
-        assert_eq!(json["schema"], "vpt.event/1");
-        assert_eq!(json["event"], "review_needed");
-        assert_eq!(json["state"], "needs_attention");
-        assert_eq!(json["recording"], "2026-08-24T144736-4f3ab19c02de");
-        assert_eq!(json["counts"]["numeric"], 3);
-        assert_eq!(json["paths"]["note"], "/h/transcripts/a.md");
-        assert_eq!(json["occurred_at"], "2026-09-16T10:53:20Z");
-    }
+```rust
+use super::*;
+use std::path::PathBuf;
+use vpt_domain::identity::RecordingId;
+use vpt_domain::notification::{EventKind, Notification};
+use vpt_domain::time::UtcInstant;
 
-    #[test]
-    fn tokens_are_substituted_inside_arguments_and_absent_values_are_empty() {
-        let argv = ["pns", "--event", "{event}", "--id", "{id}", "--n", "{count}", "--path", "{path}", "--state", "{state}"].map(str::to_owned);
-        let mut notification = review_needed();
-        notification.counts = vec![("numeric".into(), 3), ("other".into(), 2)];
+fn review_needed() -> Notification {
+    Notification::attention(
+        EventKind::ReviewNeeded,
+        Some(RecordingId::parse("2026-08-24T144736-4f3ab19c02de").expect("id")),
+        "6 spans to review".into(),
+        vec![("note".into(), PathBuf::from("/sandbox/transcripts/a.md"))],
+        UtcInstant {
+            secs: 1_789_599_200,
+        },
+    )
+}
+
+#[test]
+fn event_document_contains_the_spec_fields_and_correct_utc_timestamp() {
+    let mut notification = review_needed();
+    notification.counts = vec![("numeric".into(), 3), ("diagnostics".into(), 0)];
+    let json = serde_json::to_value(document(&notification)).expect("json");
+    assert_eq!(json["schema"], "vpt.event/1");
+    assert_eq!(json["event"], "review_needed");
+    assert_eq!(json["state"], "needs_attention");
+    assert_eq!(json["recording"], "2026-08-24T144736-4f3ab19c02de");
+    assert_eq!(json["counts"]["numeric"], 3);
+    assert_eq!(json["paths"]["note"], "/sandbox/transcripts/a.md");
+    assert_eq!(json["occurred_at"], "2026-09-16T22:53:20Z");
+}
+
+#[test]
+fn all_tokens_are_replaced_and_inserted_values_are_never_scanned() {
+    let mut notification = review_needed();
+    notification.detail = "use {count}".into();
+    notification.counts = vec![("numeric".into(), 3), ("other".into(), 2)];
+    assert_eq!(tokens(&notification, &["{detail}".into()]), ["use {count}"]);
+    let argv = [
+        "notify-command",
+        "{event}/{state}/{id}/{count}/{path}",
+        "é{unknown}{detail}",
+    ]
+    .map(str::to_owned);
+    assert_eq!(
+        tokens(&notification, &argv),
+        [
+            "notify-command",
+            "review_needed/needs_attention/2026-08-24T144736-4f3ab19c02de/5//sandbox/transcripts/a.md",
+            "é{unknown}use {count}"
+        ]
+    );
+    let bare = Notification::failed(
+        EventKind::IngestFailed,
+        "boom".into(),
+        UtcInstant { secs: 0 },
+    );
+    assert_eq!(
+        tokens(&bare, &["{id}".into(), "{path}".into(), "{detail}".into()]),
+        ["", "", "boom"]
+    );
+}
+```
+
+`crates/vpt-adapters/src/notify/delivery/tests.rs`:
+
+```rust
+use super::*;
+use std::path::PathBuf;
+use vpt_domain::notification::EventKind;
+use vpt_domain::time::UtcInstant;
+
+fn event() -> Notification {
+    Notification::failed(
+        EventKind::IngestFailed,
+        "unreadable source".into(),
+        UtcInstant { secs: 7 },
+    )
+}
+
+fn desktop() -> DesktopNotifier {
+    DesktopNotifier::new(HelperClient::new(PathBuf::from("/sandbox/fake-helper")))
+}
+
+#[test]
+fn absent_desktop_helper_is_reported_once_and_subsequent_attempts_are_suppressed() {
+    let notifier = desktop();
+    let attempts = Cell::new(0);
+    for _ in 0..2 {
         assert_eq!(
-            tokens(&notification, &argv),
-            ["pns", "--event", "review_needed", "--id", "2026-08-24T144736-4f3ab19c02de", "--n", "5", "--path", "/h/transcripts/a.md", "--state", "needs_attention"].map(str::to_owned)
+            notifier.deliver_using(|| {
+                attempts.set(attempts.get() + 1);
+                Err(HelperError::Absent)
+            }),
+            DeliveryOutcome::Suppressed
         );
-        let bare = Notification::failed(EventKind::IngestFailed, "boom".into(), UtcInstant { secs: 0 });
-        assert_eq!(tokens(&bare, &["{id}".to_owned(), "{path}".to_owned(), "{detail}".to_owned()]), ["", "", "boom"].map(str::to_owned));
     }
+    assert_eq!(attempts.get(), 1);
+    assert_eq!(
+        notifier.take_diagnostics(),
+        ["desktop notifications disabled: helper absent"]
+    );
+    assert!(notifier.take_diagnostics().is_empty());
+}
 
-    #[test]
-    fn off_raises_nothing_and_reports_suppressed() {
-        assert_eq!(OffNotifier.deliver(&review_needed()), DeliveryOutcome::Suppressed);
-    }
+#[test]
+fn failed_command_is_recorded_before_one_fallback_and_keeps_its_status() {
+    let notifier = CommandNotifier::new(vec!["notify-command".into()], desktop());
+    let attempts = Cell::new(0);
+    let result = notifier.deliver_using(
+        &event(),
+        |_, _, _, _, _| {
+            Ok(spawn::Outcome {
+                status: Status::Exited(7),
+                stdout: b"CANARY-STDOUT".to_vec(),
+                stderr: b"CANARY-STDERR".to_vec(),
+                group: 0,
+            })
+        },
+        || {
+            attempts.set(attempts.get() + 1);
+            assert_eq!(*notifier.diagnostics.borrow(), ["notify command exited 7"]);
+            notifier.fallback.deliver_using(|| Err(HelperError::Absent))
+        },
+    );
+    assert_eq!(attempts.get(), 1);
+    assert_eq!(
+        result,
+        DeliveryOutcome::Failed("notify command exited 7".into())
+    );
+    assert_eq!(
+        notifier.take_diagnostics(),
+        [
+            "notify command exited 7",
+            "desktop notifications disabled: helper absent"
+        ]
+    );
+}
+
+#[test]
+fn command_sends_substituted_argv_and_event_stdin_together_without_fallback() {
+    let notifier = CommandNotifier::new(vec!["notify-command".into(), "{event}".into()], desktop());
+    let result = notifier.deliver_using(
+        &event(),
+        |argv, stdin, deadline, limit, _| {
+            assert_eq!(argv, ["notify-command", "ingest_failed"]);
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(stdin).expect("event")["schema"],
+                "vpt.event/1"
+            );
+            assert_eq!(deadline, Duration::from_secs(5));
+            assert_eq!(limit, spawn::OUTPUT_LIMIT);
+            Ok(spawn::Outcome {
+                status: Status::Exited(0),
+                stdout: vec![],
+                stderr: vec![],
+                group: 0,
+            })
+        },
+        || panic!("unexpected fallback"),
+    );
+    assert_eq!(result, DeliveryOutcome::Delivered);
+    assert!(notifier.take_diagnostics().is_empty());
+}
+
+#[test]
+fn spawn_failure_diagnostics_never_copy_untrusted_details() {
+    let notifier = CommandNotifier::new(vec![], desktop());
+    let result = notifier.deliver_using(
+        &event(),
+        |_, _, _, _, _| Err(SpawnError::Io("CANARY".into())),
+        || DeliveryOutcome::Delivered,
+    );
+    assert_eq!(
+        result,
+        DeliveryOutcome::Failed("notify command could not start".into())
+    );
+    assert_eq!(
+        notifier.take_diagnostics(),
+        ["notify command could not start"]
+    );
+}
+
+#[test]
+fn incompatible_desktop_helper_is_diagnostic_and_off_has_no_diagnostics() {
+    let notifier = desktop();
+    assert!(matches!(
+        notifier.deliver_using(|| Err(HelperError::MajorMismatch { found: 2 })),
+        DeliveryOutcome::Failed(_)
+    ));
+    assert_eq!(
+        notifier.take_diagnostics(),
+        ["desktop notification refused: helper major version 2"]
+    );
+    assert_eq!(OffNotifier.deliver(&event()), DeliveryOutcome::Suppressed);
+    assert!(OffNotifier.take_diagnostics().is_empty());
 }
 ```
 
@@ -12716,95 +13625,112 @@ mod tests {
 ```rust
 mod support;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use support::{FAKE_ENGINE, Sandbox};
-use vpt_adapters::helper::HelperClient;
-use vpt_adapters::notify::{CommandNotifier, DesktopNotifier};
-use vpt_application::ports::notifier::{DeliveryOutcome, Notifier};
+use vpt_adapters::{CommandNotifier, DesktopNotifier, HelperClient};
+use vpt_application::ports::{DeliveryOutcome, Notifier};
 use vpt_domain::notification::{EventKind, Notification};
 use vpt_domain::time::UtcInstant;
 
 fn event() -> Notification {
-    Notification::failed(EventKind::IngestFailed, "the recordings directory is unreadable".into(), UtcInstant { secs: 7 })
+    Notification::failed(
+        EventKind::IngestFailed,
+        "the recordings directory is unreadable".into(),
+        UtcInstant { secs: 7 },
+    )
 }
 
-fn log_lines(path: &Path) -> Vec<String> {
-    std::fs::read_to_string(path).unwrap_or_default().lines().map(str::to_owned).collect()
+fn lines(path: &Path) -> Vec<String> {
+    std::fs::read_to_string(path)
+        .unwrap_or_default()
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+fn env(sandbox: &Sandbox) -> Vec<(String, String)> {
+    vec![(
+        "VPT_FAKE_LOG".into(),
+        sandbox.fake_log().to_string_lossy().into_owned(),
+    )]
 }
 
 #[test]
-fn desktop_mode_posts_through_the_helper_with_the_event_as_title() {
+fn desktop_posts_through_the_fake_and_retains_absence_diagnostics() {
     let sandbox = Sandbox::new("notify-desktop");
     sandbox.install_fake_helper();
-    let notifier = DesktopNotifier::new(HelperClient::new(sandbox.path().join("bin/vpt-macos"))).with_env(fake_env(&sandbox));
-
+    let notifier = DesktopNotifier::new(HelperClient::new(sandbox.path().join("bin/vpt-macos")))
+        .with_env(env(&sandbox));
     assert_eq!(notifier.deliver(&event()), DeliveryOutcome::Delivered);
-
-    assert_eq!(log_lines(&sandbox.fake_log()), vec!["notify\tvpt: ingest_failed\tthe recordings directory is unreadable"]);
+    assert_eq!(
+        lines(&sandbox.fake_log()),
+        ["notify\tvpt: ingest_failed\tthe recordings directory is unreadable"]
+    );
+    let absent = DesktopNotifier::new(HelperClient::new(sandbox.path().join("missing")));
+    assert_eq!(absent.deliver(&event()), DeliveryOutcome::Suppressed);
+    assert_eq!(absent.deliver(&event()), DeliveryOutcome::Suppressed);
+    assert_eq!(
+        absent.take_diagnostics(),
+        ["desktop notifications disabled: helper absent"]
+    );
 }
 
 #[test]
-fn desktop_mode_with_no_helper_is_suppressed_not_failed() {
-    let notifier = DesktopNotifier::new(HelperClient::new(PathBuf::from("/nonexistent/vpt-macos")));
-    assert_eq!(notifier.deliver(&event()), DeliveryOutcome::Suppressed);
-}
-
-#[test]
-fn command_mode_substitutes_tokens_and_writes_the_document_on_stdin() {
+fn command_gets_tokens_and_json_and_nonzero_falls_back_once() {
     let sandbox = Sandbox::new("notify-command");
     sandbox.install_fake_helper();
-    let argv = [FAKE_ENGINE, "command-sink", "--event", "{event}", "--state", "{state}"].map(str::to_owned).to_vec();
-    let notifier = CommandNotifier::new(argv, DesktopNotifier::new(HelperClient::new(sandbox.path().join("bin/vpt-macos"))))
-        .with_env(fake_env(&sandbox));
-
-    assert_eq!(notifier.deliver(&event()), DeliveryOutcome::Delivered);
-
-    let lines = log_lines(&sandbox.fake_log());
-    assert_eq!(lines.len(), 1, "{lines:?}");
-    assert!(lines[0].starts_with("command-sink\t--event ingest_failed --state failed\t"), "{}", lines[0]);
-    assert!(lines[0].contains(r#"\"schema\":\"vpt.event/1\""#) || lines[0].contains(r#""schema":"vpt.event/1""#), "{}", lines[0]);
-}
-
-#[test]
-fn a_non_zero_command_falls_back_to_the_desktop_notice_once_and_reports_failed() {
-    let sandbox = Sandbox::new("notify-fallback");
-    sandbox.install_fake_helper();
-    let argv = [FAKE_ENGINE, "command-sink"].map(str::to_owned).to_vec();
-    let mut env = fake_env(&sandbox);
-    env.push(("VPT_FAKE_EXIT".into(), "7".into()));
-    let notifier = CommandNotifier::new(argv, DesktopNotifier::new(HelperClient::new(sandbox.path().join("bin/vpt-macos")))).with_env(env);
-
-    let outcome = notifier.deliver(&event());
-
-    assert!(matches!(outcome, DeliveryOutcome::Failed(ref detail) if detail.contains('7')), "{outcome:?}");
-    let lines = log_lines(&sandbox.fake_log());
-    assert_eq!(lines.len(), 2, "{lines:?}");
-    assert!(lines[1].starts_with("notify\tvpt: ingest_failed"), "{}", lines[1]);
-}
-
-/// The fake reads VPT_FAKE_LOG from its own environment; these in-process tests
-/// hand it through the notifier's env list rather than the test process env.
-fn fake_env(sandbox: &Sandbox) -> Vec<(String, String)> {
-    vec![("VPT_FAKE_LOG".into(), sandbox.fake_log().to_string_lossy().into_owned())]
+    let desktop = DesktopNotifier::new(HelperClient::new(sandbox.path().join("bin/vpt-macos")));
+    let argv = [
+        FAKE_ENGINE,
+        "command-sink",
+        "--event",
+        "{event}",
+        "--state",
+        "{state}",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    let mut child_env = env(&sandbox);
+    child_env.push(("VPT_FAKE_EXIT".into(), "7".into()));
+    let notifier = CommandNotifier::new(argv, desktop).with_env(child_env);
+    assert_eq!(
+        notifier.deliver(&event()),
+        DeliveryOutcome::Failed("notify command exited 7".into())
+    );
+    assert_eq!(notifier.take_diagnostics(), ["notify command exited 7"]);
+    let lines = lines(&sandbox.fake_log());
+    assert_eq!(lines.len(), 2);
+    let fields: Vec<_> = lines[0].splitn(3, '\t').collect();
+    assert_eq!(fields[0], "command-sink");
+    assert_eq!(fields[1], "--event ingest_failed --state failed");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(fields[2]).expect("event")["schema"],
+        "vpt.event/1"
+    );
+    assert_eq!(
+        lines[1],
+        "notify\tvpt: ingest_failed\tthe recordings directory is unreadable"
+    );
 }
 ```
 
-`with_env` on either notifier sets what the spawned child sees; `CommandNotifier::with_env` hands the
-same list to its desktop fallback, so one call configures both paths.
+- [ ] **Step 2: Run each red command**
 
-- [ ] **Step 2: Run the tests to verify they fail**
+`cargo test -p vpt-adapters notify`
 
-Run: `cargo test -p vpt-adapters notify && cargo test -p vpt --features dev-tools --test notify`
-Expected: compile errors naming `document`, `tokens`, `OffNotifier`, `DesktopNotifier`,
-`CommandNotifier`.
+`cargo test -p vpt --features dev-tools --test notify`
 
-- [ ] **Step 3: Write the minimal implementation**
+Expected: compile errors name the absent document conversion, token substitution and notifier types.
+The new test modules must be compiled and selected. Zero selected tests or a successful command does
+not satisfy this step.
+
+- [ ] **Step 3: Implement event encoding, token substitution and delivery**
+
+Add `mod event; pub use event::{EVENT_SCHEMA, EventDocument};` to the protocol crate root.
 
 `crates/vpt-protocol/src/event.rs`:
 
 ```rust
-//! `vpt.event/1`: identities, counts, classes and paths, never recording text.
-
 use serde::Serialize;
 use serde_json::{Map, Value};
 
@@ -12826,33 +13752,37 @@ pub const EVENT_SCHEMA: &str = "vpt.event/1";
 `crates/vpt-adapters/src/notify/mod.rs`:
 
 ```rust
-//! The three `[notify]` modes over the producer API: desktop through the
-//! helper, a configured command with tokens and JSON on stdin, or off.
+mod delivery;
+pub use delivery::{CommandNotifier, DesktopNotifier, NOTIFY_DEADLINE, OffNotifier};
 
-use crate::helper::{HelperClient, HelperError};
-use crate::spawn::{self, Status};
 use serde_json::{Map, Value};
-use std::time::Duration;
-use vpt_application::ports::notifier::{DeliveryOutcome, Notifier};
 use vpt_domain::notification::Notification;
-use vpt_protocol::event::{EVENT_SCHEMA, EventDocument};
-
-pub const NOTIFY_DEADLINE: Duration = Duration::from_secs(5);
+use vpt_protocol::{EVENT_SCHEMA, EventDocument};
 
 pub fn document(notification: &Notification) -> EventDocument {
-    let mut counts = Map::new();
-    for (name, count) in &notification.counts {
-        counts.insert(name.clone(), Value::from(*count));
-    }
-    let mut paths = Map::new();
-    for (name, path) in &notification.paths {
-        paths.insert(name.clone(), Value::String(path.to_string_lossy().into_owned()));
-    }
+    let counts = notification
+        .counts
+        .iter()
+        .map(|(key, count)| (key.clone(), Value::from(*count)))
+        .collect::<Map<_, _>>();
+    let paths = notification
+        .paths
+        .iter()
+        .map(|(key, path)| {
+            (
+                key.clone(),
+                Value::String(path.to_string_lossy().into_owned()),
+            )
+        })
+        .collect::<Map<_, _>>();
     EventDocument {
         schema: EVENT_SCHEMA.into(),
         event: notification.event.as_str().into(),
         state: notification.state.as_str().into(),
-        recording: notification.recording.as_ref().map(|id| id.as_str().to_owned()),
+        recording: notification
+            .recording
+            .as_ref()
+            .map(|id| id.as_str().to_owned()),
         detail: notification.detail.clone(),
         counts,
         paths,
@@ -12861,49 +13791,137 @@ pub fn document(notification: &Notification) -> EventDocument {
 }
 
 pub fn tokens(notification: &Notification, argv: &[String]) -> Vec<String> {
-    let count: u64 = notification.counts.iter().map(|(_, n)| n).sum();
-    let path = notification.paths.first().map(|(_, p)| p.to_string_lossy().into_owned()).unwrap_or_default();
-    let id = notification.recording.as_ref().map(|id| id.as_str().to_owned()).unwrap_or_default();
+    let count = notification
+        .counts
+        .iter()
+        .map(|(_, count)| u128::from(*count))
+        .sum::<u128>()
+        .to_string();
+    let path = notification
+        .paths
+        .first()
+        .map(|(_, path)| path.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let id = notification
+        .recording
+        .as_ref()
+        .map(|id| id.as_str())
+        .unwrap_or_default();
+    let replacements = [
+        ("{event}", notification.event.as_str()),
+        ("{state}", notification.state.as_str()),
+        ("{id}", id),
+        ("{detail}", &notification.detail),
+        ("{count}", &count),
+        ("{path}", &path),
+    ];
     argv.iter()
         .map(|word| {
-            word.replace("{event}", notification.event.as_str())
-                .replace("{state}", notification.state.as_str())
-                .replace("{id}", &id)
-                .replace("{detail}", &notification.detail)
-                .replace("{count}", &count.to_string())
-                .replace("{path}", &path)
+            let mut output = String::new();
+            let mut remaining = word.as_str();
+            while !remaining.is_empty() {
+                if let Some((token, value)) = replacements
+                    .iter()
+                    .find(|(token, _)| remaining.starts_with(token))
+                {
+                    output.push_str(value);
+                    remaining = &remaining[token.len()..];
+                } else if let Some(character) = remaining.chars().next() {
+                    output.push(character);
+                    remaining = &remaining[character.len_utf8()..];
+                }
+            }
+            output
         })
         .collect()
 }
 
+#[cfg(test)]
+mod tests;
+```
+
+`crates/vpt-adapters/src/notify/delivery.rs`:
+
+```rust
+use super::{document, tokens};
+use crate::helper::{HelperClient, HelperError};
+use crate::spawn::{self, SpawnError, Status};
+use std::cell::{Cell, RefCell};
+use std::time::Duration;
+use vpt_application::ports::{DeliveryOutcome, Notifier};
+use vpt_domain::notification::Notification;
+
+pub const NOTIFY_DEADLINE: Duration = Duration::from_secs(5);
+
 pub struct DesktopNotifier {
     helper: HelperClient,
     env: Vec<(String, String)>,
+    disabled: Cell<bool>,
+    diagnostics: RefCell<Vec<String>>,
 }
 
 impl DesktopNotifier {
-    pub fn new(helper: HelperClient) -> DesktopNotifier {
-        DesktopNotifier { helper, env: vec![] }
+    pub fn new(helper: HelperClient) -> Self {
+        Self {
+            helper,
+            env: vec![],
+            disabled: Cell::new(false),
+            diagnostics: RefCell::new(vec![]),
+        }
     }
 
-    pub fn with_env(mut self, env: Vec<(String, String)>) -> DesktopNotifier {
+    pub fn with_env(mut self, env: Vec<(String, String)>) -> Self {
         self.env = env;
         self
+    }
+
+    fn deliver_using(&self, call: impl FnOnce() -> Result<(), HelperError>) -> DeliveryOutcome {
+        if self.disabled.get() {
+            return DeliveryOutcome::Suppressed;
+        }
+        let result = call();
+        self.diagnostics
+            .borrow_mut()
+            .extend(self.helper.take_diagnostics());
+        match result {
+            Ok(()) => DeliveryOutcome::Delivered,
+            Err(HelperError::Absent) => {
+                self.disabled.set(true);
+                self.diagnostics
+                    .borrow_mut()
+                    .push("desktop notifications disabled: helper absent".into());
+                DeliveryOutcome::Suppressed
+            }
+            Err(HelperError::MajorMismatch { found }) => {
+                let detail = format!("desktop notification refused: helper major version {found}");
+                self.diagnostics.borrow_mut().push(detail.clone());
+                DeliveryOutcome::Failed(detail)
+            }
+            Err(HelperError::Failed(detail) | HelperError::Unknown(detail)) => {
+                self.diagnostics.borrow_mut().push(detail.clone());
+                DeliveryOutcome::Failed(detail)
+            }
+        }
     }
 }
 
 fn borrowed(env: &[(String, String)]) -> Vec<(&str, &str)> {
-    env.iter().map(|(key, value)| (key.as_str(), value.as_str())).collect()
+    env.iter()
+        .map(|(key, value)| (key.as_str(), value.as_str()))
+        .collect()
 }
 
 impl Notifier for DesktopNotifier {
     fn deliver(&self, notification: &Notification) -> DeliveryOutcome {
         let title = format!("vpt: {}", notification.event.as_str());
-        match self.helper.notify_with_env(&title, &notification.detail, &borrowed(&self.env)) {
-            Ok(()) => DeliveryOutcome::Delivered,
-            Err(HelperError::Absent) => DeliveryOutcome::Suppressed,
-            Err(error) => DeliveryOutcome::Failed(format!("{error:?}")),
-        }
+        self.deliver_using(|| {
+            self.helper
+                .notify_with_env(&title, &notification.detail, &borrowed(&self.env))
+        })
+    }
+
+    fn take_diagnostics(&self) -> Vec<String> {
+        std::mem::take(&mut *self.diagnostics.borrow_mut())
     }
 }
 
@@ -12911,36 +13929,84 @@ pub struct CommandNotifier {
     argv: Vec<String>,
     fallback: DesktopNotifier,
     env: Vec<(String, String)>,
+    diagnostics: RefCell<Vec<String>>,
 }
 
 impl CommandNotifier {
-    pub fn new(argv: Vec<String>, fallback: DesktopNotifier) -> CommandNotifier {
-        CommandNotifier { argv, fallback, env: vec![] }
+    pub fn new(argv: Vec<String>, fallback: DesktopNotifier) -> Self {
+        Self {
+            argv,
+            fallback,
+            env: vec![],
+            diagnostics: RefCell::new(vec![]),
+        }
     }
 
-    pub fn with_env(mut self, env: Vec<(String, String)>) -> CommandNotifier {
+    pub fn with_env(mut self, env: Vec<(String, String)>) -> Self {
         self.fallback.env = env.clone();
         self.env = env;
         self
     }
-}
 
-impl Notifier for CommandNotifier {
-    fn deliver(&self, notification: &Notification) -> DeliveryOutcome {
+    fn deliver_using(
+        &self,
+        notification: &Notification,
+        run: impl FnOnce(
+            &[String],
+            &[u8],
+            Duration,
+            usize,
+            &[(&str, &str)],
+        ) -> Result<spawn::Outcome, SpawnError>,
+        fallback: impl FnOnce() -> DeliveryOutcome,
+    ) -> DeliveryOutcome {
         let argv = tokens(notification, &self.argv);
-        let body = serde_json::to_vec(&document(notification)).unwrap_or_default();
-        let detail = match spawn::run_with_env(&argv, &body, NOTIFY_DEADLINE, spawn::OUTPUT_LIMIT, &borrowed(&self.env)) {
+        let result = match serde_json::to_vec(&document(notification)) {
+            Ok(body) => run(
+                &argv,
+                &body,
+                NOTIFY_DEADLINE,
+                spawn::OUTPUT_LIMIT,
+                &borrowed(&self.env),
+            ),
+            Err(_) => return self.failed("notify event could not be encoded".into(), fallback),
+        };
+        let detail = match result {
             Ok(outcome) => match outcome.status {
                 Status::Exited(0) => return DeliveryOutcome::Delivered,
                 Status::Exited(code) => format!("notify command exited {code}"),
                 Status::Signaled(signal) => format!("notify command died on signal {signal}"),
                 Status::DeadlineExceeded => "notify command exceeded its deadline".into(),
-                Status::Interrupted => "interrupted".into(),
+                Status::Interrupted => "notify command interrupted".into(),
             },
-            Err(error) => format!("notify command could not start: {error:?}"),
+            Err(_) => "notify command could not start".into(),
         };
-        let _ = self.fallback.deliver(notification);
+        self.failed(detail, fallback)
+    }
+
+    fn failed(
+        &self,
+        detail: String,
+        fallback: impl FnOnce() -> DeliveryOutcome,
+    ) -> DeliveryOutcome {
+        self.diagnostics.borrow_mut().push(detail.clone());
+        let _ = fallback();
+        self.diagnostics
+            .borrow_mut()
+            .extend(self.fallback.take_diagnostics());
         DeliveryOutcome::Failed(detail)
+    }
+}
+
+impl Notifier for CommandNotifier {
+    fn deliver(&self, notification: &Notification) -> DeliveryOutcome {
+        self.deliver_using(notification, spawn::run_with_env, || {
+            self.fallback.deliver(notification)
+        })
+    }
+
+    fn take_diagnostics(&self) -> Vec<String> {
+        std::mem::take(&mut *self.diagnostics.borrow_mut())
     }
 }
 
@@ -12951,21 +14017,30 @@ impl Notifier for OffNotifier {
         DeliveryOutcome::Suppressed
     }
 }
+
+#[cfg(test)]
+mod tests;
 ```
 
-Add `pub mod notify;` to the adapters `lib.rs` and `pub mod event;` to the protocol `lib.rs`.
+The diagnostic queue records the command failure before fallback; the command layer emits those
+messages in its final document or run log. This preserves the single-document JSON output contract.
+All consumers, including config refusal, ingest and retention, drain `take_diagnostics`; the returned
+`DeliveryOutcome` does not replace the work's result.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Verify green and diagnostic retention**
 
-Run: `cargo test --workspace --features dev-tools`
-
-Expected: all PASS.
+Run `cargo test --workspace --features dev-tools`, `cargo fmt --all -- --check` and
+`cargo clippy --workspace --all-targets --features dev-tools -- -D warnings`.
+Expected: all tests pass. Mutate substitution to rescan an inserted `{count}`, disable the missing-helper
+suppression, and drop the queued command error in turn; each corresponding test must fail. Restore
+the source between mutants and rerun green. Production composition tests in Tasks 27 and 32 assert
+that these diagnostics reach output while the underlying work keeps its own exit status.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add crates
-SKIP_AI_COMMIT=1 git commit -m "feat(notify): vpt.event/1 and the desktop, command and off modes"
+SKIP_AI_COMMIT=1 git commit -m "feat(notify): retain delivery diagnostics and substitute tokens once"
 ```
 
 ______________________________________________________________________
