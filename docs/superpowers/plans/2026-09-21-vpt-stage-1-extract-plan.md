@@ -114,7 +114,6 @@ crates/vpt-application/src/ports/mod.rs      re-exports
 crates/vpt-application/src/ports/recorder.rs RecorderStore, SourceHandle, TitleSource
 crates/vpt-application/src/ports/archive.rs  Archive
 crates/vpt-application/src/ports/ledger.rs   RecordingLedger, PublicationJournal, rows
-crates/vpt-application/src/ports/artifacts.rs ArtifactFiles, ArtifactRenderer, NoRenderers
 crates/vpt-application/src/ports/retention.rs RetentionJournal and the intent rows
 crates/vpt-application/src/ports/clock.rs    Clock
 crates/vpt-application/src/ports/trash.rs    Trash
@@ -127,6 +126,7 @@ crates/vpt-application/src/ingest/mod.rs     Ingest, IngestReport, IngestError
 crates/vpt-application/src/ingest/candidate.rs one candidate through the gates
 crates/vpt-application/src/ingest/publish.rs staging, publication, duplicate resolution
 crates/vpt-application/src/retention/mod.rs  Retention, RetentionReport, RetentionError
+crates/vpt-application/src/retention/report.rs partial progress and typed failures
 crates/vpt-application/src/retention/reconcile.rs reconcile_intents
 crates/vpt-application/src/inventory.rs      StoreInventory for vpt storage
 crates/vpt-protocol/src/lib.rs               curated exports
@@ -135,7 +135,11 @@ crates/vpt-protocol/src/error.rs             vpt.error/1
 crates/vpt-protocol/src/event.rs             vpt.event/1
 crates/vpt-protocol/src/helper.rs            vpt.helper/1 and the notify and trash replies
 crates/vpt-protocol/src/limits.rs            the bounded JSON reader
+crates/vpt-protocol/src/limits/visitor.rs    bounded descent before retaining children
+crates/vpt-protocol/src/limits/tests.rs      private bounded-reader regressions
 crates/vpt-adapters/src/lib.rs               curated exports
+crates/vpt-adapters/src/contained.rs         no-follow access through root descriptors
+crates/vpt-adapters/src/contained/tests.rs   private checked-access regressions
 crates/vpt-adapters/src/config/schema.rs     the one key table: name, kind, default, comment, secret
 crates/vpt-adapters/src/config/render.rs     the setup template
 crates/vpt-adapters/src/config/load.rs       read, parse, unknown keys, merge over defaults
@@ -152,6 +156,7 @@ crates/vpt-adapters/src/ledger/sqlite/journal.rs PublicationJournal for SQLite
 crates/vpt-adapters/src/ledger/sqlite/retention.rs RetentionJournal for SQLite
 crates/vpt-adapters/src/ledger/memory.rs     MemoryLedger, the in-memory twin
 crates/vpt-adapters/src/ledger/contract.rs   (cfg(test)) the contract suite both ledgers run
+crates/vpt-adapters/src/ledger/contract/retention.rs private retention contract child
 crates/vpt-adapters/src/lock.rs              WriteLock over flock
 crates/vpt-adapters/src/clock.rs             SystemClock
 crates/vpt-adapters/src/voice_memos/store.rs VoiceMemosStore: listing and read-only descriptors
@@ -160,7 +165,12 @@ crates/vpt-adapters/src/archive/mod.rs       ClonefileArchive: staging and diges
 crates/vpt-adapters/src/archive/publish.rs   exclusive publication and directory sync
 crates/vpt-adapters/src/spawn.rs             bounded process execution
 crates/vpt-adapters/src/helper.rs            HelperClient: version, notify, trash
+crates/vpt-adapters/src/helper/reply.rs      known fields and additive diagnostics
+crates/vpt-adapters/src/helper/tests.rs      private helper protocol regressions
 crates/vpt-adapters/src/notify/mod.rs        DesktopNotifier, CommandNotifier, OffNotifier
+crates/vpt-adapters/src/notify/delivery.rs   delivery and fallback diagnostics
+crates/vpt-adapters/src/notify/tests.rs      event and token regressions
+crates/vpt-adapters/src/notify/delivery/tests.rs private delivery regressions
 crates/vpt-adapters/src/stores.rs            FilesystemStores
 crates/vpt-adapters/src/symlink.rs           the managed link
 crates/vpt-adapters/src/git_tree.rs          the git working tree walk
@@ -170,10 +180,17 @@ crates/vpt/src/lib.rs                        run(): parse, dispatch, emit, exit
 crates/vpt/src/cli/args.rs                   Verb, Invocation, parse, USAGE
 crates/vpt/src/cli/output.rs                 Outcome and emission
 crates/vpt/src/compose.rs                    Runtime: settings, roots, adapters
+crates/vpt/src/compose/clock.rs             production and dev-tools clocks
+crates/vpt/src/compose/errors.rs            typed failures to error documents
+crates/vpt/src/compose/ledger.rs            read-only or writable ledger composition
+crates/vpt/src/compose/recovery.rs          startup progress and retention events
+crates/vpt/src/compose/tests.rs             private composition regressions
 crates/vpt/src/documents/record.rs           RecordingRecord to JSON
 crates/vpt/src/commands/*.rs                 one file per verb
 crates/vpt/src/doctor/mod.rs                 vpt doctor: the verdict
 crates/vpt/src/doctor/checks.rs              one function per check
+crates/vpt/src/doctor/census.rs             stable check names and dependencies
+crates/vpt/src/doctor/probes.rs             independent read-only checks
 crates/vpt/src/bin/vpt-fake-engine.rs        (feature dev-tools) the fake helper and command
 crates/vpt/tests/support/mod.rs              the sandbox harness
 crates/vpt/tests/<behavior>.rs               acceptance tests, one file per behavior area
@@ -2295,7 +2312,7 @@ overlap rule too; the configuration directory is a root of its own.
   - `vpt_adapters::config::{DEFAULT_HOME: &str, from_table(table: &toml::Table, home_dir: &Path) ->`
     `Result<Settings, ConfigError>}`.
   - `vpt_adapters::config::RootError::{NotAbsolute { key: String }, ParentMissing { key: String },`
-    `NotADirectory { key: String }, Overlap { first: String, second: String },`
+    `NotADirectory { key: String }, PathEscape { key: String }, Overlap { first: String, second: String },`
     `Io { key: String, detail: String }}`;
     `Roots { pub home: PathBuf, pub state_dir: PathBuf, pub stores: StorePaths,`
     `pub recordings_dir: PathBuf,` `pub container: PathBuf, pub config_dir: PathBuf }` (every path
@@ -2993,6 +3010,7 @@ pub enum RootError {
     NotAbsolute { key: String },
     ParentMissing { key: String },
     NotADirectory { key: String },
+    PathEscape { key: String },
     Overlap { first: String, second: String },
     Io { key: String, detail: String },
 }
@@ -3154,12 +3172,13 @@ writes or hands its path to the helper.
 **Files:**
 
 - Create: `crates/vpt-adapters/src/contained.rs`, `crates/vpt-adapters/src/contained/tests.rs`
-- Modify: `crates/vpt-adapters/src/lib.rs`
+- Modify: `crates/vpt-adapters/src/lib.rs`, `crates/vpt-adapters/src/config/roots.rs`
 
 **Interfaces:**
 
-- Consumes: nothing.
+- Consumes: `config::{RootError, Roots}` and its private `private_dir(path: &Path, key: &str) -> Result<(), RootError>` creator from Task 5.
 
+- Produces: descriptor-relative creation behind `Roots::create_state_dir` and `Roots::create_leaves`; links introduced after resolution return `RootError::PathEscape { key }`.
 - Produces, re-exported from `vpt_adapters`:
   `ContainedError::{Escape { root: PathBuf, path: PathBuf }, NotRegular(PathBuf),`
   `NotADirectory(PathBuf),` `Io { path: PathBuf, kind: std::io::ErrorKind }}`;
@@ -3336,6 +3355,7 @@ fn revalidation_refuses_a_replaced_root_directory() {
     assert_eq!(root.revalidate(), Ok(()));
     std::fs::rename(&audio, base.join("original")).expect("move");
     std::fs::create_dir(&audio).expect("replacement");
+    assert!(matches!(root.names(), Err(ContainedError::Escape { .. })));
     assert!(matches!(root.revalidate(), Err(ContainedError::Escape { .. })));
 }
 
@@ -3349,6 +3369,24 @@ fn reading_a_subdirectory_creates_nothing_and_refuses_a_link() {
 }
 ```
 
+
+Append to the existing private tests in `config/roots.rs`:
+
+```rust
+#[test]
+fn creating_roots_refuses_a_link_added_after_resolution() {
+    let temp = fixture();
+    let roots = resolve(&settings_in(temp.path(), ""), &temp.path().join("cfg")).expect("roots");
+    let before = entries(&roots.container);
+    std::os::unix::fs::symlink(&roots.container, &roots.state_dir).expect("state link");
+    assert_eq!(roots.create_state_dir(), Err(RootError::PathEscape { key: "home.state_dir".into() }));
+    std::fs::rename(&roots.home, temp.path().join("original-home")).expect("move home");
+    std::os::unix::fs::symlink(&roots.container, &roots.home).expect("home link");
+    assert_eq!(roots.create_leaves(), Err(RootError::PathEscape { key: "home.path".into() }));
+    assert_eq!(entries(&roots.container), before);
+}
+```
+
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-adapters contained`
@@ -3356,6 +3394,8 @@ Run: `cargo test -p vpt-adapters contained`
 Expected: the build of the `contained::tests` module fails with `cannot find` for `RootDir`,
 `leaf_below`, `ContainedError`, `Access` and `Kind`. The module is compiled and selected; a run that
 selects zero tests, or that succeeds, does not satisfy this step.
+Also run `cargo test -p vpt-adapters creating_roots_refuses_a_link_added_after_resolution`;
+once the new module compiles, it must fail because the old creator accepts the state link.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -3637,6 +3677,7 @@ impl RootDir {
 
     /// Every entry name in sorted order; each is judged through `stat` or `open_file` before use.
     pub fn names(&self) -> Result<Vec<String>, ContainedError> {
+        self.revalidate()?;
         let entries = std::fs::read_dir(&self.path).map_err(|error| io(&self.path, &error))?;
         let mut names = Vec::new();
         for entry in entries {
@@ -3665,11 +3706,29 @@ primitive Task 18's probe verifies. A canonical root has no link in it, so the t
 temporary directories before opening them. Every later task maps a `ContainedError` to exit 3, rule
 `path_escape`, at the composition root.
 
+Replace `private_dir` in `config/roots.rs` with the body below. Remove its `DirBuilder` and
+`DirBuilderExt` imports and add `use crate::{ContainedError, RootDir};`.
+
+```rust
+fn private_dir(path: &Path, key: &str) -> Result<(), RootError> {
+    let parent = path.parent().ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
+    let name = path.file_name().and_then(|name| name.to_str())
+        .ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
+    let map = |error| match error {
+        ContainedError::Io { kind, .. } => RootError::Io { key: key.into(), detail: kind.to_string() },
+        _ => RootError::PathEscape { key: key.into() },
+    };
+    let directory = RootDir::open(parent).map_err(map)?;
+    directory.subdirectory(name).map(|_| ()).map_err(map)
+}
+```
+
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `cargo test -p vpt-adapters contained`
 
-Expected: all 11 contained-access tests PASS. Run `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no
+Expected: all 11 contained-access tests PASS. Also run
+`cargo test -p vpt-adapters config::roots` and require the root-creation regression to pass. Run `cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no
 warnings.
 
 - [ ] **Step 5: Commit**
@@ -9311,7 +9370,7 @@ recorder's and the archive's `read_at`.
     `fn message(&self) -> String`; `IngestError { pub failure: IngestFailure,`
     `pub completed: Vec<RecordingId>, pub log: Vec<String> }` (`completed` holds every identity the run
     recovered or ingested, deduplicated; `log` is the run's log up to the failure);
-    `Ingest::run(&self, mode: &Mode) -> Result<IngestReport, IngestError>`. This task supports the full
+    `Ingest::run(&self, mode: &Mode) -> Result<IngestReport, Box<IngestError>>`. This task supports the full
     sweep and `once`; Task 20 adds the gates, Task 21 the duplicates, Task 22 recovery, Task 23 the dry
     run and the aborts.
   - Test support in `crates/vpt-adapters/tests/support/mod.rs`: `Fixture::new() -> Fixture` with the
@@ -9937,7 +9996,7 @@ where
     T: Trash + ?Sized,
     N: Notifier + ?Sized,
 {
-    pub fn run(&self, mode: &Mode) -> Result<IngestReport, IngestError> {
+    pub fn run(&self, mode: &Mode) -> Result<IngestReport, Box<IngestError>> {
         let mut report = IngestReport::default();
         match self.sweep(mode, &mut report) {
             Ok(()) => Ok(report),
@@ -9947,7 +10006,7 @@ where
                     self.notifier.deliver(&Notification::failed(EventKind::IngestFailed, failure.message(), at));
                     report.log.extend(self.notifier.take_diagnostics());
                 }
-                Err(IngestError { failure, completed: report.completed(), log: report.log })
+                Err(Box::new(IngestError { failure, completed: report.completed(), log: report.log }))
             }
         }
     }
@@ -10160,10 +10219,10 @@ where
 
     /// Trash what this run owns, then hand back the failure that ended it.
     pub(super) fn abandon(&self, owned: Option<&Path>, failure: IngestFailure, report: &mut IngestReport) -> IngestFailure {
-        if let Some(path) = owned {
-            if let Err(cleanup) = self.discard(path, report) {
-                report.log.push(cleanup.message());
-            }
+        if let Some(path) = owned
+            && let Err(cleanup) = self.discard(path, report)
+        {
+            report.log.push(cleanup.message());
         }
         failure
     }
@@ -10625,7 +10684,8 @@ fn a_capture_instant_with_no_four_digit_year_is_deferred_as_an_invalid_container
     bytes.extend(box_of(b"mdat", b"audio"));
     bytes.extend(box_of(b"moov", &mvhd_v1(253_402_300_800, 1)));
     fixture.add_recording("far.m4a", &bytes);
-    let parts = fixture.parts();
+    let mut parts = fixture.parts();
+    parts.clock.offset = vpt_domain::time::UtcOffset { secs: 0 };
 
     let report = parts.ingest().run(&Mode::default()).expect("sweep");
 
@@ -10900,7 +10960,7 @@ fn lose_the_ledger(fixture: &Fixture) {
     }
 }
 
-fn with_archive(parts: &Parts, archive: &FaultyArchive<'_>) -> Result<IngestReport, IngestError> {
+fn with_archive(parts: &Parts, archive: &FaultyArchive<'_>) -> Result<IngestReport, Box<IngestError>> {
     let ingest = Ingest {
         recorder: &parts.store,
         archive,

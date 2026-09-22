@@ -28,7 +28,7 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F23: applied: 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 32c2f6e Task 19; Task 26 uses 2026-09-16T22:53:20Z for 1_789_599_200
 - F24: applied 633f045
 - F25: applied 633f045 Task 7 age_secs and the expected 29, e24d803 Task 10 nanosecond rest case
-- F26: applied 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 6dbfba7 Task 20 maps an unrepresentable capture to invalid_container
+- F26: applied 633f045 Task 7, 971b3c0 Task 8, 58a44d4 Task 9, 6dbfba7 Task 20 maps an unrepresentable capture to invalid_container; the current repair fixes the far-future fixture to use a zero offset so it cannot fall back into year 9999
 - F27: applied 58a44d4
 - F28: applied 58a44d4
 - F29: applied 58a44d4 in the F79 form: BoxReader removed, inspect takes len and a read callback
@@ -80,7 +80,7 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F75: pending
 - F76: pending
 - F77: pending
-- F78: applied in part: 1ee265f and e35c3d9 Task 5a, 67fd6db Task 11, bca62c2 Task 13, 11bef3c Task 14, 9242fcb Task 15, cbf8508 Task 16, 85021c0 Task 17, 7a6f95f Task 18; this repair adds root-identity revalidation, checked store validation, and no-create archive/store constructors (Tasks 27 to 32 pending)
+- F78: applied in part: 1ee265f and e35c3d9 Task 5a, 67fd6db Task 11, bca62c2 Task 13, 11bef3c Task 14, 9242fcb Task 15, cbf8508 Task 16, 85021c0 Task 17, 7a6f95f Task 18; 0f0e4eb adds root-identity revalidation, checked store validation, and no-create archive/store constructors; this repair checks root creation and directory listing after path replacement (Tasks 27 to 32 pending)
 - F79: applied in part: fc02c04 Task 6, 58a44d4 Task 9, 11bef3c Task 14, 9242fcb Task 15 associated Handle, 85021c0 Task 17 clone closure and associated Handle, 32c2f6e Task 19 generic ports; this repair permits composition-root trait objects through generic bounds (Task 32 pending)
 - F80: applied 48de0b7 in the LedgerCommit form: one commit carries recordings, seen rows and journal entries; the rollback scenario runs on both implementations
 - F81: applied 6dbfba7 (dataless_never_opens, oversize_never_reads, source_change_discards_stage, invalid_stage_is_trashed, absent_trash_preserves_private_stage) and 7d15839 (exdev_uses_bounded_copy, enospc_aborts_without_row, stage_sync_failure_commits_no_row, directory_sync_failure_commits_no_row); each double records operations and injects the named failure, assertions cover rows, publication, cleanup and event count
@@ -90,5 +90,5 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F85: applied in part: Task 25 returns fixed structural messages and parsed unsupported majors, with wrong-type and wrong-schema canaries; doctor consumes those errors in the runtime repair
 - F86: applied in part: Tasks 1 to 24 now keep adapter implementation modules private and publish named root exports; config, domain and protocol modules remain capability APIs (Tasks 25 to 33 pending)
 - F87: applied 757b59f (EXDEV only; StorageFull at creation and on write is NoSpace)
-- F88: applied: e24d803 Task 10, 67fd6db Task 11 flags column, 48de0b7 Task 12 SeenRow.flags with checked codecs, 9242fcb Task 15, 32c2f6e Task 19 and 6dbfba7 Task 20 carry candidate.flags; this repair tests preservation of an additional flag alongside the dataless bit
+- F88: applied: e24d803 Task 10, 67fd6db Task 11 flags column, 48de0b7 Task 12 SeenRow.flags with checked codecs, 9242fcb Task 15, 32c2f6e Task 19 and 6dbfba7 Task 20 carry candidate.flags; 0f0e4eb tests preservation of an additional flag alongside the dataless bit
 - F89: pending
