@@ -1,10 +1,21 @@
 use std::io::Read;
+use std::net::Shutdown;
+use std::os::fd::OwnedFd;
+use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
 pub const VPT: &str = env!("CARGO_BIN_EXE_vpt");
+
+pub fn broken_output() -> (OwnedFd, UnixStream) {
+    let (writer, peer) = UnixStream::pair().expect("local socket pair");
+    writer
+        .shutdown(Shutdown::Write)
+        .expect("disable socket writes");
+    (writer.into(), peer)
+}
 
 pub struct Sandbox {
     root: tempfile::TempDir,

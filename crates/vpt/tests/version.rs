@@ -1,13 +1,11 @@
 mod support;
 
-use support::{Sandbox, run, stderr, stdout};
+use support::{Sandbox, broken_output, run, stderr, stdout};
 
 #[test]
 fn a_json_stdout_write_failure_is_one_store_document_on_stderr() {
     let sandbox = Sandbox::new("version-json-write-error");
-    let (writer, reader) = std::os::unix::net::UnixStream::pair().expect("local socket pair");
-    drop(reader);
-    let descriptor: std::os::fd::OwnedFd = writer.into();
+    let (descriptor, _peer) = broken_output();
     let output = run(sandbox
         .vpt()
         .args(["--version", "--json"])
@@ -24,10 +22,8 @@ fn a_json_stdout_write_failure_is_one_store_document_on_stderr() {
 #[test]
 fn json_version_with_both_output_streams_broken_exits_one() {
     let sandbox = Sandbox::new("version-json-both-streams-broken");
-    let (writer, reader) = std::os::unix::net::UnixStream::pair().expect("local socket pair");
-    drop(reader);
-    let err: std::os::fd::OwnedFd = writer.try_clone().expect("stderr descriptor").into();
-    let out: std::os::fd::OwnedFd = writer.into();
+    let (out, _peer) = broken_output();
+    let err = out.try_clone().expect("stderr descriptor");
     let output = run(sandbox
         .vpt()
         .args(["--version", "--json"])
@@ -66,9 +62,7 @@ fn version_without_json_prints_one_human_line() {
 #[test]
 fn a_stdout_write_failure_exits_one() {
     let sandbox = Sandbox::new("version-write-error");
-    let (writer, reader) = std::os::unix::net::UnixStream::pair().expect("local socket pair");
-    drop(reader);
-    let descriptor: std::os::fd::OwnedFd = writer.into();
+    let (descriptor, _peer) = broken_output();
     let output = run(sandbox.vpt().arg("--version").stdout(descriptor));
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(stdout(&output), "");
@@ -78,10 +72,8 @@ fn a_stdout_write_failure_exits_one() {
 #[test]
 fn version_with_both_output_streams_broken_exits_one() {
     let sandbox = Sandbox::new("version-both-streams-broken");
-    let (writer, reader) = std::os::unix::net::UnixStream::pair().expect("local socket pair");
-    drop(reader);
-    let err: std::os::fd::OwnedFd = writer.try_clone().expect("stderr descriptor").into();
-    let out: std::os::fd::OwnedFd = writer.into();
+    let (out, _peer) = broken_output();
+    let err = out.try_clone().expect("stderr descriptor");
     let output = run(sandbox.vpt().arg("--version").stdout(out).stderr(err));
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(stdout(&output), "");

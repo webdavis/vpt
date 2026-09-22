@@ -1,6 +1,6 @@
 mod support;
 
-use support::{Sandbox, run, stderr, stdout};
+use support::{Sandbox, broken_output, run, stderr, stdout};
 
 #[test]
 fn an_unknown_verb_under_json_is_an_error_document_on_stderr() {
@@ -21,9 +21,7 @@ fn an_unknown_verb_under_json_is_an_error_document_on_stderr() {
 fn json_usage_with_broken_stderr_exits_one() {
     let sandbox = Sandbox::new("usage-json-broken-stderr");
     for verb in ["transcode", "doctor"] {
-        let (writer, reader) = std::os::unix::net::UnixStream::pair().expect("local socket pair");
-        drop(reader);
-        let descriptor: std::os::fd::OwnedFd = writer.into();
+        let (descriptor, _peer) = broken_output();
         let output = run(sandbox.vpt().args([verb, "--json"]).stderr(descriptor));
         assert_eq!(output.status.code(), Some(1));
         assert_eq!(stdout(&output), "");
@@ -44,9 +42,7 @@ fn an_unknown_verb_prints_usage_to_stderr_and_exits_2() {
 #[test]
 fn unknown_input_with_broken_stderr_exits_one() {
     let sandbox = Sandbox::new("usage-broken-stderr");
-    let (writer, reader) = std::os::unix::net::UnixStream::pair().expect("local socket pair");
-    drop(reader);
-    let descriptor: std::os::fd::OwnedFd = writer.into();
+    let (descriptor, _peer) = broken_output();
     let output = run(sandbox.vpt().arg("transcode").stderr(descriptor));
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(stdout(&output), "");
@@ -55,9 +51,7 @@ fn unknown_input_with_broken_stderr_exits_one() {
 #[test]
 fn unimplemented_verb_with_broken_stderr_exits_one() {
     let sandbox = Sandbox::new("unimplemented-broken-stderr");
-    let (writer, reader) = std::os::unix::net::UnixStream::pair().expect("local socket pair");
-    drop(reader);
-    let descriptor: std::os::fd::OwnedFd = writer.into();
+    let (descriptor, _peer) = broken_output();
     let output = run(sandbox.vpt().arg("doctor").stderr(descriptor));
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(stdout(&output), "");

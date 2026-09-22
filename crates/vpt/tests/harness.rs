@@ -2,7 +2,22 @@ mod support;
 
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
-use support::{Sandbox, run, stderr, stdout};
+use support::{Sandbox, broken_output, run, stderr, stdout};
+
+#[test]
+fn broken_output_rejects_writes_while_a_peer_copy_survives() {
+    let sandbox = Sandbox::new("broken-output-retained-peer");
+    let (descriptor, reader) = broken_output();
+    let retained_peer = reader.try_clone().expect("retained peer");
+    drop(reader);
+    let output = run(sandbox
+        .vpt()
+        .args(["transcode", "--json"])
+        .stderr(descriptor));
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(stdout(&output), "");
+    drop(retained_peer);
+}
 
 #[test]
 fn watchdog_terminates_the_hanging_group_and_reaps_its_child() {
