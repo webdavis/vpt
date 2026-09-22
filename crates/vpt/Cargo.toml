@@ -20,7 +20,7 @@ vpt-adapters = { path = "../vpt-adapters" }
 vpt-application = { path = "../vpt-application" }
 vpt-domain = { path = "../vpt-domain" }
 vpt-protocol = { path = "../vpt-protocol" }
-serde_json = "1.0.151"
+serde_json = { version = "1.0.151", features = ["preserve_order"] }
 
 [dev-dependencies]
 libc = "0.2.189"
