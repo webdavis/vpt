@@ -1,6 +1,6 @@
 # VPT database containment amendment
 
-Status: approach approved on 2026-09-22; written amendment awaiting operator review.
+Status: approach and written amendment approved by the operator on 2026-09-22.
 
 This amends sections 4.1, 4.4 and 5.1 of the [VPT design](2026-09-20-vpt-design.md) and replaces the
 database-opening approach in Tasks 11 and 16 of the
