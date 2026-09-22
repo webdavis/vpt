@@ -11494,8 +11494,11 @@ ______________________________________________________________________
 
 Every command vpt spawns runs from its argv directly, in its own process group, with stdin, stdout and
 stderr handled concurrently under one deadline; at the deadline or on interruption the group is
-terminated, force-killed after one second and reaped. The fake engine is the child every later test
-spawns.
+terminated, force-killed after the grace period and reaped. The private executor takes its cancellation,
+clock, waiting and grace as controls: production hands it the process-wide interrupt flag, the monotonic
+clock, a real sleep and the one-second grace; each test hands it its own, so no test touches the
+production flag or asserts elapsed wall time, and group-cleanup tests use zero grace. The fake engine is
+the child every later test spawns.
 
 **Files:**
 
@@ -11507,13 +11510,20 @@ spawns.
 
 - Consumes: nothing.
 
-- Produces: `vpt_adapters::spawn::{run(argv: &[String], stdin: &[u8], deadline: Duration,`
-  `output_limit: usize) -> Result<Outcome, SpawnError>,`
-  `run_with_env(the same plus env: &[(&str, &str)]), Outcome { pub status: Status,`
-  `pub stdout: Vec<u8>, pub stderr: Vec<u8>, pub group: libc::pid_t },`
-  `Status::{Exited(i32), Signaled(i32), DeadlineExceeded, Interrupted},`
-  `SpawnError::{NotFound(String), Io(String)}, install_interrupt_handlers(),`
-  `note_interrupt(), interrupted() -> bool, OUTPUT_LIMIT: usize = 65_536,` `GRACE: Duration = 1 s}`.
+- Produces, in `vpt_adapters::spawn`:
+  `run(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize) ->`
+  `Result<Outcome, SpawnError>`,
+  `run_with_env(argv: &[String], stdin: &[u8], deadline: Duration, output_limit: usize,`
+  `env: &[(&str, &str)]) -> Result<Outcome, SpawnError>`,
+  `Outcome { pub status: Status, pub stdout: Vec<u8>, pub stderr: Vec<u8>, pub group: libc::pid_t }`,
+  `Status::{Exited(i32), Signaled(i32), DeadlineExceeded, Interrupted}`,
+  `SpawnError::{NotFound(String), Io(String)}`, `install_interrupt_handlers()`, `note_interrupt()`,
+  `interrupted() -> bool`, `OUTPUT_LIMIT: usize = 65_536`, `GRACE: Duration = 1 s`; privately,
+  `Controls<I, K, W> { interrupted: I, now: K, wait: W, grace: Duration }` and
+  `execute(argv, stdin, deadline, output_limit, env, controls)`. The direct child's own status is
+  retained once known; the deadline and the interrupt keep being checked until the stdin writer and both
+  drains finish; on every return path the remaining members of the owned process group are terminated and
+  the direct child is reaped, a wait error included.
 
 - The fake engine `vpt-fake-engine`: `--version` prints
   `{"schema":"vpt.helper/1","version":"<VPT_FAKE_VERSION or 1.0.0>"}`; `notify --title <t> --body <b>`
@@ -11525,8 +11535,9 @@ spawns.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-adapters/src/spawn.rs`, test section (children are `/bin/sh` and `/bin/cat`, which every
-macOS runner has; vpt itself never spawns a shell):
+`crates/vpt-adapters/src/lib.rs` gains `pub mod spawn;`. `crates/vpt-adapters/src/spawn.rs` starts as its
+test module alone (children are `/bin/sh` and `/bin/cat`, which every macOS runner has; vpt itself never
+spawns a shell):
 
 ```rust
 #[cfg(test)]
@@ -11538,65 +11549,95 @@ mod tests {
         words.iter().map(|w| (*w).to_owned()).collect()
     }
 
-    fn clear_interrupt_for_tests() {
-        INTERRUPTED.store(false, Ordering::SeqCst);
+    /// Real clock and sleep, a private never-set interrupt, zero grace.
+    fn controls(interrupted: fn() -> bool) -> Controls<fn() -> bool, fn() -> Instant, fn(Duration)> {
+        Controls { interrupted, now: Instant::now, wait: std::thread::sleep, grace: Duration::ZERO }
+    }
+
+    fn calm() -> bool {
+        false
+    }
+
+    fn cancelled() -> bool {
+        true
+    }
+
+    fn run_test(argv: &[String], stdin: &[u8], deadline: Duration, limit: usize, interrupted: fn() -> bool) -> Outcome {
+        execute(argv, stdin, deadline, limit, &[], controls(interrupted)).expect("ran")
+    }
+
+    fn group_is_gone(group: libc::pid_t) -> bool {
+        // SAFETY: signal 0 probes for the group's existence and delivers nothing.
+        unsafe { libc::killpg(group, 0) == -1 }
     }
 
     #[test]
     fn the_exit_code_and_both_streams_are_returned() {
-        let outcome = run(&argv(&["/bin/sh", "-c", "echo out; echo err 1>&2; exit 3"]), b"", Duration::from_secs(5), OUTPUT_LIMIT).expect("ran");
+        let outcome = run_test(&argv(&["/bin/sh", "-c", "echo out; echo err 1>&2; exit 3"]), b"", Duration::from_secs(5), OUTPUT_LIMIT, calm);
         assert_eq!(outcome.status, Status::Exited(3));
         assert_eq!(outcome.stdout, b"out\n");
         assert_eq!(outcome.stderr, b"err\n");
+        assert!(group_is_gone(outcome.group));
     }
 
     #[test]
     fn stdin_is_written_and_a_missing_executable_is_not_found() {
-        let outcome = run(&argv(&["/bin/cat"]), b"hello", Duration::from_secs(5), OUTPUT_LIMIT).expect("ran");
+        let outcome = run_test(&argv(&["/bin/cat"]), b"hello", Duration::from_secs(5), OUTPUT_LIMIT, calm);
         assert_eq!(outcome.stdout, b"hello");
-        assert!(matches!(run(&argv(&["/nonexistent/vpt-missing"]), b"", Duration::from_secs(1), OUTPUT_LIMIT), Err(SpawnError::NotFound(_))));
+        let missing = execute(&argv(&["/nonexistent/vpt-missing"]), b"", Duration::from_secs(1), OUTPUT_LIMIT, &[], controls(calm));
+        assert!(matches!(missing, Err(SpawnError::NotFound(_))));
     }
 
     #[test]
     fn output_is_bounded_while_the_child_is_still_drained_to_completion() {
-        let outcome = run(&argv(&["/bin/sh", "-c", "yes | head -c 200000"]), b"", Duration::from_secs(5), 1_000).expect("ran");
+        let outcome = run_test(&argv(&["/bin/sh", "-c", "yes | head -c 200000"]), b"", Duration::from_secs(5), 1_000, calm);
         assert_eq!(outcome.stdout.len(), 1_000);
         assert_eq!(outcome.status, Status::Exited(0));
     }
 
     #[test]
     fn the_deadline_terminates_the_whole_process_group_and_reaps_it() {
-        let started = Instant::now();
-        let outcome = run(&argv(&["/bin/sh", "-c", "sleep 30 & sleep 30"]), b"", Duration::from_millis(100), OUTPUT_LIMIT).expect("ran");
+        let outcome = run_test(&argv(&["/bin/sh", "-c", "sleep 30 & sleep 30"]), b"", Duration::from_millis(50), OUTPUT_LIMIT, calm);
         assert_eq!(outcome.status, Status::DeadlineExceeded);
-        assert!(started.elapsed() < Duration::from_millis(900), "{:?}", started.elapsed());
-        // SAFETY: signal 0 probes for the group's existence and delivers nothing.
-        let probe = unsafe { libc::killpg(outcome.group, 0) };
-        assert_eq!(probe, -1, "the process group still exists");
+        assert!(group_is_gone(outcome.group), "the process group still exists");
     }
 
     #[test]
     fn an_interrupt_terminates_the_child_and_reports_interrupted() {
-        note_interrupt();
-        let outcome = run(&argv(&["/bin/sh", "-c", "sleep 30"]), b"", Duration::from_secs(5), OUTPUT_LIMIT).expect("ran");
-        clear_interrupt_for_tests();
+        let outcome = run_test(&argv(&["/bin/sh", "-c", "sleep 30"]), b"", Duration::from_secs(5), OUTPUT_LIMIT, cancelled);
         assert_eq!(outcome.status, Status::Interrupted);
+        assert!(group_is_gone(outcome.group));
+        assert!(!interrupted(), "the production flag is never touched by a test");
+    }
+
+    #[test]
+    fn a_descendant_holding_stdout_does_not_outlive_the_deadline() {
+        let outcome = run_test(&argv(&["/bin/sh", "-c", "sleep 30 & exit 0"]), b"", Duration::from_millis(100), OUTPUT_LIMIT, calm);
+        assert!(matches!(outcome.status, Status::Exited(0) | Status::DeadlineExceeded), "{:?}", outcome.status);
+        assert!(group_is_gone(outcome.group), "the descendant kept the group alive");
+    }
+
+    #[test]
+    fn a_descendant_that_closed_every_stream_lets_the_run_finish_with_the_child() {
+        let script = "(exec >/dev/null 2>&1 </dev/null; sleep 30) & echo done";
+        let outcome = run_test(&argv(&["/bin/sh", "-c", script]), b"", Duration::from_secs(5), OUTPUT_LIMIT, calm);
+        assert_eq!(outcome.status, Status::Exited(0));
+        assert_eq!(outcome.stdout, b"done\n");
+        assert!(group_is_gone(outcome.group), "the group is cleaned on the way out");
     }
 }
 ```
-
-`Outcome` therefore also carries `pub group: libc::pid_t`, the process group id, so a test can prove the
-group is gone. `clear_interrupt_for_tests` lives inside the test module and nowhere else.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-adapters spawn`
 
-Expected: compile error, `run` and `Status` not found.
+Expected: the build fails with `cannot find` for `execute`, `Controls`, `Outcome`, `Status`,
+`SpawnError`, `OUTPUT_LIMIT` and `interrupted`.
 
 - [ ] **Step 3: Write the minimal implementation**
 
-`crates/vpt-adapters/src/spawn.rs`:
+`crates/vpt-adapters/src/spawn.rs`, above its test module:
 
 ```rust
 //! Bounded process execution: argv, own process group, one deadline for
@@ -11604,7 +11645,7 @@ Expected: compile error, `run` and `Status` not found.
 
 use std::io::{Read, Write};
 use std::os::unix::process::{CommandExt, ExitStatusExt};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
@@ -11634,6 +11675,15 @@ pub struct Outcome {
 pub enum SpawnError {
     NotFound(String),
     Io(String),
+}
+
+/// What the executor consults: cancellation, the clock, how it waits, and
+/// how long a terminated group gets before it is killed.
+struct Controls<I, K, W> {
+    interrupted: I,
+    now: K,
+    wait: W,
+    grace: Duration,
 }
 
 extern "C" fn on_signal(_signal: libc::c_int) {
@@ -11670,6 +11720,23 @@ pub fn run_with_env(
     output_limit: usize,
     env: &[(&str, &str)],
 ) -> Result<Outcome, SpawnError> {
+    let controls = Controls { interrupted, now: Instant::now, wait: std::thread::sleep, grace: GRACE };
+    execute(argv, stdin, deadline, output_limit, env, controls)
+}
+
+fn execute<I, K, W>(
+    argv: &[String],
+    stdin: &[u8],
+    deadline: Duration,
+    output_limit: usize,
+    env: &[(&str, &str)],
+    controls: Controls<I, K, W>,
+) -> Result<Outcome, SpawnError>
+where
+    I: Fn() -> bool,
+    K: Fn() -> Instant,
+    W: Fn(Duration),
+{
     let (program, arguments) = argv.split_first().ok_or_else(|| SpawnError::Io("empty argv".into()))?;
     let mut child = Command::new(program)
         .args(arguments)
@@ -11681,7 +11748,7 @@ pub fn run_with_env(
         .spawn()
         .map_err(|error| match error.kind() {
             std::io::ErrorKind::NotFound => SpawnError::NotFound(program.clone()),
-            _ => SpawnError::Io(error.to_string()),
+            _ => SpawnError::Io(error.kind().to_string()),
         })?;
     let group = child.id() as libc::pid_t;
     let input = stdin.to_vec();
@@ -11695,29 +11762,43 @@ pub fn run_with_env(
     let stderr_pipe = child.stderr.take();
     let out = std::thread::spawn(move || drain(stdout_pipe, output_limit));
     let err = std::thread::spawn(move || drain(stderr_pipe, output_limit));
-    let started = Instant::now();
-    let status = loop {
-        if let Some(status) = child.try_wait().map_err(|error| SpawnError::Io(error.to_string()))? {
-            break match (status.code(), status.signal()) {
-                (Some(code), _) => Status::Exited(code),
-                (None, Some(signal)) => Status::Signaled(signal),
-                (None, None) => Status::Exited(-1),
-            };
+    let started = (controls.now)();
+    let mut status = None;
+    let result = loop {
+        if status.is_none() {
+            match child.try_wait() {
+                Ok(Some(exit)) => status = Some(status_of(exit)),
+                Ok(None) => {}
+                Err(error) => break Err(SpawnError::Io(error.kind().to_string())),
+            }
         }
-        if interrupted() {
-            terminate(group, &mut child);
-            break Status::Interrupted;
+        let drained = writer.is_finished() && out.is_finished() && err.is_finished();
+        if let (Some(_), true) = (&status, drained) {
+            break Ok(());
         }
-        if started.elapsed() >= deadline {
-            terminate(group, &mut child);
-            break Status::DeadlineExceeded;
+        if (controls.interrupted)() {
+            status.get_or_insert(Status::Interrupted);
+            break Ok(());
         }
-        std::thread::sleep(TICK);
+        if (controls.now)().duration_since(started) >= deadline {
+            status.get_or_insert(Status::DeadlineExceeded);
+            break Ok(());
+        }
+        (controls.wait)(TICK);
     };
+    terminate(group, &mut child, &controls);
     let _ = writer.join();
     let stdout = out.join().unwrap_or_default();
     let stderr = err.join().unwrap_or_default();
-    Ok(Outcome { status, stdout, stderr, group })
+    result.map(|()| Outcome { status: status.unwrap_or(Status::Exited(-1)), stdout, stderr, group })
+}
+
+fn status_of(exit: std::process::ExitStatus) -> Status {
+    match (exit.code(), exit.signal()) {
+        (Some(code), _) => Status::Exited(code),
+        (None, Some(signal)) => Status::Signaled(signal),
+        (None, None) => Status::Exited(-1),
+    }
 }
 
 fn drain(pipe: Option<impl Read>, limit: usize) -> Vec<u8> {
@@ -11734,18 +11815,23 @@ fn drain(pipe: Option<impl Read>, limit: usize) -> Vec<u8> {
     kept
 }
 
-/// TERM to the group, one second of grace, KILL, then reap the child.
-fn terminate(group: libc::pid_t, child: &mut std::process::Child) {
+/// TERM to whatever is left of the group, the grace period, KILL, then reap
+/// the direct child. Harmless on a group that has already gone.
+fn terminate<I, K, W>(group: libc::pid_t, child: &mut Child, controls: &Controls<I, K, W>)
+where
+    K: Fn() -> Instant,
+    W: Fn(Duration),
+{
     // SAFETY: `group` is the child's own process group, created by process_group(0).
     unsafe {
         libc::killpg(group, libc::SIGTERM);
     }
-    let until = Instant::now() + GRACE;
-    while Instant::now() < until {
+    let started = (controls.now)();
+    while (controls.now)().duration_since(started) < controls.grace {
         if matches!(child.try_wait(), Ok(Some(_))) {
             break;
         }
-        std::thread::sleep(TICK);
+        (controls.wait)(TICK);
     }
     // SAFETY: as above; a group that already exited makes killpg fail harmlessly.
     unsafe {
@@ -11755,8 +11841,11 @@ fn terminate(group: libc::pid_t, child: &mut std::process::Child) {
 }
 ```
 
-The grandchild `sleep 30 &` in the deadline test exits with the group kill, which is what the
-`killpg(group, 0)` probe proves. Add `pub mod spawn;` to `lib.rs`.
+The loop breaks in four ways: the child exited and every worker finished; the child was interrupted; the
+deadline passed; or `try_wait` failed. Every way reaches `terminate`, which signals the group (empty by
+then in the first case), reaps the direct child, and only then are the workers joined, so a descendant
+that kept a pipe open cannot block the return. A child that had already exited when the deadline or the
+interrupt arrived keeps its own status.
 
 `crates/vpt/src/bin/vpt-fake-engine.rs`:
 
@@ -11831,7 +11920,8 @@ fn command_sink(args: &[String]) -> i32 {
 
 Run: `cargo test -p vpt-adapters spawn && cargo build -p vpt --features dev-tools`
 
-Expected: 5 tests PASS; the fake engine builds.
+Expected: 7 tests PASS, none waiting on a child longer than its own deadline; the fake engine builds. Run
+`cargo clippy -p vpt-adapters --all-targets -- -D warnings` and expect no warnings.
 
 - [ ] **Step 5: Commit**
 
