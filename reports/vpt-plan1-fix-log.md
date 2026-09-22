@@ -1,10 +1,10 @@
 # Fix round 1 on the Stage 1 plan (Codex review of 153eddd)
 
 One line per finding: applied or declined, the commit sha once committed, and a reason when declined
-or applied in a different form. A line reading `pending` has not been worked yet.
+or applied in a different form. The statuses describe repairs to the plan, not implemented product features.
 
-- F01: applied in part: Tasks 1 to 24 (eb02c7e carries the full run_with_env signature)
-- F02: applied in part: Tasks 1 to 24
+- F01: applied: prior interface repairs through Task 24, 0f0e4eb shared diagnostics and read-only interfaces, 09bebc1 Tasks 25 and 26, and the current runtime and retention repairs through Task 32
+- F02: applied: prior module-registration repairs through Task 24, 09bebc1 private helper tests, and the current runtime and retention tasks register and select every new test before the red run
 - F03: applied f7f3f67 (test moved to Task 1), 589cb20 (Task 2 wording)
 - F04: applied: 589cb20 Task 2 and the Task 30 replacement emitter retain stdout write failures; injectable-writer tests cover both output modes
 - F05: applied 0d52377 (schema.rs with schema/types.rs and schema/dynamic.rs)
@@ -32,7 +32,7 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F27: applied 58a44d4
 - F28: applied 58a44d4
 - F29: applied 58a44d4 in the F79 form: BoxReader removed, inspect takes len and a read callback
-- F30: applied 48de0b7 Task 12 macros carry use super::* (Task 31 pending)
+- F30: applied: 48de0b7 Task 12 and Task 31 contract macros import their invocation parent; the retention factories reuse open_ledger and fresh
 - F31: applied 48de0b7
 - F32: applied 48de0b7
 - F33: applied bca62c2 Task 13 and eb02c7e Task 24 (Controls with cancellation, clock, wait and grace; no test touches the production flag or asserts elapsed time; zero grace in group tests)
@@ -46,7 +46,7 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F41: applied 85021c0 Task 17 StageFailure.owned_staging, 32c2f6e Task 19 owned cleanup on every exit before publication, 7d15839 Task 21 fault cases
 - F42: applied 7a6f95f (no link-and-unlink fallback; the typed failure keeps staging for the owned cleanup)
 - F43: applied 32c2f6e, 6dbfba7, 7d15839, 76c3fd4, 9405d1c (every ingest test imports Archive explicitly)
-- F44: applied in part: 527ce14 fixture mtimes from the fixed clock, 6dbfba7 the fresh-file test derives from that clock (Tasks 27, 32 pending)
+- F44: applied: 527ce14 and 6dbfba7 use fixed fixture times; Tasks 27 and 32 now derive child clocks and mtimes from FIXED_NOW_SECS
 - F45: applied 6dbfba7 (Task 23 passes the full mode to every call)
 - F46: applied 527ce14 (ingested requires no deferral reason) and 6dbfba7 (edit, fresh deferral, clock advance, second recording)
 - F47: applied 527ce14 (unchanged refreshes last_seen and clears source_gone_at, not in a dry run)
@@ -61,34 +61,36 @@ or applied in a different form. A line reading `pending` has not been worked yet
 - F56: applied eb02c7e (status retained, deadline and interrupt checked until the workers finish, group terminated and child reaped on every return path including a wait error, two descendant regressions)
 - F57: applied: Task 25 bounded deserialization checks depth and the next array entry before decoding children, checks text and keys before retention, and requires the end of the document
 - F58: applied: Task 25 captures the 65,537th byte so a valid oversized prefix is refused
-- F59: applied in part: Task 25 records escaped additive field names for all helper replies; command output drains are in the runtime and retention repair
-- F60: applied in part: Task 25 caches successful compatibility and preflights notify and Trash; 0f0e4eb carries the typed cleanup refusal, and command mappings are in the runtime and retention repair
+- F59: applied: 09bebc1 records escaped additive field names for all helper replies; Tasks 27, 30 and 32 retain diagnostic drains in final output
+- F60: applied: 09bebc1 caches successful compatibility before notify and Trash; 0f0e4eb and Tasks 27 and 32 preserve the typed cleanup refusal and map it to helper_version, exit 3; optional notification failures preserve work status under spec section 8.7
 - F61: applied: Task 25 accepts Trash confirmation only for the exact requested path
 - F62: applied: Task 25 version dispatch honors the selected configuration and its helper path
 - F63: applied: Task 5 and Task 26 use notify-command, with no notification engine named
 - F64: applied: Task 26 substitutes tokens once without rescanning inserted text
-- F65: applied in part: Task 26 records command failure before one fallback and disables absent desktop delivery after one diagnostic; final output drains are in the runtime and retention repair
-- F66: applied in part: 67fd6db Task 11 open_read_only and the writable open through the held state root (Tasks 27, 28, 30, 32 pending)
+- F65: applied: 09bebc1 records command failure before one fallback and disables absent desktop delivery after one diagnostic; Tasks 27, 30 and 32 retain diagnostics in the single final document or human log
+- F66: applied: 67fd6db read-only ledger open; Tasks 27, 28, 30 and 32 use explicit read-only composition with an empty-memory fallback, and mutable composition holds its lock before writable open and repair
 - F67: applied: Task 29 accepts relative equivalent links, rejects dangling verification and regular-file targets, and creates the approved missing target on deploy
 - F68: applied: Task 30 checks cleanup through open_read_only, treating absent audio as an empty observation without creating it
 - F69: applied: Task 30 runs separate git_tree, output and doctor test commands, with no filtering that silently selects zero tests
 - F70: applied: Task 30 always emits the same 18 named checks, running independent checks and reporting dependency failures explicitly
-- F71: pending
-- F72: pending
-- F73: pending
-- F74: pending
-- F75: pending
-- F76: pending
-- F77: pending
-- F78: applied in part: 1ee265f and e35c3d9 Task 5a, 67fd6db Task 11, bca62c2 Task 13, 11bef3c Task 14, 9242fcb Task 15, cbf8508 Task 16, 85021c0 Task 17, 7a6f95f Task 18; 0f0e4eb adds root-identity revalidation, checked store validation, and no-create archive/store constructors; this repair checks root creation and directory listing after path replacement (Tasks 27 to 32 pending)
-- F79: applied in part: fc02c04 Task 6, 58a44d4 Task 9, 11bef3c Task 14, 9242fcb Task 15 associated Handle, 85021c0 Task 17 clone closure and associated Handle, 32c2f6e Task 19 generic ports; this repair permits composition-root trait objects through generic bounds (Task 32 pending)
+- F71: applied: Task 31 compares i128 nanoseconds; tests include u64::MAX holds, extreme instants and one nanosecond before expiry
+- F72: applied: Task 32 carries RecordingId with every move and serializes completed recording identities rather than paths
+- F73: applied: Task 32 records each successful move before row or journal updates; both failure cases retain completed progress
+- F74: applied: Task 32 carries structured progress through partial reconciliation and startup failure, combines it with new work, and emits one retention event
+- F75: applied: Task 32 accepts only a successful helper preflight; absent, mismatched, malformed and failed version checks stop removal
+- F76: applied: Task 32 prints the complete borrowing-correct retention implementation, with direct report.failure calls
+- F77: applied: Task 33 requires stable gates and a separate installed-nightly per-test timing run, rejecting every test reaching one second
+- F78: applied: earlier checked-access repairs plus 0f0e4eb and 26b95d3 retain root handles, revalidate identity before pathname use, and reject replacement links; Tasks 27 through 32 use checked store operations and validate journal ownership before reads and Trash calls
+- F79: applied: prior generic port repairs, 0f0e4eb unsized composition-boundary bounds, and Task 32 generic retention and reconciliation; no application-owned dynamic dispatch or unused renderer abstraction remains
 - F80: applied 48de0b7 in the LedgerCommit form: one commit carries recordings, seen rows and journal entries; the rollback scenario runs on both implementations
 - F81: applied 6dbfba7 (dataless_never_opens, oversize_never_reads, source_change_discards_stage, invalid_stage_is_trashed, absent_trash_preserves_private_stage) and 7d15839 (exdev_uses_bounded_copy, enospc_aborts_without_row, stage_sync_failure_commits_no_row, directory_sync_failure_commits_no_row); each double records operations and injects the named failure, assertions cover rows, publication, cleanup and event count
 - F82: applied 32c2f6e whole-container snapshot under a titled sweep, 9405d1c the dry run keeps the prepopulated copy byte for byte with its mtime and mode
 - F83: applied 345453a (per-instance sequence, exclusive creation, only AlreadyExists retried, blockers kept)
 - F84: applied 32c2f6e IngestReport::completed and 9405d1c the recovery-then-failure test
 - F85: applied: 09bebc1 fixes structural error redaction with canary tests; Task 30 consumes only sanitized helper errors
-- F86: applied in part: Tasks 1 to 24 now keep adapter implementation modules private and publish named root exports; config, domain and protocol modules remain capability APIs (Tasks 25 to 33 pending)
+- F86: applied: 0f0e4eb, 09bebc1 and Tasks 27 through 33 keep implementation modules private with curated exports; config, domain and protocol capability APIs remain intentional
 - F87: applied 757b59f (EXDEV only; StorageFull at creation and on write is NoSpace)
 - F88: applied: e24d803 Task 10, 67fd6db Task 11 flags column, 48de0b7 Task 12 SeenRow.flags with checked codecs, 9242fcb Task 15, 32c2f6e Task 19 and 6dbfba7 Task 20 carry candidate.flags; 0f0e4eb tests preservation of an additional flag alongside the dataless bit
-- F89: pending
+- F89: applied: Task 34 is removed, its verification precedes the Task 33 commit, and delivery is an unnumbered checklist
+
+Summary: closed 89, rejected 0, partial 0, pending 0. Codex plan pass 2 follows the integrated repair.

@@ -16534,19 +16534,22 @@ ledgers behind it, under one contract, like the two before it.
 - Create: `crates/vpt-application/src/ports/retention.rs`
 - Modify: `crates/vpt-application/src/ports/mod.rs`
 - Create: `crates/vpt-adapters/src/ledger/sqlite/retention.rs`
+- Create: `crates/vpt-adapters/src/ledger/contract/retention.rs`
 - Modify: `crates/vpt-adapters/src/ledger/sqlite/mod.rs`, `crates/vpt-adapters/src/ledger/memory.rs`,
   `crates/vpt-adapters/src/ledger/contract.rs`
+- Modify: `crates/vpt/src/compose/ledger.rs`
 - Test: the contract invocations in both ledgers' test modules gain the new suite
 
 **Interfaces:**
 
-- Consumes: `Hold`, `FileTime::age_secs`, `LedgerError`, the `retention_intents` table of Task 11.
+- Consumes: `Hold`, `FileTime`, `UtcInstant`, `LedgerError`, the `retention_intents` table of Task 11.
 - Produces:
   - `vpt_domain::retention::expired(mtime: FileTime, hold: Hold, now: UtcInstant) -> bool`.
-  - `vpt_application::ports::retention::{ArtifactKind::Audio,`
+  - `vpt_application::ports::{ArtifactKind::Audio,`
     `NewIntent { pub kind: ArtifactKind, pub recording: RecordingId, pub path: PathBuf,`
     `pub expected: Sha256Digest, pub recorded_at: UtcInstant },`
-    `RetentionIntent { pub id: i64, ...the same fields }, RetentionJournal}` with
+    `RetentionIntent { pub id: i64, pub kind: ArtifactKind, pub recording: RecordingId,`
+    `pub path: PathBuf, pub expected: Sha256Digest, pub recorded_at: UtcInstant }, RetentionJournal}` with
     `fn record_intent(&self, intent: &NewIntent) -> Result<i64, LedgerError>`,
     `fn pending_intents(&self) -> Result<Vec<RetentionIntent>, LedgerError>`,
     `fn complete_intent(&self, id: i64, at: UtcInstant) -> Result<(), LedgerError>`.
@@ -16556,6 +16559,11 @@ The `expected` column is text so a later stage can record a note's identity and 
 records the digest hex, the only ownership proof an audio clone has.
 
 - [ ] **Step 1: Write the failing tests**
+
+The existing `retention` domain module already compiles. Register `mod retention;` in the application
+ports module and `pub use retention::{ArtifactKind, NewIntent, RetentionIntent, RetentionJournal};`
+in Step 1, with the new file containing only the tests until Step 3. Register `mod retention;` in the
+SQLite module before the red run. Keep `contract` and both ledgers' test modules private.
 
 `crates/vpt-domain/src/retention.rs`, test section:
 
@@ -16583,16 +16591,32 @@ mod tests {
     fn a_file_from_the_future_never_expires() {
         assert!(!expired(FileTime { secs: NOW.secs + 10, nanos: 0 }, Hold::of_seconds(1), NOW));
     }
+
+    #[test]
+    fn a_large_hold_does_not_wrap_and_nanoseconds_delay_the_boundary() {
+        assert!(!expired(FileTime { secs: 0, nanos: 0 }, Hold::of_seconds(u64::MAX), NOW));
+        let hold = Hold::of_seconds(1);
+        assert!(!expired(FileTime { secs: NOW.secs - 1, nanos: 1 }, hold, NOW));
+        assert!(expired(FileTime { secs: NOW.secs - 1, nanos: 0 }, hold, NOW));
+        assert!(!expired(FileTime { secs: i64::MIN, nanos: 0 }, Hold::of_seconds(u64::MAX), UtcInstant { secs: i64::MAX - 1 }));
+    }
 }
 ```
 
-`crates/vpt-adapters/src/ledger/contract.rs`, appended:
+`crates/vpt-adapters/src/ledger/contract.rs` registers its private child in Step 1:
 
 ```rust
-pub mod retention_scenarios {
-    use super::digest;
+mod retention;
+pub(crate) use retention::{retention_journal_contract, retention_scenarios};
+```
+
+`crates/vpt-adapters/src/ledger/contract/retention.rs`:
+
+```rust
+pub(crate) mod retention_scenarios {
+    use super::super::digest;
     use std::path::PathBuf;
-    use vpt_application::ports::retention::{ArtifactKind, NewIntent, RetentionJournal};
+    use vpt_application::ports::{ArtifactKind, NewIntent, RetentionJournal};
     use vpt_domain::identity::RecordingId;
     use vpt_domain::time::UtcInstant;
 
@@ -16606,7 +16630,7 @@ pub mod retention_scenarios {
         }
     }
 
-    pub fn a_recorded_intent_is_pending_with_its_fields(journal: &dyn RetentionJournal) {
+    pub fn a_recorded_intent_is_pending_with_its_fields<J: RetentionJournal>(journal: &J) {
         let id = journal.record_intent(&intent(1)).expect("recorded");
         let pending = journal.pending_intents().expect("pending");
         assert_eq!(pending.len(), 1);
@@ -16616,7 +16640,7 @@ pub mod retention_scenarios {
         assert_eq!(pending[0].kind, ArtifactKind::Audio);
     }
 
-    pub fn completing_an_intent_removes_it_and_keeps_the_others_in_order(journal: &dyn RetentionJournal) {
+    pub fn completing_an_intent_removes_it_and_keeps_the_others_in_order<J: RetentionJournal>(journal: &J) {
         let first = journal.record_intent(&intent(1)).expect("first");
         let second = journal.record_intent(&intent(2)).expect("second");
         journal.complete_intent(first, UtcInstant { secs: 200 }).expect("completed");
@@ -16628,17 +16652,18 @@ pub mod retention_scenarios {
 macro_rules! retention_journal_contract {
     ($make:expr) => {
         mod retention_journal_contract {
+            use super::*;
             use crate::ledger::contract::retention_scenarios::*;
 
             #[test]
             fn a_recorded_intent_is_pending_with_its_fields_() {
                 let (_guard, journal) = $make();
-                a_recorded_intent_is_pending_with_its_fields(&*journal);
+                a_recorded_intent_is_pending_with_its_fields(&journal);
             }
             #[test]
             fn completing_an_intent_removes_it_and_keeps_the_others_in_order_() {
                 let (_guard, journal) = $make();
-                completing_an_intent_removes_it_and_keeps_the_others_in_order(&*journal);
+                completing_an_intent_removes_it_and_keeps_the_others_in_order(&journal);
             }
         }
     };
@@ -16649,24 +16674,19 @@ pub(crate) use retention_journal_contract;
 and, in the `tests` modules of `sqlite/mod.rs` and `memory.rs`, beside the two earlier invocations:
 
 ```rust
-    crate::ledger::contract::retention_journal_contract!(|| {
-        let temp = tempfile::tempdir().expect("temp");
-        let ledger = SqliteLedger::open(temp.path()).expect("opens");
-        (temp, Box::new(ledger) as Box<dyn vpt_application::ports::retention::RetentionJournal>)
-    });
+    crate::ledger::contract::retention_journal_contract!(open_ledger);
 ```
 
 ```rust
-    crate::ledger::contract::retention_journal_contract!(|| {
-        ((), Box::new(MemoryLedger::new()) as Box<dyn vpt_application::ports::retention::RetentionJournal>)
-    });
+    crate::ledger::contract::retention_journal_contract!(fresh);
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `cargo test -p vpt-domain retention && cargo test -p vpt-adapters ledger`
 
-Expected: compile errors naming `expired`, `NewIntent`, `RetentionJournal`.
+Expected: compile errors naming `expired`, `NewIntent`, `RetentionJournal`. The new test modules must
+be compiled and selected. Zero selected tests or a successful command does not satisfy this step.
 
 - [ ] **Step 3: Write the minimal implementation**
 
@@ -16677,7 +16697,9 @@ use crate::time::{FileTime, UtcInstant};
 
 /// Expired when the hold is set and the file's age has reached it.
 pub fn expired(mtime: FileTime, hold: Hold, now: UtcInstant) -> bool {
-    hold.seconds() != 0 && mtime.age_secs(now) >= hold.seconds() as i64
+    let age = (i128::from(now.secs) - i128::from(mtime.secs)) * 1_000_000_000 - i128::from(mtime.nanos);
+    let limit = i128::from(hold.seconds()) * 1_000_000_000;
+    hold.seconds() != 0 && age >= limit
 }
 ```
 
@@ -16736,7 +16758,7 @@ pub trait RetentionJournal {
 }
 ```
 
-`ports/mod.rs` adds `pub mod retention;`. `crates/vpt-adapters/src/ledger/sqlite/retention.rs`:
+Keep the private module and curated exports registered in Step 1. `crates/vpt-adapters/src/ledger/sqlite/retention.rs`:
 
 ```rust
 //! `retention_intents` behind the journal port.
@@ -16744,8 +16766,7 @@ pub trait RetentionJournal {
 use super::{SqliteLedger, map};
 use rusqlite::params;
 use std::path::PathBuf;
-use vpt_application::ports::ledger::LedgerError;
-use vpt_application::ports::retention::{ArtifactKind, NewIntent, RetentionIntent, RetentionJournal};
+use vpt_application::ports::{ArtifactKind, LedgerError, NewIntent, RetentionIntent, RetentionJournal};
 use vpt_domain::digest::Sha256Digest;
 use vpt_domain::identity::RecordingId;
 use vpt_domain::time::UtcInstant;
@@ -16835,8 +16856,39 @@ impl RetentionJournal for MemoryLedger {
 }
 ```
 
-`State` gains `intents: Vec<(RetentionIntent, Option<UtcInstant>)>`. With all three implementations in
-it, `memory.rs` stays under 300 lines.
+`State` gains `intents: Vec<(RetentionIntent, Option<UtcInstant>)>`. Measure the final file with
+`just file-size`; the three implementation blocks do not establish its formatted line count.
+
+Append to `crates/vpt/src/compose/ledger.rs`:
+
+```rust
+use vpt_application::ports::{NewIntent, RetentionIntent, RetentionJournal};
+
+impl RetentionJournal for RuntimeLedger {
+    fn record_intent(&self, intent: &NewIntent) -> Result<i64, LedgerError> {
+        match self {
+            Self::Sqlite(ledger) => ledger.record_intent(intent),
+            Self::Empty(ledger) => ledger.record_intent(intent),
+        }
+    }
+
+    fn pending_intents(&self) -> Result<Vec<RetentionIntent>, LedgerError> {
+        match self {
+            Self::Sqlite(ledger) => ledger.pending_intents(),
+            Self::Empty(ledger) => ledger.pending_intents(),
+        }
+    }
+
+    fn complete_intent(&self, id: i64, at: UtcInstant) -> Result<(), LedgerError> {
+        match self {
+            Self::Sqlite(ledger) => ledger.complete_intent(id, at),
+            Self::Empty(ledger) => ledger.complete_intent(id, at),
+        }
+    }
+}
+```
+
+The existing imports in that file supply `LedgerError` and `UtcInstant`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -16857,141 +16909,242 @@ ______________________________________________________________________
 
 **Files:**
 
-- Create: `crates/vpt-application/src/retention/mod.rs`,
-  `crates/vpt-application/src/retention/reconcile.rs`
-- Modify: `crates/vpt-application/src/lib.rs`
-- Create: `crates/vpt-adapters/tests/retention_reconcile.rs`
-- Modify: `crates/vpt/src/compose.rs`
-- Create: `crates/vpt/src/commands/retention.rs`
-- Modify: `crates/vpt/src/commands/mod.rs`, `crates/vpt/src/lib.rs`
-- Test: `crates/vpt/tests/retention.rs`; `crates/vpt/tests/support/mod.rs` gains `set_mtime`
+- Create: `crates/vpt-application/src/retention/{mod,report,reconcile}.rs`.
+- Modify: `crates/vpt-application/src/lib.rs`.
+- Create: `crates/vpt-adapters/tests/retention_reconcile.rs`.
+- Create: `crates/vpt/src/compose/recovery.rs`, `crates/vpt/src/commands/retention.rs`.
+- Modify: `crates/vpt/src/compose.rs`, `crates/vpt/src/commands/{mod,ingest}.rs`,
+  `crates/vpt/src/lib.rs`.
+- Test: `crates/vpt/tests/{retention,retention_startup}.rs`;
+  `crates/vpt/tests/support/mod.rs` gains `set_mtime`.
 
 **Interfaces:**
 
-- Consumes: `expired`, `RetentionJournal`, `RecordingLedger::{recordings, set_audio_trashed}`,
-  `Stores::entries`, `ArtifactFiles::digest_of`, `Trash`, `Clock`, `Notifier`, `RetentionSettings`,
-  `StorePaths`, `HelperClient::version`, `Runtime::mutating`.
+- Consumes `RecordingLedger::{recordings,by_id,set_audio_trashed}`, `RetentionJournal`,
+  `Stores::{entries,validate_path,digest_of}`, `Trash::trash`, `Clock::now`,
+  `RetentionSettings::hold`, `StorePaths::get`, `HelperClient::version`.
+- Produces curated application exports:
+  - `Retention<'a,L,J,S,T,C> { pub ledger:&'a L, pub journal:&'a J, pub stores:&'a S,`
+    `pub trash:&'a T, pub clock:&'a C, pub settings:&'a RetentionSettings, pub paths:&'a StorePaths }`,
+    with `L:RecordingLedger, J:RetentionJournal, S:Stores, T:Trash, C:Clock` and
+    `run(&self,dry_run:bool,initial:ReconcileProgress)->Result<RetentionReport,RetentionFailure>`.
+  - `Moved { pub recording:RecordingId, pub store:StoreKey, pub path:PathBuf }`.
+  - `KeptReason::{Untracked,DigestMismatch}` with `as_str(self)->&'static str`;
+    `Kept { pub path:PathBuf, pub reason:KeptReason }`.
+  - `ReconcileProgress { pub moved:Vec<Moved>, pub completed:Vec<RecordingId> }`;
+    `ReconcileFailure { pub error:RetentionError, pub progress:ReconcileProgress }`.
+  - `RetentionReport { pub moved:Vec<Moved>, pub kept:Vec<Kept>,`
+    `pub completed:Vec<RecordingId> }` and `RetentionFailure { pub error:RetentionError,`
+    `pub report:RetentionReport }`.
+  - `RetentionError::{Disabled,TargetModified(PathBuf),Ledger(LedgerError),Stores(StoreError),Trash(TrashError)}`.
+  - `reconcile_intents<J:RetentionJournal,L:RecordingLedger,S:Stores,T:Trash,C:Clock>(`
+    `journal:&J,ledger:&L,stores:&S,trash:&T,clock:&C,audio:&Path)`
+    `->Result<ReconcileProgress,ReconcileFailure>`.
+- Command composition:
+  - `StartupFailure { pub error:ErrorDocument, pub progress:ReconcileProgress }`.
+  - `Runtime::mutating(&self)->Result<ReconcileProgress,Box<StartupFailure>>`.
+  - `Runtime::retention_notice(&self,moved:&[Moved])`.
+  - `Runtime::finish_recovery(&self,outcome:Outcome,progress:&ReconcileProgress)->Outcome`.
+  - `commands::retention::run(runtime:&Runtime,dry_run:bool)->Outcome`.
+  - `Sandbox::set_mtime(&self,path:&Path,seconds_ago:u64)`.
 
-- Produces:
-
-  - `vpt_application::retention::{Retention<'a> { pub ledger: &'a dyn RecordingLedger,`
-    `pub journal: &'a dyn RetentionJournal, pub stores: &'a dyn Stores,`
-    `pub files: &'a dyn ArtifactFiles, pub trash: &'a dyn Trash, pub clock: &'a dyn Clock,`
-    `pub notifier: &'a dyn Notifier, pub settings: &'a RetentionSettings,`
-    `pub paths: &'a StorePaths }, Moved { pub store: StoreKey, pub path: PathBuf },`
-    `Kept { pub path: PathBuf, pub reason: KeptReason }, KeptReason::{Untracked,`
-    `DigestMismatch}, RetentionReport { pub moved: Vec<Moved>, pub kept: Vec<Kept> },`
-    `RetentionError::{Disabled, TargetModified(PathBuf), Ledger(LedgerError), Files(String),`
-    `Trash(TrashError)}, RetentionFailure { pub error: RetentionError,` `pub completed: Vec<PathBuf> }}`
-    with `Retention::run(&self, dry_run: bool) -> Result<RetentionReport, RetentionFailure>`.
-  - `vpt_application::retention::reconcile::reconcile_intents(journal, ledger, files, trash,`
-    `clock) -> Result<Vec<PathBuf>, RetentionError>` (the paths moved again), called by
-    `Runtime::mutating` after publication repair.
-  - `vpt::commands::retention::run(runtime: &Runtime, dry_run: bool) -> Outcome`.
-  - `Sandbox::set_mtime(&self, path: &Path, seconds_ago: u64)`.
+Retention reports carry recording identities separately from paths. Recovery returns every successful
+side effect even when a later intent fails. The command emits one retention event after combining
+recovery with new moves, including on partial failure. Dry runs use the read-only runtime and never
+reconcile.
 
 - [ ] **Step 1: Write the failing tests**
 
-`crates/vpt-adapters/tests/retention_reconcile.rs` (the intent matrix, over the in-memory ledger, a
-temporary store, and the recording trash and fixed clock of `tests/support/mod.rs`):
+Register the private `retention` application module and its curated exports before the red run.
+Register `mod report; mod reconcile;` in `retention/mod.rs` and create those files before importing
+their types. Integration tests are automatically selected by their explicit `--test` names.
+
+`crates/vpt-adapters/tests/retention_reconcile.rs`:
 
 ```rust
-mod support;
-
-use std::path::PathBuf;
-use support::{RecordingTrash, clock};
-use vpt_adapters::ledger::memory::MemoryLedger;
-use vpt_adapters::stores::{FilesystemStores, digest_file};
-use vpt_application::ports::ledger::{RecordingLedger, RecordingRecord, StageStates, TitleOrigin};
-use vpt_application::ports::retention::{ArtifactKind, NewIntent, RetentionJournal};
-use vpt_application::retention::RetentionError;
-use vpt_application::retention::reconcile::reconcile_intents;
-use vpt_domain::digest::Sha256Digest;
+use std::path::{Path, PathBuf};
+use vpt_adapters::{FilesystemStores, MemoryLedger};
+use vpt_application::ports::{
+    ArtifactKind, Clock, LedgerCommit, LedgerError, NewIntent, RecordingLedger, RecordingRecord,
+    RetentionIntent, RetentionJournal, StageStates, StoreError, Stores, TitleOrigin, Trash, TrashError,
+};
+use vpt_application::{ReconcileFailure, RetentionError, reconcile_intents};
 use vpt_domain::identity::RecordingId;
 use vpt_domain::time::{UtcInstant, UtcOffset};
 
-struct World {
-    dir: tempfile::TempDir,
-    ledger: MemoryLedger,
-    trash: RecordingTrash,
+struct FixedClock;
+impl Clock for FixedClock {
+    fn now(&self) -> UtcInstant { UtcInstant { secs: 1_787_690_916 } }
+    fn offset_at(&self, _: UtcInstant) -> UtcOffset { UtcOffset { secs: 0 } }
 }
 
-fn world() -> World {
-    let dir = tempfile::tempdir().expect("dir");
-    std::fs::create_dir(dir.path().join("trash")).expect("trash");
-    World { trash: RecordingTrash::new(dir.path().join("trash")), ledger: MemoryLedger::new(), dir }
+struct LocalTrash {
+    root: PathBuf,
+    calls: std::cell::Cell<usize>,
 }
-
-fn recording(audio_path: PathBuf) -> RecordingRecord {
-    let captured_at = UtcInstant { secs: 1_787_690_856 };
-    let captured_offset = UtcOffset { secs: -21_600 };
-    let digest = Sha256Digest([7; 32]);
-    RecordingRecord {
-        id: RecordingId::derive(captured_at, captured_offset, &digest),
-        source_path: None,
-        digest,
-        captured_at,
-        captured_offset,
-        duration_secs: 3,
-        title: None,
-        title_source: TitleOrigin::Unavailable,
-        ingested_at: captured_at,
-        audio_path,
-        stages: StageStates::fresh(),
-        audio_trashed_at: None,
+impl Trash for LocalTrash {
+    fn trash(&self, path: &Path) -> Result<PathBuf, TrashError> {
+        self.calls.set(self.calls.get() + 1);
+        let target = self.root.join(path.file_name().expect("fixture leaf"));
+        std::fs::rename(path, &target).map_err(|e| TrashError::Failed(e.kind().to_string()))?;
+        Ok(target)
     }
 }
 
-fn intent(world: &World, name: &str, expected: Sha256Digest) -> (PathBuf, RecordingId, i64) {
-    let recording = recording(world.dir.path().join(name));
-    world.ledger.commit_recovered(&recording).expect("recorded");
-    let id = world
-        .ledger
-        .record_intent(&NewIntent { kind: ArtifactKind::Audio, recording: recording.id.clone(), path: recording.audio_path.clone(), expected, recorded_at: UtcInstant { secs: 1 } })
-        .expect("intent");
-    (recording.audio_path, recording.id, id)
+struct World {
+    dir: tempfile::TempDir,
+    audio: PathBuf,
+    ledger: MemoryLedger,
+    stores: FilesystemStores,
+    trash: LocalTrash,
+}
+fn fixture_world() -> World {
+    let dir = tempfile::tempdir().expect("dir");
+    let audio = dir.path().join("audio");
+    let trash = dir.path().join("trash");
+    std::fs::create_dir(&audio).expect("audio");
+    std::fs::create_dir(&trash).expect("trash");
+    let audio = audio.canonicalize().expect("canonical audio root");
+    World {
+        stores: FilesystemStores::open(std::slice::from_ref(&audio)).expect("stores"),
+        audio,
+        ledger: MemoryLedger::new(),
+        trash: LocalTrash { root: trash, calls: std::cell::Cell::new(0) },
+        dir,
+    }
+}
+fn intent(world: &World, path: PathBuf, bytes: &[u8], present: bool) -> RecordingId {
+    if present { std::fs::write(&path, bytes).expect("fixture"); }
+    let digest = world.stores.digest_bytes(bytes);
+    let at = UtcInstant { secs: 1_787_604_456 };
+    let offset = UtcOffset { secs: -21_600 };
+    let id = RecordingId::derive(at, offset, &digest).expect("id");
+    let record = RecordingRecord {
+        id: id.clone(), source_path: None, digest, captured_at: at, captured_offset: offset,
+        duration_secs: 3, title: None, title_source: TitleOrigin::Unavailable,
+        ingested_at: at, audio_path: path.clone(), stages: StageStates::fresh(), audio_trashed_at: None,
+    };
+    world.ledger.commit(&LedgerCommit {
+        recordings: vec![record], ..LedgerCommit::default()
+    }).expect("record");
+    world.ledger.record_intent(&NewIntent {
+        kind: ArtifactKind::Audio, recording: id.clone(), path, expected: digest, recorded_at: at,
+    }).expect("intent");
+    id
+}
+fn reconcile(world: &World) -> Result<vpt_application::ReconcileProgress, ReconcileFailure> {
+    reconcile_intents(&world.ledger, &world.ledger, &world.stores, &world.trash, &FixedClock, &world.audio)
 }
 
 #[test]
 fn an_absent_path_completes_the_expiration_without_the_trash() {
-    let world = world();
-    let (path, recording, _) = intent(&world, "gone.m4a", Sha256Digest([1; 32]));
-
-    let moved = reconcile_intents(&world.ledger, &world.ledger, &FilesystemStores, &world.trash, &clock()).expect("reconciled");
-
-    assert!(moved.is_empty());
+    let world = fixture_world();
+    let id = intent(&world, world.audio.join("gone.m4a"), b"gone", false);
+    let report = reconcile(&world).expect("reconciled");
+    assert!(report.moved.is_empty());
+    assert_eq!(report.completed, vec![id.clone()]);
+    assert_eq!(world.trash.calls.get(), 0);
     assert!(world.ledger.pending_intents().expect("pending").is_empty());
-    assert!(world.ledger.by_id(&recording).expect("read").expect("row").audio_trashed_at.is_some());
-    assert!(!path.exists());
+    assert!(world.ledger.by_id(&id).expect("row").expect("record").audio_trashed_at.is_some());
 }
 
 #[test]
 fn an_unchanged_original_is_moved_again_and_completed() {
-    let world = world();
-    let path = world.dir.path().join("still.m4a");
-    std::fs::write(&path, b"clone").expect("clone");
-    intent(&world, "still.m4a", digest_file(&path).expect("digest"));
-
-    let moved = reconcile_intents(&world.ledger, &world.ledger, &FilesystemStores, &world.trash, &clock()).expect("reconciled");
-
-    assert_eq!(moved, vec![path.clone()]);
-    assert!(!path.exists());
-    assert!(world.dir.path().join("trash/still.m4a").exists());
+    let world = fixture_world();
+    let path = world.audio.join("still.m4a");
+    let id = intent(&world, path.clone(), b"still", true);
+    let report = reconcile(&world).expect("reconciled");
+    assert_eq!(report.completed, vec![id]);
+    assert_eq!(report.moved[0].path, path);
+    assert_eq!(world.trash.calls.get(), 1);
+    assert!(world.trash.root.join("still.m4a").exists());
     assert!(world.ledger.pending_intents().expect("pending").is_empty());
 }
 
 #[test]
 fn replaced_content_is_a_refusal_naming_the_path_and_stays_pending() {
-    let world = world();
-    let path = world.dir.path().join("changed.m4a");
-    std::fs::write(&path, b"someone else's bytes").expect("replacement");
-    intent(&world, "changed.m4a", Sha256Digest([9; 32]));
-
-    let outcome = reconcile_intents(&world.ledger, &world.ledger, &FilesystemStores, &world.trash, &clock());
-
-    assert_eq!(outcome, Err(RetentionError::TargetModified(path.clone())));
-    assert!(path.exists());
+    let world = fixture_world();
+    let path = world.audio.join("changed.m4a");
+    intent(&world, path.clone(), b"original", true);
+    std::fs::write(&path, b"replacement").expect("replacement");
+    let failure = reconcile(&world).expect_err("refused");
+    assert_eq!(failure.error, RetentionError::TargetModified(path));
+    assert!(failure.progress.completed.is_empty());
+    assert_eq!(world.trash.calls.get(), 0);
     assert_eq!(world.ledger.pending_intents().expect("pending").len(), 1);
+}
+
+#[test]
+fn a_later_refusal_retains_the_first_move_and_its_recording_identity() {
+    let world = fixture_world();
+    let first = world.audio.join("a.m4a");
+    let id = intent(&world, first.clone(), b"first", true);
+    let second = world.audio.join("b.m4a");
+    intent(&world, second.clone(), b"second", true);
+    std::fs::write(&second, b"changed").expect("replacement");
+    let failure = reconcile(&world).expect_err("second refuses");
+    assert_eq!(failure.error, RetentionError::TargetModified(second.clone()));
+    assert_eq!(failure.progress.completed, vec![id]);
+    assert_eq!(failure.progress.moved[0].path, first);
+    assert!(!first.exists());
+    assert!(second.exists());
+    assert_eq!(world.ledger.pending_intents().expect("pending").len(), 1);
+}
+
+struct FailComplete<'a>(&'a MemoryLedger);
+impl RetentionJournal for FailComplete<'_> {
+    fn record_intent(&self, intent: &NewIntent) -> Result<i64, LedgerError> { self.0.record_intent(intent) }
+    fn pending_intents(&self) -> Result<Vec<RetentionIntent>, LedgerError> { self.0.pending_intents() }
+    fn complete_intent(&self, _: i64, _: UtcInstant) -> Result<(), LedgerError> {
+        Err(LedgerError::Corrupt("injected completion failure".into()))
+    }
+}
+
+#[test]
+fn journal_failure_after_trash_retains_the_move_and_completed_id() {
+    let world = fixture_world();
+    let path = world.audio.join("a.m4a");
+    let id = intent(&world, path.clone(), b"first", true);
+    let failure = reconcile_intents(
+        &FailComplete(&world.ledger), &world.ledger, &world.stores, &world.trash,
+        &FixedClock, &world.audio,
+    ).expect_err("completion fails");
+    assert!(matches!(failure.error, RetentionError::Ledger(_)));
+    assert_eq!(failure.progress.completed, vec![id]);
+    assert_eq!(failure.progress.moved[0].path, path);
+    assert!(!path.exists());
+    assert_eq!(world.ledger.pending_intents().expect("pending").len(), 1);
+}
+
+#[test]
+fn journal_paths_outside_audio_and_leaf_links_never_reach_trash() {
+    let world = fixture_world();
+    let outside = world.dir.path().join("outside.m4a");
+    intent(&world, outside.clone(), b"outside", true);
+    let failure = reconcile(&world).expect_err("escape");
+    assert_eq!(failure.error, RetentionError::Stores(StoreError::Escape(outside.clone())));
+    assert_eq!(std::fs::read(&outside).expect("untouched"), b"outside");
+    assert_eq!(world.trash.calls.get(), 0);
+
+    let world = fixture_world();
+    let leaf = world.audio.join("link.m4a");
+    intent(&world, leaf.clone(), b"link", false);
+    std::os::unix::fs::symlink(&outside, &leaf).expect("symlink");
+    assert!(matches!(reconcile(&world).expect_err("link").error, RetentionError::Stores(StoreError::Escape(_))));
+    assert_eq!(world.trash.calls.get(), 0);
+}
+
+#[test]
+fn replacing_the_audio_root_with_a_symlink_never_reaches_trash() {
+    let world = fixture_world();
+    let path = world.audio.join("a.m4a");
+    intent(&world, path, b"original", true);
+    let original = world.dir.path().join("original");
+    std::fs::rename(&world.audio, &original).expect("move fixture root");
+    std::os::unix::fs::symlink(&original, &world.audio).expect("root link");
+    assert!(matches!(reconcile(&world).expect_err("root link").error, RetentionError::Stores(StoreError::Escape(_))));
+    assert_eq!(world.trash.calls.get(), 0);
+    assert_eq!(std::fs::read(original.join("a.m4a")).expect("untouched"), b"original");
 }
 ```
 
@@ -16999,11 +17152,10 @@ fn replaced_content_is_a_refusal_naming_the_path_and_stays_pending() {
 
 ```rust
 mod support;
-
 use support::{Sandbox, run, stderr, stdout};
 use vpt_domain::fixtures::m4a;
 
-const CAPTURED: i64 = 1_787_690_856;
+const CAPTURED: i64 = 1_787_604_456;
 const ENABLED: &str = "[retention]\nenabled = true\ninclude_audio = true\n[retention.hold]\naudio = \"1d\"\n";
 
 fn ingested(name: &str, extra: &str) -> (Sandbox, String, std::path::PathBuf) {
@@ -17012,9 +17164,11 @@ fn ingested(name: &str, extra: &str) -> (Sandbox, String, std::path::PathBuf) {
     sandbox.write_config(extra);
     sandbox.add_recording("a.m4a", &m4a(CAPTURED, 3, b"audio"));
     let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
     let id = document["ingested"][0]["id"].as_str().expect("id").to_owned();
     let clone = sandbox.path().join(format!("home/.vpt/audio/{id}.m4a"));
+    sandbox.set_mtime(&clone, 0);
     (sandbox, id, clone)
 }
 
@@ -17022,46 +17176,40 @@ fn ingested(name: &str, extra: &str) -> (Sandbox, String, std::path::PathBuf) {
 fn an_expired_clone_moves_to_the_trash_through_the_helper_and_the_ledger_records_it() {
     let (sandbox, id, clone) = ingested("retention-move", ENABLED);
     sandbox.set_mtime(&clone, 2 * 86_400);
-
     let output = run(sandbox.vpt().args(["retention", "run", "--json"]));
-
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
-    assert_eq!(document["moved"][0]["store"], "audio");
-    assert_eq!(document["moved"][0]["path"], clone.to_string_lossy());
+    assert_eq!(document["moved"], serde_json::json!([{"store":"audio","path":clone}]));
     assert!(!clone.exists());
     assert!(sandbox.path().join(format!("trash/{id}.m4a")).exists());
     let shown = run(sandbox.vpt().args(["show", &id, "--json"]));
     let record: serde_json::Value = serde_json::from_str(&stdout(&shown)).expect("json");
     assert!(record["audio_trashed_at"].is_string());
-    let intents: i64 = sandbox.ledger().query_row("SELECT COUNT(*) FROM retention_intents WHERE completed_at IS NOT NULL", [], |r| r.get(0)).expect("count");
+    let intents: i64 = sandbox.ledger().query_row(
+        "SELECT COUNT(*) FROM retention_intents WHERE completed_at IS NOT NULL", [], |r| r.get(0),
+    ).expect("count");
     assert_eq!(intents, 1);
 }
 
 #[test]
 fn an_untracked_file_in_a_store_survives_and_is_reported_kept() {
-    let (sandbox, _id, _clone) = ingested("retention-untracked", ENABLED);
+    let (sandbox, _, _) = ingested("retention-untracked", ENABLED);
     let stray = sandbox.path().join("home/.vpt/audio/stray.m4a");
     std::fs::write(&stray, b"not vpt's").expect("stray");
     sandbox.set_mtime(&stray, 30 * 86_400);
-
     let output = run(sandbox.vpt().args(["retention", "run", "--json"]));
-
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
     assert!(stray.exists());
-    assert_eq!(document["kept"][0]["path"], stray.to_string_lossy());
-    assert_eq!(document["kept"][0]["reason"], "untracked");
+    assert_eq!(document["kept"], serde_json::json!([{"path":stray,"reason":"untracked"}]));
     assert_eq!(document["moved"], serde_json::json!([]));
 }
 
 #[test]
 fn audio_is_excluded_unless_include_audio_is_set() {
-    let (sandbox, _id, clone) = ingested("retention-exclude", "[retention]\nenabled = true\n[retention.hold]\naudio = \"1d\"\n");
+    let (sandbox, _, clone) = ingested("retention-exclude", "[retention]\nenabled = true\n[retention.hold]\naudio = \"1d\"\n");
     sandbox.set_mtime(&clone, 2 * 86_400);
-
     let output = run(sandbox.vpt().args(["retention", "run", "--json"]));
-
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert!(clone.exists());
     let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
@@ -17070,380 +17218,721 @@ fn audio_is_excluded_unless_include_audio_is_set() {
 
 #[test]
 fn dry_run_lists_what_would_move_and_moves_nothing() {
-    let (sandbox, _id, clone) = ingested("retention-dry", ENABLED);
+    let (sandbox, _, clone) = ingested("retention-dry", ENABLED);
     sandbox.set_mtime(&clone, 2 * 86_400);
-
+    let before = std::fs::read(sandbox.path().join("state/vpt/vpt.db")).expect("db");
     let output = run(sandbox.vpt().args(["retention", "run", "--dry-run", "--json"]));
-
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
-    assert_eq!(document["moved"][0]["path"], clone.to_string_lossy());
+    assert_eq!(document["moved"][0]["path"], clone.to_string_lossy().as_ref());
     assert!(clone.exists());
+    assert_eq!(std::fs::read(sandbox.path().join("state/vpt/vpt.db")).expect("db"), before);
     let intents: i64 = sandbox.ledger().query_row("SELECT COUNT(*) FROM retention_intents", [], |r| r.get(0)).expect("count");
     assert_eq!(intents, 0);
     assert!(!sandbox.fake_log().exists());
 }
 
 #[test]
-fn disabled_is_exit_2_and_an_absent_or_mismatched_helper_is_refused() {
-    let (sandbox, _id, _clone) = ingested("retention-refusals", "");
-
-    let disabled = run(sandbox.vpt().args(["retention", "run"]));
-    assert_eq!(disabled.status.code(), Some(2));
-    assert!(stderr(&disabled).contains("retention.enabled"), "{}", stderr(&disabled));
-
-    let (sandbox, _id, _clone) = ingested("retention-no-helper", ENABLED);
-    let mismatch = run(sandbox.vpt().args(["retention", "run", "--json"]).env("VPT_FAKE_VERSION", "2.0.0"));
-    assert_eq!(mismatch.status.code(), Some(3));
-    let error: serde_json::Value = serde_json::from_str(&stderr(&mismatch)).expect("json");
-    assert_eq!(error["error"]["rule"], "helper_version");
-    std::fs::remove_file(sandbox.path().join("bin/vpt-macos")).expect("unlink the fake's symlink");
-    let absent = run(sandbox.vpt().args(["retention", "run", "--json"]));
-    assert_eq!(absent.status.code(), Some(3));
-    let error: serde_json::Value = serde_json::from_str(&stderr(&absent)).expect("json");
-    assert_eq!(error["error"]["rule"], "no_trash");
+fn fresh_dry_run_creates_no_state_or_store_leaf() {
+    let sandbox = Sandbox::new("retention-fresh-dry");
+    sandbox.install_fake_helper();
+    sandbox.write_config(ENABLED);
+    let output = run(sandbox.vpt().args(["retention", "run", "--dry-run", "--json"]));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert!(!sandbox.path().join("state/vpt").exists());
+    assert!(!sandbox.path().join("home/.vpt/audio").exists());
+    assert!(!sandbox.fake_log().exists());
 }
 
 #[test]
-fn a_pending_intent_whose_target_changed_refuses_the_next_mutating_command() {
-    let (sandbox, id, clone) = ingested("retention-modified", ENABLED);
-    sandbox
-        .ledger()
-        .execute(
-            "INSERT INTO retention_intents (artifact_kind, recording, path, expected, recorded_at) VALUES ('audio', ?1, ?2, ?3, 1)",
-            [id.as_str(), clone.to_string_lossy().as_ref(), &"ab".repeat(32)],
-        )
-        .expect("seed");
+fn an_expired_clone_with_replaced_bytes_is_kept_without_an_intent() {
+    let (sandbox, _, clone) = ingested("retention-replaced", ENABLED);
+    std::fs::write(&clone, b"replacement").expect("replacement");
+    sandbox.set_mtime(&clone, 2 * 86_400);
+    let output = run(sandbox.vpt().args(["retention", "run", "--json"]));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
+    assert_eq!(document["moved"], serde_json::json!([]));
+    assert_eq!(document["kept"], serde_json::json!([{"path":clone,"reason":"digest_mismatch"}]));
+    assert_eq!(std::fs::read(&clone).expect("preserved"), b"replacement");
+    let count: i64 = sandbox.ledger().query_row(
+        "SELECT COUNT(*) FROM retention_intents", [], |row| row.get(0),
+    ).expect("count");
+    assert_eq!(count, 0);
+    assert!(!sandbox.fake_log().exists());
+}
 
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
-
+#[test]
+fn disabled_absent_and_unvalidated_helpers_refuse_before_moves() {
+    let (sandbox, _, _) = ingested("retention-disabled", "");
+    assert_eq!(run(sandbox.vpt().args(["retention", "run"])).status.code(), Some(2));
+    let (sandbox, _, clone) = ingested("retention-helper", ENABLED);
+    sandbox.set_mtime(&clone, 2 * 86_400);
+    for (version, code, rule) in [("2.0.0", 3, Some("helper_version")), ("bad", 1, None)] {
+        let output = run(sandbox.vpt().args(["retention", "run", "--json"]).env("VPT_FAKE_VERSION", version));
+        assert_eq!(output.status.code(), Some(code), "{}", stderr(&output));
+        let document: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("json");
+        assert_eq!(document["error"]["rule"], serde_json::json!(rule));
+        assert!(clone.exists());
+    }
+    std::fs::rename(sandbox.path().join("bin/vpt-macos"), sandbox.path().join("bin/helper-disabled")).expect("move fixture link");
+    let output = run(sandbox.vpt().args(["retention", "run", "--json"]));
     assert_eq!(output.status.code(), Some(3));
-    let error: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("json");
-    assert_eq!(error["error"]["rule"], "retention_target_modified");
+    let document: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("json");
+    assert_eq!(document["error"]["rule"], "no_trash");
     assert!(clone.exists());
 }
 ```
 
-`std::fs::remove_file` on the sandbox's own symlink is the test removing a link it created inside its
-temporary directory, the one place this plan unlinks anything. Support addition:
+`crates/vpt/tests/retention_startup.rs`:
+
+```rust
+mod support;
+use support::{Sandbox, run, stderr, stdout};
+use vpt_domain::fixtures::m4a;
+
+const ENABLED: &str = "[retention]\nenabled = true\ninclude_audio = true\n[retention.hold]\naudio = \"1d\"\n";
+fn fixture(name: &str) -> (Sandbox, Vec<String>) {
+    let sandbox = Sandbox::new(name);
+    sandbox.install_fake_helper();
+    sandbox.write_config(ENABLED);
+    sandbox.add_recording("a.m4a", &m4a(1_787_604_456, 3, b"first"));
+    sandbox.add_recording("b.m4a", &m4a(1_787_604_456, 3, b"second"));
+    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
+    let ids = document["ingested"].as_array().expect("records").iter()
+        .map(|row| row["id"].as_str().expect("id").to_owned()).collect::<Vec<_>>();
+    let text = std::fs::read_to_string(sandbox.config_path()).expect("config")
+        .replace("mode = \"off\"", "mode = \"desktop\"");
+    std::fs::write(sandbox.config_path(), text).expect("notify config");
+    (sandbox, ids)
+}
+fn seed(sandbox: &Sandbox, id: &str) {
+    sandbox.ledger().execute(
+        "INSERT INTO retention_intents (artifact_kind,recording,path,expected,recorded_at)
+         SELECT 'audio',id,audio_path,digest,1 FROM recordings WHERE id=?1", [id],
+    ).expect("pending intent");
+}
+fn clone_path(sandbox: &Sandbox, id: &str) -> std::path::PathBuf {
+    sandbox.path().join(format!("home/.vpt/audio/{id}.m4a"))
+}
+fn notifications(sandbox: &Sandbox) -> usize {
+    std::fs::read_to_string(sandbox.fake_log()).unwrap_or_default().lines()
+        .filter(|line| line.starts_with("notify\t")).count()
+}
+
+#[test]
+fn retention_combines_recovery_and_new_moves_in_one_report_and_event() {
+    let (sandbox, ids) = fixture("retention-recovery-event");
+    seed(&sandbox, &ids[0]);
+    sandbox.set_mtime(&clone_path(&sandbox, &ids[1]), 2 * 86_400);
+    let output = run(sandbox.vpt().args(["retention", "run", "--json"]));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
+    assert_eq!(document["moved"].as_array().expect("moves").len(), 2);
+    assert_eq!(notifications(&sandbox), 1);
+    let log = std::fs::read_to_string(sandbox.fake_log()).expect("log");
+    assert!(log.contains("2 artifacts moved to the Trash"), "{log}");
+}
+
+#[test]
+fn partial_startup_retains_completed_ids_and_one_event_on_retention_and_ingest() {
+    for verb in ["retention", "ingest"] {
+        let (sandbox, ids) = fixture(&format!("partial-{verb}"));
+        seed(&sandbox, &ids[0]);
+        seed(&sandbox, &ids[1]);
+        std::fs::write(clone_path(&sandbox, &ids[1]), b"replacement").expect("replacement");
+        let mut command = sandbox.vpt();
+        command.arg(verb);
+        if verb == "retention" { command.arg("run"); }
+        let output = run(command.arg("--json"));
+        assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
+        assert!(stdout(&output).is_empty());
+        let document: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("json");
+        assert_eq!(document["error"]["rule"], "retention_target_modified");
+        assert_eq!(document["error"]["completed"], serde_json::json!([ids[0]]));
+        assert!(!clone_path(&sandbox, &ids[0]).exists());
+        assert!(clone_path(&sandbox, &ids[1]).exists());
+        assert_eq!(notifications(&sandbox), 1);
+    }
+}
+
+#[test]
+fn a_ledger_failure_after_the_move_still_reports_its_recording_id() {
+    let (sandbox, ids) = fixture("retention-row-failure");
+    sandbox.set_mtime(&clone_path(&sandbox, &ids[0]), 2 * 86_400);
+    sandbox.set_mtime(&clone_path(&sandbox, &ids[1]), 0);
+    sandbox.ledger().execute_batch(
+        "CREATE TRIGGER fail_trashed BEFORE UPDATE OF audio_trashed_at ON recordings
+         BEGIN SELECT RAISE(FAIL,'injected row failure'); END;",
+    ).expect("failure trigger");
+    let output = run(sandbox.vpt().args(["retention", "run", "--json"]));
+    assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
+    let document: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("json");
+    assert_eq!(document["error"]["completed"], serde_json::json!([ids[0]]));
+    assert!(!clone_path(&sandbox, &ids[0]).exists());
+    assert_eq!(notifications(&sandbox), 1);
+    let pending: i64 = sandbox.ledger().query_row(
+        "SELECT COUNT(*) FROM retention_intents WHERE completed_at IS NULL", [], |row| row.get(0),
+    ).expect("pending");
+    assert_eq!(pending, 1);
+}
+
+#[test]
+fn incompatible_helper_blocks_reconciliation_without_a_trash_request() {
+    let (sandbox, ids) = fixture("retention-recovery-version");
+    seed(&sandbox, &ids[0]);
+    let output = run(sandbox.vpt().args(["ingest", "--json"]).env("VPT_FAKE_VERSION", "2.0.0"));
+    assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
+    let document: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("json");
+    assert_eq!(document["error"]["rule"], "helper_version");
+    assert!(clone_path(&sandbox, &ids[0]).exists());
+    assert!(!sandbox.fake_log().exists());
+}
+
+#[test]
+fn dry_run_preserves_pending_intents_and_emits_no_event() {
+    let (sandbox, ids) = fixture("retention-pending-dry");
+    seed(&sandbox, &ids[0]);
+    sandbox.set_mtime(&clone_path(&sandbox, &ids[0]), 2 * 86_400);
+    let output = run(sandbox.vpt().args(["retention", "run", "--dry-run", "--json"]));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert!(clone_path(&sandbox, &ids[0]).exists());
+    let pending: i64 = sandbox.ledger().query_row(
+        "SELECT COUNT(*) FROM retention_intents WHERE completed_at IS NULL", [], |row| row.get(0),
+    ).expect("pending");
+    assert_eq!(pending, 1);
+    assert!(!sandbox.fake_log().exists());
+}
+```
+
+Support addition, using the same fixed clock Task 27 gives every child:
 
 ```rust
 impl Sandbox {
     pub fn set_mtime(&self, path: &Path, seconds_ago: u64) {
-        let file = std::fs::File::options().write(true).open(path).expect("open for mtime");
-        let when = std::time::SystemTime::now() - std::time::Duration::from_secs(seconds_ago);
-        file.set_times(std::fs::FileTimes::new().set_modified(when)).expect("mtime");
+        let seconds = u64::try_from(FIXED_NOW_SECS).expect("positive fixture clock")
+            .checked_sub(seconds_ago).expect("fixture mtime after epoch");
+        let when = std::time::UNIX_EPOCH + std::time::Duration::from_secs(seconds);
+        let file = std::fs::File::options().write(true).open(path).expect("fixture file");
+        file.set_times(std::fs::FileTimes::new().set_modified(when)).expect("fixture mtime");
     }
 }
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p vpt-adapters --test retention_reconcile &&`
-`cargo test -p vpt --features dev-tools --test retention`
+Run separately:
 
-Expected: compile errors naming `reconcile_intents` and `RetentionError`; the command tests FAIL with
-exit 2.
+```bash
+cargo test -p vpt-adapters --test retention_reconcile
+cargo test -p vpt --features dev-tools --test retention --test retention_startup
+```
+
+Expected: missing retention exports cause the new test modules to fail compilation; once connected, the
+new command cases fail behaviorally. Zero selected tests or a successful command does not satisfy the
+red step. Record the leaf names selected.
 
 - [ ] **Step 3: Write the minimal implementation**
+
+`crates/vpt-application/src/retention/report.rs`:
+
+```rust
+use crate::ports::{LedgerError, StoreError, TrashError};
+use std::path::PathBuf;
+use vpt_domain::identity::RecordingId;
+use vpt_domain::layout::StoreKey;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Moved {
+    pub recording: RecordingId,
+    pub store: StoreKey,
+    pub path: PathBuf,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeptReason { Untracked, DigestMismatch }
+impl KeptReason {
+    pub fn as_str(self) -> &'static str {
+        match self { Self::Untracked => "untracked", Self::DigestMismatch => "digest_mismatch" }
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Kept { pub path: PathBuf, pub reason: KeptReason }
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ReconcileProgress {
+    pub moved: Vec<Moved>,
+    pub completed: Vec<RecordingId>,
+}
+impl ReconcileProgress {
+    pub(super) fn complete(&mut self, id: &RecordingId) {
+        if !self.completed.contains(id) { self.completed.push(id.clone()); }
+    }
+    pub(super) fn failure(&self, error: RetentionError) -> ReconcileFailure {
+        ReconcileFailure { error, progress: self.clone() }
+    }
+}
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct RetentionReport {
+    pub moved: Vec<Moved>,
+    pub kept: Vec<Kept>,
+    pub completed: Vec<RecordingId>,
+}
+impl From<ReconcileProgress> for RetentionReport {
+    fn from(progress: ReconcileProgress) -> Self {
+        Self { moved: progress.moved, kept: vec![], completed: progress.completed }
+    }
+}
+impl RetentionReport {
+    pub(super) fn failure(&self, error: RetentionError) -> RetentionFailure {
+        RetentionFailure { error, report: self.clone() }
+    }
+    pub(super) fn moved(&mut self, item: Moved, dry_run: bool) {
+        if !dry_run && !self.completed.contains(&item.recording) {
+            self.completed.push(item.recording.clone());
+        }
+        self.moved.push(item);
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RetentionError {
+    Disabled,
+    TargetModified(PathBuf),
+    Ledger(LedgerError),
+    Stores(StoreError),
+    Trash(TrashError),
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReconcileFailure {
+    pub error: RetentionError,
+    pub progress: ReconcileProgress,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetentionFailure {
+    pub error: RetentionError,
+    pub report: RetentionReport,
+}
+```
 
 `crates/vpt-application/src/retention/reconcile.rs`:
 
 ```rust
-//! Pending intents, settled before any other mutation: absent completes,
-//! unchanged moves again, replaced refuses.
+use super::{Moved, ReconcileFailure, ReconcileProgress, RetentionError};
+use crate::ports::{Clock, LedgerError, RecordingLedger, RetentionJournal, StoreError, Stores, Trash};
+use std::path::Path;
+use vpt_domain::layout::StoreKey;
 
-use super::RetentionError;
-use crate::ports::artifacts::ArtifactFiles;
-use crate::ports::clock::Clock;
-use crate::ports::ledger::RecordingLedger;
-use crate::ports::retention::RetentionJournal;
-use crate::ports::trash::Trash;
-use std::path::PathBuf;
-
-pub fn reconcile_intents(
-    journal: &dyn RetentionJournal,
-    ledger: &dyn RecordingLedger,
-    files: &dyn ArtifactFiles,
-    trash: &dyn Trash,
-    clock: &dyn Clock,
-) -> Result<Vec<PathBuf>, RetentionError> {
-    let mut moved = Vec::new();
-    for intent in journal.pending_intents().map_err(RetentionError::Ledger)? {
-        match files.digest_of(&intent.path).map_err(|error| RetentionError::Files(error.0))? {
+pub fn reconcile_intents<J, L, S, T, C>(
+    journal: &J, ledger: &L, stores: &S, trash: &T, clock: &C, audio: &Path,
+) -> Result<ReconcileProgress, ReconcileFailure>
+where
+    J: RetentionJournal, L: RecordingLedger, S: Stores, T: Trash, C: Clock,
+{
+    let mut progress = ReconcileProgress::default();
+    let intents = journal.pending_intents().map_err(|e| progress.failure(RetentionError::Ledger(e)))?;
+    for intent in intents {
+        if intent.path.parent() != Some(audio) {
+            return Err(progress.failure(RetentionError::Stores(StoreError::Escape(intent.path))));
+        }
+        let record = ledger.by_id(&intent.recording)
+            .map_err(|e| progress.failure(RetentionError::Ledger(e)))?
+            .ok_or_else(|| progress.failure(RetentionError::Ledger(
+                LedgerError::Corrupt("pending retention intent has no recording".into()),
+            )))?;
+        if record.audio_path != intent.path || record.digest != intent.expected {
+            return Err(progress.failure(RetentionError::TargetModified(intent.path)));
+        }
+        stores.validate_path(&intent.path).map_err(|e| progress.failure(RetentionError::Stores(e)))?;
+        match stores.digest_of(&intent.path).map_err(|e| progress.failure(RetentionError::Stores(e)))? {
             None => {}
             Some(digest) if digest == intent.expected => {
-                trash.trash(&intent.path).map_err(RetentionError::Trash)?;
-                moved.push(intent.path.clone());
+                stores.validate_path(&intent.path).map_err(|e| progress.failure(RetentionError::Stores(e)))?;
+                trash.trash(&intent.path).map_err(|e| progress.failure(RetentionError::Trash(e)))?;
+                progress.moved.push(Moved {
+                    recording: intent.recording.clone(), store: StoreKey::Audio, path: intent.path.clone(),
+                });
+                progress.complete(&intent.recording);
             }
-            Some(_) => return Err(RetentionError::TargetModified(intent.path)),
+            Some(_) => return Err(progress.failure(RetentionError::TargetModified(intent.path))),
         }
         let now = clock.now();
-        ledger.set_audio_trashed(&intent.recording, now).map_err(RetentionError::Ledger)?;
-        journal.complete_intent(intent.id, now).map_err(RetentionError::Ledger)?;
+        ledger.set_audio_trashed(&intent.recording, now)
+            .map_err(|e| progress.failure(RetentionError::Ledger(e)))?;
+        progress.complete(&intent.recording);
+        journal.complete_intent(intent.id, now).map_err(|e| progress.failure(RetentionError::Ledger(e)))?;
     }
-    Ok(moved)
+    Ok(progress)
 }
 ```
 
 `crates/vpt-application/src/retention/mod.rs`:
 
 ```rust
-//! `vpt retention run`: the expired artifacts the ledger owns, moved to the
-//! Trash one intent at a time.
+mod reconcile;
+mod report;
+pub use reconcile::reconcile_intents;
+pub use report::{
+    Kept, KeptReason, Moved, ReconcileFailure, ReconcileProgress, RetentionError,
+    RetentionFailure, RetentionReport,
+};
 
-pub mod reconcile;
-
-use crate::ports::artifacts::ArtifactFiles;
-use crate::ports::clock::Clock;
-use crate::ports::ledger::{LedgerError, RecordingLedger, RecordingRecord};
-use crate::ports::notifier::Notifier;
-use crate::ports::retention::{ArtifactKind, NewIntent, RetentionJournal};
-use crate::ports::stores::{StoreEntry, Stores};
-use crate::ports::trash::{Trash, TrashError};
-use crate::settings::{RetentionSettings, StorePaths};
-use std::path::PathBuf;
+use crate::ports::{
+    ArtifactKind, Clock, NewIntent, RecordingLedger, RecordingRecord, RetentionJournal,
+    StoreEntry, StoreError, Stores, Trash,
+};
+use crate::{RetentionSettings, StorePaths};
 use vpt_domain::layout::StoreKey;
-use vpt_domain::notification::{EventKind, Notification};
 use vpt_domain::retention::expired;
 
-pub struct Retention<'a> {
-    pub ledger: &'a dyn RecordingLedger,
-    pub journal: &'a dyn RetentionJournal,
-    pub stores: &'a dyn Stores,
-    pub files: &'a dyn ArtifactFiles,
-    pub trash: &'a dyn Trash,
-    pub clock: &'a dyn Clock,
-    pub notifier: &'a dyn Notifier,
+pub struct Retention<'a, L, J, S, T, C> {
+    pub ledger: &'a L,
+    pub journal: &'a J,
+    pub stores: &'a S,
+    pub trash: &'a T,
+    pub clock: &'a C,
     pub settings: &'a RetentionSettings,
     pub paths: &'a StorePaths,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Moved {
-    pub store: StoreKey,
-    pub path: PathBuf,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KeptReason {
-    Untracked,
-    DigestMismatch,
-}
-
-impl KeptReason {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            KeptReason::Untracked => "untracked",
-            KeptReason::DigestMismatch => "digest_mismatch",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Kept {
-    pub path: PathBuf,
-    pub reason: KeptReason,
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct RetentionReport {
-    pub moved: Vec<Moved>,
-    pub kept: Vec<Kept>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RetentionError {
-    Disabled,
-    TargetModified(PathBuf),
-    Ledger(LedgerError),
-    Files(String),
-    Trash(TrashError),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RetentionFailure {
-    pub error: RetentionError,
-    pub completed: Vec<PathBuf>,
-}
-
-impl Retention<'_> {
-    pub fn run(&self, dry_run: bool) -> Result<RetentionReport, RetentionFailure> {
-        if !self.settings.enabled {
-            return Err(RetentionFailure { error: RetentionError::Disabled, completed: vec![] });
-        }
-        let mut report = RetentionReport::default();
-        let owned = self.ledger.recordings().map_err(|error| RetentionFailure { error: RetentionError::Ledger(error), completed: vec![] })?;
+impl<L, J, S, T, C> Retention<'_, L, J, S, T, C>
+where
+    L: RecordingLedger, J: RetentionJournal, S: Stores, T: Trash, C: Clock,
+{
+    pub fn run(&self, dry_run: bool, initial: ReconcileProgress) -> Result<RetentionReport, RetentionFailure> {
+        let mut report = RetentionReport::from(initial);
+        if !self.settings.enabled { return Err(report.failure(RetentionError::Disabled)); }
+        let owned = self.ledger.recordings().map_err(|e| report.failure(RetentionError::Ledger(e)))?;
         for key in StoreKey::all() {
-            if key == StoreKey::Audio && !self.settings.include_audio {
-                continue;
-            }
+            if key == StoreKey::Audio && !self.settings.include_audio { continue; }
             let hold = self.settings.hold(key);
-            if hold.seconds() == 0 {
-                continue;
-            }
-            let entries = self.stores.entries(self.paths.get(key)).map_err(|error| self.failure(RetentionError::Files(error.0), &report))?;
+            if hold.seconds() == 0 { continue; }
+            let entries = self.stores.entries(self.paths.get(key))
+                .map_err(|e| report.failure(RetentionError::Stores(e)))?;
             for entry in entries {
-                let Some(record) = owned.iter().find(|record| record.audio_path == entry.path && record.audio_trashed_at.is_none()) else {
+                let record = owned.iter().find(|record| {
+                    key == StoreKey::Audio && record.audio_path == entry.path && record.audio_trashed_at.is_none()
+                });
+                let Some(record) = record else {
                     report.kept.push(Kept { path: entry.path, reason: KeptReason::Untracked });
                     continue;
                 };
-                if !expired(entry.mtime, hold, self.clock.now()) {
-                    continue;
+                if expired(entry.mtime, hold, self.clock.now()) {
+                    self.expire(key, &entry, record, dry_run, &mut report)?;
                 }
-                self.expire(key, &entry, record, dry_run, &mut report)?;
             }
-        }
-        if !dry_run && !report.moved.is_empty() {
-            self.notifier.deliver(&self.notification(&report));
         }
         Ok(report)
     }
 
-    fn expire(&self, key: StoreKey, entry: &StoreEntry, record: &RecordingRecord, dry_run: bool, report: &mut RetentionReport) -> Result<(), RetentionFailure> {
-        let fail = |error| self.failure(error, report);
-        if self.files.digest_of(&entry.path).map_err(|error| fail(RetentionError::Files(error.0)))? != Some(record.digest) {
+    fn expire(
+        &self, key: StoreKey, entry: &StoreEntry, record: &RecordingRecord,
+        dry_run: bool, report: &mut RetentionReport,
+    ) -> Result<(), RetentionFailure> {
+        if entry.path.parent() != Some(self.paths.get(key)) {
+            return Err(report.failure(RetentionError::Stores(StoreError::Escape(entry.path.clone()))));
+        }
+        self.stores.validate_path(&entry.path).map_err(|e| report.failure(RetentionError::Stores(e)))?;
+        if self.stores.digest_of(&entry.path).map_err(|e| report.failure(RetentionError::Stores(e)))? != Some(record.digest) {
             report.kept.push(Kept { path: entry.path.clone(), reason: KeptReason::DigestMismatch });
             return Ok(());
         }
-        if !dry_run {
-            let now = self.clock.now();
-            let intent = NewIntent { kind: ArtifactKind::Audio, recording: record.id.clone(), path: entry.path.clone(), expected: record.digest, recorded_at: now };
-            let id = self.journal.record_intent(&intent).map_err(|error| fail(RetentionError::Ledger(error)))?;
-            self.trash.trash(&entry.path).map_err(|error| fail(RetentionError::Trash(error)))?;
-            self.ledger.set_audio_trashed(&record.id, now).map_err(|error| fail(RetentionError::Ledger(error)))?;
-            self.journal.complete_intent(id, now).map_err(|error| fail(RetentionError::Ledger(error)))?;
+        let moved = Moved { recording: record.id.clone(), store: key, path: entry.path.clone() };
+        if dry_run {
+            report.moved(moved, true);
+            return Ok(());
         }
-        report.moved.push(Moved { store: key, path: entry.path.clone() });
+        let now = self.clock.now();
+        let intent = NewIntent {
+            kind: ArtifactKind::Audio, recording: record.id.clone(), path: entry.path.clone(),
+            expected: record.digest, recorded_at: now,
+        };
+        let id = self.journal.record_intent(&intent).map_err(|e| report.failure(RetentionError::Ledger(e)))?;
+        self.stores.validate_path(&entry.path).map_err(|e| report.failure(RetentionError::Stores(e)))?;
+        self.trash.trash(&entry.path).map_err(|e| report.failure(RetentionError::Trash(e)))?;
+        report.moved(moved, false);
+        self.ledger.set_audio_trashed(&record.id, now).map_err(|e| report.failure(RetentionError::Ledger(e)))?;
+        self.journal.complete_intent(id, now).map_err(|e| report.failure(RetentionError::Ledger(e)))?;
         Ok(())
-    }
-
-    fn failure(&self, error: RetentionError, report: &RetentionReport) -> RetentionFailure {
-        RetentionFailure { error, completed: report.moved.iter().map(|moved| moved.path.clone()).collect() }
-    }
-
-    fn notification(&self, report: &RetentionReport) -> Notification {
-        let mut counts: Vec<(String, u64)> = Vec::new();
-        for moved in &report.moved {
-            match counts.iter_mut().find(|(store, _)| store == moved.store.key_name()) {
-                Some((_, count)) => *count += 1,
-                None => counts.push((moved.store.key_name().to_owned(), 1)),
-            }
-        }
-        Notification::done(EventKind::Retention, format!("{} artifacts moved to the Trash", report.moved.len()), counts, self.clock.now())
     }
 }
 ```
 
-The closure `fail` borrows `report` immutably while `expire` later pushes into it; write `fail` as a
-small method call at each site instead, `self.failure(RetentionError::Files(error.0), report)`, so the
-borrow checker is satisfied. The listing above shows the intent; the committed file uses the method form
-at every `map_err`. Add `pub mod retention;` to the application `lib.rs`.
-
-`Runtime::mutating` in `crates/vpt/src/compose.rs` gains, after `repair_publications`:
+Application `lib.rs` retains a private `mod retention;` and re-exports only:
 
 ```rust
-        reconcile_intents(&self.ledger, &self.ledger, &FilesystemStores, self.trash(), &self.clock).map_err(retention_error)?;
+pub use retention::{
+    Kept, KeptReason, Moved, ReconcileFailure, ReconcileProgress, Retention,
+    RetentionError, RetentionFailure, RetentionReport, reconcile_intents,
+};
 ```
 
-with
+`Stores::validate_path` is Task 14's checked-root operation: it reopens the canonical root with
+`O_NOFOLLOW_ANY`, compares device and inode to its held descriptor, and checks the leaf without
+following a symbolic link. A journal path is checked against the audio root and the recording's
+pinned path before any content open, and checked again immediately before the helper call.
+
+Replace `Runtime::mutating` in `compose.rs` and remove its now-unused `RepairReport` import:
 
 ```rust
-pub fn retention_error(error: RetentionError) -> ErrorDocument {
+    pub(crate) fn mutating(&self) -> Result<ReconcileProgress, Box<StartupFailure>> {
+        if self._lock.is_none() {
+            return Err(Box::new(StartupFailure {
+                error: ErrorDocument::new(ErrorKind::Ledger, "mutating startup requires the write lock"),
+                progress: ReconcileProgress::default(),
+            }));
+        }
+        repair_publications(&self.ledger, &self.stores, |_| None).map_err(|error| StartupFailure {
+            error: repair_error(error), progress: ReconcileProgress::default(),
+        })?;
+        reconcile_intents(
+            &self.ledger, &self.ledger, &self.stores, &self.helper, &self.clock, &self.roots.stores.audio,
+        ).map_err(|failure| Box::new(StartupFailure {
+            error: retention_error(failure.error), progress: failure.progress,
+        }))
+    }
+```
+
+Add these imports and the private composition module:
+
+```rust
+mod recovery;
+pub(crate) use recovery::{StartupFailure, retention_error};
+use vpt_application::{ReconcileProgress, reconcile_intents};
+```
+
+`crates/vpt/src/compose/recovery.rs`:
+
+```rust
+use super::Runtime;
+use crate::cli::output::Outcome;
+use serde_json::json;
+use vpt_application::ports::{Clock, StoreError, TrashError};
+use vpt_application::{Moved, ReconcileProgress, RetentionError};
+use vpt_domain::notification::{EventKind, Notification};
+use vpt_protocol::error::{ErrorDocument, ErrorKind};
+
+pub(crate) struct StartupFailure {
+    pub error: ErrorDocument,
+    pub progress: ReconcileProgress,
+}
+
+pub(crate) fn retention_error(error: RetentionError) -> ErrorDocument {
     match error {
         RetentionError::Disabled => ErrorDocument::new(ErrorKind::Usage, "retention.enabled is false"),
-        RetentionError::TargetModified(path) => {
-            ErrorDocument::new(ErrorKind::Refused, format!("{} changed since its retention intent was recorded", path.display())).rule("retention_target_modified")
-        }
+        RetentionError::TargetModified(path) => ErrorDocument::new(
+            ErrorKind::Refused, format!("{} changed since its retention intent was recorded", path.display()),
+        ).rule("retention_target_modified"),
         RetentionError::Ledger(error) => ErrorDocument::new(ErrorKind::Ledger, format!("{error:?}")),
-        RetentionError::Files(detail) => ErrorDocument::new(ErrorKind::Store, detail),
-        RetentionError::Trash(TrashError::HelperAbsent) => ErrorDocument::new(ErrorKind::Refused, "the helper is absent, so nothing can reach the Trash").rule("no_trash"),
+        RetentionError::Stores(StoreError::Escape(path)) => ErrorDocument::new(
+            ErrorKind::Refused, format!("{} escapes its store root", path.display()),
+        ).rule("path_escape"),
+        RetentionError::Stores(StoreError::Io(detail)) => ErrorDocument::new(ErrorKind::Store, detail),
+        RetentionError::Trash(TrashError::HelperAbsent) => ErrorDocument::new(
+            ErrorKind::Refused, "the helper is absent, so nothing can reach the Trash",
+        ).rule("no_trash"),
+        RetentionError::Trash(TrashError::HelperVersion { found }) => ErrorDocument::new(
+            ErrorKind::Refused, format!("the helper is major version {found}; this build needs 1"),
+        ).rule("helper_version"),
         RetentionError::Trash(error) => ErrorDocument::new(ErrorKind::Helper, format!("{error:?}")),
     }
+}
+impl Runtime {
+    pub(crate) fn retention_notice(&self, moved: &[Moved]) {
+        if moved.is_empty() { return; }
+        let mut counts: Vec<(String, u64)> = vec![];
+        for item in moved {
+            if let Some((_, count)) = counts.iter_mut().find(|(key, _)| key == item.store.key_name()) {
+                *count += 1;
+            } else {
+                counts.push((item.store.key_name().into(), 1));
+            }
+        }
+        self.notifier.deliver(&Notification::done(
+            EventKind::Retention, format!("{} artifacts moved to the Trash", moved.len()), counts, self.clock.now(),
+        ));
+    }
+
+    pub(crate) fn finish_recovery(&self, mut outcome: Outcome, progress: &ReconcileProgress) -> Outcome {
+        self.retention_notice(&progress.moved);
+        let lines: Vec<String> = progress.moved.iter()
+            .map(|item| format!("moved {} ({})", item.path.display(), item.store.key_name())).collect();
+        match &mut outcome {
+            Outcome::Success { human, document } => {
+                for line in &lines { human.push_str(line); human.push('\n'); }
+                if !lines.is_empty() {
+                    human.push_str(&format!("retention moved {}\n", lines.len()));
+                    document["retention_moved"] = json!(progress.moved.iter().map(|item| {
+                        json!({"store":item.store.key_name(),"path":item.path})
+                    }).collect::<Vec<_>>());
+                }
+                let diagnostics = self.diagnostics();
+                for line in &diagnostics { human.push_str(&format!("note: {line}\n")); }
+                if !diagnostics.is_empty() { document["diagnostics"] = json!(diagnostics); }
+            }
+            Outcome::Failure(error) | Outcome::FailedReport { error, .. } => {
+                for id in &progress.completed {
+                    if !error.completed.iter().any(|known| known == id.as_str()) {
+                        error.completed.push(id.as_str().to_owned());
+                    }
+                }
+                error.diagnostics.extend(lines);
+                error.diagnostics.extend(self.diagnostics());
+            }
+        }
+        outcome
+    }
+}
+```
+
+Replace only `run` in `crates/vpt/src/commands/ingest.rs`; retain its Task 27 output functions and
+add `use vpt_application::ReconcileProgress;`:
+
+```rust
+pub fn run(runtime: &Runtime, dry_run: bool, once: Option<PathBuf>) -> Outcome {
+    let progress = if dry_run {
+        ReconcileProgress::default()
+    } else {
+        match runtime.mutating() {
+            Ok(progress) => progress,
+            Err(failure) => return runtime.finish_recovery(Outcome::Failure(failure.error), &failure.progress),
+        }
+    };
+    let ingest = Ingest {
+        recorder: &runtime.recorder,
+        archive: &runtime.archive,
+        ledger: &runtime.ledger,
+        clock: &runtime.clock,
+        trash: runtime.trash(),
+        notifier: runtime.notifier.as_ref(),
+        settings: &runtime.settings.source,
+    };
+    let mode = Mode { dry_run, once };
+    let outcome = match ingest.run(&mode) {
+        Ok(mut report) => {
+            report.log.extend(runtime.diagnostics());
+            Outcome::Success { human: human(&report), document: document("ingest", body(&report)) }
+        }
+        Err(mut error) => {
+            error.log.extend(runtime.diagnostics());
+            Outcome::Failure(failure(*error))
+        }
+    };
+    runtime.finish_recovery(outcome, &progress)
 }
 ```
 
 `crates/vpt/src/commands/retention.rs`:
 
 ```rust
-//! `vpt retention run [--dry-run]`.
-
 use crate::cli::output::Outcome;
 use crate::compose::{Runtime, retention_error};
 use serde_json::json;
-use vpt_adapters::helper::{BUILT_AGAINST_MAJOR, HelperError};
-use vpt_adapters::stores::FilesystemStores;
-use vpt_application::retention::{Retention, RetentionReport};
+use vpt_adapters::{BUILT_AGAINST_MAJOR, HelperError};
+use vpt_application::{ReconcileProgress, Retention, RetentionReport};
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
-pub fn run(runtime: &Runtime, dry_run: bool) -> Outcome {
+pub(crate) fn run(runtime: &Runtime, dry_run: bool) -> Outcome {
     if !runtime.settings.retention.enabled {
         return Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, "retention.enabled is false"));
     }
-    match runtime.helper.version() {
-        Err(HelperError::Absent) => {
-            return Outcome::Failure(ErrorDocument::new(ErrorKind::Refused, "the helper is absent, so nothing can reach the Trash").rule("no_trash"));
-        }
-        Err(HelperError::MajorMismatch { found }) => {
-            let message = format!("the helper is major version {found}; this build needs {BUILT_AGAINST_MAJOR}");
-            return Outcome::Failure(ErrorDocument::new(ErrorKind::Refused, message).rule("helper_version"));
-        }
-        _ => {}
+    let preflight = match runtime.helper.version() {
+        Ok(_) => Ok(()),
+        Err(HelperError::Absent) => Err(ErrorDocument::new(
+            ErrorKind::Refused, "the helper is absent, so nothing can reach the Trash",
+        ).rule("no_trash")),
+        Err(HelperError::MajorMismatch { found }) => Err(ErrorDocument::new(
+            ErrorKind::Refused, format!("the helper is major version {found}; this build needs {BUILT_AGAINST_MAJOR}"),
+        ).rule("helper_version")),
+        Err(_) => Err(ErrorDocument::new(ErrorKind::Helper, "the helper version could not be validated")),
+    };
+    if let Err(error) = preflight {
+        return Outcome::Failure(error.diagnostics(runtime.diagnostics()));
     }
-    let lock = if dry_run { None } else { match runtime.mutating() { Ok(lock) => Some(lock), Err(error) => return Outcome::Failure(error) } };
+    let initial = if dry_run {
+        ReconcileProgress::default()
+    } else {
+        match runtime.mutating() {
+            Ok(progress) => progress,
+            Err(failure) => return runtime.finish_recovery(Outcome::Failure(failure.error), &failure.progress),
+        }
+    };
     let retention = Retention {
-        ledger: &runtime.ledger,
-        journal: &runtime.ledger,
-        stores: &FilesystemStores,
-        files: &FilesystemStores,
-        trash: runtime.trash(),
-        clock: &runtime.clock,
-        notifier: runtime.notifier.as_ref(),
-        settings: &runtime.settings.retention,
-        paths: &runtime.roots.stores,
+        ledger: &runtime.ledger, journal: &runtime.ledger, stores: &runtime.stores,
+        trash: &runtime.helper, clock: &runtime.clock,
+        settings: &runtime.settings.retention, paths: &runtime.roots.stores,
     };
-    let outcome = match retention.run(dry_run) {
-        Ok(report) => Outcome::Success { human: human(&report, dry_run), document: document("retention run", body(&report)) },
-        Err(failure) => Outcome::Failure(retention_error(failure.error).completed(failure.completed.iter().map(|p| p.display().to_string()).collect())),
-    };
-    drop(lock);
-    outcome
+    match retention.run(dry_run, initial) {
+        Ok(report) => finish(runtime, report, None, dry_run),
+        Err(failure) => finish(runtime, failure.report, Some(retention_error(failure.error)), dry_run),
+    }
 }
 
+fn finish(runtime: &Runtime, report: RetentionReport, error: Option<ErrorDocument>, dry_run: bool) -> Outcome {
+    if !dry_run { runtime.retention_notice(&report.moved); }
+    let mut diagnostics = runtime.diagnostics();
+    match error {
+        Some(error) => {
+            diagnostics.extend(report.moved.iter().map(|item| format!("moved {} ({})", item.path.display(), item.store.key_name())));
+            diagnostics.push(format!("moved {}, kept {}", report.moved.len(), report.kept.len()));
+            Outcome::Failure(error.completed(report.completed.iter().map(|id| id.as_str().to_owned()).collect()).diagnostics(diagnostics))
+        }
+        None => {
+            let mut human = human(&report, dry_run);
+            for line in &diagnostics { human.push_str(&format!("note: {line}\n")); }
+            let mut body = body(&report);
+            if !diagnostics.is_empty() { body["diagnostics"] = json!(diagnostics); }
+            Outcome::Success { human, document: document("retention run", body) }
+        }
+    }
+}
 fn body(report: &RetentionReport) -> serde_json::Value {
     json!({
-        "moved": report.moved.iter().map(|m| json!({"store": m.store.key_name(), "path": m.path})).collect::<Vec<_>>(),
-        "kept": report.kept.iter().map(|k| json!({"path": k.path, "reason": k.reason.as_str()})).collect::<Vec<_>>(),
+        "moved": report.moved.iter().map(|item| json!({"store":item.store.key_name(),"path":item.path})).collect::<Vec<_>>(),
+        "kept": report.kept.iter().map(|item| json!({"path":item.path,"reason":item.reason.as_str()})).collect::<Vec<_>>(),
     })
 }
-
 fn human(report: &RetentionReport, dry_run: bool) -> String {
     let verb = if dry_run { "would move" } else { "moved" };
-    let mut lines: Vec<String> = report.moved.iter().map(|m| format!("{verb} {} ({})", m.path.display(), m.store.key_name())).collect();
-    lines.extend(report.kept.iter().map(|k| format!("kept {} ({})", k.path.display(), k.reason.as_str())));
+    let mut lines: Vec<String> = report.moved.iter().map(|item| format!("{verb} {} ({})", item.path.display(), item.store.key_name())).collect();
+    lines.extend(report.kept.iter().map(|item| format!("kept {} ({})", item.path.display(), item.reason.as_str())));
     lines.push(format!("{verb} {}, kept {}", report.moved.len(), report.kept.len()));
     lines.join("\n") + "\n"
 }
 ```
 
-The helper is probed before the lock so an absent or mismatched helper is refused with nothing else
-touched, dry run included. Dispatch:
-`Verb::RetentionRun { dry_run } => with_runtime(&environment, invocation,`
-`Creation::None, |runtime| commands::retention::run(runtime, *dry_run)),` and `commands/mod.rs` gains
-`retention`.
+Dispatch in `crates/vpt/src/lib.rs`:
+
+```rust
+        Verb::RetentionRun { dry_run } => {
+            let access = if *dry_run { AccessMode::ReadOnly } else { AccessMode::Mutating };
+            with_runtime(&environment, invocation, access, |runtime| commands::retention::run(runtime, *dry_run))
+        }
+```
+
+Add `pub(crate) mod retention;` to `commands/mod.rs`. The runtime's private lock remains owned until
+the command returns; retention obtains no second lock. A helper version failure ends the command
+before reconciliation or new moves. The helper also validates its version on its first Trash call,
+covering recovery entered through ingest.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cargo test --workspace --features dev-tools`
+```bash
+cargo test -p vpt-adapters --test retention_reconcile
+cargo test -p vpt --features dev-tools --test retention --test retention_startup --test ingest
+cargo test --workspace --features dev-tools
+cargo clippy --workspace --all-targets --features dev-tools -- -D warnings
+just file-size
+```
 
-Expected: all PASS, the ingest suites of Task 27 included, since `mutating` now reconciles intents too.
+Expected: the named recovery cases, command cases and ingest regressions pass; no warnings and no
+file over its hard limit. Record test names and measured results, not a predicted count.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add crates
-SKIP_AI_COMMIT=1 git commit -m "feat(retention): vpt retention run with journaled moves to the Trash"
+SKIP_AI_COMMIT=1 git commit -m "feat(retention): journal Trash moves and retain partial recovery results"
 ```
 
 ______________________________________________________________________
@@ -17884,36 +18373,19 @@ Run: `just file-size`
 
 Expected: no `FAIL` line; every Swift source is under 200 lines.
 
-- [ ] **Step 5: Commit**
-
-```bash
-git add helper justfile .github .gitignore
-SKIP_AI_COMMIT=1 git commit -m "feat(helper): the vpt-macos package with version, notify and trash"
-```
-
-______________________________________________________________________
-
-### Task 34: The final gates and the pull request record
-
-Nothing new is built here. This task proves the stage as a whole and prepares what the pull request
-carries: the gate output, the file-size table and the by-hand mutation table spec section 12 requires.
-
-**Files:**
-
-- Modify: none, unless a gate fails and the fix is committed under the task that owns the file.
-
-- [ ] **Step 1: Run every gate in CI order**
+Run every gate in CI order before the helper commit:
 
 Run: `just ship`
 
-Expected: `fmt` prints nothing; `clippy` ends in `Finished` with no warnings; `test` reports every crate
-`test result: ok.` and no test over one second in the `--report-time` sense (spot-check the slowest with
-`cargo test --workspace --features dev-tools -- -Z unstable-options --report-time` on a nightly only if
-one looks slow; the sandbox tests spawn one process each and finish in tens of milliseconds); `doc`
-finishes with no warning; `gitleaks` reports no leaks; `file-size` prints no `FAIL`; `swift-build` and
-`swift-test` pass.
+Expected: each stable gate passes. Record its command, exit code and selected leaf test names.
 
-- [ ] **Step 2: Record the file-size table**
+Run `cargo +nightly test --workspace --features dev-tools -- -Z unstable-options --report-time`
+using the installed nightly. Record per-test durations and reject any test reaching one second.
+Run the required stable suite separately. Do not infer duration from subprocess counts. If the
+installed nightly cannot run this command, record the blocker and stop delivery until equivalent
+per-test measurements exist.
+
+Record the file-size table:
 
 Run: `just file-size 2>&1 | sort -k2 -n | tail -15`
 
@@ -17924,7 +18396,7 @@ with the split it would take. The files this plan expects nearest the warning li
 `crates/vpt/src/doctor/checks.rs` and the two ingest acceptance suites. A file that crosses 500 splits
 along the seam its task named before the pull request opens.
 
-- [ ] **Step 3: Verify the mutants by hand and record the table**
+Verify the mutants by hand and record the table:
 
 For each row, apply the mutation to a scratch copy of the working tree, run the named test, confirm it
 fails, then run the unmutated control and confirm it passes. The table goes in the pull request body.
@@ -17935,40 +18407,63 @@ fails, then run the unmutated control and confirm it passes. The table goes in t
 | the rest gate                         | `>=` becomes `>` on the quiet period                           | `the_rest_gate_needs_the_whole_quiet_period`                                   |
 | the size gate                         | the limit comparison drops one byte                            | `the_size_gate_defers_one_byte_over_the_limit_and_accepts_the_limit`           |
 | the source stays read-only            | `open` drops `O_NOFOLLOW`                                      | `open_refuses_a_symbolic_link_and_reads_a_regular_file_by_descriptor`          |
-| the source is unchanged after a sweep | staging writes back one byte to the source handle              | the Task 19 sweep test asserting `entries()` before equals after               |
+| the source is unchanged after a sweep | staging writes back one byte to the source handle              | `a_full_sweep_with_titles_leaves_every_container_entry_with_its_size_mtime_and_flags`               |
 | dry run touches no title copy         | `Mode::DryRun` refreshes the title copy                        | `dry_run_creates_no_state_directory_and_no_title_copy`                         |
 | exclusive publication                 | `exclusive` falls back to `rename` when the target exists      | `publish_never_replaces_an_existing_target_and_names_it`                       |
 | repair after rename, before clear     | `repair_publications` skips the directory sync before clearing | `a_failed_directory_sync_leaves_the_entry_pending`                             |
 | target modified refuses               | the digest comparison in repair always matches                 | `any_other_bytes_are_refused_as_target_modified_and_nothing_is_overwritten`    |
 | a future schema is refused            | `migrate` accepts any `user_version`                           | `a_future_schema_version_is_refused_with_its_number`                           |
-| the write lock                        | `acquire` returns before `flock` succeeds                      | `a_second_acquisition_waits_the_bounded_time_then_reports_busy`                |
+| the write lock                        | `acquire` returns before `flock` succeeds                      | `a_held_lock_makes_a_second_acquisition_busy_after_its_wait`                |
 | the deadline kills the group          | `terminate` signals the child pid instead of the group         | `the_deadline_terminates_the_whole_process_group_and_reaps_it`                 |
-| the bounded reader                    | `check_depth` ignores `[`                                      | `nesting_past_the_depth_limit_is_refused_without_allocating_the_tree`          |
-| helper major version                  | `version_with_env` accepts any major                           | `a_helper_of_another_major_version_is_refused_naming_it`                       |
-| command notify falls back once        | the fallback delivery is removed                               | `a_non_zero_command_falls_back_to_the_desktop_notice_once_and_reports_failed`  |
+| the bounded reader                    | disable `Node::enter`'s depth guard                                      | `depth_is_checked_before_reading_children`          |
+| helper major version                  | compatibility preflight accepts any major                           | `incompatible_version_never_receives_notify_or_trash`                       |
+| command notify falls back once        | the fallback delivery is removed                               | `failed_command_is_recorded_before_one_fallback_and_keeps_its_status`  |
 | an untracked file survives retention  | `Retention::run` trashes entries with no ledger owner          | `an_untracked_file_in_a_store_survives_and_is_reported_kept`                   |
 | retention target modified             | `reconcile_intents` moves a path whose digest differs          | `replaced_content_is_a_refusal_naming_the_path_and_stays_pending`              |
 | audio excluded by default             | `include_audio` is ignored                                     | `audio_is_excluded_unless_include_audio_is_set`                                |
 | doctor never refuses at startup       | `checks::all` returns early on a config error                  | `without_a_config_the_config_check_fails_and_the_rest_are_reported_as_not_run` |
 | symlink verify writes nothing         | `verify` creates the target when missing                       | `verify_names_a_missing_link_and_a_wrong_target_and_writes_nothing`            |
+| expiration arithmetic | cast the hold to `i64` or ignore nanoseconds | `a_large_hold_does_not_wrap_and_nanoseconds_delay_the_boundary` |
+| partial retention | append moves after ledger updates | `a_ledger_failure_after_the_move_still_reports_its_recording_id` |
+| partial recovery | drop progress when a later intent fails | `partial_startup_retains_completed_ids_and_one_event_on_retention_and_ingest` |
+| single recovery event | emit recovery and new-move events separately | `retention_combines_recovery_and_new_moves_in_one_report_and_event` |
+| root substitution | skip root revalidation before the helper | `replacing_the_audio_root_with_a_symlink_never_reaches_trash` |
+| helper recovery compatibility | skip the helper version check in Trash | `incompatible_helper_blocks_reconciliation_without_a_trash_request` |
 
-- [ ] **Step 4: Confirm the README carries both install steps**
+Confirm the README carries both install steps:
 
 Run: `grep -c 'cargo install --git https://github.com/webdavis/vpt vpt' README.md &&`
 `grep -c 'swift build -c release' README.md`
 
 Expected: `1` and `1`.
 
-- [ ] **Step 5: Open the pull request**
 
-The branch carries one commit per task in order. The pull request body carries the gate summary, the
-file-size table and the mutation table. No commit is made by this task.
+- [ ] **Step 5: Commit**
+
+```bash
+git add helper justfile .github .gitignore
+SKIP_AI_COMMIT=1 git commit -m "feat(helper): the vpt-macos package with version, notify and trash"
+```
+
+______________________________________________________________________
+
+## Delivery checklist
+
+- [ ] Confirm the branch contains one commit per implementation task, with Task 33 including the
+  final gate repairs it owns. Keep independent fixes in their owning task's commit.
+- [ ] Read the repository's pull request instructions and draft the gate summary, file-size table,
+  leaf-test results and mutation/control table from recorded outputs.
+- [ ] Open the pull request only when requested. Leave it unmerged for review unless the operator
+  explicitly authorized merging. The operator alone runs `just smoke` against the real helper.
 
 ______________________________________________________________________
 
 ## Self-review
 
 ### Spec coverage, sections 4, 5 and 9 to 13 as they apply to stage 1
+
+These are implementation assignments. Execution must record the named test results and gate output
+before claiming the behavior is verified.
 
 | Spec requirement                                                                                                                                                                                       | Task                                                                                                                                                                                                             |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -17978,7 +18473,7 @@ ______________________________________________________________________
 | 4.1 every root resolved once at startup before any work                                                                                                                                                | 5, 27                                                                                                                                                                                                            |
 | 4.1 stores pairwise disjoint, the home may contain them, no overlap with the Voice Memos container                                                                                                     | 5                                                                                                                                                                                                                |
 | 4.1 a release destination may not overlap a private store, the state directory or the config directory                                                                                                 | 5                                                                                                                                                                                                                |
-| 4.1 `path_escape` below a resolved root                                                                                                                                                                | not reachable in stage 1: every path stage 1 opens or publishes below a root is `<root>/<id>.m4a` with a validated identity and an exclusive create; the check lands with the first artifact renderer in stage 3 |
+| 4.1 `path_escape` below a resolved root                                                                                                                                                                | 5a, 11, 13 to 18, 27 to 32: held root descriptors, no-follow leaves, journal validation, and root revalidation before helper calls |
 | 4.1 the ledger lives in `~/.local/state/vpt/` by default, never in a store                                                                                                                             | 5, 11                                                                                                                                                                                                            |
 | 4.1 config at `~/.config/vpt/config.toml`, mode 0600                                                                                                                                                   | 5, 6                                                                                                                                                                                                             |
 | 4.2 `symlink_target` with a non-default home is a startup refusal                                                                                                                                      | 5                                                                                                                                                                                                                |
@@ -18049,31 +18544,40 @@ ______________________________________________________________________
 
 ### Placeholder scan
 
-Every step carries its code, its command and its expected output. A search of this document for `TBD`,
-`TODO`, `placeholder`, `similar to`, `fill in`, `add appropriate` and `implement the rest` finds only
-this sentence. The two stubs an earlier draft carried, a leaf-table probe in Task 3 and an
-intended-digest helper in Task 14, are gone: each task's Step 3 is the code that stays.
+The execution contract requires the printed code, module declarations, interfaces and test cases to
+agree before approval. Re-run the scan after any edit:
+
+```bash
+rg -n 'TBD|TODO|the same fields|similar to|fill in|add appropriate|implement the rest|the listing above shows the intent' docs/superpowers/plans/2026-09-21-vpt-stage-1-extract-plan.md
+```
+
+The scan command itself is a known match. Classify other matches by context and replace any missing
+implementation with complete code before execution.
 
 ### Type consistency
 
-Names used across tasks resolve to one definition each:
+Cross-task contracts checked during this repair:
 
 - `RecordingRecord` (Task 12) carries `source_path: Option<PathBuf>` and `title_source: TitleOrigin`;
   Tasks 19, 22, 27 and 28 read those fields with those types. `TitleOrigin` is the ledger's enum and
   `TitleSource` the recorder port's trait; they never share a name.
 - `RecordingLedger` (Task 12) has `seen`, `seen_all`, `record_seen`, `by_digest`, `by_id`, `recordings`,
-  `commit_ingest`, `commit_recovered`, `set_source_path`, `set_audio_trashed`; Tasks 19 to 22, 30 and 32
+  `commit`, `set_source_path`, `set_audio_trashed`; Tasks 19 to 22, 30 and 32
   call only those.
 - `Outcome` (Task 2) gains `FailedReport` in Task 30; `emit` handles all three variants.
-- `Runtime` (Task 27) exposes `settings`, `roots`, `ledger`, `recorder`, `archive`, `clock`, `helper`,
-  `notifier`, `mutating`, `trash`; Tasks 28, 30 and 32 use those names. `with_runtime` (Task 28) takes
-  the `Creation` argument every dispatch arm passes.
+- `Runtime` (Task 27) owns its write lock and selects `AccessMode::ReadOnly` or `Mutating` before
+  ledger open. Task 32 changes `mutating` to return `ReconcileProgress` or `StartupFailure` and
+  updates both ingest and retention callers. `with_runtime` takes `AccessMode`.
+- `Stores` is one port extended by Task 28 with `entries`; Task 32 uses its checked `validate_path`
+  and `digest_of` operations.
+- `RetentionFailure` carries `RetentionReport`; both it and `ReconcileProgress` retain completed
+  `RecordingId` values. `Moved` keeps a separate recording identity, store and path.
 - `HelperClient` (Task 25) has `version`, `version_with_env`, `notify`, `notify_with_env`,
-  `trash_with_env`, `with_deadline`; Tasks 26, 27, 30 and 32 call those.
+  `trash_with_env`, `with_deadline`, `take_diagnostics`; Tasks 26, 27, 30 and 32 call those. Its first notify or Trash operation validates and caches a compatible version.
 - `Sandbox` (Task 1) gains `install_fake_helper` and `fake_log` in Task 25, `write_config`,
   `add_recording` and `ledger` in Task 27, `set_mtime` in Task 32; `FAKE_ENGINE` is the constant Task 25
   defines.
-- `spawn::run_with_env` (Task 25) is the one body; `run` calls it with no environment.
+- `spawn::run_with_env` (Task 24) is the one body; `run` calls it with no environment.
 - `Check` (Task 2) is `{ name, ok, detail }`; Task 30 builds every check through it.
 - `StoreKey::{all, key_name, default_leaf, from_key_name, is_private}` (Task 5) are the only store-key
   methods later tasks call.
