@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  gates:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install just and gitleaks
+        run: brew install gitleaks just
+      - name: Toolchain
+        run: rustup show active-toolchain
+      - name: Format
+        run: just fmt
+      - name: Clippy
+        run: just clippy
+      - name: Test
+        run: just test
+      - name: Docs
+        run: just doc
+      - name: Secrets scan
+        run: just gitleaks
+      - name: File size
+        run: just file-size
