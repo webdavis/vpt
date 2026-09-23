@@ -1,6 +1,7 @@
 mod load;
 mod render;
 mod schema;
+mod validate;
 
 pub use load::{CONFIG_VERSION, ConfigError, get, load_file, load_text};
 pub use render::template;

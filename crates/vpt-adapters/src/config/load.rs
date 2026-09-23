@@ -18,6 +18,17 @@ pub enum ConfigError {
     OutOfRange { key: String, rule: String },
 }
 
+impl ConfigError {
+    pub fn key(&self) -> Option<&str> {
+        match self {
+            Self::UnknownKey(key) | Self::WrongType { key, .. } | Self::OutOfRange { key, .. } => {
+                Some(key)
+            }
+            _ => None,
+        }
+    }
+}
+
 pub fn load_file(path: &Path) -> Result<Table, ConfigError> {
     let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
@@ -54,6 +65,7 @@ pub fn load_text(text: &str) -> Result<Table, ConfigError> {
         .parse()
         .map_err(|_: toml::de::Error| ConfigError::Unparseable(UNPARSEABLE.into()))?;
     merge_into(&mut merged, operator);
+    super::validate::validate(&merged)?;
     Ok(merged)
 }
 
