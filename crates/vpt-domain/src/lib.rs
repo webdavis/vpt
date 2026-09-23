@@ -6,4 +6,5 @@ pub mod fixtures;
 pub mod identity;
 pub mod layout;
 pub mod retention;
+pub mod sweep;
 pub mod time;
