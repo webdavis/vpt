@@ -1,4 +1,8 @@
-use std::io::Read;
+mod capture;
+mod process;
+
+use capture::Capture;
+use process::ProcessGroup;
 use std::net::Shutdown;
 use std::os::fd::OwnedFd;
 use std::os::unix::net::UnixStream;
@@ -67,24 +71,31 @@ impl Sandbox {
 
 pub fn run(command: &mut Command) -> Output {
     let started = Instant::now();
-    let mut group = ProcessGroup(command.process_group(0).spawn().expect("command spawned"));
-    let out = group.0.stdout.take();
-    let err = group.0.stderr.take();
-    let stdout = std::thread::spawn(move || read_output(out));
-    let stderr = std::thread::spawn(move || read_output(err));
+    collect(
+        command.process_group(0).spawn().expect("command spawned"),
+        started,
+    )
+}
+
+pub fn collect(child: Child, started: Instant) -> Output {
+    let mut group = ProcessGroup::new(child, started + Duration::from_millis(900));
+    let mut stdout = Capture::new(group.child.stdout.take());
+    let mut stderr = Capture::new(group.child.stderr.take());
     let status = loop {
-        match group.0.try_wait() {
-            Ok(Some(status)) => break Ok(Some(status)),
-            Ok(None) if started.elapsed() < Duration::from_millis(500) => {
-                std::thread::sleep(Duration::from_millis(1));
-            }
-            Ok(None) => break Ok(None),
-            Err(error) => break Err(error),
+        stdout.drain().expect("read stdout");
+        stderr.drain().expect("read stderr");
+        if let Some(status) = group.child.try_wait().expect("wait for command")
+            && stdout.finished()
+            && stderr.finished()
+        {
+            break Some(status);
         }
+        if started.elapsed() >= Duration::from_millis(500) {
+            break None;
+        }
+        std::thread::sleep(Duration::from_millis(1));
     };
     drop(group);
-    let stdout = stdout.join().expect("stdout reader").expect("read stdout");
-    let stderr = stderr.join().expect("stderr reader").expect("read stderr");
     let elapsed = started.elapsed();
     assert!(
         elapsed < Duration::from_secs(1),
@@ -94,36 +105,9 @@ pub fn run(command: &mut Command) -> Output {
         eprintln!("slow command: {elapsed:?}");
     }
     Output {
-        status: status
-            .expect("wait for command")
-            .expect("command exceeded 500 ms deadline"),
-        stdout,
-        stderr,
-    }
-}
-
-fn read_output(pipe: Option<impl Read>) -> std::io::Result<Vec<u8>> {
-    let mut bytes = Vec::new();
-    if let Some(mut pipe) = pipe {
-        pipe.read_to_end(&mut bytes)?;
-    }
-    Ok(bytes)
-}
-
-struct ProcessGroup(Child);
-
-impl Drop for ProcessGroup {
-    fn drop(&mut self) {
-        let pid = i32::try_from(self.0.id()).expect("child pid fits pid_t");
-        // The child created this process group; only its descendants receive signals.
-        unsafe { libc::killpg(pid, libc::SIGTERM) };
-        let deadline = Instant::now() + Duration::from_millis(50);
-        while matches!(self.0.try_wait(), Ok(None)) && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(1));
-        }
-        // Kill surviving descendants even when the group leader has exited.
-        unsafe { libc::killpg(pid, libc::SIGKILL) };
-        self.0.wait().expect("reap child");
+        status: status.expect("command exceeded 500 ms deadline"),
+        stdout: stdout.bytes,
+        stderr: stderr.bytes,
     }
 }
 

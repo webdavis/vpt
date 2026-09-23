@@ -5,6 +5,46 @@ use std::time::{Duration, Instant};
 use support::{Sandbox, broken_output, run, stderr, stdout};
 
 #[test]
+fn retained_output_after_exit_obeys_the_deadline() {
+    use std::os::fd::OwnedFd;
+    use std::os::unix::{net::UnixStream, process::CommandExt};
+    let sandbox = Sandbox::new("retained-output");
+    let mut command = sandbox.vpt();
+    command.arg("--version").process_group(0);
+    let mut child = command.spawn().expect("owned child");
+    let (reader, peer) = UnixStream::pair().expect("owned output");
+    child.stdout = Some(OwnedFd::from(reader).into());
+    let (send, receive) = std::sync::mpsc::channel();
+    let started = Instant::now();
+    let worker = std::thread::spawn(move || {
+        let outcome = std::panic::catch_unwind(|| support::collect(child, started));
+        send.send(outcome.is_err()).expect("result receiver");
+    });
+    let bounded = receive.recv_timeout(Duration::from_millis(700));
+    if bounded.is_err() {
+        peer.shutdown(std::net::Shutdown::Both)
+            .expect("release owned peer");
+        receive
+            .recv_timeout(Duration::from_millis(150))
+            .expect("released collector");
+    }
+    while !worker.is_finished() && started.elapsed() < Duration::from_millis(900) {
+        std::thread::yield_now();
+    }
+    assert!(
+        worker.is_finished(),
+        "collector did not finish after peer release"
+    );
+    worker.join().expect("collector worker");
+    assert_eq!(
+        bounded.ok(),
+        Some(true),
+        "retained output escaped its deadline"
+    );
+    assert!(started.elapsed() < Duration::from_secs(1));
+}
+
+#[test]
 fn broken_output_rejects_writes_while_a_peer_copy_survives() {
     let sandbox = Sandbox::new("broken-output-retained-peer");
     let (descriptor, reader) = broken_output();
@@ -70,4 +110,35 @@ fn runner_captures_output_and_exit_status() {
     assert_eq!(output.status.code(), Some(0));
     assert!(stdout(&output).starts_with("vpt "));
     assert_eq!(stderr(&output), "");
+}
+
+#[test]
+fn watchdog_kills_a_direct_child_that_ignores_term() {
+    let sandbox = Sandbox::new("ignore-term");
+    let environment = sandbox.vpt();
+    let mut command = Command::new("/bin/sh");
+    command
+        .env_clear()
+        .envs(environment.get_envs().map(|(k, v)| (k, v.expect("set"))))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .args([
+            "-c",
+            "trap '' TERM; printf '%s' \"$$\" > \"$1\"; read answer",
+            "ignore-term",
+        ])
+        .arg(sandbox.path().join("pid"));
+    let started = Instant::now();
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&mut command))).is_err());
+    let pid = std::fs::read_to_string(sandbox.path().join("pid"))
+        .expect("ready pid")
+        .parse::<i32>()
+        .expect("pid");
+    assert_eq!(unsafe { libc::killpg(pid, 0) }, -1, "owned group survived");
+    assert_eq!(
+        std::io::Error::last_os_error().raw_os_error(),
+        Some(libc::ESRCH)
+    );
+    assert!(started.elapsed() < Duration::from_secs(1));
 }
