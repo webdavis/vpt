@@ -1,4 +1,5 @@
 mod files;
+mod locks;
 
 use crate::ContainedError;
 
