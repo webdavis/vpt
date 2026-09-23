@@ -1,4 +1,4 @@
-mod capture;
+pub(crate) mod capture;
 mod process;
 
 use capture::Capture;
@@ -71,17 +71,33 @@ impl Sandbox {
 
 pub fn run(command: &mut Command) -> Output {
     let started = Instant::now();
-    collect(
-        command.process_group(0).spawn().expect("command spawned"),
-        started,
-    )
+    collect(spawn(command), started)
+}
+
+pub fn spawn(command: &mut Command) -> Child {
+    // SAFETY: setsid is async-signal-safe in the child before exec.
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setsid() == -1 {
+                Err(std::io::Error::last_os_error())
+            } else {
+                Ok(())
+            }
+        });
+    }
+    command.spawn().expect("command spawned")
 }
 
 pub fn collect(child: Child, started: Instant) -> Output {
+    collect_with(child, started, || {})
+}
+
+pub fn collect_with(child: Child, started: Instant, mut drive: impl FnMut()) -> Output {
     let mut group = ProcessGroup::new(child, started + Duration::from_millis(900));
     let mut stdout = Capture::new(group.child.stdout.take());
     let mut stderr = Capture::new(group.child.stderr.take());
     let status = loop {
+        drive();
         stdout.drain().expect("read stdout");
         stderr.drain().expect("read stderr");
         if let Some(status) = group.child.try_wait().expect("wait for command")

@@ -8,7 +8,7 @@ name = "vpt"
 path = "src/main.rs"
 
 [features]
-dev-tools = []
+dev-tools = ["dep:libc"]
 
 [[bin]]
 name = "vpt-fake-engine"
@@ -21,6 +21,7 @@ vpt-application = { path = "../vpt-application" }
 vpt-domain = { path = "../vpt-domain" }
 vpt-protocol = { path = "../vpt-protocol" }
 serde_json = { version = "1.0.151", features = ["preserve_order"] }
+libc = { version = "0.2.189", optional = true }
 
 [dev-dependencies]
 libc = "0.2.189"

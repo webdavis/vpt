@@ -1,5 +1,6 @@
 mod cli;
 mod commands;
+mod compose;
 
 use cli::args::{Invocation, Verb, parse};
 use cli::output::{Outcome, emit};
@@ -24,6 +25,11 @@ fn dispatch(invocation: &Invocation) -> i32 {
             document: commands::version::document(None),
             human: commands::version::human(None),
         },
+        Verb::Setup { force } => commands::setup::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            *force,
+        ),
         _ => Outcome::Failure(ErrorDocument::new(
             ErrorKind::Usage,
             "verb not implemented yet",

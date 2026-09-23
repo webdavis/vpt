@@ -5,6 +5,9 @@ mod roots;
 mod schema;
 mod settings;
 mod validate;
+mod write;
+
+pub use write::FilesystemSetupWriter;
 
 pub use load::{CONFIG_VERSION, ConfigError, get, load_file, load_text};
 pub use paths::{config_path, default_state_dir};

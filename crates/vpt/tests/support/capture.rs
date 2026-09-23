@@ -42,7 +42,7 @@ impl<T: Read + AsRawFd> Capture<T> {
     }
 }
 
-pub(super) fn nonblocking(file: &impl AsRawFd) -> io::Result<()> {
+pub(crate) fn nonblocking(file: &impl AsRawFd) -> io::Result<()> {
     // SAFETY: the live descriptor is borrowed; fcntl changes only its status flags.
     let result = unsafe {
         let flags = libc::fcntl(file.as_raw_fd(), libc::F_GETFL);

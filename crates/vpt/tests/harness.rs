@@ -6,14 +6,27 @@ use support::{Sandbox, broken_output, run, stderr, stdout};
 
 #[test]
 fn retained_output_after_exit_obeys_the_deadline() {
+    retained_peer_obeys_deadline(false);
+}
+
+#[test]
+fn retained_error_after_exit_obeys_the_deadline() {
+    retained_peer_obeys_deadline(true);
+}
+
+fn retained_peer_obeys_deadline(on_stderr: bool) {
     use std::os::fd::OwnedFd;
-    use std::os::unix::{net::UnixStream, process::CommandExt};
-    let sandbox = Sandbox::new("retained-output");
+    use std::os::unix::net::UnixStream;
+    let sandbox = Sandbox::new("retained-peer");
     let mut command = sandbox.vpt();
-    command.arg("--version").process_group(0);
-    let mut child = command.spawn().expect("owned child");
+    command.arg("--version");
+    let mut child = support::spawn(&mut command);
     let (reader, peer) = UnixStream::pair().expect("owned output");
-    child.stdout = Some(OwnedFd::from(reader).into());
+    if on_stderr {
+        child.stderr = Some(OwnedFd::from(reader).into());
+    } else {
+        child.stdout = Some(OwnedFd::from(reader).into());
+    }
     let (send, receive) = std::sync::mpsc::channel();
     let started = Instant::now();
     let worker = std::thread::spawn(move || {
@@ -136,6 +149,52 @@ fn watchdog_kills_a_direct_child_that_ignores_term() {
         .parse::<i32>()
         .expect("pid");
     assert_eq!(unsafe { libc::killpg(pid, 0) }, -1, "owned group survived");
+    assert_eq!(
+        std::io::Error::last_os_error().raw_os_error(),
+        Some(libc::ESRCH)
+    );
+    assert!(started.elapsed() < Duration::from_secs(1));
+}
+
+#[cfg(feature = "dev-tools")]
+#[test]
+fn watchdog_parent_reaps_its_same_group_descendant() {
+    let sandbox = Sandbox::new("descendant-reaping");
+    let environment = sandbox.vpt();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_vpt-fake-engine"));
+    command
+        .env("UNOWNED_SENTINEL", "present")
+        .env_clear()
+        .envs(environment.get_envs().map(|(k, v)| (k, v.expect("set"))))
+        .arg("reap-descendant")
+        .arg(sandbox.path().join("ready"))
+        .arg(sandbox.path().join("reaped"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let started = Instant::now();
+    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&mut command)));
+    assert!(failure.is_err(), "retained child output must time out");
+    let ready = std::fs::read_to_string(sandbox.path().join("ready")).expect("ready record");
+    let mut pids = ready.split_whitespace();
+    let group = pids.next().expect("group pid").parse::<i32>().expect("pid");
+    let child = pids.next().expect("child pid").parse::<i32>().expect("pid");
+    assert_eq!(pids.next(), Some("absent"), "fixture inherited unowned env");
+    assert_eq!(
+        pids.next(),
+        Some(sandbox.path().join("home").to_str().expect("home path"))
+    );
+    assert_eq!(
+        pids.next(),
+        Some(sandbox.path().join("bin").to_str().expect("PATH"))
+    );
+    let reaped = std::fs::read_to_string(sandbox.path().join("reaped")).expect("reaping record");
+    assert_eq!(reaped.trim(), format!("{child} 15"));
+    // Signal zero checks only the group recorded by this owned fixture.
+    assert_eq!(
+        unsafe { libc::killpg(group, 0) },
+        -1,
+        "owned group survived"
+    );
     assert_eq!(
         std::io::Error::last_os_error().raw_os_error(),
         Some(libc::ESRCH)
