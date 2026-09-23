@@ -30,8 +30,23 @@ fn busy(result: Result<(), DatabaseError>) {
 
 #[test]
 fn closing_another_description_keeps_the_writer_lock() {
-    let (temp, first, second) = owners();
-    let root = crate::RootDir::open(&temp.path().canonicalize().unwrap().join("state")).unwrap();
+    let (temp, _root) = root();
+    let output = child("close_description", temp.path())
+        .unwrap()
+        .finish()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+}
+
+pub(super) fn close_description(root: crate::RootDir) {
+    let files = DatabaseFiles::new(
+        root.try_clone().unwrap(),
+        Path::new("vpt.db"),
+        AccessPolicy::WritableLedger,
+    )
+    .unwrap();
+    let first = DatabaseLocks::new(files.open(FileRole::Database, true).unwrap());
+    let second = DatabaseLocks::new(files.open(FileRole::Database, false).unwrap());
     let unrelated = root
         .open_file(Path::new("vpt.db"), crate::Access::ReadWrite)
         .unwrap();

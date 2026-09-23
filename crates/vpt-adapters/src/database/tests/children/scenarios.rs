@@ -52,6 +52,7 @@ fn database_child() {
     let directory = std::env::var_os("VPT_DATABASE_ROOT").expect("owned root");
     let root = RootDir::open(&Path::new(&directory).join("state")).unwrap();
     match scenario.as_str() {
+        "close_description" => super::super::locks::close_description(root),
         "stall" => {
             // SAFETY: this supervised fixture ignores termination to exercise forced cleanup.
             unsafe {
