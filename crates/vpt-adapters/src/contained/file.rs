@@ -3,6 +3,55 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 
 impl RootDir {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "D3 wires database creation callbacks")
+    )]
+    pub(crate) fn create_read_write_file(
+        &self,
+        path: &Path,
+        mode: u32,
+    ) -> Result<File, ContainedError> {
+        let leaf = self.leaf(path)?;
+        let file = self.open_at(
+            &leaf,
+            libc::O_RDWR | libc::O_CREAT | libc::O_EXCL | NO_FOLLOW | libc::O_NONBLOCK,
+            mode,
+        )?;
+        let metadata = file.metadata().map_err(|error| io(&leaf, error))?;
+        if !metadata.is_file() {
+            return Err(ContainedError::NotRegular(leaf));
+        }
+        if metadata.nlink() != 1 {
+            return Err(escape(&self.path, &leaf));
+        }
+        file.set_permissions(std::fs::Permissions::from_mode(mode))
+            .map_err(|error| io(&leaf, error))?;
+        self.sync()?;
+        Ok(file)
+    }
+
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "D3 wires database deletion callbacks")
+    )]
+    pub(crate) fn unlink_file(&self, path: &Path) -> Result<(), ContainedError> {
+        let leaf = self.leaf(path)?;
+        let metadata = self.named_stat(&leaf)?;
+        if metadata.st_mode & libc::S_IFMT != libc::S_IFREG {
+            return Err(ContainedError::NotRegular(leaf));
+        }
+        if metadata.st_nlink != 1 {
+            return Err(escape(&self.path, &leaf));
+        }
+        let name = self.c_name(&leaf)?;
+        // SAFETY: the retained directory and validated NUL-terminated name outlive unlinkat.
+        if unsafe { libc::unlinkat(self.file.as_raw_fd(), name.as_ptr(), 0) } != 0 {
+            return Err(io(&leaf, std::io::Error::last_os_error()));
+        }
+        Ok(())
+    }
+
     pub(super) fn open_at(
         &self,
         leaf: &Path,
@@ -22,7 +71,7 @@ impl RootDir {
         opened(fd, leaf, flags & libc::O_DIRECTORY != 0)
     }
 
-    pub fn stat(&self, path: &Path) -> Result<Stat, ContainedError> {
+    fn named_stat(&self, path: &Path) -> Result<libc::stat, ContainedError> {
         let leaf = self.leaf(path)?;
         let name = self.c_name(&leaf)?;
         let mut raw = std::mem::MaybeUninit::<libc::stat>::uninit();
@@ -39,7 +88,11 @@ impl RootDir {
             return Err(io(&leaf, std::io::Error::last_os_error()));
         }
         // SAFETY: successful fstatat initialized raw completely.
-        let raw = unsafe { raw.assume_init() };
+        Ok(unsafe { raw.assume_init() })
+    }
+
+    pub fn stat(&self, path: &Path) -> Result<Stat, ContainedError> {
+        let raw = self.named_stat(path)?;
         let kind = match raw.st_mode & libc::S_IFMT {
             libc::S_IFREG => Kind::File,
             libc::S_IFDIR => Kind::Directory,

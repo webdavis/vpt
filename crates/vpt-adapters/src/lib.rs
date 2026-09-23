@@ -1,5 +1,6 @@
 pub mod config;
 mod contained;
+mod database;
 mod prompt;
 pub use prompt::TtyPrompt;
 

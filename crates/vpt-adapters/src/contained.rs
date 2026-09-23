@@ -135,7 +135,14 @@ impl RootDir {
         Ok((metadata.dev(), metadata.ino()))
     }
     pub fn revalidate(&self) -> Result<(), ContainedError> {
-        let current = Self::open(&self.path)?;
+        let current = Self::open(&self.path).map_err(|error| match error {
+            ContainedError::NotADirectory(_)
+            | ContainedError::Io {
+                kind: std::io::ErrorKind::NotFound,
+                ..
+            } => escape(&self.path, &self.path),
+            error => error,
+        })?;
         if self.identity()? != current.identity()? {
             return Err(escape(&self.path, &self.path));
         }

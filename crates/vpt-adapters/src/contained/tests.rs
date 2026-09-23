@@ -2,6 +2,7 @@ use super::*;
 use std::fs;
 use std::os::unix::fs::{PermissionsExt, symlink};
 
+mod database;
 mod directory;
 mod fifo;
 mod files;
