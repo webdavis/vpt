@@ -1,0 +1,91 @@
+use std::path::{Path, PathBuf};
+use vpt_domain::layout::StoreKey;
+use vpt_domain::retention::Hold;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Settings {
+    pub config_version: u32,
+    pub home: PathBuf,
+    pub state_dir: PathBuf,
+    pub symlink_target: Option<PathBuf>,
+    pub helper_path: PathBuf,
+    pub stores: StorePaths,
+    pub source: SourceSettings,
+    pub notify: NotifySettings,
+    pub retention: RetentionSettings,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StorePaths {
+    pub audio: PathBuf,
+    pub transcripts: PathBuf,
+    pub analysis: PathBuf,
+    pub briefs: PathBuf,
+    pub engine_outputs: PathBuf,
+    pub drafts: PathBuf,
+    pub released: PathBuf,
+}
+
+impl StorePaths {
+    pub fn get(&self, key: StoreKey) -> &Path {
+        match key {
+            StoreKey::Audio => &self.audio,
+            StoreKey::Transcripts => &self.transcripts,
+            StoreKey::Analysis => &self.analysis,
+            StoreKey::Briefs => &self.briefs,
+            StoreKey::EngineOutputs => &self.engine_outputs,
+            StoreKey::Drafts => &self.drafts,
+            StoreKey::Released => &self.released,
+        }
+    }
+
+    pub fn set(&mut self, key: StoreKey, path: PathBuf) {
+        match key {
+            StoreKey::Audio => self.audio = path,
+            StoreKey::Transcripts => self.transcripts = path,
+            StoreKey::Analysis => self.analysis = path,
+            StoreKey::Briefs => self.briefs = path,
+            StoreKey::EngineOutputs => self.engine_outputs = path,
+            StoreKey::Drafts => self.drafts = path,
+            StoreKey::Released => self.released = path,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceSettings {
+    pub recordings_dir: PathBuf,
+    pub read_titles: bool,
+    pub quiet_period_secs: u64,
+    pub deferral_page_threshold: u32,
+    pub max_audio_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NotifyMode {
+    Desktop,
+    Command(Vec<String>),
+    Off,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotifySettings {
+    pub mode: NotifyMode,
+    pub aggregate_after: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetentionSettings {
+    pub enabled: bool,
+    pub include_audio: bool,
+    pub holds: Vec<(StoreKey, Hold)>,
+}
+
+impl RetentionSettings {
+    pub fn hold(&self, key: StoreKey) -> Hold {
+        self.holds
+            .iter()
+            .find(|(store, _)| *store == key)
+            .map_or(Hold::never(), |(_, hold)| *hold)
+    }
+}
