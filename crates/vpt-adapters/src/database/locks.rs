@@ -7,26 +7,17 @@ use std::fs::File;
 use std::io::ErrorKind;
 use std::os::fd::AsRawFd;
 
-#[cfg_attr(not(test), expect(dead_code, reason = "D3 uses SQLite lock bytes"))]
 const PENDING_BYTE: i64 = 0x4000_0000;
-#[cfg_attr(not(test), expect(dead_code, reason = "D3 uses SQLite lock bytes"))]
 const RESERVED_BYTE: i64 = PENDING_BYTE + 1;
-#[cfg_attr(not(test), expect(dead_code, reason = "D3 uses SQLite lock bytes"))]
 const SHARED_FIRST: i64 = PENDING_BYTE + 2;
-#[cfg_attr(not(test), expect(dead_code, reason = "D3 uses SQLite lock bytes"))]
 const SHARED_SIZE: i64 = 510;
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "D3 selects callback lock kinds")
-)]
 pub(crate) enum LockKind {
     Shared,
     Exclusive,
     Unlock,
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "D3 sets callback record locks"))]
 pub(crate) fn set_record_lock(
     file: &File,
     start: i64,
@@ -36,13 +27,11 @@ pub(crate) fn set_record_lock(
     record_lock(file, start, length, kind, libc::F_OFD_SETLK).map(|_| ())
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "D3 queries reserved locks"))]
 fn has_conflict(file: &File, start: i64, length: i64) -> Result<bool, DatabaseError> {
     record_lock(file, start, length, LockKind::Exclusive, libc::F_OFD_GETLK)
         .map(|lock| lock.l_type != libc::F_UNLCK)
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "D3 invokes nonblocking locks"))]
 fn record_lock(
     file: &File,
     start: i64,
@@ -88,16 +77,11 @@ fn record_lock(
     }
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "D3 owns each file's locks"))]
 pub(super) struct DatabaseLocks {
     file: File,
     level: i32,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "D3 wires file callbacks and controls")
-)]
 impl DatabaseLocks {
     pub(super) fn new(file: File) -> Self {
         Self { file, level: NONE }
@@ -168,10 +152,6 @@ impl DatabaseLocks {
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "D3 rejects invalid lock requests")
-)]
 fn invalid() -> DatabaseError {
     DatabaseError::Io {
         operation: "record lock",

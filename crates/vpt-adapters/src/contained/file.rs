@@ -3,10 +3,6 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 
 impl RootDir {
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "D3 wires database creation callbacks")
-    )]
     pub(crate) fn create_read_write_file(
         &self,
         path: &Path,
@@ -27,14 +23,9 @@ impl RootDir {
         }
         file.set_permissions(std::fs::Permissions::from_mode(mode))
             .map_err(|error| io(&leaf, error))?;
-        self.sync()?;
         Ok(file)
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "D3 wires database deletion callbacks")
-    )]
     pub(crate) fn unlink_file(&self, path: &Path) -> Result<(), ContainedError> {
         let leaf = self.leaf(path)?;
         let metadata = self.named_stat(&leaf)?;

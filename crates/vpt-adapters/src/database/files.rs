@@ -7,23 +7,13 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "D3 retains checked files in each registration")
-)]
 pub(super) struct DatabaseFiles {
     root: RootDir,
     leaf: CString,
     policy: AccessPolicy,
+    pub(super) faults: super::faults::FaultState,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "D3 routes filesystem callbacks through these operations"
-    )
-)]
 impl DatabaseFiles {
     pub(super) fn new(
         root: RootDir,
@@ -38,7 +28,12 @@ impl DatabaseFiles {
             return Err(invalid().into());
         }
         let leaf = CString::new(leaf.as_os_str().as_bytes()).map_err(|_| invalid())?;
-        Ok(Self { root, leaf, policy })
+        Ok(Self {
+            root,
+            leaf,
+            policy,
+            faults: Default::default(),
+        })
     }
 
     fn name(&self, role: FileRole) -> OsString {
@@ -57,13 +52,13 @@ impl DatabaseFiles {
         let path = Path::new(&name);
         let writable = self.policy.writable(role);
         if writable && create {
-            match self.root.create_read_write_file(path, 0o600) {
+            match self.create(role) {
                 Ok(file) => return Ok(file),
-                Err(ContainedError::Io {
+                Err(DatabaseError::Contained(ContainedError::Io {
                     kind: ErrorKind::AlreadyExists,
                     ..
-                }) => {}
-                Err(error) => return Err(error.into()),
+                })) => {}
+                Err(error) => return Err(error),
             }
         }
         let access = if writable {
@@ -93,6 +88,17 @@ impl DatabaseFiles {
         Ok(file)
     }
 
+    pub(super) fn create(&self, role: FileRole) -> Result<File, DatabaseError> {
+        if !self.policy.writable(role) {
+            return Err(super::sqlite_error(rusqlite::ffi::SQLITE_READONLY));
+        }
+        let file = self
+            .root
+            .create_read_write_file(Path::new(&self.name(role)), 0o600)?;
+        self.sync()?;
+        Ok(file)
+    }
+
     pub(super) fn remove(&self, role: FileRole, sync: bool) -> Result<(), DatabaseError> {
         if !self.policy.writable(role) {
             return Err(DatabaseError::Io {
@@ -102,12 +108,64 @@ impl DatabaseFiles {
         }
         self.root.unlink_file(Path::new(&self.name(role)))?;
         if sync {
-            self.root.sync()?;
+            self.sync()?;
         }
         Ok(())
     }
 
     pub(super) fn revalidate(&self) -> Result<(), DatabaseError> {
         self.root.revalidate().map_err(Into::into)
+    }
+
+    pub(super) fn sync(&self) -> Result<(), DatabaseError> {
+        self.faults.check("directory sync")?;
+        self.root.sync().map_err(Into::into)
+    }
+
+    pub(super) fn policy(&self) -> AccessPolicy {
+        self.policy
+    }
+
+    pub(super) fn metadata(
+        &self,
+        role: FileRole,
+        write: bool,
+    ) -> Result<Option<std::fs::Metadata>, DatabaseError> {
+        let file = match self.root.open_file(
+            Path::new(&self.name(role)),
+            if write {
+                Access::ReadWrite
+            } else {
+                Access::Read
+            },
+        ) {
+            Ok(file) => file,
+            Err(ContainedError::Io {
+                kind: ErrorKind::NotFound,
+                ..
+            }) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        let metadata = file
+            .metadata()
+            .map_err(|error| super::io_error("file metadata", error))?;
+        if metadata.nlink() != 1 {
+            return Err(ContainedError::Escape {
+                root: self.root.path().into(),
+                path: self.root.path().join(self.name(role)),
+            }
+            .into());
+        }
+        Ok(Some(metadata))
+    }
+
+    pub(super) fn moved(&self, role: FileRole, file: &File) -> Result<bool, DatabaseError> {
+        let Some(named) = self.metadata(role, false)? else {
+            return Ok(true);
+        };
+        let opened = file
+            .metadata()
+            .map_err(|error| super::io_error("file metadata", error))?;
+        Ok(named.dev() != opened.dev() || named.ino() != opened.ino())
     }
 }

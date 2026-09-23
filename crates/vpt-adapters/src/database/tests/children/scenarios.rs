@@ -53,6 +53,25 @@ fn database_child() {
     let root = RootDir::open(&Path::new(&directory).join("state")).unwrap();
     match scenario.as_str() {
         "close_description" => super::super::locks::close_description(root),
+        "owner_failed_open" => super::super::owner::failed_open(root),
+        "owner_retry_close" => super::super::owner::retry_close(root),
+        "owner_invalid_drop" => super::super::owner::invalid_drop(root, ready),
+        "owner_latches" => super::super::owner::error_latches(root),
+        "owner_exclusive_create" | "owner_controls" | "owner_readonly" | "owner_path_access" => {
+            super::super::owner::controls_case(&scenario, root)
+        }
+        "owner_transaction_sync"
+        | "owner_transaction_directory"
+        | "owner_transaction_short"
+        | "owner_transaction_write" => super::super::owner::transaction_failure(&scenario, root),
+        "owner_short_read"
+        | "owner_partial_write"
+        | "owner_invalid_offsets"
+        | "owner_unknown_open"
+        | "owner_root_switch"
+        | "owner_panic"
+        | "owner_delete_sync"
+        | "owner_faults" => super::super::owner::callback_case(&scenario, root),
         "stall" => {
             // SAFETY: this supervised fixture ignores termination to exercise forced cleanup.
             unsafe {
