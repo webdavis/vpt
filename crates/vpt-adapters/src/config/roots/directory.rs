@@ -1,7 +1,6 @@
 use super::{RootError, io};
-use std::fs::DirBuilder;
+use crate::{ContainedError, RootDir};
 use std::io::ErrorKind;
-use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 
 pub fn planned_directory(path: &Path, key: &str) -> Result<PathBuf, RootError> {
@@ -75,9 +74,20 @@ fn existing_directory(path: &Path, key: &str) -> Result<Option<PathBuf>, RootErr
 }
 
 pub(super) fn private_dir(path: &Path, key: &str) -> Result<(), RootError> {
-    match DirBuilder::new().mode(0o700).create(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == ErrorKind::AlreadyExists && path.is_dir() => Ok(()),
-        Err(error) => Err(io(key, error)),
-    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
+    let map = |error| match error {
+        ContainedError::Io { kind, .. } => RootError::Io {
+            key: key.into(),
+            detail: kind.to_string(),
+        },
+        _ => RootError::PathEscape { key: key.into() },
+    };
+    let directory = RootDir::open(parent).map_err(map)?;
+    directory.subdirectory(name).map(|_| ()).map_err(map)
 }

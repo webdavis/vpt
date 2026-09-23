@@ -151,3 +151,58 @@ fn planned_directory_resolves_an_existing_symlink_and_missing_suffix() {
     );
     assert!(entries(&target).is_empty());
 }
+
+#[test]
+fn creating_roots_refuses_a_link_added_after_resolution() {
+    let temp = fixture();
+    let roots = resolve(&settings_in(temp.path()), &temp.path().join("cfg")).expect("roots");
+    let before = entries(&roots.container);
+    symlink(&roots.container, &roots.state_dir).expect("state link");
+    assert_eq!(
+        roots.create_state_dir(),
+        Err(RootError::PathEscape {
+            key: "home.state_dir".into()
+        })
+    );
+    fs::create_dir(&roots.home).expect("home");
+    fs::rename(&roots.home, temp.path().join("original-home")).expect("move home");
+    symlink(&roots.container, &roots.home).expect("home link");
+    assert_eq!(
+        roots.create_leaves(),
+        Err(RootError::PathEscape {
+            key: "home.path".into()
+        })
+    );
+    assert_eq!(entries(&roots.container), before);
+}
+
+#[test]
+fn creating_stores_refuses_a_link_in_the_parent_or_leaf() {
+    let temp = fixture();
+    let mut settings = settings_in(temp.path());
+    fs::create_dir(temp.path().join("external")).expect("external");
+    settings.stores.audio = temp.path().join("external/audio");
+    let roots = resolve(&settings, &temp.path().join("cfg")).expect("roots");
+    let before = entries(&roots.container);
+    fs::rename(temp.path().join("external"), temp.path().join("held")).expect("move");
+    symlink(&roots.container, temp.path().join("external")).expect("parent link");
+    assert_eq!(
+        roots.create_leaves(),
+        Err(RootError::PathEscape {
+            key: "stores.audio".into()
+        })
+    );
+    assert_eq!(entries(&roots.container), before);
+
+    let temp = fixture();
+    let roots = resolve(&settings_in(temp.path()), &temp.path().join("cfg")).expect("roots");
+    fs::create_dir(&roots.home).expect("home");
+    symlink(&roots.container, &roots.stores.audio).expect("leaf link");
+    assert_eq!(
+        roots.create_leaves(),
+        Err(RootError::PathEscape {
+            key: "stores.audio".into()
+        })
+    );
+    assert!(!roots.stores.released.exists());
+}
