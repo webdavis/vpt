@@ -63,7 +63,7 @@ impl Registration {
         let state = Box::pin(State {
             vfs: UnsafeCell::new(vfs),
             name,
-            files: DatabaseFiles::new(root, leaf, policy)?,
+            files: std::rc::Rc::new(DatabaseFiles::new(root, leaf, policy)?),
             native,
             error: RefCell::new(None),
             poisoned: Cell::new(false),

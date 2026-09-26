@@ -8,7 +8,11 @@ use std::ffi::{CStr, CString};
 use std::path::Path;
 use std::ptr;
 
-pub(super) fn open(registration: &Registration, name: &CStr, flags: i32) -> (i32, Box<FileHandle>) {
+pub(in crate::database::tests) fn open(
+    registration: &Registration,
+    name: &CStr,
+    flags: i32,
+) -> (i32, Box<FileHandle>) {
     let mut file = Box::new(FileHandle {
         base: sqlite3_file {
             pMethods: ptr::null(),

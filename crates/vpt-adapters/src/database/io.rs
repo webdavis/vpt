@@ -1,4 +1,5 @@
 mod controls;
+mod shared_memory;
 mod transfer;
 
 use super::locks::DatabaseLocks;
@@ -19,6 +20,7 @@ pub(super) struct FileState {
     pub(super) role: FileRole,
     pub(super) writable: bool,
     pub(super) persistent_wal: bool,
+    pub(super) shared_memory: Option<super::shared_memory::SharedMemory>,
 }
 
 pub(super) static METHODS: sqlite3_io_methods = sqlite3_io_methods {
@@ -35,10 +37,10 @@ pub(super) static METHODS: sqlite3_io_methods = sqlite3_io_methods {
     xFileControl: Some(controls::control),
     xSectorSize: Some(controls::sector),
     xDeviceCharacteristics: Some(controls::characteristics),
-    xShmMap: None,
-    xShmLock: None,
-    xShmBarrier: None,
-    xShmUnmap: None,
+    xShmMap: Some(shared_memory::map),
+    xShmLock: Some(shared_memory::lock),
+    xShmBarrier: Some(shared_memory::barrier),
+    xShmUnmap: Some(shared_memory::unmap),
     xFetch: None,
     xUnfetch: None,
 };

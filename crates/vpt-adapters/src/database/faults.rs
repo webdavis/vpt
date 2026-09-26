@@ -21,6 +21,7 @@ pub(super) enum Fault {
     FileSync,
     DirectorySync,
     Truncate,
+    Map,
 }
 
 #[cfg(test)]
@@ -56,6 +57,7 @@ impl FaultState {
             Fault::FileSync => "file sync",
             Fault::DirectorySync => "directory sync",
             Fault::Truncate => "truncate",
+            Fault::Map => "map",
         };
         if operation != expected {
             return Ok(());

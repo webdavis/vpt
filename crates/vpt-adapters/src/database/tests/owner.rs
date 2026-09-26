@@ -7,6 +7,8 @@ mod controls;
 mod durability;
 mod lifetime;
 
+pub(super) use callbacks::open as open_callback_file;
+
 pub(super) use controls::controls_case;
 pub(super) use durability::transaction_failure;
 

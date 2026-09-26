@@ -9,7 +9,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 pub(super) struct State {
     pub(super) vfs: UnsafeCell<sqlite3_vfs>,
     pub(super) name: CString,
-    pub(super) files: DatabaseFiles,
+    pub(super) files: std::rc::Rc<DatabaseFiles>,
     pub(super) native: *mut sqlite3_vfs,
     pub(super) error: RefCell<Option<DatabaseError>>,
     pub(super) poisoned: Cell<bool>,

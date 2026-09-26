@@ -1,6 +1,7 @@
 mod capture;
 mod process;
-mod scenarios;
+pub(super) mod scenarios;
+mod supervision;
 
 use capture::{Capture, nonblocking};
 use process::ProcessGroup;
@@ -15,11 +16,39 @@ pub(super) struct ChildGuard {
     input: ChildStdin,
     stdout: Capture<ChildStdout>,
     stderr: Capture<ChildStderr>,
+    ready_offset: usize,
     deadline: Instant,
 }
 
 pub(super) fn child(scenario: &str, directory: &Path) -> io::Result<ChildGuard> {
-    let started = Instant::now();
+    spawn(
+        scenario,
+        directory,
+        std::env::var_os("VPT_DATABASE_ROOT_PID"),
+        Instant::now(),
+    )
+}
+
+pub(super) fn child_for_root(
+    scenario: &str,
+    directory: &Path,
+    root_pid: u32,
+    started: Instant,
+) -> io::Result<ChildGuard> {
+    spawn(
+        scenario,
+        directory,
+        Some(root_pid.to_string().into()),
+        started,
+    )
+}
+
+fn spawn(
+    scenario: &str,
+    directory: &Path,
+    root_pid: Option<std::ffi::OsString>,
+    started: Instant,
+) -> io::Result<ChildGuard> {
     let directory = directory.canonicalize()?;
     for leaf in ["home", "config", "data", "xdg-state", "bin"] {
         std::fs::create_dir_all(directory.join(leaf))?;
@@ -44,9 +73,19 @@ pub(super) fn child(scenario: &str, directory: &Path) -> io::Result<ChildGuard> 
         .env("PATH", directory.join("bin"))
         .env("VPT_DATABASE_SCENARIO", scenario)
         .env("VPT_DATABASE_ROOT", &directory);
-    // SAFETY: setsid is async-signal-safe in the child before exec.
+    if let Some(root_pid) = root_pid {
+        command.env("VPT_DATABASE_ROOT_PID", root_pid);
+    }
+    // SAFETY: the pre-exec closure uses raw process syscalls and stack-owned values.
     unsafe {
         command.pre_exec(|| {
+            let limit = libc::rlimit {
+                rlim_cur: 0,
+                rlim_max: 0,
+            };
+            if libc::setrlimit(libc::RLIMIT_CORE, &limit) != 0 {
+                return Err(io::Error::last_os_error());
+            }
             if libc::setsid() == -1 {
                 Err(io::Error::last_os_error())
             } else {
@@ -64,6 +103,7 @@ pub(super) fn child(scenario: &str, directory: &Path) -> io::Result<ChildGuard> 
         input,
         stdout,
         stderr,
+        ready_offset: 0,
         deadline: started + Duration::from_millis(500),
     })
 }
@@ -71,22 +111,53 @@ pub(super) fn child(scenario: &str, directory: &Path) -> io::Result<ChildGuard> 
 impl ChildGuard {
     fn poll(&mut self) -> io::Result<()> {
         if Instant::now() >= self.deadline {
-            return Err(io::ErrorKind::TimedOut.into());
+            return Err(self.timeout());
         }
         self.stdout.drain()?;
         self.stderr.drain()
     }
 
+    fn timeout(&mut self) -> io::Error {
+        let child = match self.group.child.try_wait() {
+            Ok(None) => "running".to_owned(),
+            Ok(Some(status)) => format!("exited:{status}"),
+            Err(error) => format!("wait-error:{:?}", error.kind()),
+        };
+        let preview = |bytes: &[u8]| bytes[..bytes.len().min(64)].escape_ascii().to_string();
+        let phase = self
+            .stderr
+            .bytes
+            .split(|byte| *byte == b'\n')
+            .rev()
+            .find_map(|line| line.strip_prefix(b"VPT_PHASE "))
+            .map_or_else(|| "none".to_owned(), preview);
+        io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!(
+                "child={child} stdout_eof={} stderr_eof={} stdout_bytes={} stderr_bytes={} phase={phase} stdout_preview={} stderr_preview={}",
+                self.stdout.finished(),
+                self.stderr.finished(),
+                self.stdout.bytes.len(),
+                self.stderr.bytes.len(),
+                preview(&self.stdout.bytes),
+                preview(&self.stderr.bytes),
+            ),
+        )
+    }
+
     pub(super) fn ready(&mut self) -> io::Result<()> {
         loop {
             self.poll()?;
-            if self
-                .stdout
-                .bytes
-                .split(|byte| *byte == b'\n')
-                .any(|line| line == b"VPT_READY")
+            for line in
+                self.stdout.bytes[self.ready_offset..].split_inclusive(|byte| *byte == b'\n')
             {
-                return Ok(());
+                if !line.ends_with(b"\n") {
+                    break;
+                }
+                self.ready_offset += line.len();
+                if line == b"VPT_READY\n" {
+                    return Ok(());
+                }
             }
             if self.group.child.try_wait()?.is_some() {
                 return Err(io::Error::other(format!(

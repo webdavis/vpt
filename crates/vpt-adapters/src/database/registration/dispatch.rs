@@ -48,7 +48,10 @@ pub(super) unsafe extern "C" fn open(
             return Err(invalid("open flags"));
         }
         let writable = state.files.policy().writable(role);
-        if !writable && mode == SQLITE_OPEN_READWRITE {
+        if !writable
+            && mode == SQLITE_OPEN_READWRITE
+            && (role != FileRole::Wal || flags & SQLITE_OPEN_EXCLUSIVE != 0)
+        {
             return Err(sqlite_error(SQLITE_READONLY));
         }
         let acquired = if flags & SQLITE_OPEN_EXCLUSIVE != 0 {
@@ -62,6 +65,7 @@ pub(super) unsafe extern "C" fn open(
             role,
             writable: writable && mode == SQLITE_OPEN_READWRITE,
             persistent_wal: false,
+            shared_memory: None,
         });
         // SAFETY: the header takes this one Box; xClose drops it before registration is freed.
         unsafe {
@@ -69,7 +73,11 @@ pub(super) unsafe extern "C" fn open(
             file.state = Box::into_raw(owned);
             file.base.pMethods = &METHODS;
             if !output.is_null() {
-                *output = flags;
+                *output = if writable {
+                    flags
+                } else {
+                    (flags & !(SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE)) | SQLITE_OPEN_READONLY
+                };
             }
         }
         Ok(SQLITE_OK)

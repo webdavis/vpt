@@ -1,9 +1,11 @@
 use super::super::FileRole;
 use crate::RootDir;
-use std::fs;
-use std::os::macos::fs::MetadataExt as MacMetadataExt;
+use std::ffi::{CStr, CString, OsStr};
+use std::fs::{self, File};
+use std::io::Read;
+use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
 use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
 pub(super) const ROLES: [(FileRole, &str); 4] = [
@@ -36,45 +38,147 @@ pub(super) struct Snapshot {
 }
 
 pub(super) fn snapshot(path: &Path) -> Vec<Snapshot> {
-    let meta = fs::symlink_metadata(path).expect("metadata");
-    let bytes = if meta.is_file() {
-        fs::read(path).expect("bytes")
-    } else if meta.is_symlink() {
-        fs::read_link(path)
-            .expect("link")
-            .as_os_str()
-            .as_bytes()
-            .to_vec()
-    } else {
-        Vec::new()
-    };
-    let mut result = vec![Snapshot {
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path.parent().expect("owned snapshot parent"))
+        .expect("owned snapshot parent");
+    let mut result = Vec::new();
+    let name = CString::new(path.file_name().unwrap().as_bytes()).unwrap();
+    child(&file, &name, path, &mut result);
+    result.sort_by(|a, b| a.path.cmp(&b.path));
+    result
+}
+
+fn metadata(file: &File) -> libc::stat {
+    let mut stat = std::mem::MaybeUninit::uninit();
+    // SAFETY: stat is writable output and file retains the descriptor.
+    assert_eq!(
+        unsafe { libc::fstat(file.as_raw_fd(), stat.as_mut_ptr()) },
+        0
+    );
+    // SAFETY: successful fstat initialized every stat field.
+    unsafe { stat.assume_init() }
+}
+
+fn entry(path: &Path, stat: libc::stat, bytes: Vec<u8>) -> Snapshot {
+    Snapshot {
         path: path.into(),
         metadata: [
-            u64::from(meta.mode()),
-            u64::from(meta.uid()),
-            u64::from(meta.gid()),
-            meta.dev(),
-            meta.ino(),
-            meta.nlink(),
-            meta.size(),
-            meta.mtime() as u64,
-            meta.mtime_nsec() as u64,
-            meta.ctime() as u64,
-            meta.ctime_nsec() as u64,
-            u64::from(meta.st_flags()),
+            u64::from(stat.st_mode),
+            u64::from(stat.st_uid),
+            u64::from(stat.st_gid),
+            stat.st_dev as u64,
+            stat.st_ino,
+            u64::from(stat.st_nlink),
+            stat.st_size as u64,
+            stat.st_mtime as u64,
+            stat.st_mtime_nsec as u64,
+            stat.st_ctime as u64,
+            stat.st_ctime_nsec as u64,
+            u64::from(stat.st_flags),
         ],
         bytes,
-    }];
-    if meta.is_dir() {
-        let mut paths: Vec<_> = fs::read_dir(path)
-            .expect("entries")
-            .map(|entry| entry.expect("entry").path())
-            .collect();
-        paths.sort();
-        for child in paths {
-            result.extend(snapshot(&child));
-        }
     }
-    result
+}
+
+fn directory(file: &File, path: &Path, result: &mut Vec<Snapshot>) {
+    result.push(entry(path, metadata(file), Vec::new()));
+    let descriptor = file.try_clone().unwrap();
+    // SAFETY: fdopendir takes the newly duplicated descriptor on success.
+    let stream = unsafe { libc::fdopendir(descriptor.as_raw_fd()) };
+    assert!(!stream.is_null());
+    let _ = descriptor.into_raw_fd();
+    let stream = Directory(stream);
+    loop {
+        // SAFETY: stream owns this DIR; errno distinguishes exhaustion from an error.
+        let item = unsafe {
+            *libc::__error() = 0;
+            libc::readdir(stream.0)
+        };
+        if item.is_null() {
+            assert_eq!(std::io::Error::last_os_error().raw_os_error(), Some(0));
+            break;
+        }
+        // SAFETY: the entry name remains live until the next readdir; it is copied here.
+        let name = unsafe { CStr::from_ptr((*item).d_name.as_ptr()) }.to_owned();
+        if matches!(name.to_bytes(), b"." | b"..") {
+            continue;
+        }
+        child(
+            file,
+            &name,
+            &path.join(OsStr::from_bytes(name.to_bytes())),
+            result,
+        );
+    }
+}
+
+fn child(directory: &File, name: &CString, path: &Path, result: &mut Vec<Snapshot>) {
+    let mut stat = std::mem::MaybeUninit::uninit();
+    // SAFETY: the retained directory anchors this no-follow metadata lookup.
+    assert_eq!(
+        unsafe {
+            libc::fstatat(
+                directory.as_raw_fd(),
+                name.as_ptr(),
+                stat.as_mut_ptr(),
+                libc::AT_SYMLINK_NOFOLLOW,
+            )
+        },
+        0
+    );
+    // SAFETY: successful fstatat initialized stat.
+    let stat = unsafe { stat.assume_init() };
+    let kind = stat.st_mode & libc::S_IFMT;
+    if kind == libc::S_IFLNK {
+        let mut bytes = vec![0; usize::try_from(stat.st_size).unwrap() + 1];
+        // SAFETY: readlinkat writes only to the owned buffer and never follows the entry.
+        let length = unsafe {
+            libc::readlinkat(
+                directory.as_raw_fd(),
+                name.as_ptr(),
+                bytes.as_mut_ptr().cast(),
+                bytes.len(),
+            )
+        };
+        assert!(length >= 0 && (length as usize) < bytes.len());
+        bytes.truncate(length as usize);
+        result.push(entry(path, stat, bytes));
+    } else if matches!(kind, libc::S_IFREG | libc::S_IFDIR) {
+        // SAFETY: no-follow and nonblocking acquisition prevent redirection and FIFO blocking.
+        let fd = unsafe {
+            libc::openat(
+                directory.as_raw_fd(),
+                name.as_ptr(),
+                libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK,
+            )
+        };
+        assert!(fd >= 0);
+        // SAFETY: successful openat transferred this fresh descriptor.
+        let mut file = unsafe { File::from_raw_fd(fd) };
+        let opened = metadata(&file);
+        assert_eq!(
+            (opened.st_dev, opened.st_ino, opened.st_mode),
+            (stat.st_dev, stat.st_ino, stat.st_mode)
+        );
+        if kind == libc::S_IFDIR {
+            self::directory(&file, path, result);
+        } else {
+            let mut bytes = Vec::new();
+            file.read_to_end(&mut bytes).unwrap();
+            result.push(entry(path, opened, bytes));
+        }
+    } else {
+        result.push(entry(path, stat, Vec::new()));
+    }
+}
+
+struct Directory(*mut libc::DIR);
+
+impl Drop for Directory {
+    fn drop(&mut self) {
+        // SAFETY: this guard exclusively owns the directory stream and its descriptor.
+        assert_eq!(unsafe { libc::closedir(self.0) }, 0);
+    }
 }

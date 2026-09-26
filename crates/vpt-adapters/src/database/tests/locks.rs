@@ -235,8 +235,28 @@ fn child_watchdog_reaps_a_stalled_lock_test() {
     let (temp, _root) = root();
     let started = Instant::now();
     let process = child("stall", temp.path()).unwrap();
-    assert_eq!(process.finish().unwrap_err().kind(), ErrorKind::TimedOut);
+    let error = process.finish().unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::TimedOut);
     assert!(started.elapsed() < Duration::from_secs(1));
+    let message = error.to_string();
+    for expected in [
+        "child=running",
+        "stdout_eof=false",
+        "stderr_eof=false",
+        "phase=stall-wait",
+        "OUT\\t\\x1b",
+        "ERR\\t\\x1b",
+    ] {
+        assert!(message.contains(expected), "{message}");
+    }
+    for stream in ["stdout_bytes=", "stderr_bytes="] {
+        let count = message
+            .split_whitespace()
+            .find_map(|part| part.strip_prefix(stream))
+            .unwrap();
+        assert!(count.parse::<usize>().unwrap() > 1024);
+    }
+    assert!(message.len() < 1024, "bounded previews: {}", message.len());
 }
 
 fn fifo(scenario: &str) {

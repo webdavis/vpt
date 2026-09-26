@@ -4,6 +4,7 @@ mod io;
 mod locks;
 mod owner;
 mod registration;
+mod shared_memory;
 mod state;
 
 #[cfg_attr(

@@ -6,7 +6,7 @@ use std::io::{self, Write};
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 
-fn ready() {
+pub(in crate::database::tests) fn ready() {
     println!("\nVPT_READY");
     io::stdout().flush().unwrap();
     let mut command = String::new();
@@ -49,9 +49,45 @@ fn database_child() {
     let Ok(scenario) = std::env::var("VPT_DATABASE_SCENARIO") else {
         return;
     };
+    if let Some(expected) = std::env::var_os("VPT_DATABASE_ROOT_PID") {
+        // SAFETY: getppid only observes the parent process identifier.
+        let parent = unsafe { libc::getppid() };
+        assert_eq!(
+            parent.to_string(),
+            expected
+                .into_string()
+                .expect("root test process identifier"),
+            "database participant must be a direct child of the root test"
+        );
+    }
     let directory = std::env::var_os("VPT_DATABASE_ROOT").expect("owned root");
     let root = RootDir::open(&Path::new(&directory).join("state")).unwrap();
     match scenario.as_str() {
+        "supervision_ready" => ready(),
+        "supervision_twice" => {
+            ready();
+            ready();
+        }
+        "supervision_stall" => {
+            ready();
+            eprintln!("VPT_PHASE pre-sql-stall");
+            loop {
+                std::thread::park();
+            }
+        }
+        s if s.starts_with("wal_") => super::super::wal::run(s, root),
+        s if s.starts_with("failure_") => super::super::failures::run(s, root),
+        s if s.starts_with("shm_") => super::super::shared_memory::run(s, root),
+        "native_wal_writer"
+        | "native_reader"
+        | "native_wal_contender"
+        | "rooted_snapshot_writer"
+        | "rooted_wal_writer"
+        | "rooted_committed"
+        | "rooted_uncommitted"
+        | "rooted_rollback" => {
+            super::super::wal::scenarios::participant(&scenario, root, ready, native)
+        }
         "close_description" => super::super::locks::close_description(root),
         "owner_failed_open" => super::super::owner::failed_open(root),
         "owner_retry_close" => super::super::owner::retry_close(root),
@@ -77,6 +113,12 @@ fn database_child() {
             unsafe {
                 libc::signal(libc::SIGTERM, libc::SIG_IGN);
             }
+            println!("OUT\t\u{1b}{}", "o".repeat(1024));
+            io::stdout().flush().unwrap();
+            eprintln!(
+                "ERR\t\u{1b}{}\nVPT_PHASE stall-start\nVPT_PHASE stall-wait",
+                "e".repeat(1024)
+            );
             let mut command = String::new();
             io::stdin().read_line(&mut command).unwrap();
             panic!("stall fixture unexpectedly received input");

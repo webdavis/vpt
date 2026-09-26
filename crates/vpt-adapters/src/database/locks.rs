@@ -28,8 +28,21 @@ pub(crate) fn set_record_lock(
 }
 
 fn has_conflict(file: &File, start: i64, length: i64) -> Result<bool, DatabaseError> {
-    record_lock(file, start, length, LockKind::Exclusive, libc::F_OFD_GETLK)
-        .map(|lock| lock.l_type != libc::F_UNLCK)
+    conflicting_lock(file, start, length).map(|kind| !matches!(kind, LockKind::Unlock))
+}
+
+pub(super) fn conflicting_lock(
+    file: &File,
+    start: i64,
+    length: i64,
+) -> Result<LockKind, DatabaseError> {
+    let lock = record_lock(file, start, length, LockKind::Exclusive, libc::F_OFD_GETLK)?;
+    match lock.l_type {
+        libc::F_UNLCK => Ok(LockKind::Unlock),
+        libc::F_RDLCK => Ok(LockKind::Shared),
+        libc::F_WRLCK => Ok(LockKind::Exclusive),
+        _ => Err(invalid()),
+    }
 }
 
 fn record_lock(
