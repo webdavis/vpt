@@ -1,4 +1,5 @@
 mod capture;
+mod identity;
 mod process;
 pub(super) mod scenarios;
 mod supervision;
@@ -49,6 +50,22 @@ fn spawn(
     root_pid: Option<std::ffi::OsString>,
     started: Instant,
 ) -> io::Result<ChildGuard> {
+    spawn_with_signal(
+        scenario,
+        directory,
+        root_pid,
+        started,
+        process::signal_group,
+    )
+}
+
+fn spawn_with_signal(
+    scenario: &str,
+    directory: &Path,
+    root_pid: Option<std::ffi::OsString>,
+    started: Instant,
+    signal: impl FnMut(i32, i32) + Send + 'static,
+) -> io::Result<ChildGuard> {
     let directory = directory.canonicalize()?;
     for leaf in ["home", "config", "data", "xdg-state", "bin"] {
         std::fs::create_dir_all(directory.join(leaf))?;
@@ -93,11 +110,15 @@ fn spawn(
             }
         });
     }
-    let mut group = ProcessGroup::new(command.spawn()?, started + Duration::from_millis(900));
-    let input = group.child.stdin.take().expect("piped input");
+    let mut group = ProcessGroup::new(
+        command.spawn()?,
+        started + Duration::from_millis(900),
+        signal,
+    );
+    let input = group.stdin.take().expect("piped input");
     nonblocking(&input)?;
-    let stdout = Capture::new(group.child.stdout.take().expect("piped stdout"))?;
-    let stderr = Capture::new(group.child.stderr.take().expect("piped stderr"))?;
+    let stdout = Capture::new(group.stdout.take().expect("piped stdout"))?;
+    let stderr = Capture::new(group.stderr.take().expect("piped stderr"))?;
     Ok(ChildGuard {
         group,
         input,
@@ -118,7 +139,7 @@ impl ChildGuard {
     }
 
     fn timeout(&mut self) -> io::Error {
-        let child = match self.group.child.try_wait() {
+        let child = match self.group.observe() {
             Ok(None) => "running".to_owned(),
             Ok(Some(status)) => format!("exited:{status}"),
             Err(error) => format!("wait-error:{:?}", error.kind()),
@@ -159,7 +180,7 @@ impl ChildGuard {
                     return Ok(());
                 }
             }
-            if self.group.child.try_wait()?.is_some() {
+            if self.group.observe()?.is_some() {
                 return Err(io::Error::other(format!(
                     "child exited before ready: {:?}",
                     self.stderr.bytes
@@ -192,7 +213,7 @@ impl ChildGuard {
     pub(crate) fn finish(mut self) -> io::Result<Output> {
         loop {
             self.poll()?;
-            if let Some(status) = self.group.child.try_wait()?
+            if let Some(status) = self.group.observe()?
                 && self.stdout.finished()
                 && self.stderr.finished()
             {

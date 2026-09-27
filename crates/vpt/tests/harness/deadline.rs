@@ -1,5 +1,5 @@
-use crate::support::{self, Sandbox};
-use std::process::{Child, Command, Stdio};
+use crate::support::{self, ProcessGroup, Sandbox};
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 pub(super) fn sandboxed_shell(sandbox: &Sandbox, script: &str) -> Command {
@@ -23,7 +23,7 @@ pub(super) fn late_completion_observed_after_deadline_is_rejected() {
     let sandbox = Sandbox::new("late-completion");
     let mut command = sandboxed_shell(&sandbox, "exit 0");
     let mut child = support::spawn(&mut command);
-    reap_short_owned_child(&mut child);
+    observe_short_owned_child(&mut child);
     let started = Instant::now() - Duration::from_millis(501);
     let mut drove = false;
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -46,8 +46,10 @@ pub(super) fn watchdog_absent_pipe_is_not_reported_as_eof() {
     let child = support::spawn(&mut command);
     let spawn_return = Instant::now();
     let pid = i32::try_from(child.id()).expect("owned pid");
-    let failure = std::panic::catch_unwind(|| support::collect(child, started, Some(spawn_return)))
-        .expect_err("stdin-blocked owned child must time out");
+    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        support::collect(child, started, Some(spawn_return))
+    }))
+    .expect_err("stdin-blocked owned child must time out");
     ensure_group_gone(pid);
     let message = panic_message(&failure);
     assert!(
@@ -61,19 +63,13 @@ pub(super) fn watchdog_absent_pipe_is_not_reported_as_eof() {
     assert!(message.contains("stderr_bytes=5"), "{message}");
 }
 
-pub(super) fn reap_short_owned_child(child: &mut Child) {
+pub(super) fn observe_short_owned_child(child: &mut ProcessGroup) {
     let ready_by = Instant::now() + Duration::from_millis(400);
     loop {
-        match child.try_wait() {
+        match child.observe() {
             Ok(Some(_)) => return,
             Ok(None) if Instant::now() < ready_by => std::thread::yield_now(),
-            result => {
-                let pid = i32::try_from(child.id()).expect("owned pid");
-                // SAFETY: spawn created this child's owned process group.
-                unsafe { libc::killpg(pid, libc::SIGKILL) };
-                child.wait().expect("reap owned child after setup failure");
-                panic!("short owned child did not exit: {result:?}");
-            }
+            result => panic!("short owned child did not exit: {result:?}"),
         }
     }
 }
@@ -87,32 +83,29 @@ pub(super) fn panic_message(failure: &Box<dyn std::any::Any + Send>) -> &str {
 }
 
 pub(super) fn ensure_group_gone(pid: i32) {
-    // SAFETY: this PID is from the owned direct child spawned by this test.
+    // SAFETY: signal zero is an observational probe of the recorded group number.
     let group = unsafe { libc::killpg(pid, 0) };
-    if group == 0 {
-        // SAFETY: the same owned process group remains after the collector returned.
-        unsafe { libc::killpg(pid, libc::SIGKILL) };
-        let until = Instant::now() + Duration::from_millis(100);
-        let mut status = 0;
-        while unsafe { libc::waitpid(pid, &mut status, libc::WNOHANG) } == 0
-            && Instant::now() < until
-        {
-            std::thread::yield_now();
-        }
-        panic!("owned command group survived collector cleanup: {pid}");
-    }
-    assert_eq!(group, -1);
+    let group_error = std::io::Error::last_os_error();
+    assert_eq!(group, -1, "recorded group number remains present: {pid}");
     assert_eq!(
-        std::io::Error::last_os_error().raw_os_error(),
+        group_error.raw_os_error(),
         Some(libc::ESRCH),
         "owned group probe failed unexpectedly"
     );
-    let mut status = 0;
-    // SAFETY: only the owned direct child may match this exact PID.
-    let reaped = unsafe { libc::waitpid(pid, &mut status, libc::WNOHANG) };
-    assert_eq!(reaped, -1, "collector left its owned child unreaped");
+    // SAFETY: initialized storage receives a non-consuming numeric PID observation.
+    let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+    let observed = unsafe {
+        libc::waitid(
+            libc::P_PID,
+            pid as libc::id_t,
+            &mut info,
+            libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+        )
+    };
+    let child_error = std::io::Error::last_os_error();
+    assert_eq!(observed, -1, "recorded child number remains waitable");
     assert_eq!(
-        std::io::Error::last_os_error().raw_os_error(),
+        child_error.raw_os_error(),
         Some(libc::ECHILD),
         "owned child probe failed unexpectedly"
     );

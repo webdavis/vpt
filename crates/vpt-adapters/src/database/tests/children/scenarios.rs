@@ -63,6 +63,9 @@ fn database_child() {
     let directory = std::env::var_os("VPT_DATABASE_ROOT").expect("owned root");
     let root = RootDir::open(&Path::new(&directory).join("state")).unwrap();
     match scenario.as_str() {
+        "identity_exit" | "identity_signal" | "identity_grace" => {
+            super::identity::finite_child(&scenario, Path::new(&directory))
+        }
         "supervision_ready" => ready(),
         "supervision_twice" => {
             ready();
