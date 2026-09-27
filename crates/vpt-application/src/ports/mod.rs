@@ -4,7 +4,7 @@ mod prompt;
 mod recorder;
 mod stores;
 
-pub use archive::{Archive, ArchiveError, StageFailure, Staged};
+pub use archive::{Archive, ArchiveError, Published, StageFailure, Staged};
 pub use ledger::{
     DirtyPublication, LedgerCommit, LedgerError, PublicationJournal, RecordingLedger,
     RecordingRecord, SeenRow, StageState, StageStates, TitleOrigin,

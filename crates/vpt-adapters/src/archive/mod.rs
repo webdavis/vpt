@@ -1,3 +1,4 @@
+mod publish;
 mod staging;
 
 use crate::{Access, ContainedError, Kind, RootDir};
@@ -5,7 +6,9 @@ use std::fs::File;
 use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use vpt_application::ports::{Archive, ArchiveError, CloneError, CloneKind, StageFailure, Staged};
+use vpt_application::ports::{
+    Archive, ArchiveError, CloneError, CloneKind, Published, StageFailure, Staged,
+};
 use vpt_domain::container::ReadFailure;
 use vpt_domain::digest::Sha256Digest;
 
@@ -147,6 +150,14 @@ impl Archive for ClonefileArchive {
 
     fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError> {
         self.list(|name| name.starts_with(STAGING_PREFIX))
+    }
+
+    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError> {
+        publish::exclusive(self.root()?, staged, target_name)
+    }
+
+    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError> {
+        publish::sync_file_and_directory(self.root()?, path)
     }
 }
 

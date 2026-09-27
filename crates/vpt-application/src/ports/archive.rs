@@ -27,6 +27,12 @@ pub struct StageFailure {
     pub owned_staging: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Published {
+    Placed(PathBuf),
+    Exists(PathBuf),
+}
+
 pub trait Archive {
     type Handle;
 
@@ -46,4 +52,6 @@ pub trait Archive {
     fn target(&self, name: &str) -> PathBuf;
     fn archived(&self) -> Result<Vec<PathBuf>, ArchiveError>;
     fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError>;
+    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError>;
+    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError>;
 }
