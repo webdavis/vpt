@@ -1,4 +1,4 @@
-use super::super::{OpenError, SqliteLedger};
+use super::super::{OpenError, SCHEMA_VERSION, SqliteLedger};
 use super::{database, seed, supervised};
 use crate::{RootDir, database::snapshot};
 use std::os::unix::fs::PermissionsExt;
@@ -170,10 +170,10 @@ fn populated(scenario: &str, root: &RootDir) {
         snapshot(root.path()) == before,
         "observational open changed the state snapshot"
     );
-    assert_eq!(observed.schema_version().unwrap(), 1);
+    assert_eq!(observed.schema_version().unwrap(), SCHEMA_VERSION);
     observed
         .read(|c| {
-            assert_eq!(super::version(c), 1);
+            assert_eq!(super::version(c), SCHEMA_VERSION);
             assert!(
                 snapshot(root.path()) == before,
                 "observational query changed the state snapshot"
