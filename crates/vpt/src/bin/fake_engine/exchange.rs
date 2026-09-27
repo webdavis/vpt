@@ -5,6 +5,30 @@ use std::time::{Duration, Instant};
 
 const INPUT_BOUND: Duration = Duration::from_millis(300);
 
+enum InputClock {
+    Real(Instant),
+    Controlled(Duration),
+}
+
+impl InputClock {
+    fn elapsed(&self) -> Duration {
+        match self {
+            Self::Real(started) => started.elapsed(),
+            Self::Controlled(elapsed) => *elapsed,
+        }
+    }
+
+    fn pending(&mut self) -> bool {
+        if let Self::Controlled(elapsed) = self
+            && *elapsed == Duration::ZERO
+        {
+            *elapsed = INPUT_BOUND;
+            return true;
+        }
+        false
+    }
+}
+
 pub(super) fn run(args: &[String]) -> i32 {
     let wanted = std::env::var("VPT_FAKE_INPUT_LEN")
         .ok()
@@ -45,7 +69,11 @@ pub(super) fn run(args: &[String]) -> i32 {
 }
 
 fn read_input(wanted: usize) -> Result<Vec<u8>, &'static str> {
-    let started = Instant::now();
+    let mut clock = if std::env::var("VPT_FAKE_EXPIRE_INPUT_ON_PENDING").as_deref() == Ok("1") {
+        InputClock::Controlled(Duration::ZERO)
+    } else {
+        InputClock::Real(Instant::now())
+    };
     let mut input = io::stdin().lock();
     // SAFETY: stdin is a live fixture descriptor; only its status flags change.
     let nonblocking = unsafe {
@@ -62,7 +90,7 @@ fn read_input(wanted: usize) -> Result<Vec<u8>, &'static str> {
     let mut bytes = Vec::with_capacity(wanted);
     let mut buffer = [0; 8192];
     while bytes.len() < wanted {
-        if started.elapsed() >= INPUT_BOUND {
+        if clock.elapsed() >= INPUT_BOUND {
             return Err("fixture input deadline");
         }
         let count = buffer.len().min(wanted - bytes.len());
@@ -71,6 +99,9 @@ fn read_input(wanted: usize) -> Result<Vec<u8>, &'static str> {
             Ok(count) => bytes.extend_from_slice(&buffer[..count]),
             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                if clock.pending() {
+                    let _ = writeln!(io::stderr().lock(), "fixture input pending");
+                }
                 let mut descriptor = libc::pollfd {
                     fd: input.as_raw_fd(),
                     events: libc::POLLIN,
@@ -87,4 +118,21 @@ fn read_input(wanted: usize) -> Result<Vec<u8>, &'static str> {
         }
     }
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn controlled_input_clock_expires_only_after_pending_input() {
+        let mut clock = InputClock::Controlled(Duration::ZERO);
+        assert_eq!(clock.elapsed(), Duration::ZERO);
+        assert!(
+            clock.pending(),
+            "first pending read must advance the controlled clock"
+        );
+        assert_eq!(clock.elapsed(), INPUT_BOUND);
+        assert!(!clock.pending(), "pending transition is emitted only once");
+    }
 }

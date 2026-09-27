@@ -14,6 +14,7 @@ fn bounded_exchange_fixture_preserves_arguments_input_and_separate_streams() {
         .arg("process-exchange")
         .args(arguments)
         .env("VPT_FAKE_INPUT_LEN", text.len().to_string())
+        .env("VPT_FAKE_EXPIRE_INPUT_ON_PENDING", "1")
         .stdin(std::fs::File::open(input).expect("owned input")));
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(stderr(&output), "owned stderr marker\n");
@@ -33,10 +34,14 @@ fn bounded_exchange_fixture_fails_when_its_retained_input_never_arrives() {
     let output = run(fake(&sandbox)
         .arg("process-exchange")
         .env("VPT_FAKE_INPUT_LEN", "1")
+        .env("VPT_FAKE_EXPIRE_INPUT_ON_PENDING", "1")
         .stdin(OwnedFd::from(reader)));
     assert_eq!(output.status.code(), Some(75));
     assert_eq!(stdout(&output), "");
-    assert_eq!(stderr(&output), "fixture input deadline\n");
+    assert_eq!(
+        stderr(&output),
+        "fixture input pending\nfixture input deadline\n"
+    );
 }
 
 #[test]
