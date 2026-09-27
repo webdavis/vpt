@@ -9,6 +9,6 @@ pub use ledger::{
 };
 pub use prompt::{Prompt, PromptError};
 pub use recorder::{
-    Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata,
+    Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata, TitleLookup,
 };
 pub use stores::{StoreError, Stores};

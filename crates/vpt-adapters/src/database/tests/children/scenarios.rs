@@ -84,6 +84,7 @@ fn database_child() {
         s if s.starts_with("ledger_") => crate::ledger::run_scenario(s, root, ready, native),
         s if s.starts_with("lock_") => crate::lock::tests::scenarios::run(s, root, ready),
         s if s.starts_with("recorder_") => crate::voice_memos::run_scenario(s, root),
+        s if s.starts_with("title_") => crate::voice_memos::run_title_scenario(s, root, ready),
         s if s.starts_with("failure_") => super::super::failures::run(s, root),
         s if s.starts_with("shm_") => super::super::shared_memory::run(s, root),
         "native_wal_writer"

@@ -22,4 +22,4 @@ pub use symlink::{
     LinkState, SymlinkError, deploy as deploy_symlink, inspect as inspect_symlink,
     verify as verify_symlink,
 };
-pub use voice_memos::{APPLE_SUBDIRECTORIES, VoiceMemosStore};
+pub use voice_memos::{APPLE_SUBDIRECTORIES, COPY_DIRECTORY, TitleCopy, VoiceMemosStore};

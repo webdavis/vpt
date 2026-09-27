@@ -1,11 +1,13 @@
 mod cloning;
+mod titles;
 
 use crate::{Access, ContainedError, Kind, RootDir};
 use std::fs::File;
 use std::os::unix::fs::{FileExt, MetadataExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use titles::Titles;
 use vpt_application::ports::{
-    Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata,
+    Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata, TitleLookup,
 };
 use vpt_domain::container::ReadFailure;
 use vpt_domain::time::FileTime;
@@ -19,12 +21,24 @@ pub const APPLE_SUBDIRECTORIES: [&str; 4] = [
 
 pub struct VoiceMemosStore {
     recordings: RootDir,
+    titles: Option<Titles>,
 }
 
 impl VoiceMemosStore {
+    pub fn with_titles(mut self, state_dir: PathBuf, refresh: bool) -> Self {
+        self.titles = Some(Titles::from_path(state_dir, refresh));
+        self
+    }
+
+    pub fn with_titles_root(mut self, state: &RootDir, refresh: bool) -> Self {
+        self.titles = Some(Titles::from_root(state, refresh));
+        self
+    }
+
     pub fn open(recordings_dir: &Path) -> Result<Self, ContainedError> {
         Ok(Self {
             recordings: RootDir::open(recordings_dir)?,
+            titles: None,
         })
     }
 
@@ -56,6 +70,18 @@ impl VoiceMemosStore {
 
 impl RecorderStore for VoiceMemosStore {
     type Handle = File;
+
+    fn title(&self, file_name: &str) -> TitleLookup {
+        self.titles
+            .as_ref()
+            .map_or(TitleLookup::Unavailable, |titles| titles.title(file_name))
+    }
+
+    fn refresh_titles(&self) -> Result<(), RecorderError> {
+        self.titles
+            .as_ref()
+            .map_or(Ok(()), |titles| titles.refresh(&self.recordings))
+    }
 
     fn candidates(&self) -> Result<Vec<Candidate>, RecorderError> {
         let names = self

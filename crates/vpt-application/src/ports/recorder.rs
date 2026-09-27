@@ -28,6 +28,12 @@ pub enum RecorderError {
     Io(String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TitleLookup {
+    Titled(String),
+    Unavailable,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CloneKind {
     CopyOnWrite,
@@ -63,4 +69,6 @@ pub trait RecorderStore {
         name: &str,
     ) -> Result<CloneKind, CloneError>;
     fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)>;
+    fn title(&self, file_name: &str) -> TitleLookup;
+    fn refresh_titles(&self) -> Result<(), RecorderError>;
 }

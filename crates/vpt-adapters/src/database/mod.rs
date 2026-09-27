@@ -7,6 +7,7 @@ mod registration;
 mod shared_memory;
 mod state;
 
+pub(crate) use locks::{LockKind, set_record_lock};
 pub(crate) use owner::Database;
 
 use crate::ContainedError;
@@ -33,15 +34,7 @@ fn invalid(operation: &'static str) -> DatabaseError {
 pub(crate) enum AccessPolicy {
     WritableLedger,
     ObservationalLedger,
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "D6 constructs refreshed title connections")
-    )]
     RefreshedTitleCopy,
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "D6 constructs existing title connections")
-    )]
     ExistingTitleCopy,
 }
 
