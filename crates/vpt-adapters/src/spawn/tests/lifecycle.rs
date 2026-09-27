@@ -146,6 +146,12 @@ fn elapsed_spawn_and_registration_at_the_deadline_cannot_report_success() {
                        pipes: &mut PipeSlots,
                        registration: &mut Option<Registration>| {
                 fixture.register(lease, pipes, registration)?;
+                while !fixture.leader_terminal() {
+                    if fixture.watchdog_fired() {
+                        return Err(io::ErrorKind::TimedOut.into());
+                    }
+                    std::thread::yield_now();
+                }
                 elapsed.set(deadline);
                 Ok(())
             },
@@ -153,6 +159,10 @@ fn elapsed_spawn_and_registration_at_the_deadline_cannot_report_success() {
     )
     .expect("late first observation executed");
     assert_eq!(outcome.status, Status::DeadlineExceeded);
+    assert_eq!(
+        fixture.recorded_status().and_then(|status| status.code()),
+        Some(0)
+    );
     fixture.assert_finished();
 }
 
