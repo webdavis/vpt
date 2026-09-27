@@ -30,6 +30,14 @@ fn dispatch(invocation: &Invocation) -> i32 {
             invocation.config.as_deref(),
             *force,
         ),
+        Verb::SymlinkDeploy => commands::symlink::deploy(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+        ),
+        Verb::SymlinkVerify => commands::symlink::verify(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+        ),
         _ => Outcome::Failure(ErrorDocument::new(
             ErrorKind::Usage,
             "verb not implemented yet",

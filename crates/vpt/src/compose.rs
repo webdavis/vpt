@@ -1,6 +1,8 @@
 use std::ffi::OsString;
-use std::path::PathBuf;
-use vpt_adapters::config::{ConfigError, default_state_dir};
+use std::path::{Path, PathBuf};
+use vpt_adapters::config::{ConfigError, default_state_dir, from_table, load_file};
+use vpt_application::Settings;
+use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
 pub(crate) struct Environment {
     vars: Vec<(OsString, OsString)>,
@@ -47,4 +49,55 @@ impl Environment {
         let value = self.var("XDG_STATE_HOME")?;
         Ok(default_state_dir(|_| value.clone()))
     }
+}
+
+pub(crate) fn settings_from(
+    environment: &Environment,
+    config: Option<&Path>,
+) -> Result<Settings, Box<ErrorDocument>> {
+    let selected = config
+        .map(Path::to_path_buf)
+        .map_or_else(|| environment.config_path().map_err(config_error), Ok)?;
+    let table = load_file(&selected).map_err(config_error)?;
+    let home = environment.home_dir().map_err(config_error)?;
+    from_table(&table, &home).map_err(config_error)
+}
+
+fn config_error(error: ConfigError) -> Box<ErrorDocument> {
+    let document = match error {
+        ConfigError::Missing(path) => ErrorDocument::new(
+            ErrorKind::Config,
+            format!("configuration {path} does not exist"),
+        ),
+        ConfigError::PathEscape(path) => ErrorDocument::new(
+            ErrorKind::Refused,
+            format!("configuration {path} escapes its checked root"),
+        )
+        .rule("path_escape"),
+        ConfigError::Unreadable { path, detail } => ErrorDocument::new(
+            ErrorKind::Config,
+            format!("cannot read configuration {path}: {detail}"),
+        ),
+        ConfigError::Unparseable(_) => {
+            ErrorDocument::new(ErrorKind::Config, "configuration does not parse")
+        }
+        ConfigError::MissingVersion => {
+            ErrorDocument::new(ErrorKind::Config, "configuration needs config_version")
+        }
+        ConfigError::UnsupportedVersion(version) => ErrorDocument::new(
+            ErrorKind::Config,
+            format!("unsupported configuration version {version}"),
+        ),
+        ConfigError::UnknownKey(key) => ErrorDocument::new(
+            ErrorKind::Config,
+            format!("unknown configuration key {key}"),
+        ),
+        ConfigError::WrongType { key, expected } => {
+            ErrorDocument::new(ErrorKind::Config, format!("{key} must be {expected}"))
+        }
+        ConfigError::OutOfRange { key, rule } => {
+            ErrorDocument::new(ErrorKind::Config, format!("{key}: {rule}"))
+        }
+    };
+    Box::new(document)
 }
