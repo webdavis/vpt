@@ -1,3 +1,8 @@
+#[path = "fake_engine/commands.rs"]
+mod commands;
+#[path = "fake_engine/exchange.rs"]
+mod exchange;
+
 fn main() {
     if std::env::args().nth(1).as_deref() == Some("reap-descendant") {
         reap_descendant();
@@ -16,8 +21,8 @@ fn main() {
         eprintln!("terminal fixture: {error}");
         std::process::exit(1);
     }
-    eprintln!("vpt-fake-engine: no subcommand yet");
-    std::process::exit(2);
+    let args = std::env::args().skip(1).collect::<Vec<_>>();
+    std::process::exit(commands::run(&args));
 }
 
 fn reap_descendant() {
