@@ -1,6 +1,8 @@
 mod connection;
 mod error;
+mod journal;
 mod migrations;
+mod recordings;
 
 use crate::database::AccessPolicy;
 use crate::{ContainedError, RootDir};
@@ -102,10 +104,6 @@ impl SqliteLedger {
         self.read(migrations::current)
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "Task 12 ledger repositories use transactions")
-    )]
     pub(crate) fn transaction<T>(
         &self,
         operation: impl FnOnce(&rusqlite::Transaction<'_>) -> Result<T, LedgerError>,
