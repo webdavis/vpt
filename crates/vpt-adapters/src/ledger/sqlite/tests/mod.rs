@@ -3,6 +3,7 @@ mod migration;
 mod observation;
 mod peers;
 mod schema;
+pub(crate) mod schema_diagnostics;
 
 use super::{SqliteLedger, error, map};
 use crate::RootDir;
@@ -12,7 +13,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 use vpt_application::ports::LedgerError;
 
-fn finish(child: ChildGuard) {
+fn finish(child: ChildGuard) -> std::process::Output {
     let output = child.finish().expect("bounded ledger child");
     assert!(
         output.status.success(),
@@ -21,12 +22,23 @@ fn finish(child: ChildGuard) {
         output.stdout.escape_ascii(),
         output.stderr.escape_ascii()
     );
+    output
 }
 
 fn supervised(scenario: &str) {
     let (temp, _root) = root();
     let started = Instant::now();
-    finish(child_for_root(scenario, temp.path(), std::process::id(), started).unwrap());
+    let output =
+        finish(child_for_root(scenario, temp.path(), std::process::id(), started).unwrap());
+    if scenario == "ledger_schema_foreign_keys" {
+        eprintln!(
+            "VPT_TRACE parent_elapsed_ms={}",
+            started.elapsed().as_millis()
+        );
+        for phase in schema_diagnostics::formatted_phases(&output.stderr) {
+            eprintln!("VPT_TRACE {phase}");
+        }
+    }
 }
 
 fn database<T>(
@@ -73,6 +85,7 @@ pub(crate) fn run_scenario(
 ) {
     eprintln!("VPT_PHASE {scenario}");
     match scenario {
+        "ledger_contract_schema_trace" => schema_diagnostics::run(&root),
         s if s.starts_with("ledger_migration_") => migration::run(s, &root),
         s if s.starts_with("ledger_schema_") => schema::run(s, &root),
         s if s.starts_with("ledger_observe_") => observation::run(s, &root),

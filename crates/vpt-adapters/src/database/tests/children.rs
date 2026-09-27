@@ -18,6 +18,7 @@ pub(crate) struct ChildGuard {
     stdout: Capture<ChildStdout>,
     stderr: Capture<ChildStderr>,
     ready_offset: usize,
+    started: Instant,
     deadline: Instant,
 }
 
@@ -125,6 +126,7 @@ fn spawn_with_signal(
         stdout,
         stderr,
         ready_offset: 0,
+        started,
         deadline: started + Duration::from_millis(500),
     })
 }
@@ -155,7 +157,8 @@ impl ChildGuard {
         io::Error::new(
             io::ErrorKind::TimedOut,
             format!(
-                "child={child} stdout_eof={} stderr_eof={} stdout_bytes={} stderr_bytes={} phase={phase} stdout_preview={} stderr_preview={}",
+                "child={child} parent_elapsed_ms={} stdout_eof={} stderr_eof={} stdout_bytes={} stderr_bytes={} phase={phase} stdout_preview={} stderr_preview={}",
+                self.started.elapsed().as_millis(),
                 self.stdout.finished(),
                 self.stderr.finished(),
                 self.stdout.bytes.len(),

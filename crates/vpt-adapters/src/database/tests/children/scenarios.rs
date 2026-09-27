@@ -61,7 +61,9 @@ fn database_child() {
         );
     }
     let directory = std::env::var_os("VPT_DATABASE_ROOT").expect("owned root");
+    let opening = crate::ledger::schema_diagnostics::start("root.open.start");
     let root = RootDir::open(&Path::new(&directory).join("state")).unwrap();
+    crate::ledger::schema_diagnostics::end(opening, "root.open.end");
     match scenario.as_str() {
         "identity_exit" | "identity_signal" | "identity_grace" => {
             super::identity::finite_child(&scenario, Path::new(&directory))
