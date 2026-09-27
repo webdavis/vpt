@@ -1,0 +1,216 @@
+use super::*;
+use serde_json::{Value, json};
+use std::path::PathBuf;
+use vpt_domain::history::{EventPathKey, ExportFailureId};
+use vpt_domain::run::{
+    EffectKind, EffectOutcome, EffectReference, FailureWindow, HookFailureClass, RecoveryEvidence,
+    RunKind, RunOutcome, WorkOutcome,
+};
+
+fn assert_fact(fact: HistoryFact, expected: Value) {
+    let record = record(fact);
+    let line = encode_history(&record, UtcInstant { secs: 12 }).unwrap();
+    assert!(!line.contains('\n'));
+    assert_eq!(
+        serde_json::from_str::<Value>(&line).unwrap(),
+        json!({
+            "schema":"vpt.log/1",
+            "event_id":record.id.render(),
+            "run_id":record.run.render(),
+            "sequence":2,
+            "occurred_at":"1970-01-01T00:00:11Z",
+            "appended_at":"1970-01-01T00:00:12Z",
+            "fact":expected
+        })
+    );
+}
+
+fn evidence() -> RecoveryEvidence {
+    RecoveryEvidence {
+        affected_runs: vec![record(HistoryFact::RunStarted(RunKind::Ingest)).run],
+        first_failure_observed_at: Some(UtcInstant { secs: 13 }),
+        logging_restored_observed_at: Some(UtcInstant { secs: 14 }),
+        failures: 1,
+        recovered_records: 2,
+        completed: 3,
+        failed: 4,
+        unresolved: 5,
+        missing_history: 6,
+    }
+}
+
+fn evidence_json(value: &RecoveryEvidence) -> Value {
+    json!({
+        "affected_runs":[value.affected_runs[0].render()],
+        "first_failure_observed_at":"1970-01-01T00:00:13Z",
+        "logging_restored_observed_at":"1970-01-01T00:00:14Z",
+        "failures":1,"recovered_records":2,"completed":3,"failed":4,
+        "unresolved":5,"missing_history":6
+    })
+}
+
+#[test]
+fn history_document_pins_every_closed_fact_variant() {
+    for (kind, name) in [
+        (RunKind::Ingest, "ingest"),
+        (RunKind::Recover, "recover"),
+        (RunKind::Publish, "publish"),
+        (RunKind::Retain, "retain"),
+    ] {
+        assert_fact(
+            HistoryFact::RunStarted(kind),
+            json!({"tag":"run_started","kind":name}),
+        );
+    }
+    for (outcome, name) in [
+        (RunOutcome::Completed, "completed"),
+        (RunOutcome::Failed, "failed"),
+        (RunOutcome::Interrupted, "interrupted"),
+    ] {
+        assert_fact(
+            HistoryFact::RunFinished(outcome),
+            json!({"tag":"run_finished","outcome":name}),
+        );
+    }
+    for (outcome, name) in [
+        (WorkOutcome::Completed, "completed"),
+        (WorkOutcome::Failed, "failed"),
+        (WorkOutcome::Unknown, "unknown"),
+    ] {
+        assert_fact(
+            HistoryFact::WorkStep {
+                recording: Some(recording()),
+                outcome,
+            },
+            json!({"tag":"work_step","recording":recording().as_str(),"outcome":name}),
+        );
+    }
+    assert_fact(
+        HistoryFact::WorkStep {
+            recording: None,
+            outcome: WorkOutcome::Unknown,
+        },
+        json!({"tag":"work_step","recording":null,"outcome":"unknown"}),
+    );
+
+    for (kind, name, reference, wire) in [
+        (
+            EffectKind::Archive,
+            "archive",
+            EffectReference::ArchiveTarget(PathBuf::from("/sandbox/archive")),
+            json!({"tag":"archive_target","path":"/sandbox/archive"}),
+        ),
+        (
+            EffectKind::Publication,
+            "publication",
+            EffectReference::PublicationTarget(PathBuf::from("/sandbox/brief")),
+            json!({"tag":"publication_target","path":"/sandbox/brief"}),
+        ),
+        (
+            EffectKind::AudioTrash,
+            "audio_trash",
+            EffectReference::AudioTrash {
+                recording: recording(),
+                path: PathBuf::from("/sandbox/audio"),
+            },
+            json!({"tag":"audio_trash","recording":recording().as_str(),"path":"/sandbox/audio"}),
+        ),
+        (
+            EffectKind::RetentionTrash,
+            "retention_trash",
+            EffectReference::RetentionIntent {
+                id: 7,
+                path: PathBuf::from("/sandbox/retention"),
+            },
+            json!({"tag":"retention_intent","id":7,"path":"/sandbox/retention"}),
+        ),
+    ] {
+        assert_fact(
+            HistoryFact::EffectIntent { kind, reference },
+            json!({"tag":"effect_intent","kind":name,"reference":wire}),
+        );
+    }
+    let event_id = record(HistoryFact::RunStarted(RunKind::Ingest)).id;
+    for (outcome, name) in [
+        (EffectOutcome::Completed, "completed"),
+        (EffectOutcome::Failed, "failed"),
+        (EffectOutcome::Unknown, "unknown"),
+    ] {
+        assert_fact(
+            HistoryFact::EffectObserved {
+                intent: event_id,
+                outcome,
+            },
+            json!({"tag":"effect_observed","intent":event_id.render(),"outcome":name}),
+        );
+    }
+
+    for (failure, wire) in [
+        (HookFailureClass::Spawn, json!({"tag":"spawn"})),
+        (HookFailureClass::Io, json!({"tag":"io"})),
+        (HookFailureClass::Encoding, json!({"tag":"encoding"})),
+        (
+            HookFailureClass::Exited(7),
+            json!({"tag":"exited","code":7}),
+        ),
+        (
+            HookFailureClass::Signaled(9),
+            json!({"tag":"signaled","signal":9}),
+        ),
+        (
+            HookFailureClass::DeadlineExceeded,
+            json!({"tag":"deadline_exceeded"}),
+        ),
+        (HookFailureClass::Interrupted, json!({"tag":"interrupted"})),
+    ] {
+        assert_fact(
+            HistoryFact::HookFailed {
+                event: event_id,
+                failure,
+            },
+            json!({"tag":"hook_failed","event":event_id.render(),"failure":wire}),
+        );
+    }
+
+    let mut emitted = event(EventKind::BriefWritten, EventState::Done);
+    emitted.recording = Some(recording());
+    emitted.occurred_at = UtcInstant { secs: 11 };
+    emitted.paths.push(EventPath {
+        key: EventPathKey::Brief,
+        path: PathBuf::from("/sandbox/brief.md"),
+    });
+    assert_fact(
+        HistoryFact::Event(emitted),
+        json!({"tag":"event","event":{
+            "event":"brief_written","state":"done","recording":recording().as_str(),
+            "detail":"","counts":{"numeric":0,"proper_noun":0,"low_confidence":0,
+            "formatting":0,"other":0,"unsupported":0,"agreed_unverified":0,"diagnostics":0},
+            "paths":{"brief":"/sandbox/brief.md"},"occurred_at":"1970-01-01T00:00:11Z"
+        }}),
+    );
+
+    let recovery = evidence();
+    let wire = evidence_json(&recovery);
+    assert_fact(
+        HistoryFact::RecoveryProgress(recovery.clone()),
+        json!({"tag":"recovery_progress","evidence":wire}),
+    );
+    assert_fact(
+        HistoryFact::RecoverySummary {
+            evidence: recovery.clone(),
+            window: None,
+        },
+        json!({"tag":"recovery_summary","evidence":wire,"window":null}),
+    );
+    let failure = ExportFailureId::new(recovery.affected_runs[0].namespace(), 1);
+    assert_fact(
+        HistoryFact::RecoverySummary {
+            evidence: recovery,
+            window: Some(FailureWindow {
+                after: None,
+                through: failure,
+            }),
+        },
+        json!({"tag":"recovery_summary","evidence":wire,"window":{"after":null,"through":failure.render()}}),
+    );
+}
