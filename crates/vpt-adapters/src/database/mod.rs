@@ -102,6 +102,6 @@ impl DatabaseError {
 mod tests;
 
 #[cfg(test)]
-pub(crate) use tests::children::{ChildGuard, child_for_root};
-#[cfg(test)]
 pub(crate) use tests::support::{root, snapshot};
+#[cfg(test)]
+pub(crate) use tests::{ChildGuard, child_for_root, test_root};
