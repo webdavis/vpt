@@ -14,6 +14,9 @@ use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
 pub const VPT: &str = env!("CARGO_BIN_EXE_vpt");
+#[cfg(feature = "dev-tools")]
+#[allow(dead_code, reason = "used only by helper integration tests")]
+pub const FAKE_ENGINE: &str = env!("CARGO_BIN_EXE_vpt-fake-engine");
 
 pub fn broken_output() -> (OwnedFd, UnixStream) {
     let (writer, peer) = UnixStream::pair().expect("local socket pair");
@@ -38,6 +41,8 @@ impl Sandbox {
             "config",
             "data",
             "state",
+            "cache",
+            "tmp",
             "bin",
             "voice-memos/Recordings",
         ] {
@@ -54,6 +59,18 @@ impl Sandbox {
         self.path().join("config/vpt/config.toml")
     }
 
+    #[cfg(feature = "dev-tools")]
+    #[allow(dead_code, reason = "used only by helper integration tests")]
+    pub fn install_fake_helper(&self) {
+        std::os::unix::fs::symlink(FAKE_ENGINE, self.path().join("bin/vpt-macos"))
+            .expect("fake helper");
+        std::fs::create_dir_all(self.path().join("trash")).expect("fake trash");
+    }
+
+    pub fn fake_log(&self) -> PathBuf {
+        self.path().join("fake.log")
+    }
+
     pub fn vpt(&self) -> Command {
         let mut command = Command::new(VPT);
         command
@@ -65,8 +82,12 @@ impl Sandbox {
             .env("XDG_CONFIG_HOME", self.path().join("config"))
             .env("XDG_DATA_HOME", self.path().join("data"))
             .env("XDG_STATE_HOME", self.path().join("state"))
+            .env("XDG_CACHE_HOME", self.path().join("cache"))
+            .env("TMPDIR", self.path().join("tmp"))
             .env("VPT_CONFIG", self.config_path())
-            .env("PATH", self.path().join("bin"));
+            .env("PATH", self.path().join("bin"))
+            .env("VPT_FAKE_TRASH", self.path().join("trash"))
+            .env("VPT_FAKE_LOG", self.fake_log());
         command
     }
 }

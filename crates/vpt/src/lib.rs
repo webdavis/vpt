@@ -7,6 +7,7 @@ use cli::output::{Outcome, emit};
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
 pub fn run() -> ! {
+    vpt_adapters::install_interrupt_handlers();
     let args: Vec<_> = std::env::args_os().collect();
     let json = args.iter().skip(1).any(|word| word == "--json");
     let code = match parse(args) {
@@ -21,10 +22,10 @@ pub fn run() -> ! {
 
 fn dispatch(invocation: &Invocation) -> i32 {
     let outcome = match &invocation.verb {
-        Verb::Version => Outcome::Success {
-            document: commands::version::document(None),
-            human: commands::version::human(None),
-        },
+        Verb::Version => commands::version::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+        ),
         Verb::Setup { force } => commands::setup::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

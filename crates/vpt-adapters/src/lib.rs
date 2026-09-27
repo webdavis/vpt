@@ -2,6 +2,7 @@ mod archive;
 pub mod config;
 mod contained;
 mod database;
+mod helper;
 mod ledger;
 mod lock;
 mod prompt;
@@ -9,6 +10,7 @@ mod spawn;
 mod stores;
 mod symlink;
 mod voice_memos;
+pub use helper::{BUILT_AGAINST_MAJOR, CALL_DEADLINE, HelperClient, HelperError};
 pub use prompt::TtyPrompt;
 pub use spawn::{
     GRACE, OUTPUT_LIMIT, Outcome, SpawnError, Status, install_interrupt_handlers, run, run_with_env,
