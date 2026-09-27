@@ -1,7 +1,9 @@
 pub(crate) mod capture;
+mod diagnostic;
 mod process;
 
 use capture::Capture;
+use diagnostic::Diagnostic;
 use process::ProcessGroup;
 use std::net::Shutdown;
 use std::os::fd::OwnedFd;
@@ -71,7 +73,9 @@ impl Sandbox {
 
 pub fn run(command: &mut Command) -> Output {
     let started = Instant::now();
-    collect(spawn(command), started)
+    let child = spawn(command);
+    let spawn_return = Instant::now();
+    collect(child, started, Some(spawn_return))
 }
 
 pub fn spawn(command: &mut Command) -> Child {
@@ -88,40 +92,84 @@ pub fn spawn(command: &mut Command) -> Child {
     command.spawn().expect("command spawned")
 }
 
-pub fn collect(child: Child, started: Instant) -> Output {
-    collect_with(child, started, || {})
+pub fn collect(child: Child, started: Instant, spawn_return: Option<Instant>) -> Output {
+    collect_with(child, started, spawn_return, || {})
 }
 
-pub fn collect_with(child: Child, started: Instant, mut drive: impl FnMut()) -> Output {
+pub fn collect_with(
+    child: Child,
+    started: Instant,
+    spawn_return: Option<Instant>,
+    mut drive: impl FnMut(),
+) -> Output {
+    let mut diagnostic = Diagnostic::new(started, child.id(), spawn_return);
     let mut group = ProcessGroup::new(child, started + Duration::from_millis(900));
+    let stdout_piped = group.child.stdout.is_some();
+    let stderr_piped = group.child.stderr.is_some();
     let mut stdout = Capture::new(group.child.stdout.take());
     let mut stderr = Capture::new(group.child.stderr.take());
     let status = loop {
-        drive();
-        stdout.drain().expect("read stdout");
-        stderr.drain().expect("read stderr");
-        if let Some(status) = group.child.try_wait().expect("wait for command")
-            && stdout.finished()
-            && stderr.finished()
-        {
-            break Some(status);
-        }
-        if started.elapsed() >= Duration::from_millis(500) {
+        let poll_started = Instant::now();
+        diagnostic.poll_started(poll_started);
+        if poll_started.duration_since(started) >= Duration::from_millis(500) {
+            diagnostic.deadline(poll_started);
             break None;
         }
+        let step_started = Instant::now();
+        drive();
+        diagnostic.step("driver", step_started, Instant::now());
+        let step_started = Instant::now();
+        stdout.drain().expect("read stdout");
+        let step_done = Instant::now();
+        diagnostic.step("stdout_drain", step_started, step_done);
+        if stdout_piped && stdout.finished() {
+            diagnostic.stdout_eof(step_done);
+        }
+        let step_started = Instant::now();
+        stderr.drain().expect("read stderr");
+        let step_done = Instant::now();
+        diagnostic.step("stderr_drain", step_started, step_done);
+        if stderr_piped && stderr.finished() {
+            diagnostic.stderr_eof(step_done);
+        }
+        let step_started = Instant::now();
+        let observed = group.child.try_wait().expect("wait for command");
+        let observed_at = Instant::now();
+        diagnostic.step("try_wait", step_started, observed_at);
+        if let Some(status) = observed {
+            diagnostic.child_exit(observed_at, status);
+        }
+        if observed_at.duration_since(started) >= Duration::from_millis(500) {
+            diagnostic.deadline(observed_at);
+            break None;
+        }
+        if observed.is_some() && stdout.finished() && stderr.finished() {
+            break observed;
+        }
+        diagnostic.poll_completed(observed_at);
         std::thread::sleep(Duration::from_millis(1));
     };
     drop(group);
-    let elapsed = started.elapsed();
-    assert!(
-        elapsed < Duration::from_secs(1),
-        "command exceeded one second: {elapsed:?}"
-    );
+    let cleaned_at = Instant::now();
+    diagnostic.cleanup(cleaned_at);
+    let elapsed = cleaned_at.duration_since(started);
+    if elapsed >= Duration::from_secs(1) || status.is_none() {
+        let record = diagnostic.render(
+            &stdout.bytes,
+            &stderr.bytes,
+            stdout.finished(),
+            stderr.finished(),
+        );
+        if elapsed >= Duration::from_secs(1) {
+            panic!("command exceeded one second: {record}");
+        }
+        panic!("command exceeded 500 ms deadline: {record}");
+    }
     if elapsed > Duration::from_millis(200) {
         eprintln!("slow command: {elapsed:?}");
     }
     Output {
-        status: status.expect("command exceeded 500 ms deadline"),
+        status: status.expect("completed command status"),
         stdout: stdout.bytes,
         stderr: stderr.bytes,
     }

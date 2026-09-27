@@ -19,6 +19,10 @@ pub fn run(sandbox: &Sandbox, answer: Answer<'_>) -> Output {
 }
 
 pub fn run_args(sandbox: &Sandbox, answer: Answer<'_>, args: &[&str]) -> Output {
+    run_command(sandbox, answer, support::VPT, args)
+}
+
+pub fn run_command(sandbox: &Sandbox, answer: Answer<'_>, path: &str, args: &[&str]) -> Output {
     let mut master = OpenOptions::new()
         .read(true)
         .write(true)
@@ -62,7 +66,7 @@ pub fn run_args(sandbox: &Sandbox, answer: Answer<'_>, args: &[&str]) -> Output 
     let mut command = Command::new(env!("CARGO_BIN_EXE_vpt-fake-engine"));
     command
         .arg("terminal-exec")
-        .arg(support::VPT)
+        .arg(path)
         .args(args)
         .stdin(Stdio::from(slave))
         .stdout(Stdio::piped())
@@ -75,10 +79,11 @@ pub fn run_args(sandbox: &Sandbox, answer: Answer<'_>, args: &[&str]) -> Output 
         );
     let started = Instant::now();
     let child = support::spawn(&mut command);
+    let spawn_return = Instant::now();
     drop(command);
     let mut seen = Vec::new();
     let mut answered = false;
-    let output = support::collect_with(child, started, || {
+    let output = support::collect_with(child, started, Some(spawn_return), || {
         let mut buffer = [0; 1024];
         match master.read(&mut buffer) {
             Ok(count) => seen.extend_from_slice(&buffer[..count]),
@@ -98,10 +103,18 @@ pub fn run_args(sandbox: &Sandbox, answer: Answer<'_>, args: &[&str]) -> Output 
             answered = true;
         }
     });
-    assert!(
-        answered,
-        "prompt not observed: {}",
-        String::from_utf8_lossy(&seen)
-    );
+    if !answered {
+        let preview = |bytes: &[u8]| bytes[..bytes.len().min(64)].escape_ascii().to_string();
+        panic!(
+            "prompt not observed: status={:?} terminal_bytes={} stdout_bytes={} stderr_bytes={} terminal_preview={} stdout_preview={} stderr_preview={}",
+            output.status.code(),
+            seen.len(),
+            output.stdout.len(),
+            output.stderr.len(),
+            preview(&seen),
+            preview(&output.stdout),
+            preview(&output.stderr),
+        );
+    }
     output
 }

@@ -101,9 +101,110 @@ fn setup_terminal_answer_timeout_reaps_the_owned_command() {
     let sandbox = Sandbox::new("setup-timeout");
     let started = std::time::Instant::now();
     let failure = std::panic::catch_unwind(|| terminal::run(&sandbox, terminal::Answer::None));
-    assert!(failure.is_err(), "missing answer must time out");
+    assert!(
+        is_command_deadline(&failure),
+        "missing answer must hit the command deadline: {failure:?}"
+    );
     assert!(started.elapsed() < std::time::Duration::from_secs(1));
     assert!(!sandbox.config_path().exists());
+}
+
+#[cfg(feature = "dev-tools")]
+#[test]
+fn setup_terminal_exit_before_prompt_reports_status_and_output() {
+    let sandbox = Sandbox::new("setup-before-prompt");
+    let failure = std::panic::catch_unwind(|| {
+        terminal::run_args(&sandbox, terminal::Answer::None, &["--version"])
+    })
+    .expect_err("version must exit before a setup prompt");
+    let message = terminal_panic_message(&failure);
+    assert!(message.starts_with("prompt not observed:"), "{message}");
+    assert!(message.contains("status=Some(0)"), "{message}");
+    assert!(message.contains("stdout_bytes="), "{message}");
+    assert!(message.contains("stdout_preview=vpt "), "{message}");
+    assert!(message.contains("terminal_bytes="), "{message}");
+    assert!(!sandbox.config_path().exists());
+}
+
+#[cfg(feature = "dev-tools")]
+#[test]
+fn setup_terminal_missing_prompt_escapes_and_bounds_captured_bytes() {
+    let sandbox = Sandbox::new("setup-diagnostic-bytes");
+    let payload = "A".repeat(80);
+    let script =
+        "printf '\\033%s' \"$1\" > /dev/tty; printf '\\002%s' \"$2\"; printf '\\003%s' \"$3\" >&2";
+    let failure = std::panic::catch_unwind(|| {
+        terminal::run_command(
+            &sandbox,
+            terminal::Answer::None,
+            "/bin/sh",
+            &[
+                "-c",
+                script,
+                "terminal-fixture",
+                &payload,
+                &payload,
+                &payload,
+            ],
+        )
+    })
+    .expect_err("owned shell must exit before a setup prompt");
+    let message = terminal_panic_message(&failure);
+    for field in ["terminal_bytes=81", "stdout_bytes=81", "stderr_bytes=81"] {
+        assert!(message.contains(field), "missing {field}: {message}");
+    }
+    for field in [
+        "terminal_preview=\\x1b",
+        "stdout_preview=\\x02",
+        "stderr_preview=\\x03",
+    ] {
+        assert!(message.contains(field), "missing {field}: {message}");
+    }
+    assert!(
+        !message.contains('\u{1b}') && !message.contains('\u{2}') && !message.contains('\u{3}')
+    );
+    assert!(!message.contains(&"A".repeat(64)), "{message}");
+}
+
+#[cfg(feature = "dev-tools")]
+#[test]
+fn setup_terminal_timeout_assertion_rejects_pre_prompt_exit() {
+    let sandbox = Sandbox::new("setup-timeout-classification");
+    let outcome = std::panic::catch_unwind(|| {
+        terminal::run_args(&sandbox, terminal::Answer::None, &["--version"])
+    });
+    let failure = outcome
+        .as_ref()
+        .expect_err("version must exit before a setup prompt");
+    let message = terminal_panic_message(failure);
+    assert!(message.starts_with("prompt not observed:"), "{message}");
+    assert!(
+        !is_command_deadline(&outcome),
+        "early exit classified as timeout"
+    );
+}
+
+#[cfg(feature = "dev-tools")]
+fn is_command_deadline(outcome: &std::thread::Result<std::process::Output>) -> bool {
+    outcome
+        .as_ref()
+        .err()
+        .and_then(|failure| {
+            failure
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| failure.downcast_ref::<&str>().copied())
+        })
+        .is_some_and(|message| message.starts_with("command exceeded 500 ms deadline:"))
+}
+
+#[cfg(feature = "dev-tools")]
+fn terminal_panic_message(failure: &Box<dyn std::any::Any + Send>) -> &str {
+    failure
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| failure.downcast_ref::<&str>().copied())
+        .expect("panic message")
 }
 
 #[test]

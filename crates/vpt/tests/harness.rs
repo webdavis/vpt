@@ -1,8 +1,99 @@
+#[path = "harness/deadline.rs"]
+mod deadline;
 mod support;
 
+use deadline::{ensure_group_gone, panic_message, reap_short_owned_child, sandboxed_shell};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 use support::{Sandbox, broken_output, run, stderr, stdout};
+
+#[test]
+fn late_completion_observed_after_deadline_is_rejected() {
+    deadline::late_completion_observed_after_deadline_is_rejected();
+}
+
+#[test]
+fn completion_observed_during_poll_after_deadline_is_rejected() {
+    let sandbox = Sandbox::new("completion-during-poll");
+    let mut command = sandboxed_shell(&sandbox, "exit 0");
+    let mut child = support::spawn(&mut command);
+    reap_short_owned_child(&mut child);
+    let started = Instant::now() - Duration::from_millis(400);
+    let mut drove = false;
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        support::collect_with(child, started, None, || {
+            drove = true;
+            while started.elapsed() < Duration::from_millis(501) {
+                std::thread::yield_now();
+            }
+        })
+    }));
+    assert!(drove, "the poll did not start before the deadline");
+    let failure = outcome.expect_err("completion observed after the poll deadline must fail");
+    let message = panic_message(&failure);
+    assert!(
+        message.starts_with("command exceeded 500 ms deadline:"),
+        "{message}"
+    );
+}
+
+#[test]
+fn watchdog_timeout_reports_bounded_capture_and_phase() {
+    let sandbox = Sandbox::new("watchdog-diagnostic");
+    let stdout_payload = "A".repeat(80);
+    let stderr_payload = "B".repeat(80);
+    let mut command = sandboxed_shell(
+        &sandbox,
+        "printf '\\033%s' \"$1\"; printf '\\002%s' \"$2\" >&2; IFS= read -r answer",
+    );
+    command.args(["watchdog-diagnostic", &stdout_payload, &stderr_payload]);
+    let started = Instant::now();
+    let child = support::spawn(&mut command);
+    let spawn_return = Instant::now();
+    let pid = i32::try_from(child.id()).expect("owned pid");
+    let failure = std::panic::catch_unwind(|| support::collect(child, started, Some(spawn_return)))
+        .expect_err("stdin-blocked owned child must time out");
+    ensure_group_gone(pid);
+    let message = panic_message(&failure);
+    assert!(
+        message.starts_with("command exceeded 500 ms deadline:"),
+        "{message}"
+    );
+    assert!(message.contains("stdout_bytes=81"), "{message}");
+    assert!(message.contains("stderr_bytes=81"), "{message}");
+    assert!(!message.contains("spawn_return=none"), "{message}");
+    assert!(message.contains("stdout_preview=\\x1b"), "{message}");
+    assert!(message.contains("stderr_preview=\\x02"), "{message}");
+    assert!(
+        !message.contains('\u{1b}') && !message.contains('\u{2}'),
+        "{message}"
+    );
+    assert!(!message.contains(&"A".repeat(64)), "{message}");
+    assert!(!message.contains(&"B".repeat(64)), "{message}");
+    for field in [
+        "spawn_return=",
+        "driver=",
+        "stdout_drain=",
+        "stderr_drain=",
+        "try_wait=",
+        "child_exit=",
+        "stdout_eof=",
+        "stderr_eof=",
+        "deadline=",
+        "cleanup=",
+        "poll_gap=",
+        "active_step=",
+        "child=",
+        "status=",
+    ] {
+        assert!(message.contains(field), "missing {field}: {message}");
+    }
+}
+
+#[test]
+fn watchdog_absent_pipe_is_not_reported_as_eof() {
+    deadline::watchdog_absent_pipe_is_not_reported_as_eof();
+}
 
 #[test]
 fn retained_output_after_exit_obeys_the_deadline() {
@@ -30,7 +121,7 @@ fn retained_peer_obeys_deadline(on_stderr: bool) {
     let (send, receive) = std::sync::mpsc::channel();
     let started = Instant::now();
     let worker = std::thread::spawn(move || {
-        let outcome = std::panic::catch_unwind(|| support::collect(child, started));
+        let outcome = std::panic::catch_unwind(|| support::collect(child, started, None));
         send.send(outcome.is_err()).expect("result receiver");
     });
     let bounded = receive.recv_timeout(Duration::from_millis(700));
