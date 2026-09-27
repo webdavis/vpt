@@ -14,11 +14,11 @@ fn a_second_milestone_cannot_reuse_the_first_ready_message() {
         started,
     )
     .unwrap();
-    let pid = participant.group.child.id();
+    let pid = participant.group.id();
     participant.ready().unwrap();
     let second = participant.ready();
     drop(participant);
-    assert_reaped(pid, started + Duration::from_millis(900));
+    assert_reaped(pid);
     assert!(
         matches!(second, Err(error) if error.kind() == io::ErrorKind::TimedOut),
         "the participant is still waiting at its first milestone"
@@ -37,11 +37,11 @@ fn a_later_peer_keeps_the_original_scenario_budget() {
         started,
     )
     .unwrap();
-    let first_pid = first.group.child.id();
+    let first_pid = first.group.id();
     first.ready().unwrap();
     first.send("continue").unwrap();
     assert!(first.finish().unwrap().status.success());
-    assert_reaped(first_pid, started + Duration::from_millis(900));
+    assert_reaped(first_pid);
 
     let mut later = child_for_root(
         "supervision_stall",
@@ -50,11 +50,11 @@ fn a_later_peer_keeps_the_original_scenario_budget() {
         started,
     )
     .unwrap();
-    let later_pid = later.group.child.id();
+    let later_pid = later.group.id();
     later.ready().unwrap();
     later.send("continue").unwrap();
     let error = later.finish().unwrap_err();
-    assert_reaped(later_pid, started + Duration::from_millis(900));
+    assert_reaped(later_pid);
     assert_eq!(error.kind(), io::ErrorKind::TimedOut);
     assert!(error.to_string().contains("phase=pre-sql-stall"));
     assert!(
@@ -75,46 +75,42 @@ fn a_direct_participant_stalled_before_sql_is_terminated_and_reaped() {
         started,
     )
     .unwrap();
-    let pid = participant.group.child.id();
+    let pid = participant.group.id();
     participant.ready().unwrap();
     participant.send("continue").unwrap();
     let error = participant.finish().unwrap_err();
-    assert_reaped(pid, started + Duration::from_millis(900));
+    assert_reaped(pid);
     assert_eq!(error.kind(), io::ErrorKind::TimedOut);
     assert!(error.to_string().contains("phase=pre-sql-stall"));
     assert!(started.elapsed() < Duration::from_secs(1));
+    let elapsed_ms = error
+        .to_string()
+        .split_ascii_whitespace()
+        .find_map(|part| part.strip_prefix("parent_elapsed_ms="))
+        .and_then(|value| value.parse::<u128>().ok())
+        .expect("timeout reports numeric parent elapsed milliseconds");
+    assert!(elapsed_ms >= 500, "timeout preceded the operation deadline");
 }
 
-fn assert_reaped(pid: u32, deadline: Instant) {
+fn assert_reaped(pid: u32) {
     let pid = i32::try_from(pid).unwrap();
-    let mut status = 0;
-    // SAFETY: this exact child was spawned by the root fixture and owns its group.
-    let observed = unsafe { libc::waitpid(pid, &mut status, libc::WNOHANG) };
+    // SAFETY: initialized storage receives a non-consuming numeric PID observation.
+    let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+    let observed = unsafe {
+        libc::waitid(
+            libc::P_PID,
+            pid as libc::id_t,
+            &mut info,
+            libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+        )
+    };
     let error = io::Error::last_os_error();
-    if observed == 0 {
-        // SAFETY: terminate only the still-owned child group before reporting a cleanup failure.
-        unsafe { libc::killpg(pid, libc::SIGKILL) };
-        loop {
-            // SAFETY: the root fixture remains this child's parent and reaping authority.
-            let reaped = unsafe { libc::waitpid(pid, &mut status, libc::WNOHANG) };
-            if reaped == pid
-                || (reaped == -1 && io::Error::last_os_error().raw_os_error() == Some(libc::ECHILD))
-            {
-                break;
-            }
-            assert!(
-                Instant::now() < deadline,
-                "owned child cleanup backstop expired"
-            );
-            std::thread::sleep(Duration::from_millis(1));
-        }
-    }
     assert_eq!(
         observed, -1,
-        "watchdog did not reap child {pid}: status={status}"
+        "recorded child number remains waitable: {pid}"
     );
     assert_eq!(error.raw_os_error(), Some(libc::ECHILD));
-    // SAFETY: signal zero only observes this fixture-owned process group.
+    // SAFETY: signal zero is an observational probe of the recorded group number.
     assert_eq!(unsafe { libc::killpg(pid, 0) }, -1);
     assert_eq!(io::Error::last_os_error().raw_os_error(), Some(libc::ESRCH));
 }

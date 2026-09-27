@@ -8,12 +8,12 @@ use std::time::{Duration, Instant};
 fn observation(root: &RootDir, scenario: &str) {
     let mut writer = open(root, AccessPolicy::WritableLedger);
     initialize(&mut writer);
-    if scenario == "wal_heap_observation" {
+    if matches!(scenario, "wal_closed_observation" | "wal_heap_observation") {
         writer
             .with_connection::<_, DatabaseError>(|c| {
                 c.set_db_config(
                     rusqlite::config::DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE,
-                    true,
+                    scenario == "wal_heap_observation",
                 )?;
                 Ok(())
             })
@@ -120,6 +120,8 @@ fn crash(root: &RootDir, scenario: &str) {
 
 pub(in crate::database::tests) fn run(scenario: &str, root: RootDir) {
     match scenario {
+        "wal_close_policy" => super::close::policy(&root),
+        "wal_close_committed" => super::close::committed(&root),
         "wal_snapshot" => snapshot_reader(&root),
         "wal_live_observation"
         | "wal_closed_observation"

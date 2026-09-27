@@ -1,16 +1,16 @@
 pub(crate) mod capture;
 mod diagnostic;
-mod process;
+pub(crate) mod process;
 
 use capture::Capture;
 use diagnostic::Diagnostic;
-use process::ProcessGroup;
+pub(crate) use process::ProcessGroup;
 use std::net::Shutdown;
 use std::os::fd::OwnedFd;
 use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
+use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
 pub const VPT: &str = env!("CARGO_BIN_EXE_vpt");
@@ -78,7 +78,15 @@ pub fn run(command: &mut Command) -> Output {
     collect(child, started, Some(spawn_return))
 }
 
-pub fn spawn(command: &mut Command) -> Child {
+pub fn spawn(command: &mut Command) -> ProcessGroup {
+    spawn_with_signal(command, Instant::now(), process::signal_group)
+}
+
+pub(crate) fn spawn_with_signal(
+    command: &mut Command,
+    started: Instant,
+    signal: impl FnMut(i32, i32) + Send + 'static,
+) -> ProcessGroup {
     // SAFETY: setsid is async-signal-safe in the child before exec.
     unsafe {
         command.pre_exec(|| {
@@ -89,25 +97,29 @@ pub fn spawn(command: &mut Command) -> Child {
             }
         });
     }
-    command.spawn().expect("command spawned")
+    ProcessGroup::new(
+        command.spawn().expect("command spawned"),
+        started + Duration::from_millis(900),
+        signal,
+    )
 }
 
-pub fn collect(child: Child, started: Instant, spawn_return: Option<Instant>) -> Output {
+pub fn collect(child: ProcessGroup, started: Instant, spawn_return: Option<Instant>) -> Output {
     collect_with(child, started, spawn_return, || {})
 }
 
 pub fn collect_with(
-    child: Child,
+    mut group: ProcessGroup,
     started: Instant,
     spawn_return: Option<Instant>,
     mut drive: impl FnMut(),
 ) -> Output {
-    let mut diagnostic = Diagnostic::new(started, child.id(), spawn_return);
-    let mut group = ProcessGroup::new(child, started + Duration::from_millis(900));
-    let stdout_piped = group.child.stdout.is_some();
-    let stderr_piped = group.child.stderr.is_some();
-    let mut stdout = Capture::new(group.child.stdout.take());
-    let mut stderr = Capture::new(group.child.stderr.take());
+    let mut diagnostic = Diagnostic::new(started, group.id(), spawn_return);
+    group.set_deadline(started + Duration::from_millis(900));
+    let stdout_piped = group.stdout.is_some();
+    let stderr_piped = group.stderr.is_some();
+    let mut stdout = Capture::new(group.stdout.take());
+    let mut stderr = Capture::new(group.stderr.take());
     let status = loop {
         let poll_started = Instant::now();
         diagnostic.poll_started(poll_started);
@@ -133,7 +145,7 @@ pub fn collect_with(
             diagnostic.stderr_eof(step_done);
         }
         let step_started = Instant::now();
-        let observed = group.child.try_wait().expect("wait for command");
+        let observed = group.observe().expect("wait for command");
         let observed_at = Instant::now();
         diagnostic.step("try_wait", step_started, observed_at);
         if let Some(status) = observed {

@@ -1,8 +1,10 @@
 #[path = "harness/deadline.rs"]
 mod deadline;
+#[path = "harness/identity.rs"]
+mod identity;
 mod support;
 
-use deadline::{ensure_group_gone, panic_message, reap_short_owned_child, sandboxed_shell};
+use deadline::{ensure_group_gone, observe_short_owned_child, panic_message, sandboxed_shell};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 use support::{Sandbox, broken_output, run, stderr, stdout};
@@ -17,7 +19,7 @@ fn completion_observed_during_poll_after_deadline_is_rejected() {
     let sandbox = Sandbox::new("completion-during-poll");
     let mut command = sandboxed_shell(&sandbox, "exit 0");
     let mut child = support::spawn(&mut command);
-    reap_short_owned_child(&mut child);
+    observe_short_owned_child(&mut child);
     let started = Instant::now() - Duration::from_millis(400);
     let mut drove = false;
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -51,8 +53,10 @@ fn watchdog_timeout_reports_bounded_capture_and_phase() {
     let child = support::spawn(&mut command);
     let spawn_return = Instant::now();
     let pid = i32::try_from(child.id()).expect("owned pid");
-    let failure = std::panic::catch_unwind(|| support::collect(child, started, Some(spawn_return)))
-        .expect_err("stdin-blocked owned child must time out");
+    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        support::collect(child, started, Some(spawn_return))
+    }))
+    .expect_err("stdin-blocked owned child must time out");
     ensure_group_gone(pid);
     let message = panic_message(&failure);
     assert!(
@@ -121,7 +125,9 @@ fn retained_peer_obeys_deadline(on_stderr: bool) {
     let (send, receive) = std::sync::mpsc::channel();
     let started = Instant::now();
     let worker = std::thread::spawn(move || {
-        let outcome = std::panic::catch_unwind(|| support::collect(child, started, None));
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            support::collect(child, started, None)
+        }));
         send.send(outcome.is_err()).expect("result receiver");
     });
     let bounded = receive.recv_timeout(Duration::from_millis(700));

@@ -47,6 +47,8 @@ impl SqliteLedger {
     }
 
     pub fn open_with_timeout(state: &RootDir, busy: Duration) -> Result<Self, OpenError> {
+        #[cfg(test)]
+        let opening = tests::schema_diagnostics::start("ledger.open.start");
         connection::present(state)?;
         let ledger = Self {
             state: state.try_clone()?,
@@ -59,6 +61,8 @@ impl SqliteLedger {
                 ledger.state.revalidate().map_err(error::contained)
             })
         })?;
+        #[cfg(test)]
+        tests::schema_diagnostics::end(opening, "ledger.open.end");
         Ok(ledger)
     }
 
@@ -126,9 +130,27 @@ impl SqliteLedger {
         &self,
         operation: impl FnOnce(&rusqlite::Connection) -> Result<T, LedgerError>,
     ) -> Result<T, LedgerError> {
+        #[cfg(test)]
+        let reading = tests::schema_diagnostics::start("repo.read.start");
+        #[cfg(test)]
+        let opening = tests::schema_diagnostics::start("db.open.start");
         let mut owner = connection::open(&self.state, self.busy, self.policy)?;
+        #[cfg(test)]
+        tests::schema_diagnostics::end(opening, "db.open.end");
+        #[cfg(test)]
+        let operating = tests::schema_diagnostics::start("db.operation.start");
         let result = owner.with_connection(operation);
-        error::finish(result, owner.try_close().map_err(Into::into))
+        #[cfg(test)]
+        tests::schema_diagnostics::end(operating, "db.operation.end");
+        #[cfg(test)]
+        let closing = tests::schema_diagnostics::start("db.close.start");
+        let closed = owner.try_close().map_err(Into::into);
+        #[cfg(test)]
+        tests::schema_diagnostics::end(closing, "db.close.end");
+        let result = error::finish(result, closed);
+        #[cfg(test)]
+        tests::schema_diagnostics::end(reading, "repo.read.end");
+        result
     }
 }
 

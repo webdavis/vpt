@@ -1,3 +1,4 @@
+mod close;
 mod peers;
 pub(super) mod scenarios;
 
@@ -74,6 +75,14 @@ fn finish(child: ChildGuard) {
 
 pub(super) use scenarios::run;
 
+#[test]
+fn writable_close_policy_preserves_full_sync_and_automatic_checkpoints() {
+    supervised("wal_close_policy");
+}
+#[test]
+fn writable_close_leaves_committed_frames_readable_without_checkpointing() {
+    supervised("wal_close_committed");
+}
 #[test]
 fn a_reader_keeps_its_snapshot_while_a_writer_commits() {
     supervised("wal_snapshot");
