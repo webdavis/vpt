@@ -16,7 +16,7 @@ struct SignalRecord {
     exit_observed: bool,
 }
 
-fn terminal(pid: i32) -> Result<Option<(i32, i32)>, i32> {
+pub(super) fn terminal(pid: i32) -> Result<Option<(i32, i32)>, i32> {
     // SAFETY: initialized storage receives a non-consuming observation of this exact child.
     let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
     let result = unsafe {

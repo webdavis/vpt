@@ -1,3 +1,4 @@
+mod budget;
 mod capture;
 mod identity;
 mod process;
@@ -127,8 +128,16 @@ fn spawn_with_signal(
         stderr,
         ready_offset: 0,
         started,
-        deadline: started + Duration::from_millis(500),
+        deadline: started + operation_budget(scenario),
     })
+}
+
+fn operation_budget(scenario: &str) -> Duration {
+    if scenario.starts_with("ledger_contract_history_") {
+        Duration::from_millis(700)
+    } else {
+        Duration::from_millis(500)
+    }
 }
 
 impl ChildGuard {

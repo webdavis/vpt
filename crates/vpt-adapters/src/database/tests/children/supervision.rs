@@ -92,7 +92,7 @@ fn a_direct_participant_stalled_before_sql_is_terminated_and_reaped() {
     assert!(elapsed_ms >= 500, "timeout preceded the operation deadline");
 }
 
-fn assert_reaped(pid: u32) {
+pub(super) fn assert_reaped(pid: u32) {
     let pid = i32::try_from(pid).unwrap();
     // SAFETY: initialized storage receives a non-consuming numeric PID observation.
     let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };

@@ -65,6 +65,9 @@ fn database_child() {
     let root = RootDir::open(&Path::new(&directory).join("state")).unwrap();
     crate::ledger::schema_diagnostics::end(opening, "root.open.end");
     match scenario.as_str() {
+        "ledger_contract_history_budget_exit"
+        | "ledger_contract_history_budget_stall"
+        | "budget_exit" => super::budget::finite_child(&scenario, Path::new(&directory)),
         "identity_exit" | "identity_signal" | "identity_grace" => {
             super::identity::finite_child(&scenario, Path::new(&directory))
         }

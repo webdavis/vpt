@@ -86,6 +86,10 @@ impl ProcessGroup {
         self.child.id()
     }
 
+    pub(super) fn cleanup_deadline(&self) -> Instant {
+        self.deadline
+    }
+
     pub(super) fn observe(&mut self) -> io::Result<Option<ExitStatus>> {
         let pid = self.child.id();
         self.identity.observe_with(|| {
