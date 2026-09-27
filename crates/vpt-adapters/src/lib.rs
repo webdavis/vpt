@@ -1,3 +1,4 @@
+mod archive;
 pub mod config;
 mod contained;
 mod database;
@@ -13,6 +14,7 @@ pub use spawn::{
     GRACE, OUTPUT_LIMIT, Outcome, SpawnError, Status, install_interrupt_handlers, run, run_with_env,
 };
 
+pub use archive::{ClonefileArchive, STAGING_PREFIX};
 pub use config::{RootError, Roots};
 pub use contained::{Access, ContainedError, Kind, RootDir, Stat, leaf_below};
 pub use ledger::{MemoryLedger, OpenError, SCHEMA_VERSION, SqliteLedger};
