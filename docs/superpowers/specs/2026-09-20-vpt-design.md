@@ -8,6 +8,7 @@ the winning answer appears here.
 
 Reporting and helper scope were revised on 2026-09-26: logs are always enabled for emitted events,
 report and alert commands are opt-in, and built-in Apple notifications are outside the roadmap.
+Logging recovery uses saved run history to restore missed entries and explain any remaining gaps.
 
 The tool is built in Rust, stage by stage, test-first, to the clean-code standard. The implementation
 plan argues from this document; every requirement below is written so that a failing test can be named
@@ -1212,6 +1213,9 @@ and the deterministic `title` is what makes the duplicate findable.
 VPT logs every emitted event. Routine summaries use the report channel; failures and items needing
 review use the alert channel. `[report] command` and `[alert] command` are independent optional
 argument lists, both empty by default. An absent or empty command sends no notification.
+The default log is `<state_dir>/events.jsonl`, a private file with mode `0600` inside the validated
+private state directory. Existing unsafe files or directories are refused without changing their
+permissions or writing event content through them.
 
 Each configured hook receives one documented `vpt.event/1` JSON document on standard input:
 
@@ -1255,6 +1259,51 @@ interruption or timeout produces a bounded, content-free diagnostic in the logs.
 the work's result, retry delivery inline, invoke the other hook or fall back to a desktop notification.
 Dry runs and observational commands do not spawn hooks. Built-in Apple notifications are outside the
 roadmap; report and alert commands have no dependency on the macOS helper or any notification engine.
+
+#### 8.7.1 Saved history and recovery summaries
+
+Ledger-backed mutations save their run and event history in the same private SQLite database as the
+work state. The application owns a narrow run-history repository; the JSON Lines file is a readable
+export of that history. History records contain only the safe metadata permitted above.
+
+A run has a stable identifier. Save its start before starting its work, then record meaningful step
+outcomes as they happen. Ledger state changes and their corresponding history records commit in the
+same transaction. External effects use their existing publication or retention intents: a recorded
+intent means planned work, and completion requires a recorded result or evidence from reconciliation.
+An interrupted step with no conclusive evidence remains unknown.
+
+After each history commit, attempt to export its new records before continuing work or invoking
+that event's configured hook. Export and hook execution happen outside the database transaction.
+A failed export still permits the original configured hook; recovery never sends that hook again.
+
+Each exported record has a stable event identifier, its run identifier and an ordering sequence.
+Keep the original occurrence time separate from the time the record was appended during recovery.
+Record a log-write failure in the database when possible, including its bounded error class and the
+last confirmed export position. A failed export preserves the operation's result and exit status,
+adds a visible warning in human output or inside the existing JSON result or error document, and
+does not recursively attempt to log its own warning. Refusal of the shared state root or failure
+to commit required work state or run history stops new work through the existing failure path.
+The command still reports work already completed.
+
+The next mutating command, while holding the existing write lock, reconciles unfinished work and
+restores pending log records when the log becomes writable. It then appends a recovery summary based
+on the saved evidence: the affected runs, observed logging failures, recovered records, confirmed
+completed and failed work, and unresolved steps or missing history. A summary states when VPT first
+observed the failure and when VPT observed logging working again; it does not claim the exact repair
+time, cause or operator action without evidence. Each recovery attempt retains its progress so that
+another interruption can resume it.
+
+An append may succeed before its database acknowledgement commits. Replaying that record retains its
+original identifier and sequence, so a duplicate is recognizable. The exporter acknowledges only
+complete, synced records and handles an incomplete final line without merging it into a valid record.
+Recovery does not rerun the underlying operation or resend report or alert hooks. Recovery summaries
+are log records, not new notification requests.
+
+If both the ledger and the log are unavailable, VPT reports that history could not be saved through
+the command's existing output. A later summary distinguishes retained evidence from detectable
+gaps. An attempt that left no durable evidence cannot be reconstructed or reliably detected later.
+Failures before a safe state root exists are reported in the command error without writing through
+an unvalidated path. Observational commands and dry runs create no history and perform no log repair.
 
 ## 9. The command-line surface
 
