@@ -169,6 +169,60 @@ fn read_only_open_keeps_missing_root_absent_and_refuses_link() {
 }
 
 #[test]
+fn entries_lists_only_depth_one_files_with_full_paths_and_absent_roots() {
+    let (temp, root, _stores) = store();
+    std::fs::write(root.join("a.m4a"), b"abc").unwrap();
+    std::fs::create_dir(root.join("child")).unwrap();
+    std::fs::write(root.join("child/nested.m4a"), b"nested").unwrap();
+    let absent = temp.path().join("absent");
+    let stores = FilesystemStores::open_read_only(&[root.clone(), absent.clone()]).unwrap();
+    let found = stores.entries(&root).unwrap();
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].path, root.join("a.m4a"));
+    assert_eq!(found[0].size, 3);
+    assert_eq!(stores.entries(&absent), Ok(vec![]));
+    assert!(!absent.exists());
+}
+
+#[test]
+fn entries_refuses_unconfigured_roots() {
+    let (temp, _root, stores) = store();
+    let unknown = temp.path().join("unknown");
+    assert_eq!(stores.entries(&unknown), Err(StoreError::Escape(unknown)));
+}
+
+#[test]
+fn entries_refuses_a_link_without_following_its_target() {
+    let (_temp, root, stores) = store();
+    let real = root.join("real.m4a");
+    let link = root.join("linked.m4a");
+    std::fs::write(&real, b"private audio").unwrap();
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+    assert_eq!(stores.entries(&root), Err(StoreError::Escape(link.clone())));
+    assert_eq!(std::fs::read(&real).unwrap(), b"private audio");
+    assert_eq!(std::fs::read_link(&link).unwrap(), real);
+}
+
+#[test]
+fn entries_refuses_a_replaced_retained_root() {
+    let (temp, root, stores) = store();
+    let held = temp.path().join("held-store");
+    std::fs::write(root.join("original.m4a"), b"original").unwrap();
+    std::fs::rename(&root, &held).unwrap();
+    std::fs::create_dir(&root).unwrap();
+    std::fs::write(root.join("replacement.m4a"), b"replacement").unwrap();
+    assert_eq!(stores.entries(&root), Err(StoreError::Escape(root.clone())));
+    assert_eq!(
+        std::fs::read(held.join("original.m4a")).unwrap(),
+        b"original"
+    );
+    assert_eq!(
+        std::fs::read(root.join("replacement.m4a")).unwrap(),
+        b"replacement"
+    );
+}
+
+#[test]
 fn replaced_root_is_refused_for_digest_publish_and_sync() {
     let (temp, root, stores) = store();
     let old_root = temp.path().join("old-store");

@@ -1,5 +1,5 @@
 use super::*;
-use crate::ports::DirtyPublication;
+use crate::ports::{DirtyPublication, StoreEntry};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use vpt_domain::digest::Sha256Digest;
@@ -41,6 +41,10 @@ struct FakeStores {
 }
 
 impl Stores for FakeStores {
+    fn entries(&self, _root: &Path) -> Result<Vec<StoreEntry>, StoreError> {
+        Ok(Vec::new())
+    }
+
     fn validate_path(&self, _path: &Path) -> Result<(), StoreError> {
         Ok(())
     }

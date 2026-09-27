@@ -4,8 +4,9 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use vpt_application::ports::{StoreError, Stores};
+use vpt_application::ports::{StoreEntry, StoreError, Stores};
 use vpt_domain::digest::Sha256Digest;
+use vpt_domain::time::FileTime;
 
 pub const BUFFER: usize = 64 * 1024;
 
@@ -109,6 +110,43 @@ impl FilesystemStores {
 }
 
 impl Stores for FilesystemStores {
+    fn entries(&self, path: &Path) -> Result<Vec<StoreEntry>, StoreError> {
+        if !self.configured.iter().any(|configured| configured == path) {
+            return Err(StoreError::Escape(path.to_path_buf()));
+        }
+        let Some(root) = self.roots.iter().find(|root| root.path() == path) else {
+            return Ok(Vec::new());
+        };
+        let mut entries = Vec::new();
+        for name in root
+            .names_strict()
+            .map_err(|error| store_error(path, error))?
+        {
+            let stat = root
+                .stat(Path::new(&name))
+                .map_err(|error| store_error(path, error))?;
+            if stat.kind == Kind::Link {
+                return Err(StoreError::Escape(path.join(name)));
+            }
+            if stat.kind != Kind::File {
+                continue;
+            }
+            entries.push(StoreEntry {
+                path: root
+                    .leaf(Path::new(&name))
+                    .map_err(|error| store_error(path, error))?,
+                size: stat.size,
+                mtime: FileTime {
+                    secs: stat.mtime_secs,
+                    nanos: stat.mtime_nanos,
+                },
+            });
+        }
+        root.revalidate()
+            .map_err(|error| store_error(path, error))?;
+        Ok(entries)
+    }
+
     fn validate_path(&self, path: &Path) -> Result<(), StoreError> {
         let (root, leaf) = self.owner(path)?;
         match root.stat(&leaf) {

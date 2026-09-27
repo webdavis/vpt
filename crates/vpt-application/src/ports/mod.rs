@@ -18,5 +18,5 @@ pub use recorder::{
     Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata, TitleLookup,
 };
 pub use retention::{ArtifactKind, NewIntent, RetentionIntent, RetentionJournal};
-pub use stores::{StoreError, Stores};
+pub use stores::{StoreEntry, StoreError, Stores};
 pub use trash::{Trash, TrashError};

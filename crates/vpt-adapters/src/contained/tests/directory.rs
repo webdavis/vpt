@@ -1,5 +1,5 @@
 use super::*;
-use crate::contained::directory::entry_name;
+use crate::contained::directory::{checked_entry_name, entry_name};
 
 #[test]
 fn subdirectory_creates_0700_once_and_refuses_a_link_or_a_file() {
@@ -60,6 +60,53 @@ fn directory_names_skip_invalid_utf8_and_dot_entries() {
         assert_eq!(entry_name(name), None);
     }
     assert_eq!(entry_name(c"caf\xc3\xa9"), Some("café"));
+}
+
+#[test]
+fn strict_name_decoder_refuses_invalid_bytes_with_typed_invalid_data() {
+    let (_temp, root) = root();
+    assert!(matches!(
+        checked_entry_name(c"\xff", root.path()),
+        Err(ContainedError::Io { path, kind: std::io::ErrorKind::InvalidData }) if path == root.path()
+    ));
+}
+
+#[test]
+fn strict_name_decoder_keeps_unicode() {
+    let (_temp, root) = root();
+    assert_eq!(
+        checked_entry_name(c"caf\xc3\xa9", root.path()),
+        Ok(Some("café"))
+    );
+}
+
+#[test]
+fn strict_name_decoder_skips_dot_entries() {
+    let (_temp, root) = root();
+    assert_eq!(checked_entry_name(c".", root.path()), Ok(None));
+    assert_eq!(checked_entry_name(c"..", root.path()), Ok(None));
+}
+
+#[test]
+fn strict_names_list_valid_entries_from_the_retained_directory() {
+    let (_temp, root) = root();
+    fs::write(root.path().join("café"), b"owned").unwrap();
+    assert_eq!(
+        root.names_strict().unwrap(),
+        ["café", "dirlink", "link.m4a", "plain.m4a", "sub"]
+    );
+}
+
+#[test]
+fn strict_names_refuse_a_replaced_retained_root() {
+    let (_temp, root) = root();
+    let sub = root.open_subdirectory("sub").unwrap();
+    fs::rename(sub.path(), root.path().join("held-sub")).unwrap();
+    fs::create_dir(sub.path()).unwrap();
+    assert!(matches!(
+        sub.names_strict(),
+        Err(ContainedError::Escape { .. })
+    ));
 }
 
 #[test]

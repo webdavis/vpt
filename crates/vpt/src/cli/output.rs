@@ -56,6 +56,7 @@ fn failure_text(error: &ErrorDocument, json: bool, parser_help: bool) -> String 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vpt_application::ports::LedgerError;
     use vpt_protocol::error::ErrorKind;
 
     #[test]
@@ -88,5 +89,64 @@ mod tests {
             serde_json::json!(["helper absent"])
         );
         assert!(text.ends_with('\n'));
+    }
+
+    fn assert_safe_ledger_fault(fault: LedgerError, message: &str) {
+        let error = crate::compose::errors::ledger_error(fault);
+        assert_eq!(error.exit_code(), 1);
+        let text = failure_text(&error, true, false);
+        assert_eq!(text.lines().count(), 1);
+        let actual: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            actual,
+            serde_json::json!({
+                "schema": "vpt.error/1",
+                "error": {
+                    "kind": "ledger",
+                    "rule": null,
+                    "message": message,
+                    "ids": [],
+                    "completed": [],
+                }
+            })
+        );
+        assert!(!text.contains("private"));
+    }
+
+    #[test]
+    fn typed_ledger_fault_busy_emits_safe_complete_error_document() {
+        assert_safe_ledger_fault(LedgerError::Busy, "ledger is busy");
+    }
+
+    #[test]
+    fn typed_ledger_fault_schema_emits_safe_complete_error_document() {
+        assert_safe_ledger_fault(
+            LedgerError::UnsupportedSchema(789),
+            "unsupported ledger schema",
+        );
+    }
+
+    #[test]
+    fn typed_ledger_fault_io_emits_safe_complete_error_document() {
+        assert_safe_ledger_fault(
+            LedgerError::Io("private io canary".into()),
+            "ledger operation failed",
+        );
+    }
+
+    #[test]
+    fn typed_ledger_fault_conflict_emits_safe_complete_error_document() {
+        assert_safe_ledger_fault(
+            LedgerError::Conflict("private conflict canary".into()),
+            "ledger conflict",
+        );
+    }
+
+    #[test]
+    fn typed_ledger_fault_corrupt_emits_safe_complete_error_document() {
+        assert_safe_ledger_fault(
+            LedgerError::Corrupt("private corrupt canary".into()),
+            "ledger is corrupt",
+        );
     }
 }

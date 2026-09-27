@@ -37,7 +37,16 @@ impl RootDir {
         self.retained_names()
     }
 
+    pub fn names_strict(&self) -> Result<Vec<String>, ContainedError> {
+        self.revalidate()?;
+        self.scan_names(true)
+    }
+
     pub(super) fn retained_names(&self) -> Result<Vec<String>, ContainedError> {
+        self.scan_names(false)
+    }
+
+    fn scan_names(&self, strict: bool) -> Result<Vec<String>, ContainedError> {
         let flags = libc::O_RDONLY | libc::O_DIRECTORY | NO_FOLLOW;
         // SAFETY: the retained descriptor is live; dot opens that directory with an independent offset.
         let fd = unsafe { libc::openat(self.file.as_raw_fd(), c".".as_ptr(), flags) };
@@ -64,7 +73,12 @@ impl RootDir {
             }
             // SAFETY: readdir's NUL-terminated name stays live until the next read or close.
             let name = unsafe { CStr::from_ptr((*entry).d_name.as_ptr()) };
-            if let Some(name) = entry_name(name) {
+            let decoded = if strict {
+                checked_entry_name(name, &self.path)?
+            } else {
+                entry_name(name)
+            };
+            if let Some(name) = decoded {
                 names.push(name.to_owned());
             }
         }
@@ -78,6 +92,16 @@ pub(super) fn entry_name(name: &CStr) -> Option<&str> {
     name.to_str()
         .ok()
         .filter(|name| *name != "." && *name != "..")
+}
+
+pub(super) fn checked_entry_name<'a>(
+    name: &'a CStr,
+    root: &Path,
+) -> Result<Option<&'a str>, ContainedError> {
+    let name = name
+        .to_str()
+        .map_err(|_| io(root, std::io::ErrorKind::InvalidData.into()))?;
+    Ok((name != "." && name != "..").then_some(name))
 }
 
 struct DirectoryStream(NonNull<libc::DIR>);
