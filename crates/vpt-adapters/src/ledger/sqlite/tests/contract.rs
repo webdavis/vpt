@@ -243,3 +243,17 @@ mod publication_journal_contract {
     }
     contract::journal_cases!(case);
 }
+
+mod retention_journal_contract {
+    use super::*;
+
+    macro_rules! case {
+        ($name:ident) => {
+            #[test]
+            fn $name() {
+                super::super::supervised(concat!("ledger_contract_retention_", stringify!($name)));
+            }
+        };
+    }
+    contract::retention_cases!(case);
+}

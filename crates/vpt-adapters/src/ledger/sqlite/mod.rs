@@ -3,6 +3,7 @@ mod error;
 mod journal;
 mod migrations;
 mod recordings;
+mod retention;
 
 use crate::database::AccessPolicy;
 use crate::{ContainedError, RootDir};

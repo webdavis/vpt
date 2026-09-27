@@ -1,5 +1,6 @@
 pub(crate) mod journal;
 pub(crate) mod recording;
+pub(crate) mod retention;
 
 use std::path::{Path, PathBuf};
 use vpt_application::ports::{
@@ -116,6 +117,15 @@ macro_rules! journal_cases {
 }
 pub(crate) use journal_cases;
 
+macro_rules! retention_cases {
+    ($case:ident) => {
+        $case!(a_recorded_intent_is_pending_with_its_fields);
+        $case!(completing_an_intent_removes_it_and_keeps_the_others_in_order);
+        $case!(repeated_and_unknown_completion_change_no_pending_intents);
+    };
+}
+pub(crate) use retention_cases;
+
 pub(crate) fn run_sqlite(scenario: &str, ledger: &crate::ledger::SqliteLedger) {
     macro_rules! run_recording {
         ($name:ident) => {
@@ -133,7 +143,16 @@ pub(crate) fn run_sqlite(scenario: &str, ledger: &crate::ledger::SqliteLedger) {
             }
         };
     }
+    macro_rules! run_retention {
+        ($name:ident) => {
+            if scenario == concat!("ledger_contract_retention_", stringify!($name)) {
+                retention::$name(ledger);
+                return;
+            }
+        };
+    }
     recording_cases!(run_recording);
     journal_cases!(run_journal);
+    retention_cases!(run_retention);
     panic!("unknown ledger contract scenario");
 }

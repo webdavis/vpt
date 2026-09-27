@@ -2,6 +2,7 @@ mod archive;
 mod ledger;
 mod prompt;
 mod recorder;
+mod retention;
 mod stores;
 mod trash;
 
@@ -14,5 +15,6 @@ pub use prompt::{Prompt, PromptError};
 pub use recorder::{
     Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata, TitleLookup,
 };
+pub use retention::{ArtifactKind, NewIntent, RetentionIntent, RetentionJournal};
 pub use stores::{StoreError, Stores};
 pub use trash::{Trash, TrashError};

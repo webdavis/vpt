@@ -3,6 +3,7 @@ mod contract;
 mod migration;
 mod observation;
 mod peers;
+mod retention;
 mod schema;
 pub(crate) mod schema_diagnostics;
 
@@ -91,6 +92,7 @@ pub(crate) fn run_scenario(
         s if s.starts_with("ledger_schema_") => schema::run(s, &root),
         s if s.starts_with("ledger_observe_") => observation::run(s, &root),
         s if s.starts_with("ledger_boundary_") => boundary::run(s, &root),
+        s if s.starts_with("ledger_contract_sqlite_retention_") => retention::run(s, &root),
         s if s.starts_with("ledger_contract_sqlite_") => contract::run(s, &root),
         s if s.starts_with("ledger_contract_") => {
             let ledger = SqliteLedger::open(&root).expect("owned ledger");

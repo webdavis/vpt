@@ -1,8 +1,8 @@
 use std::path::Path;
 use std::sync::Mutex;
 use vpt_application::ports::{
-    DirtyPublication, LedgerCommit, LedgerError, PublicationJournal, RecordingLedger,
-    RecordingRecord, SeenRow,
+    DirtyPublication, LedgerCommit, LedgerError, NewIntent, PublicationJournal, RecordingLedger,
+    RecordingRecord, RetentionIntent, RetentionJournal, SeenRow,
 };
 use vpt_domain::digest::Sha256Digest;
 use vpt_domain::identity::RecordingId;
@@ -13,6 +13,8 @@ struct State {
     seen: Vec<SeenRow>,
     recordings: Vec<RecordingRecord>,
     publications: Vec<DirtyPublication>,
+    intents: Vec<(RetentionIntent, Option<UtcInstant>)>,
+    next_intent_id: i64,
 }
 
 #[derive(Default)]
@@ -166,10 +168,57 @@ impl PublicationJournal for MemoryLedger {
     }
 }
 
+impl RetentionJournal for MemoryLedger {
+    fn record_intent(&self, intent: &NewIntent) -> Result<i64, LedgerError> {
+        with(self, |state| {
+            let id = state
+                .next_intent_id
+                .checked_add(1)
+                .ok_or_else(|| LedgerError::Conflict("intent identifier exhausted".into()))?;
+            state.intents.push((
+                RetentionIntent {
+                    id,
+                    kind: intent.kind,
+                    recording: intent.recording.clone(),
+                    path: intent.path.clone(),
+                    expected: intent.expected,
+                    recorded_at: intent.recorded_at,
+                },
+                None,
+            ));
+            state.next_intent_id = id;
+            Ok(id)
+        })?
+    }
+
+    fn pending_intents(&self) -> Result<Vec<RetentionIntent>, LedgerError> {
+        with(self, |state| {
+            state
+                .intents
+                .iter()
+                .filter(|(_, done)| done.is_none())
+                .map(|(intent, _)| intent.clone())
+                .collect()
+        })
+    }
+
+    fn complete_intent(&self, id: i64, at: UtcInstant) -> Result<(), LedgerError> {
+        with(self, |state| {
+            if let Some((_, done)) = state.intents.iter_mut().find(|(intent, _)| intent.id == id)
+                && done.is_none()
+            {
+                *done = Some(at);
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::MemoryLedger;
     use crate::ledger::contract;
+    use vpt_application::ports::{LedgerError, RetentionJournal};
+    use vpt_domain::time::UtcInstant;
 
     mod recording_ledger_contract {
         use super::*;
@@ -199,5 +248,47 @@ mod tests {
             };
         }
         contract::journal_cases!(case);
+    }
+
+    mod retention_journal_contract {
+        use super::*;
+
+        macro_rules! case {
+            ($name:ident) => {
+                #[test]
+                fn $name() {
+                    let ledger = MemoryLedger::new();
+                    contract::retention::$name(&ledger);
+                }
+            };
+        }
+        contract::retention_cases!(case);
+    }
+
+    #[test]
+    fn repeated_completion_keeps_the_first_recorded_time() {
+        let ledger = MemoryLedger::new();
+        let new = contract::retention::fixture(6);
+        let id = ledger.record_intent(&new).expect("recorded");
+        ledger
+            .complete_intent(id, UtcInstant { secs: 8_000 })
+            .expect("first");
+        ledger
+            .complete_intent(id, UtcInstant { secs: 8_001 })
+            .expect("repeat");
+        let state = ledger.state.lock().expect("state");
+        assert_eq!(state.intents[0].1, Some(UtcInstant { secs: 8_000 }));
+    }
+
+    #[test]
+    fn intent_id_exhaustion_is_checked_without_inserting_a_row() {
+        let ledger = MemoryLedger::new();
+        ledger.state.lock().expect("state").next_intent_id = i64::MAX;
+        let result = ledger.record_intent(&contract::retention::fixture(7));
+        assert!(
+            matches!(result, Err(LedgerError::Conflict(_))),
+            "{result:?}"
+        );
+        assert!(ledger.state.lock().expect("state").intents.is_empty());
     }
 }
