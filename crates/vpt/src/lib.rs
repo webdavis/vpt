@@ -1,6 +1,7 @@
 mod cli;
 mod commands;
 mod compose;
+mod doctor;
 mod documents;
 
 use cli::args::{Invocation, Verb, parse};
@@ -23,6 +24,10 @@ pub fn run() -> ! {
 
 fn dispatch(invocation: &Invocation) -> i32 {
     let outcome = match &invocation.verb {
+        Verb::Doctor => doctor::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+        ),
         Verb::Version => commands::version::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

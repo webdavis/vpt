@@ -2,6 +2,7 @@ mod archive;
 pub mod config;
 mod contained;
 mod database;
+mod git_tree;
 mod helper;
 mod ledger;
 mod lock;
@@ -10,6 +11,7 @@ mod spawn;
 mod stores;
 mod symlink;
 mod voice_memos;
+pub use git_tree::enclosing_git_tree;
 pub use helper::{BUILT_AGAINST_MAJOR, CALL_DEADLINE, HelperClient, HelperError};
 pub use prompt::TtyPrompt;
 pub use spawn::{

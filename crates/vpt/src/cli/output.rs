@@ -8,32 +8,59 @@ pub(crate) enum Outcome {
     },
     Failure(ErrorDocument),
     ParseFailure(ErrorDocument),
+    FailedReport {
+        error: ErrorDocument,
+        human: String,
+    },
 }
 
 pub(crate) fn emit(outcome: Outcome, json: bool) -> i32 {
+    emit_to(
+        outcome,
+        json,
+        &mut std::io::stdout(),
+        &mut std::io::stderr(),
+    )
+}
+
+fn emit_to(outcome: Outcome, json: bool, stdout: &mut dyn Write, stderr: &mut dyn Write) -> i32 {
     let parser_help = matches!(&outcome, Outcome::ParseFailure(_));
     match outcome {
+        Outcome::FailedReport { error, human } => {
+            let text = if json {
+                failure_text(&error, true, false)
+            } else {
+                format!("{human}{}", failure_text(&error, false, false))
+            };
+            write_failure(&error, &text, stderr)
+        }
         Outcome::Success { document, human } => {
             let text = if json { format!("{document}\n") } else { human };
-            if std::io::stdout().write_all(text.as_bytes()).is_err() {
-                return emit(
+            if stdout.write_all(text.as_bytes()).is_err() {
+                return emit_to(
                     Outcome::Failure(ErrorDocument::new(
                         ErrorKind::Store,
                         "standard output write failed",
                     )),
                     json,
+                    stdout,
+                    stderr,
                 );
             }
             0
         }
         Outcome::Failure(error) | Outcome::ParseFailure(error) => {
             let text = failure_text(&error, json, parser_help);
-            if std::io::stderr().write_all(text.as_bytes()).is_err() {
-                return 1;
-            }
-            error.exit_code()
+            write_failure(&error, &text, stderr)
         }
     }
+}
+
+fn write_failure(error: &ErrorDocument, text: &str, stderr: &mut dyn Write) -> i32 {
+    if stderr.write_all(text.as_bytes()).is_err() {
+        return 1;
+    }
+    error.exit_code()
 }
 
 fn failure_text(error: &ErrorDocument, json: bool, parser_help: bool) -> String {
@@ -55,6 +82,7 @@ fn failure_text(error: &ErrorDocument, json: bool, parser_help: bool) -> String 
 
 #[cfg(test)]
 mod tests {
+    mod reports;
     use super::*;
     use vpt_application::ports::LedgerError;
     use vpt_protocol::error::ErrorKind;
