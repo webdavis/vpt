@@ -1,4 +1,5 @@
 mod boundary;
+mod contract;
 mod migration;
 mod observation;
 mod peers;
@@ -90,6 +91,11 @@ pub(crate) fn run_scenario(
         s if s.starts_with("ledger_schema_") => schema::run(s, &root),
         s if s.starts_with("ledger_observe_") => observation::run(s, &root),
         s if s.starts_with("ledger_boundary_") => boundary::run(s, &root),
+        s if s.starts_with("ledger_contract_sqlite_") => contract::run(s, &root),
+        s if s.starts_with("ledger_contract_") => {
+            let ledger = SqliteLedger::open(&root).expect("owned ledger");
+            crate::ledger::contract::run_sqlite(s, &ledger);
+        }
         s if s.starts_with("ledger_peer_") => peers::run(s, &root, ready, native),
         _ => panic!("unknown ledger scenario"),
     }
