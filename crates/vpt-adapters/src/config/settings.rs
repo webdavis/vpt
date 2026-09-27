@@ -1,9 +1,7 @@
 use super::{ConfigError, get};
 use std::path::{Path, PathBuf};
 use toml::{Table, Value};
-use vpt_application::{
-    NotifyMode, NotifySettings, RetentionSettings, Settings, SourceSettings, StorePaths,
-};
+use vpt_application::{RetentionSettings, Settings, SourceSettings, StorePaths};
 use vpt_domain::duration::parse_duration;
 use vpt_domain::layout::StoreKey;
 use vpt_domain::retention::Hold;
@@ -35,26 +33,6 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         drafts: store("stores.drafts")?,
         released: store("stores.released")?,
     };
-    let mode = match text(table, "notify.mode")? {
-        "desktop" => NotifyMode::Desktop,
-        "off" => NotifyMode::Off,
-        "command" => {
-            let argv = strings(table, "notify.command")?;
-            if argv.is_empty() {
-                return Err(ConfigError::OutOfRange {
-                    key: "notify.command".into(),
-                    rule: "command mode needs a command".into(),
-                });
-            }
-            NotifyMode::Command(argv)
-        }
-        _ => {
-            return Err(ConfigError::OutOfRange {
-                key: "notify.mode".into(),
-                rule: "one of desktop, command, off".into(),
-            });
-        }
-    };
     let holds = StoreKey::all()
         .into_iter()
         .map(|key| {
@@ -75,10 +53,9 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
             deferral_page_threshold: small(table, "source.deferral_page_threshold")?,
             max_audio_bytes: wide(table, "source.max_audio_bytes")?,
         },
-        notify: NotifySettings {
-            mode,
-            aggregate_after: small(table, "notify.aggregate_after")?,
-        },
+        report_command: strings(table, "report.command")?,
+        alert_command: strings(table, "alert.command")?,
+        alert_aggregate_after: small(table, "alert.aggregate_after")?,
         retention: RetentionSettings {
             enabled: boolean(table, "retention.enabled")?,
             include_audio: boolean(table, "retention.include_audio")?,

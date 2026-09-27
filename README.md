@@ -14,4 +14,9 @@ These are the two installation steps for the completed Stage 1 release:
 
 1. `cargo install --git https://github.com/webdavis/vpt vpt` installs `vpt` into `~/.cargo/bin`.
 2. Once `helper/vpt-macos` ships, run `cd helper/vpt-macos && swift build -c release` and copy
-   `.build/release/vpt-macos` beside `vpt` in `~/.cargo/bin` for desktop notifications and the Trash.
+   `.build/release/vpt-macos` beside `vpt` in `~/.cargo/bin` for the system Trash.
+
+The reporting pipeline will log reports and alerts by default. Optional `[report].command` and
+`[alert].command` argument lists will receive a documented JSON event on standard input. Both commands
+default to empty lists, so no notifications will be sent unless configured. The script chooses the
+notification system and message format.

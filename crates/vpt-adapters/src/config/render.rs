@@ -55,6 +55,15 @@ mod tests {
     }
 
     #[test]
+    fn the_template_declares_empty_report_and_alert_hooks() {
+        let text = template("apple", "~/.local/state/vpt");
+        assert!(text.contains("\n[report]\ncommand = [] #"), "{text}");
+        assert!(text.contains("\n[alert]\ncommand = [] #"), "{text}");
+        assert!(text.contains("aggregate_after = 3 #"), "{text}");
+        assert!(!text.contains("\n[notify]\n"), "{text}");
+    }
+
+    #[test]
     fn every_key_line_carries_a_comment() {
         for line in template("apple", "~/.local/state/vpt").lines() {
             if line.contains(" = ") {

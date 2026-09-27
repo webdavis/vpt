@@ -7,14 +7,14 @@
 **Goal:** Ship stage 1 of vpt, the Voice Processing Tool: a workspace that installs, sweeps Apple's Voice
 Memos store read-only, archives each recording under a content-derived identity in a SQLite-backed home,
 and offers `setup`, `doctor`, `ingest`, `show`, `list`, `storage`, `retention run`, `symlink` and
-`--version`, with notifications through the producer API and a Swift helper for `notify` and `trash`.
+`--version`, with logged reports, opt-in report and alert commands, and a Swift helper for `trash`.
 
 **Architecture:** Five crates in one Cargo workspace with a one-way dependency direction enforced by each
 manifest: `vpt-domain` (pure policy: identity, the MPEG-4 wholeness gate, sweep gates, retention
 decision), `vpt-application` (one concrete use case per verb and the ports it owns), `vpt-protocol` (the
 versioned JSON documents), `vpt-adapters` (filesystem, SQLite, process spawning, TOML) and the command
 crate `vpt` (argument decoding, exit codes, composition). A Swift package `helper/vpt-macos` reaches the
-macOS frameworks for notifications and the Trash. Every test runs in a sandbox and nothing reaches the
+macOS frameworks for the Trash. Every test runs in a sandbox and nothing reaches the
 operator's real store, home, config or desktop.
 
 **Tech Stack:** Rust stable (edition 2024), `rusqlite` 0.39 (bundled SQLite, WAL), `serde` 1.0.229 and
@@ -24,6 +24,41 @@ operator's real store, home, config or desktop.
 
 **Spec:** `docs/superpowers/specs/2026-09-20-vpt-design.md` (the plan argues from it; read sections 3, 4,
 5, 9 to 14 alongside each task).
+
+## Report and alert execution amendment, 2026-09-26
+
+Spec section 8.7 is authoritative for reporting. It replaces every `[notify]`, desktop-notification,
+notification-fallback and `vpt-macos notify` example below. Those earlier sample portions are withdrawn
+from implementation; they do not describe current scope. Reconcile the affected task's examples with
+this amendment before dispatching it.
+
+- All emitted events are logged. `report.command` and `alert.command` are independent argument lists
+  defaulting to `[]`. Reports are routine summaries; alerts are failures or items needing review.
+- Only the selected, configured hook is invoked. It receives one documented `vpt.event/1` JSON document
+  on stdin, including its `report` or `alert` channel. Scripts own downstream notification formatting.
+- Preserve argument boundaries, the five-second process limit, owned-process cleanup, event privacy,
+  output envelopes and unchanged work exit status. Hook failures are logged without retries, another
+  channel, desktop fallback or a dependency on the macOS helper.
+- Keep the review-event aggregation contract as `alert.aggregate_after`, default `3`, a positive
+  32-bit integer. Empty command lists still mean logs only. Remove old `notify` keys and types without
+  a compatibility alias; VPT is unshipped.
+- Task 19's event capability is `EventSink` over domain `Event`, including a recording fake. Adapt
+  subsequent use cases to that capability without introducing a notification engine dependency.
+- Task 25's helper client handles version and Trash only in Stage 1. Remove notification request,
+  reply, compatibility and fake-helper branches from its sample before implementation.
+- Task 26 implements logged events and the optional report/alert hooks. Its old desktop, off-mode,
+  token-formatting and fallback implementations are withdrawn. Required tests cover both hooks
+  absent, either hook independently configured, exact JSON stdin and argv, privacy, failure logging,
+  no cross-channel fallback, no spawn during observation/dry run, and unchanged work results.
+- Task 27 composes the event sink without helper notification startup. Task 32 emits a logged
+  retention report and invokes only a configured report command. Their fixtures use fake hooks.
+- Task 33 ships `--version` and `trash`. Its notification parser, poster, reply document, tests and
+  live-notification smoke command are withdrawn. Speech arrives in Stage 2; Apple notifications are
+  outside the roadmap.
+
+Only configuration exists for reporting at the current implementation checkpoint. Accepting the new
+settings and rendering their template does not establish runtime logging or hook delivery. Task 26 and
+the command-composition tests establish those behaviors.
 
 ## Global Constraints
 
@@ -15387,7 +15422,10 @@ SKIP_AI_COMMIT=1 git commit -m "feat(helper): validate replies and cache compati
 
 ______________________________________________________________________
 
-### Task 26: Notifications: `vpt.event/1` and the three modes
+### Task 26: Logged reports and optional report/alert commands
+
+Use the report and alert execution amendment above and spec section 8.7. The original sample below is
+reference material only; its desktop, off-mode, token-formatting and fallback routes are withdrawn.
 
 **Files:**
 
@@ -20260,7 +20298,10 @@ SKIP_AI_COMMIT=1 git commit -m "feat(retention): journal Trash moves and retain 
 
 ______________________________________________________________________
 
-### Task 33: The `vpt-macos` helper package: `--version`, `notify`, `trash`
+### Task 33: The `vpt-macos` helper package: `--version` and `trash`
+
+Use the report and alert execution amendment above. Notification-specific portions of the original
+sample below are withdrawn, including the live notification smoke command.
 
 The Swift package behind `[helper] path`. Stage 1 ships the three subcommands vpt calls now; `transcribe`
 arrives with stage 2. The notification poster and the Trash sit behind protocols so the suite reaches no

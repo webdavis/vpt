@@ -417,19 +417,19 @@ pub const KEYS: &[KeySpec] = &[
         "let transcripts, analysis notes and briefs be handed off",
     ),
     key(
-        "notify.mode",
-        Kind::Enum(&["desktop", "command", "off"]),
-        "\"desktop\"",
-        "desktop, command or off",
-    ),
-    key(
-        "notify.command",
+        "report.command",
         Kind::Argv,
         "[]",
-        "argv with {event}, {state}, {id}, {detail}, {count}, {path} tokens; receives vpt's JSON on stdin",
+        "optional routine-summary argv; receives event JSON on stdin",
     ),
     key(
-        "notify.aggregate_after",
+        "alert.command",
+        Kind::Argv,
+        "[]",
+        "optional failure-or-review argv; receives event JSON on stdin",
+    ),
+    key(
+        "alert.aggregate_after",
         Kind::PositiveInt,
         "3",
         "recordings needing review in one run before one aggregate event",

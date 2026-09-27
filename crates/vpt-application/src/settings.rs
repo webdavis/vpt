@@ -11,7 +11,9 @@ pub struct Settings {
     pub helper_path: PathBuf,
     pub stores: StorePaths,
     pub source: SourceSettings,
-    pub notify: NotifySettings,
+    pub report_command: Vec<String>,
+    pub alert_command: Vec<String>,
+    pub alert_aggregate_after: u32,
     pub retention: RetentionSettings,
 }
 
@@ -59,19 +61,6 @@ pub struct SourceSettings {
     pub quiet_period_secs: u64,
     pub deferral_page_threshold: u32,
     pub max_audio_bytes: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NotifyMode {
-    Desktop,
-    Command(Vec<String>),
-    Off,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NotifySettings {
-    pub mode: NotifyMode,
-    pub aggregate_after: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

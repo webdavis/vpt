@@ -1,6 +1,5 @@
 use super::*;
 use crate::config::load_text;
-use vpt_application::NotifyMode;
 use vpt_domain::layout::StoreKey;
 
 fn settings(text: &str) -> Result<Settings, ConfigError> {
@@ -38,8 +37,9 @@ fn defaults_expand_into_typed_settings() {
     assert_eq!(value.source.quiet_period_secs, 30);
     assert_eq!(value.source.deferral_page_threshold, 4);
     assert_eq!(value.source.max_audio_bytes, 2_147_483_648);
-    assert_eq!(value.notify.mode, NotifyMode::Desktop);
-    assert_eq!(value.notify.aggregate_after, 3);
+    assert!(value.report_command.is_empty());
+    assert!(value.alert_command.is_empty());
+    assert_eq!(value.alert_aggregate_after, 3);
     assert!(!value.retention.enabled);
     assert!(!value.retention.include_audio);
 }
@@ -63,7 +63,7 @@ deferral_page_threshold = 4294967295
 max_audio_bytes = 9223372036854775807
 [helper]
 path = "/bin/helper"
-[notify]
+[alert]
 aggregate_after = 4294967295
 "#,
     )
@@ -82,33 +82,36 @@ aggregate_after = 4294967295
     assert_eq!(value.source.deferral_page_threshold, u32::MAX);
     assert_eq!(value.source.max_audio_bytes, 9_223_372_036_854_775_807);
     assert_eq!(value.helper_path, Path::new("/bin/helper"));
-    assert_eq!(value.notify.aggregate_after, u32::MAX);
+    assert_eq!(value.alert_aggregate_after, u32::MAX);
 }
 
 #[test]
-fn notify_command_preserves_argv_and_off_needs_no_command() {
+fn report_and_alert_commands_preserve_argv_and_accept_empty() {
+    let value = settings(
+        "[report]\ncommand = ['reporter', 'two words']\n[alert]\ncommand = ['alerter', '--urgent']",
+    )
+    .expect("settings");
     assert_eq!(
-        settings("[notify]\nmode = 'command'\ncommand = ['helper', '{event}', 'two words']")
-            .expect("settings")
-            .notify
-            .mode,
-        NotifyMode::Command(vec!["helper".into(), "{event}".into(), "two words".into()])
+        value.report_command,
+        vec!["reporter".to_owned(), "two words".to_owned()]
     );
     assert_eq!(
-        settings("[notify]\nmode = 'off'")
-            .expect("settings")
-            .notify
-            .mode,
-        NotifyMode::Off
+        value.alert_command,
+        vec!["alerter".to_owned(), "--urgent".to_owned()]
     );
+    let empty = settings("[report]\ncommand = []\n[alert]\ncommand = []").expect("settings");
+    assert!(empty.report_command.is_empty());
+    assert!(empty.alert_command.is_empty());
 }
 
 #[test]
-fn command_mode_requires_a_command() {
-    assert_eq!(
-        settings("[notify]\nmode = 'command'").unwrap_err().key(),
-        Some("notify.command")
-    );
+fn each_hook_can_be_left_empty_independently() {
+    let only_report = settings("[report]\ncommand = ['reporter']").expect("settings");
+    assert_eq!(only_report.report_command, vec!["reporter"]);
+    assert!(only_report.alert_command.is_empty());
+    let only_alert = settings("[alert]\ncommand = ['alerter']").expect("settings");
+    assert!(only_alert.report_command.is_empty());
+    assert_eq!(only_alert.alert_command, vec!["alerter"]);
 }
 
 #[test]

@@ -6,6 +6,9 @@ decisions of 2026-09-15, the ten earlier transcript decisions and the sixteen ru
 a single document that stands on its own. Where two of those sources disagreed, the ruling won and only
 the winning answer appears here.
 
+Reporting and helper scope were revised on 2026-09-26: logs are always enabled for emitted events,
+report and alert commands are opt-in, and built-in Apple notifications are outside the roadmap.
+
 The tool is built in Rust, stage by stage, test-first, to the clean-code standard. The implementation
 plan argues from this document; every requirement below is written so that a failing test can be named
 for it.
@@ -68,14 +71,14 @@ it says; it never records the option that lost.
 | D3  | Two engine slots, both named in config; whether the second runs on failure only or always is config.                                          |
 | D4  | Reconciliation picks a winner, flags uncertainty inline plus a `vpt review <id>` queue; no summary block.                                     |
 | D5  | Built: a winner rule, both-engines-fail handling, engine per language. Not built: a disagreement threshold, a cloud spend ceiling.            |
-| D6  | `[notify]` has exactly three modes, `desktop`, `command`, `off`; command mode substitutes argv tokens and writes JSON on stdin, both, always. |
+| D6  | Events are logged by default; optional `[report] command` and `[alert] command` hooks receive JSON on stdin. |
 | D7  | vpt carries no copy of any notification engine's wire contract and no producer-wire crate.                                                    |
 | D8  | Every subcommand ships `--json` on its own output, in vpt's own shape.                                                                        |
-| D9  | The configured command's own exit code decides whether vpt falls back to its desktop notice.                                                  |
+| D9  | Hook failures are logged without changing the work's result or invoking another delivery route. |
 | D10 | Engines are named in config; two first-class adapters (Apple Speech, whisply) plus a generic command adapter with no uncertainty flagging.    |
 | D11 | Two ideas adopted from FluidVoice with credit: local by default with cloud opt-in, and post-processing as its own layer.                      |
 | D12 | whisply, openai-whisper and the ElevenLabs CLI stay declared on the machine; the `minutes` cask has no remaining use.                         |
-| D13 | Posture converges on the same three-mode `[notify]` shape (a ledger task in the dotfiles repository, not vpt's).                              |
+| D13 | Report and alert hooks depend only on the user's configured commands, not on another tool's configuration. |
 | D14 | The tool is named `vpt`, Voice Processing Tool; config at `~/.config/vpt/config.toml`.                                                        |
 
 ### 2.3 The sixteen rulings of 2026-09-20
@@ -105,7 +108,7 @@ it says; it never records the option that lost.
 | --- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | O1  | 2026-09-19 | Task and event context comes from `dam`, never `td`.                                                                              |
 | O2  | 2026-09-20 | Five crates in one workspace, to the clean-code standard, test-first without exception.                                           |
-| O3  | 2026-09-15 | Notification is the producer API (argv tokens plus JSON on stdin, exit code load-bearing), never a named engine's submit command. |
+| O3  | 2026-09-26 | Report and alert hooks receive vpt's JSON event on stdin; scripts own notification formatting and delivery. |
 
 Standing repository rules that bind vpt as well: Rust files target 200 implementation and 300 total
 lines, and never exceed 500 total with tests included; no workspace depends on another; a tool never
@@ -152,7 +155,7 @@ Unicode version pinned by the lockfile.
 trait.
 
 `vpt-protocol` holds the documents that cross a process boundary, each carrying a `schema` string with a
-major version: `vpt.engine/1` (an engine's transcript), `vpt.event/1` (a notification), `vpt.proposal/1`
+major version: `vpt.engine/1` (an engine's transcript), `vpt.event/1` (a report or alert), `vpt.proposal/1`
 (an agent's synthesis), `vpt.context/1` (calendar and task context), `vpt.brief/1`, `vpt.handoff/1`, and
 the `--json` output and error documents. It is plain serde over JSON. An unknown major version is refused
 with the version named; an unknown additive field is accepted and named in diagnostics; byte, depth,
@@ -161,7 +164,7 @@ array-length and text-length limits are enforced while a document is read, befor
 other incoming document; depth 8; 65,536 characters per text value; engine `segments` and `words` and
 proposal `summary` and `actions` allow at most 65,536 entries, every other array 256.
 
-Application ports exchange domain values (`Transcript`, `Notification`, `Proposal`, `ContextSnapshot`,
+Application ports exchange domain values (`Transcript`, `Event`, `Proposal`, `ContextSnapshot`,
 `Record`), never a protocol document: an adapter validates an incoming wire document and converts it into
 the domain value, and serializes an outgoing value into its protocol document, so `vpt-application` does
 not depend on `vpt-protocol`.
@@ -179,7 +182,7 @@ not depend on `vpt-protocol`.
 | `Ledger`                  | the repositories of section 4.4                                                           | `sqlite` (one database, write-ahead log, busy timeout); in-memory (tests)                          |
 | `Stores`                  | resolve a store path; write a file atomically; read; list; walk up for a git working tree | `filesystem`                                                                                       |
 | `Trash`                   | move a path to the system Trash                                                           | `macos_helper` (`vpt-macos trash`)                                                                 |
-| `Notifier`                | deliver a `Notification`                                                                  | `desktop` (`vpt-macos notify`), `command` (argv tokens plus stdin), `off`                          |
+| `EventSink`               | log an `Event` and invoke its configured report or alert hook                              | logging with optional command execution                                                           |
 | `ContextSource`           | a `ContextSnapshot` (occasions and tasks) for a window and a selection                    | `dam` (spawns `dam ls --json --no-pull`), `google` (native HTTPS, read-only scope), `none`         |
 | `AgentCommand`            | run the configured synthesis command over a transcript and read a `Proposal` back         | `command`                                                                                          |
 | `KnownTerms`, `KnownTags` | read and append the two confirmation lists                                                | `filesystem`                                                                                       |
@@ -191,8 +194,8 @@ workspace is a trait. `dyn Trait` appears only at the composition root in `vpt`.
 
 | Stage                  | Domain                                           | Application use case                       | Adapters used                                             |
 | ---------------------- | ------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------- |
-| 1 Extract              | identity, wholeness gate, sweep decision         | `Ingest`                                   | `RecorderStore`, `Archive`, `Ledger`, `Notifier`          |
-| 2 Transcribe           | normalize, align, classify, rank, readability    | `Transcribe`, `Review`, `Confirm`          | `Engine` x2, `Ledger`, `Stores`, `KnownTerms`, `Notifier` |
+| 1 Extract              | identity, wholeness gate, sweep decision         | `Ingest`                                   | `RecorderStore`, `Archive`, `Ledger`, `EventSink`          |
+| 2 Transcribe           | normalize, align, classify, rank, readability    | `Transcribe`, `Review`, `Confirm`          | `Engine` x2, `Ledger`, `Stores`, `KnownTerms`, `EventSink` |
 | 3 Vault note           | render, managed block, tag gate, relations, slug | `WriteNote`, `Path`                        | `Stores`, `Ledger`, `KnownTags`                           |
 | 4 Synthesis and extras | verify-note grounding, brief selector, redaction | `Synthesize`, `Brief`, `Redact`, `Handoff` | `AgentCommand`, `ContextSource`, `Stores`, `Ledger`       |
 
@@ -217,38 +220,35 @@ copy is immutable whatever changes upstream.
 
 ### 3.4 The macOS helper
 
-Apple's speech framework, the desktop notification and the system Trash are reachable only through macOS
-frameworks, so they live in one Swift executable, `vpt-macos`, built from `helper/vpt-macos/` in this
-repository (a Swift package, `swift build -c release`). It has three subcommands, each a pure function of
-its arguments with JSON on stdout:
+Apple speech and the system Trash use one Swift executable, `vpt-macos`, built from
+`helper/vpt-macos/` in this repository (a Swift package, `swift build -c release`). Its commands take
+explicit arguments and print JSON on stdout:
 
 ```
 vpt-macos transcribe <audio-path> --locale <tag>     prints one vpt.engine/1 document
-vpt-macos notify --title <t> --body <b>              posts a notification, prints {"posted": true}
 vpt-macos trash <path>                               moves to the Trash, prints {"trashed": "<path>"}
 ```
 
 `transcribe` uses `SpeechAnalyzer` and `SpeechTranscriber` with per-token confidence and time range (the
 `ConfidenceAttribute` and `TimeRangeAttribute` the framework exposes on macOS 26 and above), so the Apple
-adapter is a first-class engine with uncertainty flagging. `notify` posts through the
-`display notification` AppleScript command executed in-process with `NSAppleScript`, which needs no
-signed bundle. `trash` calls `FileManager.trashItem(at:resultingItemURL:)`, which is the system Trash and
-never `unlink`.
+adapter is a first-class engine with uncertainty flagging. `trash` calls
+`FileManager.trashItem(at:resultingItemURL:)`, which moves the file to the system Trash. The helper has
+no notification command; Apple notification support is outside the roadmap.
 
 vpt finds the helper by the `[helper] path` config value, default `vpt-macos`, resolved on `PATH`. When
-the helper is absent: the Apple engine is unavailable (a startup refusal if it is configured), `desktop`
-notify degrades to `off` with one log line, and retention refuses to run (it never unlinks, so with no
-Trash there is no removal). `vpt doctor` reports the helper's presence and version. The helper prints
+the helper is absent, the Apple engine is unavailable (a startup refusal if it is configured) and
+retention refuses to run (it never unlinks, so with no Trash there is no removal). Report and alert
+commands do not use the helper. `vpt doctor` reports the helper's presence and version. The helper prints
 `{"schema": "vpt.helper/1", "version": "<semver>"}` for `--version`, and vpt refuses a helper whose major
 version differs from the one it was built against.
 
 ### 3.5 Spawned commands
 
-Every command vpt spawns (an engine, the helper, the agent command, `dam`, the notify command) is
+Every command vpt spawns (an engine, the helper, the agent command, `dam`, a report or alert command) is
 executed from its argv directly, never through a shell, in its own process group. Writing its stdin,
 draining its stdout and stderr concurrently, and waiting share one deadline: the configured
 `timeout_secs` for an engine or the agent command, 30 seconds for a whole context collection, five
-seconds for a notification and for every helper call other than `transcribe`, `--version` included. At
+seconds for a report or alert hook and for every helper call other than `transcribe`, `--version` included. At
 the deadline, and when vpt itself is interrupted (`SIGINT`, `SIGTERM` or `SIGHUP`), vpt terminates the
 group, force-kills survivors after one second and reaps the child before it exits, so no engine
 descendant outlives the command that spawned it. Child output is bounded by the protocol limits and is
@@ -412,8 +412,8 @@ Five rules:
    copy once Apple evicts the original; when included, an expired clone moves and the recording's row
    records `audio_trashed_at`.
 1. Nothing is ever unlinked. If the helper is absent, `retention run` refuses with exit 3.
-1. What moved is reported in the run output and delivered as one `vpt.event/1` (`event = "retention"`,
-   counts per store) when `[notify]` is not `off`.
+1. What moved is reported in the run output and logged as one `vpt.event/1` (`event = "retention"`,
+   counts per store). A configured `[report] command` receives that event.
 
 ## 5. Stage 1: Extract
 
@@ -679,7 +679,7 @@ the note records `vptReadability: true` when it ran.
 - the transcript note (stage 3 renders it; stage 2 supplies its body).
 - one `vpt.event/1` (`event = "review_needed"`) when any surfaced flag is open, carrying counts per
   class, the identity and the note path; never a flagged span, an alternative, a title or any transcript
-  text. Past `[notify] aggregate_after` (default 3) recordings needing review in one run, one aggregate
+  text. Past `[alert] aggregate_after` (default 3) recordings needing review in one run, one aggregate
   event carries the count instead of one per recording.
 
 ### 6.7 Review and confirmation
@@ -1207,14 +1207,18 @@ recipe, the return path for a note authored there, and a remote identifier that 
 replace rather than duplicate, all wait until that service is deployed; a re-handoff today duplicates,
 and the deterministic `title` is what makes the duplicate findable.
 
-### 8.7 Notifications through the producer API
+### 8.7 Logged reports and opt-in alert commands
 
-`[notify] mode` is `desktop`, `command` or `off`, default `desktop`. Every event vpt raises is one
-`vpt.event/1`:
+VPT logs every emitted event. Routine summaries use the report channel; failures and items needing
+review use the alert channel. `[report] command` and `[alert] command` are independent optional
+argument lists, both empty by default. An absent or empty command sends no notification.
+
+Each configured hook receives one documented `vpt.event/1` JSON document on standard input:
 
 ```json
 {
   "schema": "vpt.event/1",
+  "channel": "alert",
   "event": "review_needed",
   "state": "needs_attention",
   "recording": "2026-08-24T144736-4f3ab19c02de",
@@ -1234,23 +1238,23 @@ and the deterministic `title` is what makes the duplicate findable.
 }
 ```
 
-Event names: `review_needed`, `transcribe_failed`, `ingest_failed`, `deferred`, `brief_written`,
-`retention`, `config_refused`. `state` is `needs_attention`, `failed` or `done`. `counts` carries one
-entry per lexical class plus `diagnostics`. An event carries identities, counts, classes and paths, and
-never a transcript span, an alternative, a title, a tag, a mask value or a brief line.
+Event names are `review_needed`, `transcribe_failed`, `ingest_failed`, `deferred`, `brief_written`,
+`retention` and `config_refused`. `state` is `needs_attention`, `failed` or `done`. Completed briefs and
+retention summaries are reports; the other events are alerts. `counts` carries one entry per lexical
+class plus `diagnostics`. Logs and hook input contain identities, counts, classes and paths, never a
+transcript span, an alternative, a title, a tag, a mask value or a brief line.
 
-- `desktop`: `vpt-macos notify` with a title of `vpt: <event>` and the `detail` as body.
-- `command`: vpt runs `[notify] command` (an argv list) with the tokens `{event}`, `{state}`, `{id}`,
-  `{detail}`, `{count}` and `{path}` substituted into the argument list, and writes the event document on
-  the command's stdin, both, on every invocation, with no sub-mode key. The command's exit code is
-  load-bearing: non-zero means vpt attempts its desktop notice once as a fallback, logs the exit code,
-  and keeps the work's own exit status. The config comment at the key states that the command receives
-  vpt's JSON (not any downstream tool's), and that a wrapper must pass through its final delivery's exit
-  code.
-- `off`: nothing is raised.
+VPT logs the event independently of hook configuration, then invokes only its configured channel's
+command. The argument list is passed directly; event values are supplied in JSON, not interpolated
+into a shell command. A script translates that document into its chosen notification system's format.
+Hook input is separate from VPT's command output, and captured hook output never enters the command's
+stdout or stderr. Logging must preserve the structured-output contract in section 9.
 
-A notification failure never fails the work it reports on: the note, the flags and the clone are already
-written when the event is raised. vpt's source contains no name of any notification engine.
+Each hook has the five-second process deadline from section 3.5. A nonzero exit, spawn failure,
+interruption or timeout produces a bounded, content-free diagnostic in the logs. It does not change
+the work's result, retry delivery inline, invoke the other hook or fall back to a desktop notification.
+Dry runs and observational commands do not spawn hooks. Built-in Apple notifications are outside the
+roadmap; report and alert commands have no dependency on the macOS helper or any notification engine.
 
 ## 9. The command-line surface
 
@@ -1425,9 +1429,9 @@ canary-secret test.
 | `share.redact.mask`                  | string         | `[{class} {n}]`                                                           | rendered in place of a removed value                                                                         |
 | `share.redact.flagged_spans`         | enum           | `omit`                                                                    | `omit` or `mark`                                                                                             |
 | `handoff.allow_private`              | bool           | `false`                                                                   | let transcripts, analysis notes and briefs be handed off                                                     |
-| `notify.mode`                        | enum           | `desktop`                                                                 | `desktop`, `command` or `off`                                                                                |
-| `notify.command`                     | string list    | `[]`                                                                      | argv with `{event}`, `{state}`, `{id}`, `{detail}`, `{count}`, `{path}` tokens; receives vpt's JSON on stdin |
-| `notify.aggregate_after`             | int            | `3`                                                                       | recordings needing review in one run before one aggregate event                                              |
+| `report.command`                     | string list    | `[]`                                                                      | optional routine-report command; receives `vpt.event/1` JSON on stdin; empty means logs only |
+| `alert.command`                      | string list    | `[]`                                                                      | optional failure or review-needed command; receives `vpt.event/1` JSON on stdin; empty means logs only |
+| `alert.aggregate_after`              | int            | `3`                                                                       | recordings needing review in one run before one aggregate alert                                              |
 | `retention.enabled`                  | bool           | `false`                                                                   | the opt-in retention run                                                                                     |
 | `retention.include_audio`            | bool           | `false`                                                                   | let the audio store expire                                                                                   |
 | `retention.hold.<store>`             | duration       | `0` for every store                                                       | files older than this move to the Trash; `0` never                                                           |
@@ -1460,7 +1464,7 @@ the node number is the tree's.
 | 9.7   | mask numbering restarts at 1 in every released copy                                           |
 | 9.10  | a released file does not name vpt                                                             |
 | 9.12  | the shared folder defaults to `<home>/released`                                               |
-| 10.8  | one event per recording, one aggregate event past `notify.aggregate_after = 3`                |
+| 10.8  | one event per recording, one aggregate event past `alert.aggregate_after = 3`                 |
 | 10.9  | which route a configured command posts to is the command's business, not vpt's                |
 | 12.4  | secrets are values in `config.toml`; rendering them is the operator's concern                 |
 | 14.6  | vpt installs to `~/.cargo/bin`                                                                |
@@ -1501,20 +1505,11 @@ projects = ["work/"]
 [handoff]
 allow_private = true
 
-[notify]
-mode = "command"
-command = [
-  "<a producer on PATH>",
-  "send",
-  "--producer",
-  "vpt",
-  "--event",
-  "{event}",
-  "--state",
-  "{state}",
-  "--detail",
-  "{detail}",
-]
+[report]
+command = []
+
+[alert]
+command = ["<an alert script on PATH>"]
 ```
 
 ## 11. Errors and refusals
@@ -1535,7 +1530,7 @@ Refused at startup, before any work, exit 2 or 3 as marked:
   or a `command` engine missing `family` or `local` (2).
 - both engine slots reporting one family without `allow_same_family` (3, `same_family`).
 - `context.type` set with the needed selection list empty, when a verb asks for that half (2).
-- `notify.mode = "command"` with an empty command (2).
+- a report or alert command with a non-string argument (2); an empty list is valid and disables that hook.
 - the `obsidian` profile with `note.obsidian.vault_root` empty, relative or not an existing directory
   (2).
 - the helper present with a different major version (3, `helper_version`).
@@ -1593,8 +1588,11 @@ What the tests use instead of the world:
   subdirectories, a `.waveform` sidecar, and a fixture `CloudRecordings.db` with the `ZCUSTOMLABEL` and
   `ZPATH` columns plus a `-wal`. `SF_DATALESS` is tested through the port with a fake that reports the
   flag, never by setting it on disk.
-- **A fake helper.** The same dev-tools binary answers `transcribe`, `notify` and `trash` with recorded
-  documents, so `desktop` notify and retention are tested without posting or moving anything.
+- **A fake helper.** The same dev-tools binary answers `transcribe` and `trash` with recorded
+  documents, so speech and retention are tested without real destinations.
+- **Fake report and alert commands.** Owned fixtures capture the exact argument list and JSON stdin,
+  including privacy canaries, and exercise nonzero exits and deadlines. Default-empty commands log
+  events without spawning a process; hook failures never invoke another route.
 - **A fixed clock**, an **in-memory ledger** that runs the same contract suite as the SQLite one, and
   **fake context commands** whose stdout is a fixture; the Google reader is tested against a local HTTP
   listener the test starts on a loopback port.
@@ -1615,10 +1613,10 @@ byte-identical, a proposal line holding a managed delimiter renders as text, `vp
 and succeeds with name resolution failing, and the grep for notebook vocabulary finds nothing (stage 4).
 
 The Swift helper has its own `swift test` suite in `helper/vpt-macos/Tests`, and it reaches no real
-destination: speech results are injected through a protocol the transcriber implements, the notification
-poster is a stub, and the Trash is a temporary-directory adapter. The tests cover the conversion of
+destination: speech results are injected through a protocol the transcriber implements, and the Trash
+is a temporary-directory adapter. The tests cover the conversion of
 speech results into `vpt.engine/1` (schema, confidence in `[0, 1]`, non-inverted and contained ranges,
-segment order), argument handling and exit codes, and the printed documents of `notify` and `trash`. A
+segment order), argument handling and exit codes, and the printed document of `trash`. A
 real `SpeechAnalyzer` run and a real move to the Trash are operator-run smoke checks (`just smoke`),
 never part of the automated suite.
 
@@ -1672,7 +1670,8 @@ the SQLite ledger with its in-memory twin, migrations, the write lock, the dirty
 protocol and the retention intents, `vpt ingest` with the wholeness gate, the title copy, staging and
 publication, `vpt show`, `vpt list`, `vpt storage`, `vpt doctor` (config, stores, helper presence,
 recordings directory readability, symlink, git trees, subdirectory counts), the `vpt-macos` helper
-package with `notify` and `trash`, `[notify]` with all three modes and `vpt.event/1`, and
+package with `--version` and `trash`, logged reports and alerts with optional command hooks using
+`vpt.event/1`, and
 `vpt retention run`. Depends on nothing.
 
 ### Stage 2: Transcribe

@@ -31,6 +31,54 @@ fn an_operator_value_wins_over_the_default() {
 }
 
 #[test]
+fn report_and_alert_hooks_default_to_empty_argv() {
+    let table = load_text("config_version = 1\n").expect("defaults load");
+    for key in ["report.command", "alert.command"] {
+        assert_eq!(
+            get(&table, key).and_then(Value::as_array),
+            Some(&Vec::new())
+        );
+    }
+    assert_eq!(
+        get(&table, "alert.aggregate_after").and_then(Value::as_integer),
+        Some(3)
+    );
+}
+
+#[test]
+fn report_and_alert_tables_preserve_operator_argv() {
+    let table = load_text(
+        "config_version = 1\n[report]\ncommand = ['reporter', 'two words']\n\
+         [alert]\ncommand = ['alerter', '--urgent']\naggregate_after = 7\n",
+    )
+    .expect("hooks load");
+    for (key, first, second) in [
+        ("report.command", "reporter", "two words"),
+        ("alert.command", "alerter", "--urgent"),
+    ] {
+        let argv = get(&table, key)
+            .and_then(Value::as_array)
+            .expect("hook argv");
+        assert_eq!(argv[0].as_str(), Some(first));
+        assert_eq!(argv[1].as_str(), Some(second));
+    }
+    assert_eq!(
+        get(&table, "alert.aggregate_after").and_then(Value::as_integer),
+        Some(7)
+    );
+}
+
+#[test]
+fn legacy_notify_table_is_refused() {
+    assert_eq!(
+        load_text("config_version = 1\n[notify]\nmode = 'off'\n")
+            .map(drop)
+            .expect_err("legacy table refused"),
+        ConfigError::UnknownKey("notify".into())
+    );
+}
+
+#[test]
 fn an_unknown_key_is_refused_by_its_full_path() {
     let error = load_text("config_version = 1\n[source]\nquiet_period = 90\n")
         .map(drop)

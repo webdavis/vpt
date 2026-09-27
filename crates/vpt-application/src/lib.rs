@@ -4,6 +4,4 @@ mod setup;
 
 pub use setup::{Setup, SetupError, SetupOutcome, SetupWriter};
 
-pub use settings::{
-    NotifyMode, NotifySettings, RetentionSettings, Settings, SourceSettings, StorePaths,
-};
+pub use settings::{RetentionSettings, Settings, SourceSettings, StorePaths};

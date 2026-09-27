@@ -85,7 +85,7 @@ fn positive_integers_enforce_the_32_bit_endpoints() {
         "note.slug_max_chars",
         "synthesis.timeout_secs",
         "synthesis.grounding_window_secs",
-        "notify.aggregate_after",
+        "alert.aggregate_after",
     ] {
         for value in ["1", "4294967295"] {
             assert_eq!(load(key, value), Ok(()), "{key} = {value}");
@@ -152,7 +152,7 @@ fn wrong_scalar_types_name_the_key_and_expected_type() {
         ("source.max_audio_bytes", "1.0", "integer"),
         ("reconcile.confidence_floor", "\"0.5\"", "number"),
         ("reconcile.max_divergence_ratio", "true", "number"),
-        ("notify.mode", "1", "string"),
+        ("alert.aggregate_after", "'canary-private'", "integer"),
         ("home.path", "false", "string"),
         (
             "context.google.client_secret",
@@ -175,16 +175,26 @@ fn wrong_scalar_types_name_the_key_and_expected_type() {
 
 #[test]
 fn enum_values_are_limited_to_the_declared_options() {
-    for value in ["\"desktop\"", "\"command\"", "\"off\""] {
-        assert_eq!(load("notify.mode", value), Ok(()));
+    for value in ["\"portable\"", "\"obsidian\""] {
+        assert_eq!(load("note.profile", value), Ok(()));
     }
-    let error = load("notify.mode", "\"canary-private\"").expect_err("configuration refused");
+    let error = load("note.profile", "\"canary-private\"").expect_err("configuration refused");
     assert!(!format!("{error:?}").contains("canary"));
     assert_eq!(
         error,
-        out_of_range("notify.mode", "one of desktop, command, off")
+        out_of_range("note.profile", "one of portable, obsidian")
     );
-    assert_eq!(error.key(), Some("notify.mode"));
+    assert_eq!(error.key(), Some("note.profile"));
+}
+
+#[test]
+fn legacy_notify_keys_are_unknown() {
+    for key in ["notify.mode", "notify.command", "notify.aggregate_after"] {
+        assert_eq!(
+            load(key, "'canary-private'"),
+            Err(ConfigError::UnknownKey("notify".into()))
+        );
+    }
 }
 
 #[test]
@@ -215,7 +225,7 @@ fn durations_accept_zero_and_checked_unit_forms() {
 
 #[test]
 fn lists_and_argv_require_string_elements() {
-    for key in ["context.calendars", "notify.command"] {
+    for key in ["context.calendars", "report.command", "alert.command"] {
         for value in ["[]", "[\"first\", \"second\"]"] {
             assert_eq!(load(key, value), Ok(()));
         }
@@ -284,4 +294,21 @@ fn refusals_without_a_key_report_none() {
             .key(),
         Some("absent")
     );
+}
+
+#[test]
+fn report_and_alert_hooks_reject_invalid_argv_without_leaking_values() {
+    for key in ["report.command", "alert.command"] {
+        for value in ["'canary-private'", "['canary-private', false]"] {
+            let error = load(key, value).expect_err("invalid argv refused");
+            assert_eq!(
+                error,
+                ConfigError::WrongType {
+                    key: key.into(),
+                    expected: "list of strings".into()
+                }
+            );
+            assert!(!format!("{error:?}").contains("canary-private"));
+        }
+    }
 }
