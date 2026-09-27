@@ -130,12 +130,10 @@ fn configure(
     policy: AccessPolicy,
     busy: Duration,
 ) -> Result<(), DatabaseError> {
-    if policy != AccessPolicy::WritableLedger {
-        connection.set_db_config(
-            rusqlite::config::DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE,
-            true,
-        )?;
-    }
+    connection.set_db_config(
+        rusqlite::config::DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE,
+        true,
+    )?;
     let milliseconds = i32::try_from(busy.as_millis()).map_err(|_| invalid("busy timeout"))?;
     // SAFETY: the owner retains the connection while configuring checked SQLite settings.
     unsafe {
