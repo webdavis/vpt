@@ -18,7 +18,11 @@ pub use spawn::{
 
 pub use archive::{ClonefileArchive, STAGING_PREFIX};
 pub use config::{RootError, Roots};
-pub use contained::{Access, ContainedError, Kind, RootDir, Stat, leaf_below};
+pub use contained::{
+    Access, AppendEffects, AppendFailure, AppendReceipt, AppendSync, ContainedError, EventLog,
+    Kind, LogError, LogInspection, LogRefusal, PrivateStateError, RootDir, Stat, TailRepair,
+    leaf_below,
+};
 pub use ledger::{MemoryLedger, OpenError, SCHEMA_VERSION, SqliteLedger};
 pub use lock::{LockError, WriteLock};
 pub use stores::{BUFFER, FilesystemStores, digest_open};

@@ -1,6 +1,14 @@
 mod directory;
 mod file;
+mod private_log;
+mod private_state;
 mod rename;
+
+pub use private_log::{
+    AppendEffects, AppendFailure, AppendReceipt, AppendSync, EventLog, LogError, LogInspection,
+    LogRefusal, TailRepair,
+};
+pub use private_state::PrivateStateError;
 
 use std::ffi::CString;
 use std::fs::File;
