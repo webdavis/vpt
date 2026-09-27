@@ -3,6 +3,18 @@ use crate::ledger::SqliteLedger;
 use crate::ledger::contract;
 use vpt_application::ports::{LedgerCommit, LedgerError, PublicationJournal, RecordingLedger};
 
+mod run_history_contract {
+    macro_rules! case {
+        ($name:ident) => {
+            #[test]
+            fn $name() {
+                super::super::supervised(concat!("ledger_contract_history_", stringify!($name)));
+            }
+        };
+    }
+    crate::ledger::contract::history_cases!(case);
+}
+
 #[test]
 fn a_reopened_ledger_preserves_recording_seen_and_publication() {
     super::supervised("ledger_contract_sqlite_reopen");

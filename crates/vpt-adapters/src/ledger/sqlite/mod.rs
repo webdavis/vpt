@@ -1,5 +1,6 @@
 mod connection;
 mod error;
+mod history;
 mod journal;
 mod migrations;
 mod recordings;

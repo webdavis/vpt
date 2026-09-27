@@ -1,5 +1,5 @@
 mod codec;
-mod write;
+pub(super) mod write;
 
 use super::{SqliteLedger, journal, map};
 use codec::{RECORDING_COLUMNS, SEEN_COLUMNS, record_from_row, seen_from_row};
@@ -27,6 +27,22 @@ fn one_record(
         .optional()
         .map_err(map)?
         .transpose()
+}
+
+pub(super) fn apply_commit(
+    transaction: &rusqlite::Transaction<'_>,
+    batch: &LedgerCommit,
+) -> Result<(), LedgerError> {
+    for row in &batch.seen {
+        upsert_seen(transaction, row)?;
+    }
+    for entry in &batch.publications {
+        journal::upsert_publication(transaction, entry)?;
+    }
+    for recording in &batch.recordings {
+        insert_recording(transaction, recording)?;
+    }
+    Ok(())
 }
 
 impl RecordingLedger for SqliteLedger {
@@ -85,18 +101,7 @@ impl RecordingLedger for SqliteLedger {
     }
 
     fn commit(&self, batch: &LedgerCommit) -> Result<(), LedgerError> {
-        self.transaction(|transaction| {
-            for row in &batch.seen {
-                upsert_seen(transaction, row)?;
-            }
-            for entry in &batch.publications {
-                journal::upsert_publication(transaction, entry)?;
-            }
-            for recording in &batch.recordings {
-                insert_recording(transaction, recording)?;
-            }
-            Ok(())
-        })
+        self.transaction(|transaction| apply_commit(transaction, batch))
     }
 
     fn set_source_path(&self, id: &RecordingId, path: &Path) -> Result<(), LedgerError> {

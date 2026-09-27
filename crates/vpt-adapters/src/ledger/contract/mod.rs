@@ -1,3 +1,4 @@
+pub(crate) mod history;
 pub(crate) mod journal;
 pub(crate) mod recording;
 pub(crate) mod retention;
@@ -126,6 +127,48 @@ macro_rules! retention_cases {
 }
 pub(crate) use retention_cases;
 
+macro_rules! history_cases {
+    ($case:ident) => {
+        $case!(start_and_steps_have_stable_order_and_pending_export);
+        $case!(source_update_and_history_commit_together);
+        $case!(publication_clear_commits_with_history);
+        $case!(duplicate_recording_rolls_back_publication_clear);
+        $case!(unknown_intent_stays_unresolved);
+        $case!(audio_trash_marker_shares_history_commit);
+        $case!(pending_export_does_not_read_unrelated_publication);
+        $case!(receipt_lists_only_completed_recordings);
+        $case!(invalid_intent_fact_rolls_back_completed_work_delta);
+        $case!(duplicate_run_started_fact_rolls_back_work_delta);
+        $case!(mismatched_effect_kind_and_reference_are_refused);
+        $case!(export_ack_rejects_out_of_order_event);
+        $case!(export_ack_rejects_changed_file_and_nonincreasing_offset);
+        $case!(export_ack_saves_confirmed_receipt_fields);
+        $case!(export_failure_retains_cursor_and_partial_repair);
+        $case!(encoding_export_failure_stays_distinct_from_io);
+        $case!(failure_immediately_after_reset_has_no_confirmed_position);
+        $case!(failure_after_first_replay_ack_uses_receipt_position);
+        $case!(recovery_progress_and_summary_are_saved_facts);
+        $case!(recreated_safe_log_replays_stable_event_ids);
+        $case!(stale_acknowledgement_token_is_refused_after_recreated_log);
+        $case!(identical_stale_restart_does_not_erase_replay_progress);
+        $case!(later_stale_restart_preserves_original_observation);
+        $case!(changed_stale_restart_boundary_is_refused);
+        $case!(growing_same_file_reset_preserves_prior_ack);
+        $case!(repeated_same_file_shortening_replays_again);
+        $case!(saved_export_failures_have_unique_order_for_repeated_observation);
+        $case!(observed_log_file_round_trips_without_acknowledgement);
+        $case!(recovery_progress_does_not_advance_failure_watermark);
+        $case!(recovery_summaries_advance_saved_failure_window);
+        $case!(summary_window_rejects_stale_missing_and_foreign_ids);
+        $case!(work_only_recovery_summary_preserves_absent_failure_time);
+        $case!(zero_affected_run_progress_rolls_back_work);
+        $case!(zero_affected_run_windowless_summary_rolls_back_work);
+        $case!(invalid_summary_window_rolls_back_work_delta);
+        $case!(hook_failure_requires_event_in_same_run);
+    };
+}
+pub(crate) use history_cases;
+
 pub(crate) fn run_sqlite(scenario: &str, ledger: &crate::ledger::SqliteLedger) {
     macro_rules! run_recording {
         ($name:ident) => {
@@ -151,8 +194,17 @@ pub(crate) fn run_sqlite(scenario: &str, ledger: &crate::ledger::SqliteLedger) {
             }
         };
     }
+    macro_rules! run_history {
+        ($name:ident) => {
+            if scenario == concat!("ledger_contract_history_", stringify!($name)) {
+                history::$name(ledger);
+                return;
+            }
+        };
+    }
     recording_cases!(run_recording);
     journal_cases!(run_journal);
     retention_cases!(run_retention);
+    history_cases!(run_history);
     panic!("unknown ledger contract scenario");
 }

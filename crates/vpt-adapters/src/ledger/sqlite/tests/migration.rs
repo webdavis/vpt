@@ -24,7 +24,44 @@ fn migration_root_replacement_rolls_back_before_commit() {
     supervised("ledger_migration_root_replacement");
 }
 
+#[test]
+fn version_one_rows_and_pending_intents_survive_history_migration() {
+    supervised("ledger_migration_preserve_v1");
+}
+
 pub(super) fn run(scenario: &str, root: &RootDir) {
+    if scenario == "ledger_migration_preserve_v1" {
+        database(root, |connection| {
+            connection.execute_batch(migrations::SCHEMA_V1).map_err(super::map)?;
+            connection.pragma_update(None, "user_version", 1).map_err(super::map)?;
+            connection.execute(
+                "INSERT INTO dirty_publications VALUES ('/h/pending.md', NULL, 'digest', 7)",
+                [],
+            ).map_err(super::map)?;
+            connection.execute(
+                "INSERT INTO retention_intents (artifact_kind, recording, path, expected, recorded_at) VALUES ('audio', NULL, '/h/audio/pending.m4a', 'digest', 8)",
+                [],
+            ).map_err(super::map)?;
+            connection.execute(
+                "INSERT INTO seen (path, file_name, size, mtime_secs, mtime_nanos, flags, first_seen, last_seen, deferral_count) VALUES ('/vm/Recordings/v1.m4a', 'v1.m4a', 8, 7, 0, 0, 7, 8, 0)",
+                [],
+            ).map_err(super::map)?;
+            let recording = crate::ledger::contract::record(94);
+            connection.execute(
+                "INSERT INTO recordings (id, digest, captured_at, captured_offset, duration_secs, title_source, ingested_at, audio_path, stage_transcribe, stage_note, stage_synthesis) VALUES (?1, ?2, ?3, ?4, ?5, 'unavailable', ?6, ?7, 'pending', 'pending', 'pending')",
+                rusqlite::params![recording.id.as_str(), recording.digest.hex(), recording.captured_at.secs, recording.captured_offset.secs, i64::try_from(recording.duration_secs).unwrap(), recording.ingested_at.secs, recording.audio_path.to_string_lossy()],
+            ).map_err(super::map)?;
+            migrations::migrate(connection, || Ok(()))?;
+            assert_eq!(version(connection), 2);
+            assert_eq!(connection.query_row("SELECT count(*) FROM dirty_publications", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
+            assert_eq!(connection.query_row("SELECT count(*) FROM retention_intents WHERE completed_at IS NULL", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
+            assert_eq!(connection.query_row("SELECT count(*) FROM seen WHERE path = '/vm/Recordings/v1.m4a'", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
+            assert_eq!(connection.query_row("SELECT count(*) FROM recordings WHERE id = ?1", [recording.id.as_str()], |row| row.get::<_, u32>(0)).unwrap(), 1);
+            assert_eq!(connection.query_row("SELECT length(namespace) FROM history_identity WHERE id = 1", [], |row| row.get::<_, u32>(0)).unwrap(), 16);
+            Ok(())
+        }).unwrap();
+        return;
+    }
     if scenario == "ledger_migration_root_replacement" {
         let expected = LedgerError::PathEscape(root.path().into());
         let result = database(root, |connection| {
@@ -77,8 +114,8 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                     },
                     2
                 );
-                assert_eq!(version(connection), 1);
-                assert_eq!(tables(connection).len(), 11);
+                assert_eq!(version(connection), 2);
+                assert_eq!(tables(connection).len(), 16);
                 if scenario == "ledger_migration_rollback" {
                     Err(injected.clone())
                 } else {
@@ -96,10 +133,10 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                 assert_eq!(version(connection), 0);
             } else {
                 result.unwrap();
-                assert_eq!(migrations::current(connection).unwrap(), 1);
-                assert_eq!(tables(connection).len(), 11);
+                assert_eq!(migrations::current(connection).unwrap(), 2);
+                assert_eq!(tables(connection).len(), 16);
                 migrations::migrate(connection, || Ok(())).unwrap();
-                assert_eq!(tables(connection).len(), 11);
+                assert_eq!(tables(connection).len(), 16);
             }
         }
         Ok(())

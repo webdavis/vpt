@@ -1,0 +1,151 @@
+use super::{corrupt, count, field, recording, signed, string};
+use serde_json::{Value, json};
+use std::path::PathBuf;
+use vpt_application::ports::LedgerError;
+use vpt_domain::history::{
+    Event, EventCounts, EventDetail, EventKind, EventPath, EventPathKey, EventState,
+    SafeFailureClass,
+};
+use vpt_domain::time::UtcInstant;
+
+pub(super) fn encode(event: &Event) -> Result<Value, LedgerError> {
+    let detail = match event.detail {
+        EventDetail::None => json!({"tag":"none"}),
+        EventDetail::Review {
+            spans,
+            agreed_unverified,
+        } => {
+            json!({"tag":"review","spans":spans,"agreed_unverified":agreed_unverified})
+        }
+        EventDetail::Failure(class) => json!({"tag":"failure","class":failure_tag(class)}),
+        EventDetail::Deferred => json!({"tag":"deferred"}),
+        EventDetail::Retention { completed, failed } => {
+            json!({"tag":"retention","completed":completed,"failed":failed})
+        }
+    };
+    let counts = &event.counts;
+    let paths: Vec<_> = event
+        .paths
+        .iter()
+        .map(|entry| {
+            Ok(json!({"key":entry.key.as_str(),"path":entry.path.to_str().ok_or_else(corrupt)?}))
+        })
+        .collect::<Result<_, LedgerError>>()?;
+    Ok(json!({
+        "kind":event.kind.as_str(),
+        "state":event.state.as_str(),
+        "recording":event.recording.as_ref().map(|id| id.as_str()),
+        "detail":detail,
+        "counts":{
+            "numeric":counts.numeric,
+            "proper_noun":counts.proper_noun,
+            "low_confidence":counts.low_confidence,
+            "formatting":counts.formatting,
+            "other":counts.other,
+            "unsupported":counts.unsupported,
+            "agreed_unverified":counts.agreed_unverified,
+            "diagnostics":counts.diagnostics,
+        },
+        "paths":paths,
+        "occurred_at":event.occurred_at.secs,
+    }))
+}
+
+pub(super) fn decode(value: &Value) -> Result<Event, LedgerError> {
+    let kind = match string(value, "kind")? {
+        "review_needed" => EventKind::ReviewNeeded,
+        "transcribe_failed" => EventKind::TranscribeFailed,
+        "ingest_failed" => EventKind::IngestFailed,
+        "deferred" => EventKind::Deferred,
+        "brief_written" => EventKind::BriefWritten,
+        "retention" => EventKind::Retention,
+        "config_refused" => EventKind::ConfigRefused,
+        _ => return Err(corrupt()),
+    };
+    let state = match string(value, "state")? {
+        "needs_attention" => EventState::NeedsAttention,
+        "failed" => EventState::Failed,
+        "done" => EventState::Done,
+        _ => return Err(corrupt()),
+    };
+    let detail = decode_detail(field(value, "detail")?)?;
+    let stored_counts = field(value, "counts")?;
+    let counts = EventCounts {
+        numeric: count(stored_counts, "numeric")?,
+        proper_noun: count(stored_counts, "proper_noun")?,
+        low_confidence: count(stored_counts, "low_confidence")?,
+        formatting: count(stored_counts, "formatting")?,
+        other: count(stored_counts, "other")?,
+        unsupported: count(stored_counts, "unsupported")?,
+        agreed_unverified: count(stored_counts, "agreed_unverified")?,
+        diagnostics: count(stored_counts, "diagnostics")?,
+    };
+    let paths = field(value, "paths")?
+        .as_array()
+        .ok_or_else(corrupt)?
+        .iter()
+        .map(|entry| {
+            let key = match string(entry, "key")? {
+                "note" => EventPathKey::Note,
+                "audio" => EventPathKey::Audio,
+                "brief" => EventPathKey::Brief,
+                "archive" => EventPathKey::Archive,
+                _ => return Err(corrupt()),
+            };
+            Ok(EventPath {
+                key,
+                path: PathBuf::from(string(entry, "path")?),
+            })
+        })
+        .collect::<Result<Vec<_>, LedgerError>>()?;
+    Ok(Event {
+        kind,
+        state,
+        recording: recording(value, "recording")?,
+        detail,
+        counts,
+        paths,
+        occurred_at: UtcInstant {
+            secs: signed(value, "occurred_at")?,
+        },
+    })
+}
+
+fn failure_tag(class: SafeFailureClass) -> &'static str {
+    match class {
+        SafeFailureClass::SourceUnavailable => "source_unavailable",
+        SafeFailureClass::ArchiveFailed => "archive_failed",
+        SafeFailureClass::RecordingFailed => "recording_failed",
+        SafeFailureClass::LedgerUnavailable => "ledger_unavailable",
+        SafeFailureClass::ExportUnavailable => "export_unavailable",
+        SafeFailureClass::ConfigurationRefused => "configuration_refused",
+    }
+}
+
+fn decode_detail(value: &Value) -> Result<EventDetail, LedgerError> {
+    match string(value, "tag")? {
+        "none" => Ok(EventDetail::None),
+        "review" => Ok(EventDetail::Review {
+            spans: count(value, "spans")?,
+            agreed_unverified: count(value, "agreed_unverified")?,
+        }),
+        "failure" => {
+            let class = match string(value, "class")? {
+                "source_unavailable" => SafeFailureClass::SourceUnavailable,
+                "archive_failed" => SafeFailureClass::ArchiveFailed,
+                "recording_failed" => SafeFailureClass::RecordingFailed,
+                "ledger_unavailable" => SafeFailureClass::LedgerUnavailable,
+                "export_unavailable" => SafeFailureClass::ExportUnavailable,
+                "configuration_refused" => SafeFailureClass::ConfigurationRefused,
+                _ => return Err(corrupt()),
+            };
+            Ok(EventDetail::Failure(class))
+        }
+        "deferred" => Ok(EventDetail::Deferred),
+        "retention" => Ok(EventDetail::Retention {
+            completed: count(value, "completed")?,
+            failed: count(value, "failed")?,
+        }),
+        _ => Err(corrupt()),
+    }
+}

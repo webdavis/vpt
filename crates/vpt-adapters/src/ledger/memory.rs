@@ -8,6 +8,8 @@ use vpt_domain::digest::Sha256Digest;
 use vpt_domain::identity::RecordingId;
 use vpt_domain::time::UtcInstant;
 
+mod history;
+
 #[derive(Clone, Default)]
 struct State {
     seen: Vec<SeenRow>,
@@ -15,6 +17,7 @@ struct State {
     publications: Vec<DirtyPublication>,
     intents: Vec<(RetentionIntent, Option<UtcInstant>)>,
     next_intent_id: i64,
+    history: history::HistoryState,
 }
 
 #[derive(Default)]
@@ -59,6 +62,28 @@ fn upsert_publication(state: &mut State, entry: &DirtyPublication) {
         Some(stored) => *stored = entry.clone(),
         None => state.publications.push(entry.clone()),
     }
+}
+
+fn apply_commit(state: &mut State, batch: &LedgerCommit) -> Result<(), LedgerError> {
+    for row in &batch.seen {
+        upsert_seen(state, row);
+    }
+    for entry in &batch.publications {
+        upsert_publication(state, entry);
+    }
+    for recording in &batch.recordings {
+        if state
+            .recordings
+            .iter()
+            .any(|stored| stored.id == recording.id || stored.digest == recording.digest)
+        {
+            return Err(LedgerError::Conflict(
+                "digest or identity already recorded".into(),
+            ));
+        }
+        state.recordings.push(recording.clone());
+    }
+    Ok(())
 }
 
 impl RecordingLedger for MemoryLedger {
@@ -109,24 +134,7 @@ impl RecordingLedger for MemoryLedger {
     fn commit(&self, batch: &LedgerCommit) -> Result<(), LedgerError> {
         with(self, |state| {
             let mut next = state.clone();
-            for row in &batch.seen {
-                upsert_seen(&mut next, row);
-            }
-            for entry in &batch.publications {
-                upsert_publication(&mut next, entry);
-            }
-            for recording in &batch.recordings {
-                if next
-                    .recordings
-                    .iter()
-                    .any(|stored| stored.id == recording.id || stored.digest == recording.digest)
-                {
-                    return Err(LedgerError::Conflict(
-                        "digest or identity already recorded".into(),
-                    ));
-                }
-                next.recordings.push(recording.clone());
-            }
+            apply_commit(&mut next, batch)?;
             *state = next;
             Ok(())
         })?
@@ -290,5 +298,20 @@ mod tests {
             "{result:?}"
         );
         assert!(ledger.state.lock().expect("state").intents.is_empty());
+    }
+
+    mod run_history_contract {
+        use super::*;
+
+        macro_rules! case {
+            ($name:ident) => {
+                #[test]
+                fn $name() {
+                    let ledger = MemoryLedger::new();
+                    contract::history::$name(&ledger);
+                }
+            };
+        }
+        contract::history_cases!(case);
     }
 }

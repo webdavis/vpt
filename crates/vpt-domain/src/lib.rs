@@ -3,8 +3,10 @@ pub mod digest;
 pub mod duration;
 #[cfg(any(test, feature = "fixtures"))]
 pub mod fixtures;
+pub mod history;
 pub mod identity;
 pub mod layout;
 pub mod retention;
+pub mod run;
 pub mod sweep;
 pub mod time;
