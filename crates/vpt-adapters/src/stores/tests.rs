@@ -1,0 +1,196 @@
+use super::*;
+use std::io::{Seek, SeekFrom};
+use std::os::unix::fs::PermissionsExt;
+
+fn store() -> (tempfile::TempDir, PathBuf, FilesystemStores) {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("store");
+    std::fs::create_dir(&root).unwrap();
+    let stores = FilesystemStores::open(std::slice::from_ref(&root)).unwrap();
+    (temp, root, stores)
+}
+
+fn entries(root: &Path) -> Vec<String> {
+    let mut names: Vec<_> = std::fs::read_dir(root)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn digest_of_matches_bytes_and_absence_is_none() {
+    let (_temp, root, stores) = store();
+    let target = root.join("a.md");
+    std::fs::write(&target, b"hello").unwrap();
+    let digest = stores.digest_of(&target).unwrap().unwrap();
+    assert_eq!(
+        digest.hex(),
+        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    );
+    assert_eq!(digest, stores.digest_bytes(b"hello"));
+    assert_eq!(stores.digest_of(&root.join("missing.md")), Ok(None));
+}
+
+#[test]
+fn digest_open_hashes_from_start_even_when_cursor_is_nonzero() {
+    let (_temp, root, _stores) = store();
+    let target = root.join("a.md");
+    std::fs::write(&target, b"hello").unwrap();
+    let mut file = File::open(target).unwrap();
+    file.seek(SeekFrom::Start(2)).unwrap();
+    assert_eq!(
+        digest_open(&mut file).unwrap().hex(),
+        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    );
+}
+
+#[test]
+fn publish_replaces_target_with_mode_0644_and_no_temporary_leftover() {
+    let (_temp, root, stores) = store();
+    let target = root.join("a.md");
+    std::fs::write(&target, b"old").unwrap();
+    stores.publish(&target, b"new").unwrap();
+    assert_eq!(std::fs::read(&target).unwrap(), b"new");
+    assert_eq!(entries(&root), ["a.md"]);
+    assert_eq!(
+        std::fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+        0o644
+    );
+    assert_eq!(stores.sync_directory_of(&target), Ok(()));
+}
+
+#[test]
+fn existing_temporary_names_are_preserved_and_skipped() {
+    let (_temp, root, stores) = store();
+    let pid = std::process::id();
+    for sequence in 0..2 {
+        std::fs::write(
+            root.join(format!(".a.md.vpt-{pid}-{sequence}")),
+            b"abandoned",
+        )
+        .unwrap();
+    }
+    stores.publish(&root.join("a.md"), b"new").unwrap();
+    assert_eq!(std::fs::read(root.join("a.md")).unwrap(), b"new");
+    for sequence in 0..2 {
+        assert_eq!(
+            std::fs::read(root.join(format!(".a.md.vpt-{pid}-{sequence}"))).unwrap(),
+            b"abandoned"
+        );
+    }
+    assert!(!root.join(format!(".a.md.vpt-{pid}-2")).exists());
+}
+
+#[test]
+fn failed_rename_leaves_temporary_and_retry_uses_a_new_sequence() {
+    let (_temp, root, stores) = store();
+    let target = root.join("a.md");
+    std::fs::create_dir(&target).unwrap();
+    assert!(matches!(
+        stores.publish(&target, b"first"),
+        Err(StoreError::Io(_))
+    ));
+    let abandoned = root.join(format!(".a.md.vpt-{}-0", std::process::id()));
+    assert_eq!(std::fs::read(&abandoned).unwrap(), b"first");
+    std::fs::remove_dir(&target).unwrap();
+    stores.publish(&target, b"second").unwrap();
+    assert_eq!(std::fs::read(&target).unwrap(), b"second");
+    assert_eq!(std::fs::read(&abandoned).unwrap(), b"first");
+    assert_eq!(entries(&root).len(), 2);
+}
+
+#[test]
+fn outside_nested_and_link_paths_are_refused() {
+    let (temp, root, stores) = store();
+    let outside = temp.path().join("outside.md");
+    assert_eq!(
+        stores.publish(&outside, b"x"),
+        Err(StoreError::Escape(outside.clone()))
+    );
+    assert_eq!(
+        stores.digest_of(&outside),
+        Err(StoreError::Escape(outside.clone()))
+    );
+    assert_eq!(
+        stores.sync_directory_of(&outside),
+        Err(StoreError::Escape(outside))
+    );
+
+    let nested = root.join("sub/a.md");
+    assert_eq!(
+        stores.publish(&nested, b"x"),
+        Err(StoreError::Escape(nested))
+    );
+    let real = root.join("real.md");
+    let link = root.join("link.md");
+    std::fs::write(&real, b"real").unwrap();
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+    assert_eq!(
+        stores.digest_of(&link),
+        Err(StoreError::Escape(link.clone()))
+    );
+    assert_eq!(
+        stores.validate_path(&link),
+        Err(StoreError::Escape(link.clone()))
+    );
+    assert_eq!(stores.validate_path(&real), Ok(()));
+    assert_eq!(stores.validate_path(&root.join("absent.md")), Ok(()));
+}
+
+#[test]
+fn direct_publish_refuses_symlink_target_before_creating_temporary() {
+    let (_temp, root, stores) = store();
+    let real = root.join("real.md");
+    let link = root.join("link.md");
+    std::fs::write(&real, b"real").unwrap();
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+    let before = entries(&root);
+    assert_eq!(
+        stores.publish(&link, b"new"),
+        Err(StoreError::Escape(link.clone()))
+    );
+    assert_eq!(std::fs::read_link(&link).unwrap(), real);
+    assert_eq!(std::fs::read(&real).unwrap(), b"real");
+    assert_eq!(entries(&root), before);
+}
+
+#[test]
+fn read_only_open_keeps_missing_root_absent_and_refuses_link() {
+    let temp = tempfile::tempdir().unwrap();
+    let missing = temp.path().join("missing");
+    let stores = FilesystemStores::open_read_only(std::slice::from_ref(&missing)).unwrap();
+    assert!(stores.roots.is_empty());
+    assert_eq!(stores.configured.as_slice(), std::slice::from_ref(&missing));
+    assert!(!missing.exists());
+    std::os::unix::fs::symlink(temp.path(), temp.path().join("link")).unwrap();
+    assert!(FilesystemStores::open_read_only(&[temp.path().join("link")]).is_err());
+}
+
+#[test]
+fn replaced_root_is_refused_for_digest_publish_and_sync() {
+    let (temp, root, stores) = store();
+    let old_root = temp.path().join("old-store");
+    std::fs::write(root.join("a.md"), b"original").unwrap();
+    std::fs::rename(&root, &old_root).unwrap();
+    std::fs::create_dir(&root).unwrap();
+    std::fs::write(root.join("a.md"), b"replacement").unwrap();
+    let target = root.join("a.md");
+    assert_eq!(
+        stores.digest_of(&target),
+        Err(StoreError::Escape(target.clone()))
+    );
+    assert_eq!(
+        stores.publish(&target, b"new"),
+        Err(StoreError::Escape(target.clone()))
+    );
+    assert_eq!(
+        stores.sync_directory_of(&target),
+        Err(StoreError::Escape(target))
+    );
+    assert_eq!(std::fs::read(root.join("a.md")).unwrap(), b"replacement");
+    assert_eq!(std::fs::read(old_root.join("a.md")).unwrap(), b"original");
+    assert_eq!(entries(&root), ["a.md"]);
+    assert_eq!(entries(&old_root), ["a.md"]);
+}
