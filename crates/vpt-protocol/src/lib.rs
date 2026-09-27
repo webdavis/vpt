@@ -1,8 +1,10 @@
 pub mod error;
+mod event;
 mod helper;
 mod limits;
 pub mod result;
 
+pub use event::{EventEncodeError, encode_history, encode_hook};
 pub use helper::{HELPER_SCHEMA, HelperVersion, Trashed};
 pub use limits::{LimitViolation, Limits, read_bounded};
 
