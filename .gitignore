@@ -1,5 +1,6 @@
 target/
 .superpowers/
+helper/vpt-macos/.build/
 *.m4a
 *.wav
 *.mp3

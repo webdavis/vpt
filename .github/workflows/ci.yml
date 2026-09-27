@@ -13,10 +13,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install just and gitleaks
-        run: brew install gitleaks just
+      - name: Install command tools
+        run: brew install gitleaks just swiftformat swiftlint
       - name: Toolchain
-        run: rustup show active-toolchain
+        run: |
+          rustup show active-toolchain
+          xcodebuild -version
+          swift --version
       - name: Format
         run: just fmt
       - name: Clippy
@@ -29,3 +32,11 @@ jobs:
         run: just gitleaks
       - name: File size
         run: just file-size
+      - name: Swift format
+        run: just swift-format
+      - name: Swift lint
+        run: just swift-lint
+      - name: Swift build
+        run: just swift-build
+      - name: Swift test
+        run: just swift-test

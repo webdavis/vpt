@@ -9,7 +9,21 @@ test:
 
 test-rust: test
 
-lint-check: fmt clippy
+swift-format:
+  bash helper/vpt-macos/scripts/with-isolated-env.sh swiftformat Sources Tests Package.swift --lint --cache ignore --swift-version 6.0 --max-width 100 --trailing-commas never
+
+swift-lint:
+  bash helper/vpt-macos/scripts/with-isolated-env.sh swiftlint lint Sources Tests Package.swift --no-cache --strict
+
+swift-build:
+  bash helper/vpt-macos/scripts/with-isolated-env.sh swift build -c release --cache-path .build/isolated/cache --config-path .build/isolated/config --security-path .build/isolated/security --scratch-path .build/isolated/scratch --manifest-cache local --disable-dependency-cache --disable-automatic-resolution --explicit-target-dependency-import-check error
+
+swift-test:
+  bash helper/vpt-macos/scripts/with-isolated-env.sh swift test --cache-path .build/isolated/cache --config-path .build/isolated/config --security-path .build/isolated/security --scratch-path .build/isolated/scratch --manifest-cache local --disable-dependency-cache --disable-automatic-resolution --explicit-target-dependency-import-check error
+
+test-swift: swift-test
+
+lint-check: fmt clippy swift-format swift-lint
 
 doc:
   RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps
@@ -37,6 +51,15 @@ file-size:
       printf 'WARN %5d impl %5d total %s\n' "$impl" "$total" "$f"
     fi
   done < <(git -c core.fsmonitor=false ls-files 'crates/*.rs' 'crates/**/*.rs')
+  while IFS= read -r -d '' f; do
+    total=$(wc -l < "$f")
+    limit=200
+    [[ "$f" == helper/vpt-macos/Tests/* ]] && limit=700
+    if (( total > limit )); then
+      printf 'FAIL %5d total (limit %d) %s\n' "$total" "$limit" "$f"
+      status=1
+    fi
+  done < <(find helper/vpt-macos -path '*/.build' -prune -o -type f -name '*.swift' -print0)
   exit "$status"
 
-ship: fmt clippy test doc gitleaks file-size
+ship: fmt clippy test doc gitleaks file-size swift-format swift-lint swift-build swift-test
