@@ -1,7 +1,8 @@
 use std::path::Path;
 use vpt_adapters::{MemoryLedger, SqliteLedger};
 use vpt_application::ports::{
-    LedgerCommit, LedgerError, RecordingLedger, RecordingRecord, SeenRow,
+    LedgerCommit, LedgerError, NewIntent, RecordingLedger, RecordingRecord, RetentionIntent,
+    RetentionJournal, SeenRow,
 };
 use vpt_domain::digest::Sha256Digest;
 use vpt_domain::identity::RecordingId;
@@ -61,8 +62,33 @@ impl RecordingLedger for RuntimeLedger {
     }
 }
 
+impl RetentionJournal for RuntimeLedger {
+    fn record_intent(&self, intent: &NewIntent) -> Result<i64, LedgerError> {
+        match self {
+            Self::Sqlite(ledger) => ledger.record_intent(intent),
+            Self::Empty(_) => Err(LedgerError::Io("read-only ledger".into())),
+        }
+    }
+
+    fn pending_intents(&self) -> Result<Vec<RetentionIntent>, LedgerError> {
+        match self {
+            Self::Sqlite(ledger) => ledger.pending_intents(),
+            Self::Empty(ledger) => ledger.pending_intents(),
+        }
+    }
+
+    fn complete_intent(&self, id: i64, at: UtcInstant) -> Result<(), LedgerError> {
+        match self {
+            Self::Sqlite(ledger) => ledger.complete_intent(id, at),
+            Self::Empty(_) => Err(LedgerError::Io("read-only ledger".into())),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    mod retention;
+
     use super::*;
     use vpt_adapters::RootDir;
     use vpt_application::ports::{StageStates, TitleOrigin};
