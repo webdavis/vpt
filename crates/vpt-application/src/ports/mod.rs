@@ -8,7 +8,10 @@ mod stores;
 mod trash;
 
 pub use archive::{Archive, ArchiveError, Published, StageFailure, Staged};
-pub use history::{EventSink, HistoryReceipt, HistoryWrite, RunHistory, SinkOutcome, WorkDelta};
+pub use history::{
+    EventSink, HistoryReceipt, HistoryWrite, RunHistory, SinkError, SinkOutcome, SinkStop,
+    SinkWarning, WorkDelta,
+};
 pub use ledger::{
     DirtyPublication, LedgerCommit, LedgerError, PublicationJournal, RecordingLedger,
     RecordingRecord, SeenRow, StageState, StageStates, TitleOrigin,
