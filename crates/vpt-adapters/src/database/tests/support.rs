@@ -15,7 +15,7 @@ pub(super) const ROLES: [(FileRole, &str); 4] = [
     (FileRole::SharedMemory, "vpt.db-shm"),
 ];
 
-pub(super) fn root() -> (tempfile::TempDir, RootDir) {
+pub(crate) fn root() -> (tempfile::TempDir, RootDir) {
     let temp = tempfile::tempdir().expect("owned temp");
     let path = temp
         .path()
@@ -31,13 +31,13 @@ pub(super) fn root() -> (tempfile::TempDir, RootDir) {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct Snapshot {
+pub(crate) struct Snapshot {
     path: PathBuf,
     metadata: [u64; 12],
     bytes: Vec<u8>,
 }
 
-pub(super) fn snapshot(path: &Path) -> Vec<Snapshot> {
+pub(crate) fn snapshot(path: &Path) -> Vec<Snapshot> {
     let file = fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)

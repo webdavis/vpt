@@ -11,7 +11,7 @@ use std::path::Path;
 use std::process::{ChildStderr, ChildStdin, ChildStdout, Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
-pub(super) struct ChildGuard {
+pub(crate) struct ChildGuard {
     group: ProcessGroup,
     input: ChildStdin,
     stdout: Capture<ChildStdout>,
@@ -29,7 +29,7 @@ pub(super) fn child(scenario: &str, directory: &Path) -> io::Result<ChildGuard> 
     )
 }
 
-pub(super) fn child_for_root(
+pub(crate) fn child_for_root(
     scenario: &str,
     directory: &Path,
     root_pid: u32,
@@ -145,7 +145,7 @@ impl ChildGuard {
         )
     }
 
-    pub(super) fn ready(&mut self) -> io::Result<()> {
+    pub(crate) fn ready(&mut self) -> io::Result<()> {
         loop {
             self.poll()?;
             for line in
@@ -169,7 +169,7 @@ impl ChildGuard {
         }
     }
 
-    pub(super) fn send(&mut self, command: &str) -> io::Result<()> {
+    pub(crate) fn send(&mut self, command: &str) -> io::Result<()> {
         if command != "continue" {
             return Err(io::ErrorKind::InvalidInput.into());
         }
@@ -189,7 +189,7 @@ impl ChildGuard {
         Ok(())
     }
 
-    pub(super) fn finish(mut self) -> io::Result<Output> {
+    pub(crate) fn finish(mut self) -> io::Result<Output> {
         loop {
             self.poll()?;
             if let Some(status) = self.group.child.try_wait()?

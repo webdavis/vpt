@@ -9,20 +9,12 @@ use std::ptr;
 use std::rc::Rc;
 use std::time::Duration;
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "D5 constructs the contained ledger owner")
-)]
 pub(crate) struct Database {
     connection: Option<Connection>,
     registration: Option<Registration>,
     not_send_or_sync: PhantomData<Rc<()>>,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "D5 uses the contained ledger owner operations")
-)]
 impl Database {
     pub(super) fn open_registered(
         registration: Registration,

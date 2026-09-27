@@ -7,10 +7,6 @@ mod registration;
 mod shared_memory;
 mod state;
 
-#[cfg_attr(
-    not(test),
-    expect(unused_imports, reason = "D5 imports the contained ledger owner")
-)]
 pub(crate) use owner::Database;
 
 use crate::ContainedError;
@@ -36,10 +32,6 @@ fn invalid(operation: &'static str) -> DatabaseError {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AccessPolicy {
     WritableLedger,
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "D5 constructs observational ledger connections")
-    )]
     ObservationalLedger,
     #[cfg_attr(
         not(test),
@@ -75,10 +67,6 @@ enum FileRole {
 pub(crate) enum DatabaseError {
     Contained(ContainedError),
     Sqlite(rusqlite::Error),
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "D5 maps typed storage failures")
-    )]
     Io {
         operation: &'static str,
         kind: std::io::ErrorKind,
@@ -112,3 +100,8 @@ impl DatabaseError {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(crate) use tests::children::{ChildGuard, child_for_root};
+#[cfg(test)]
+pub(crate) use tests::support::{root, snapshot};
