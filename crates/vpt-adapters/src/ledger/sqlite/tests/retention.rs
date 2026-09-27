@@ -9,8 +9,13 @@ use vpt_application::ports::{LedgerError, RetentionIntent, RetentionJournal};
 use vpt_domain::time::UtcInstant;
 
 #[test]
-fn reopening_preserves_every_pending_intent_field_and_completion() {
+fn reopening_preserves_every_pending_intent_field() {
     super::supervised("ledger_contract_sqlite_retention_reopen");
+}
+
+#[test]
+fn reopening_preserves_completed_intent_exclusion() {
+    super::supervised("ledger_contract_sqlite_retention_completion_reopen");
 }
 
 #[test]
@@ -77,10 +82,18 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                 reopened.pending_intents().expect("pending"),
                 vec![recorded(first_id, first), recorded(second_id, second)]
             );
-            reopened
+        }
+        "ledger_contract_sqlite_retention_completion_reopen" => {
+            let first_id = ledger
+                .record_intent(&contract::retention::fixture(20))
+                .expect("first");
+            let second_id = ledger
+                .record_intent(&contract::retention::fixture(21))
+                .expect("second");
+            ledger
                 .complete_intent(first_id, UtcInstant { secs: 9_000 })
                 .expect("complete");
-            drop(reopened);
+            drop(ledger);
             let final_open = SqliteLedger::open(root).expect("final reopen");
             assert_eq!(
                 final_open.pending_intents().expect("pending"),

@@ -1,6 +1,7 @@
 use super::super::{error, migrations};
 use super::{database, supervised, tables, version};
 use crate::RootDir;
+use rusqlite::{Transaction, TransactionBehavior};
 use std::cell::Cell;
 use vpt_application::ports::LedgerError;
 
@@ -32,25 +33,30 @@ fn version_one_rows_and_pending_intents_survive_history_migration() {
 pub(super) fn run(scenario: &str, root: &RootDir) {
     if scenario == "ledger_migration_preserve_v1" {
         database(root, |connection| {
-            connection.execute_batch(migrations::SCHEMA_V1).map_err(super::map)?;
-            connection.pragma_update(None, "user_version", 1).map_err(super::map)?;
-            connection.execute(
+            let fixture = Transaction::new_unchecked(connection, TransactionBehavior::Immediate)
+                .map_err(super::map)?;
+            fixture.execute_batch(migrations::SCHEMA_V1).map_err(super::map)?;
+            fixture.pragma_update(None, "user_version", 1).map_err(super::map)?;
+            fixture.execute(
                 "INSERT INTO dirty_publications VALUES ('/h/pending.md', NULL, 'digest', 7)",
                 [],
             ).map_err(super::map)?;
-            connection.execute(
+            fixture.execute(
                 "INSERT INTO retention_intents (artifact_kind, recording, path, expected, recorded_at) VALUES ('audio', NULL, '/h/audio/pending.m4a', 'digest', 8)",
                 [],
             ).map_err(super::map)?;
-            connection.execute(
+            fixture.execute(
                 "INSERT INTO seen (path, file_name, size, mtime_secs, mtime_nanos, flags, first_seen, last_seen, deferral_count) VALUES ('/vm/Recordings/v1.m4a', 'v1.m4a', 8, 7, 0, 0, 7, 8, 0)",
                 [],
             ).map_err(super::map)?;
             let recording = crate::ledger::contract::record(94);
-            connection.execute(
+            fixture.execute(
                 "INSERT INTO recordings (id, digest, captured_at, captured_offset, duration_secs, title_source, ingested_at, audio_path, stage_transcribe, stage_note, stage_synthesis) VALUES (?1, ?2, ?3, ?4, ?5, 'unavailable', ?6, ?7, 'pending', 'pending', 'pending')",
                 rusqlite::params![recording.id.as_str(), recording.digest.hex(), recording.captured_at.secs, recording.captured_offset.secs, i64::try_from(recording.duration_secs).unwrap(), recording.ingested_at.secs, recording.audio_path.to_string_lossy()],
             ).map_err(super::map)?;
+            fixture.commit().map_err(super::map)?;
+            assert!(connection.is_autocommit());
+            assert_eq!(version(connection), 1);
             migrations::migrate(connection, || Ok(()))?;
             assert_eq!(version(connection), 2);
             assert_eq!(connection.query_row("SELECT count(*) FROM dirty_publications", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
