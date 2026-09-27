@@ -49,8 +49,12 @@ pub(super) fn run(args: &[String]) -> i32 {
         "XDG_CONFIG_HOME",
         "XDG_DATA_HOME",
         "XDG_STATE_HOME",
+        "XDG_CACHE_HOME",
+        "TMPDIR",
         "VPT_CONFIG",
         "PATH",
+        "VPT_FAKE_TRASH",
+        "VPT_FAKE_LOG",
     ] {
         environment.insert(key.into(), json!(std::env::var(key).ok()));
     }
