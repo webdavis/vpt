@@ -98,7 +98,8 @@ macro_rules! recording_cases {
         $case!(commit_writes_recording_seen_and_publication);
         $case!(stored_conflict_rolls_back_earlier_rows);
         $case!(within_batch_conflict_rolls_back_earlier_rows);
-        $case!(source_path_and_audio_trashed_are_updatable);
+        $case!(source_path_update_preserves_other_recording_fields);
+        $case!(audio_trashed_update_preserves_other_recording_fields);
         $case!(unknown_identity_reads_as_absent);
         $case!(recording_without_source_or_seen_commits);
         $case!(recordings_order_by_capture_then_identity);

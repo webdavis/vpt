@@ -135,20 +135,34 @@ where
     assert!(ledger.recordings().unwrap().is_empty());
 }
 
-pub(crate) fn source_path_and_audio_trashed_are_updatable<L: RecordingLedger>(ledger: &L) {
-    let recording = record(4);
+pub(crate) fn source_path_update_preserves_other_recording_fields<L: RecordingLedger>(ledger: &L) {
+    let mut recording = record(4);
+    recording.audio_trashed_at = Some(UtcInstant {
+        secs: 1_787_800_000,
+    });
     ledger
         .commit(&ingest(recording.clone(), seen_row("/vm/Recordings/4.m4a")))
         .unwrap();
     let path = Path::new("/vm/Recordings/renamed.m4a");
+    ledger.set_source_path(&recording.id, path).unwrap();
+    recording.source_path = Some(path.to_path_buf());
+    assert_eq!(ledger.by_id(&recording.id).unwrap(), Some(recording));
+}
+
+pub(crate) fn audio_trashed_update_preserves_other_recording_fields<L: RecordingLedger>(
+    ledger: &L,
+) {
+    let mut recording = record(4);
+    recording.source_path = Some(PathBuf::from("/vm/Recordings/renamed.m4a"));
+    ledger
+        .commit(&ingest(recording.clone(), seen_row("/vm/Recordings/4.m4a")))
+        .unwrap();
     let at = UtcInstant {
         secs: 1_787_800_000,
     };
-    ledger.set_source_path(&recording.id, path).unwrap();
     ledger.set_audio_trashed(&recording.id, at).unwrap();
-    let stored = ledger.by_id(&recording.id).unwrap().unwrap();
-    assert_eq!(stored.source_path, Some(path.to_path_buf()));
-    assert_eq!(stored.audio_trashed_at, Some(at));
+    recording.audio_trashed_at = Some(at);
+    assert_eq!(ledger.by_id(&recording.id).unwrap(), Some(recording));
 }
 
 pub(crate) fn unknown_identity_reads_as_absent<L: RecordingLedger>(ledger: &L) {
