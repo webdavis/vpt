@@ -46,6 +46,9 @@ fn fact_value(fact: &HistoryFact) -> Result<Value, EventEncodeError> {
             "intent": intent.render(),
             "outcome": effect_outcome(*outcome),
         }),
+        HistoryFact::MissingRetentionHistory { intent_id } => json!({
+            "tag": "missing_retention_history", "intent_id": intent_id,
+        }),
         HistoryFact::HookFailed { event, failure } => json!({
             "tag": "hook_failed",
             "event": event.render(),

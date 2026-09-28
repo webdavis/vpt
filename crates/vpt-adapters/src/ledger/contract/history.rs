@@ -37,8 +37,9 @@ pub(crate) use recovery::{
     work_only_recovery_summary_preserves_absent_failure_time,
 };
 pub(crate) use recovery_invalid_id::{
-    zero_affected_run_progress_rolls_back_work,
+    positive_missing_retention_id_is_saved, zero_affected_run_progress_rolls_back_work,
     zero_affected_run_windowless_summary_rolls_back_work,
+    zero_missing_retention_id_rolls_back_work,
 };
 pub(crate) use replay::{
     changed_stale_restart_boundary_is_refused, growing_same_file_reset_preserves_prior_ack,

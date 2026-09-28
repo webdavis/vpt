@@ -12,6 +12,7 @@ use vpt_domain::sweep::DeferralReason;
 use vpt_domain::time::UtcInstant;
 
 mod deferral;
+mod missing_retention_history;
 mod vocabulary;
 
 #[test]

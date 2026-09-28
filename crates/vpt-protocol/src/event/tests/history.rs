@@ -23,6 +23,14 @@ fn deferred_work_has_distinct_outgoing_history_outcome() {
 }
 
 #[test]
+fn missing_retention_history_has_exact_outgoing_fact_without_invented_identity() {
+    assert_fact(
+        HistoryFact::MissingRetentionHistory { intent_id: 71 },
+        json!({"tag":"missing_retention_history","intent_id":71}),
+    );
+}
+
+#[test]
 fn deferred_event_history_keeps_reason_count_and_source_path() {
     let mut value = event(EventKind::Deferred, EventState::NeedsAttention);
     value.detail = EventDetail::Deferred {

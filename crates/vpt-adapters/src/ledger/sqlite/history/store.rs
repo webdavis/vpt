@@ -52,7 +52,7 @@ pub(super) fn step(
             .map_err(storage::column)?;
         if exists.is_none()
             || facts.iter().any(|(_, fact)| {
-                matches!(fact, HistoryFact::RunStarted(_)) || !fact.recovery_run_ids_are_nonzero()
+                matches!(fact, HistoryFact::RunStarted(_)) || !fact.referenced_ids_are_nonzero()
             })
         {
             return Err(storage::conflict());

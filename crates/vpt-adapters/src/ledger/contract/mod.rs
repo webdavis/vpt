@@ -164,6 +164,8 @@ macro_rules! history_cases {
         $case!(work_only_recovery_summary_preserves_absent_failure_time);
         $case!(zero_affected_run_progress_rolls_back_work);
         $case!(zero_affected_run_windowless_summary_rolls_back_work);
+        $case!(positive_missing_retention_id_is_saved);
+        $case!(zero_missing_retention_id_rolls_back_work);
         $case!(invalid_summary_window_rolls_back_work_delta);
         $case!(hook_failure_requires_event_in_same_run);
     };
