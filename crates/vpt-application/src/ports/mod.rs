@@ -1,4 +1,5 @@
 mod archive;
+mod clock;
 mod history;
 mod ledger;
 mod prompt;
@@ -8,6 +9,7 @@ mod stores;
 mod trash;
 
 pub use archive::{Archive, ArchiveError, Published, StageFailure, Staged};
+pub use clock::Clock;
 pub use history::{
     EventSink, HistoryReceipt, HistoryWrite, RunHistory, SinkError, SinkOutcome, SinkStop,
     SinkWarning, WorkDelta,

@@ -1,3 +1,4 @@
+mod ingest;
 mod inventory;
 pub mod ports;
 mod publication;
@@ -6,6 +7,7 @@ mod setup;
 
 pub use setup::{Setup, SetupError, SetupOutcome, SetupWriter};
 
+pub use ingest::{Deferred, Ingest, IngestError, IngestFailure, IngestReport, Mode, WouldIngest};
 pub use inventory::{StoreInventory, inventory};
 pub use publication::{RepairError, RepairReport, repair_publications};
 pub use settings::{RetentionSettings, Settings, SourceSettings, StorePaths};
