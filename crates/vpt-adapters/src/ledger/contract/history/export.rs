@@ -56,16 +56,26 @@ pub(crate) fn export_failure_retains_cursor_and_partial_repair<L: RunHistory>(le
 }
 
 pub(crate) fn recovery_progress_and_summary_are_saved_facts<L: RunHistory>(ledger: &L) {
-    let run = committed(ledger.begin_run(RunKind::Recover, UtcInstant { secs: 10 })).run;
+    let started = committed(ledger.begin_run(RunKind::Recover, UtcInstant { secs: 10 }));
+    let run = started.run;
+    let baseline = vpt_domain::run::RecoveryBaseline {
+        generation: None,
+        pending_from: Some(started.records[0].id),
+        through: Some(started.records[0].id),
+    };
     let evidence = RecoveryEvidence {
         affected_runs: vec![run],
         first_failure_observed_at: Some(UtcInstant { secs: 2 }),
         logging_restored_observed_at: None,
         failures: 2,
         recovered_records: 1,
-        completed: 0,
-        failed: 0,
-        unresolved: 1,
+        completed_work: 0,
+        failed_work: 0,
+        unknown_work: 1,
+        deferred_work: 0,
+        completed_effects: 0,
+        failed_effects: 0,
+        unresolved_effects: 0,
         missing_history: 0,
     };
     committed(ledger.commit_step(
@@ -73,7 +83,10 @@ pub(crate) fn recovery_progress_and_summary_are_saved_facts<L: RunHistory>(ledge
         &WorkDelta::default(),
         &[(
             UtcInstant { secs: 11 },
-            HistoryFact::RecoveryProgress(evidence.clone()),
+            HistoryFact::RecoveryProgress {
+                evidence: evidence.clone(),
+                baseline,
+            },
         )],
     ));
     let progress = ledger
@@ -84,7 +97,13 @@ pub(crate) fn recovery_progress_and_summary_are_saved_facts<L: RunHistory>(ledge
         .unwrap()
         .fact
         .clone();
-    assert_eq!(progress, HistoryFact::RecoveryProgress(evidence.clone()));
+    assert_eq!(
+        progress,
+        HistoryFact::RecoveryProgress {
+            evidence: evidence.clone(),
+            baseline,
+        }
+    );
     let mut restored = evidence;
     restored.logging_restored_observed_at = Some(UtcInstant { secs: 12 });
     restored.recovered_records = 2;

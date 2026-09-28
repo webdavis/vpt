@@ -37,8 +37,12 @@ pub(super) fn encode(fact: &HistoryFact) -> Result<Value, LedgerError> {
             json!({"tag":"hook_failed","event":event.render(),"failure":encode_hook_failure(*failure)})
         }
         HistoryFact::Event(event) => json!({"tag":"event","event":event::encode(event)?}),
-        HistoryFact::RecoveryProgress(evidence) => {
-            json!({"tag":"recovery_progress","evidence":super::recovery::encode(evidence)})
+        HistoryFact::RecoveryProgress { evidence, baseline } => {
+            if !baseline.is_well_formed() {
+                return Err(corrupt());
+            }
+            json!({"tag":"recovery_progress","evidence":super::recovery::encode(evidence),
+                "baseline":super::recovery::encode_baseline(*baseline)})
         }
         HistoryFact::RecoverySummary { evidence, window } => {
             json!({"tag":"recovery_summary","evidence":super::recovery::encode(evidence),"window":window.map(encode_window)})
@@ -106,9 +110,10 @@ pub(super) fn decode(value: &Value) -> Result<HistoryFact, LedgerError> {
             failure: decode_hook_failure(field(value, "failure")?)?,
         }),
         "event" => Ok(HistoryFact::Event(event::decode(field(value, "event")?)?)),
-        "recovery_progress" => Ok(HistoryFact::RecoveryProgress(super::recovery::decode(
-            field(value, "evidence")?,
-        )?)),
+        "recovery_progress" => Ok(HistoryFact::RecoveryProgress {
+            evidence: super::recovery::decode(field(value, "evidence")?)?,
+            baseline: super::recovery::decode_baseline(field(value, "baseline")?)?,
+        }),
         "recovery_summary" => Ok(HistoryFact::RecoverySummary {
             evidence: super::recovery::decode(field(value, "evidence")?)?,
             window: optional(value, "window")?.map(decode_window).transpose()?,

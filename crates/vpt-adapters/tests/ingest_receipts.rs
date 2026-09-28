@@ -2,13 +2,59 @@ mod support;
 
 use std::cell::Cell;
 use std::collections::BTreeSet;
+use std::os::unix::fs::PermissionsExt;
+use support::faults::{FaultLedger, HistoryFault};
 use support::{CAPTURED, Fixture, StopAt};
-use vpt_application::ports::{Archive, Clock, RecordingLedger, RunHistory, SinkWarning};
+use vpt_adapters::{LoggedEvents, RootDir};
+use vpt_application::ports::{
+    Archive, Clock, EventSink, HistoryWrite, RecordingLedger, RunHistory, SinkOutcome, SinkWarning,
+};
 use vpt_application::{Ingest, IngestFailure, Mode};
 use vpt_domain::fixtures::m4a;
 use vpt_domain::history::{EventDetail, EventKind, EventState, SafeFailureClass};
-use vpt_domain::run::{HistoryFact, RunOutcome};
+use vpt_domain::run::{HistoryFact, RunKind, RunOutcome};
 use vpt_domain::time::{UtcInstant, UtcOffset};
+
+#[test]
+fn fault_ledger_preserves_atomic_recovery_through_logged_events() {
+    let fixture = Fixture::new();
+    std::fs::set_permissions(&fixture.state, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let parts = fixture.parts();
+    let history = FaultLedger::new(parts.ledger, HistoryFault::Intent);
+    let HistoryWrite::Committed(started) =
+        history.begin_run(RunKind::Ingest, UtcInstant { secs: 10 })
+    else {
+        panic!("fixture run was not committed");
+    };
+    let before = history.recovery_view().unwrap();
+    let root = RootDir::open(&fixture.state).unwrap();
+    let mut sink = LoggedEvents::new(&root, &history, &[], &[], || UtcInstant { secs: 20 });
+
+    assert_eq!(
+        sink.recover(&before),
+        SinkOutcome::Continue {
+            warnings: BTreeSet::new(),
+        }
+    );
+    let after = history.recovery_view().unwrap();
+    let saved = &after.records[before.records.len()..];
+    assert_eq!(saved.len(), 4);
+    assert_eq!(saved[0].fact, HistoryFact::RunStarted(RunKind::Recover));
+    let HistoryFact::RecoveryProgress { baseline, .. } = &saved[1].fact else {
+        panic!("atomic recovery progress missing");
+    };
+    assert_eq!(baseline.generation, None);
+    assert_eq!(baseline.pending_from, Some(started.records[0].id));
+    assert_eq!(baseline.through, Some(started.records[0].id));
+    assert!(matches!(saved[2].fact, HistoryFact::RecoverySummary { .. }));
+    assert_eq!(
+        saved[3].fact,
+        HistoryFact::RunFinished(RunOutcome::Completed)
+    );
+    assert!(saved.iter().all(|record| record.run == saved[0].run));
+    assert!(history.pending_exports().unwrap().is_empty());
+    assert_eq!(history.failed_calls.get(), 0);
+}
 
 #[test]
 fn sink_stop_after_start_intent_or_record_stops_new_work() {

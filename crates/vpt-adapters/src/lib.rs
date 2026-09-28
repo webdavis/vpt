@@ -2,6 +2,7 @@ mod archive;
 pub mod config;
 mod contained;
 mod database;
+mod events;
 mod git_tree;
 mod helper;
 mod ledger;
@@ -25,6 +26,7 @@ pub use contained::{
     Kind, LogError, LogInspection, LogRefusal, PrivateStateError, RootDir, Stat, TailRepair,
     leaf_below,
 };
+pub use events::LoggedEvents;
 pub use ledger::{MemoryLedger, OpenError, SCHEMA_VERSION, SqliteLedger};
 pub use lock::{LockError, WriteLock};
 pub use stores::{BUFFER, FilesystemStores, digest_open};

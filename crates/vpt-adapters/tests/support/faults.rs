@@ -13,7 +13,8 @@ use vpt_domain::digest::Sha256Digest;
 use vpt_domain::history::{EventId, RunId};
 use vpt_domain::identity::RecordingId;
 use vpt_domain::run::{
-    ExportCursor, ExportFailure, ExportPosition, HistoryFact, RecoveryView, RunKind,
+    ExportCursor, ExportFailure, ExportPosition, HistoryFact, RecoveryEvidence, RecoveryView,
+    RunKind,
 };
 use vpt_domain::sweep::SF_DATALESS;
 use vpt_domain::time::UtcInstant;
@@ -54,6 +55,14 @@ impl RunHistory for FaultLedger {
             return HistoryWrite::Unconfirmed(self.failure());
         }
         self.base.begin_run(kind, at)
+    }
+
+    fn begin_recovery(
+        &self,
+        at: UtcInstant,
+        evidence: RecoveryEvidence,
+    ) -> HistoryWrite<HistoryReceipt> {
+        self.base.begin_recovery(at, evidence)
     }
 
     fn commit_step(

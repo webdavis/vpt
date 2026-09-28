@@ -32,9 +32,13 @@ fn recovery() -> RecoveryEvidence {
         logging_restored_observed_at: None,
         failures: 0,
         recovered_records: 0,
-        completed: 0,
-        failed: 0,
-        unresolved: 0,
+        completed_work: 0,
+        failed_work: 0,
+        unknown_work: 0,
+        deferred_work: 0,
+        completed_effects: 0,
+        failed_effects: 0,
+        unresolved_effects: 0,
         missing_history: 0,
     }
 }
@@ -168,7 +172,10 @@ fn utc_wire_year_bounds_apply_to_occurrence_append_and_recovery_times() {
         evidence.first_failure_observed_at = Some(invalid);
         assert_eq!(
             encode_history(
-                &record(HistoryFact::RecoveryProgress(evidence.clone())),
+                &record(HistoryFact::RecoveryProgress {
+                    evidence: evidence.clone(),
+                    baseline: vpt_domain::run::RecoveryBaseline::default(),
+                }),
                 UtcInstant { secs: 12 }
             ),
             Err(EventEncodeError::TimestampOutOfRange)

@@ -157,6 +157,11 @@ pub(super) fn record(
     {
         return Err(conflict());
     }
+    if let HistoryFact::RecoveryProgress { baseline, .. } = &fact
+        && !baseline.is_valid_for(run.namespace())
+    {
+        return Err(conflict());
+    }
     if let HistoryFact::EffectObserved { intent, .. } = &fact {
         if intent.namespace() != run.namespace() {
             return Err(conflict());

@@ -28,16 +28,25 @@ pub(crate) use export::{
 };
 pub(crate) use hook::hook_failure_requires_event_in_same_run;
 pub(crate) use recovery::{
+    atomic_recovery_begin_on_empty_ledger_has_no_frontier,
+    atomic_recovery_begin_retains_all_acked_frontier,
+    atomic_recovery_begin_snapshots_pending_frontier,
+    first_recovery_progress_rejects_fabricated_snapshot,
+    foreign_pending_recovery_baseline_rolls_back_work,
     invalid_summary_window_rolls_back_work_delta,
+    later_recovery_progress_keeps_first_snapshot_after_ack,
+    missing_pending_recovery_baseline_rolls_back_work,
     observed_log_file_round_trips_without_acknowledgement,
     recovery_progress_does_not_advance_failure_watermark,
-    recovery_summaries_advance_saved_failure_window,
+    recovery_summaries_advance_saved_failure_window, reversed_recovery_baseline_rolls_back_work,
     saved_export_failures_have_unique_order_for_repeated_observation,
     summary_window_rejects_stale_missing_and_foreign_ids,
     work_only_recovery_summary_preserves_absent_failure_time,
+    zero_pending_recovery_baseline_rolls_back_work,
 };
 pub(crate) use recovery_invalid_id::{
-    positive_missing_retention_id_is_saved, zero_affected_run_progress_rolls_back_work,
+    positive_missing_retention_id_is_saved, zero_affected_run_atomic_begin_has_no_partial_history,
+    zero_affected_run_progress_rolls_back_work,
     zero_affected_run_windowless_summary_rolls_back_work,
     zero_missing_retention_id_rolls_back_work,
 };

@@ -13,6 +13,8 @@ use vpt_domain::time::UtcInstant;
 
 mod deferral;
 mod missing_retention_history;
+mod recovery_baseline;
+mod recovery_counts;
 mod vocabulary;
 
 #[test]
@@ -26,9 +28,13 @@ fn every_fact_variant_round_trips_with_typed_safe_event_fields() {
         logging_restored_observed_at: Some(UtcInstant { secs: 7 }),
         failures: 2,
         recovered_records: 3,
-        completed: 4,
-        failed: 5,
-        unresolved: 6,
+        completed_work: 4,
+        failed_work: 5,
+        unknown_work: 6,
+        deferred_work: 0,
+        completed_effects: 7,
+        failed_effects: 8,
+        unresolved_effects: 9,
         missing_history: 7,
     };
     let event = Event {
@@ -110,7 +116,10 @@ fn every_fact_variant_round_trips_with_typed_safe_event_fields() {
             outcome: EffectOutcome::Unknown,
         },
         HistoryFact::Event(event),
-        HistoryFact::RecoveryProgress(evidence.clone()),
+        HistoryFact::RecoveryProgress {
+            evidence: evidence.clone(),
+            baseline: vpt_domain::run::RecoveryBaseline::default(),
+        },
         HistoryFact::RecoverySummary {
             evidence,
             window: None,
@@ -160,9 +169,13 @@ fn hook_failure_classes_and_summary_window_round_trip_with_closed_tags() {
         logging_restored_observed_at: None,
         failures: 1,
         recovered_records: 0,
-        completed: 0,
-        failed: 0,
-        unresolved: 1,
+        completed_work: 0,
+        failed_work: 0,
+        unknown_work: 1,
+        deferred_work: 0,
+        completed_effects: 0,
+        failed_effects: 0,
+        unresolved_effects: 0,
         missing_history: 0,
     };
     let window = FailureWindow {
@@ -188,9 +201,13 @@ fn work_only_recovery_evidence_round_trips_without_failure_observation() {
         logging_restored_observed_at: None,
         failures: 0,
         recovered_records: 1,
-        completed: 1,
-        failed: 0,
-        unresolved: 0,
+        completed_work: 1,
+        failed_work: 0,
+        unknown_work: 0,
+        deferred_work: 0,
+        completed_effects: 0,
+        failed_effects: 0,
+        unresolved_effects: 0,
         missing_history: 0,
     };
     let fact = HistoryFact::RecoverySummary {
@@ -229,13 +246,20 @@ fn zero_affected_run_is_refused_before_recovery_fact_encoding() {
         logging_restored_observed_at: None,
         failures: 0,
         recovered_records: 0,
-        completed: 0,
-        failed: 0,
-        unresolved: 0,
+        completed_work: 0,
+        failed_work: 0,
+        unknown_work: 0,
+        deferred_work: 0,
+        completed_effects: 0,
+        failed_effects: 0,
+        unresolved_effects: 0,
         missing_history: 0,
     };
     for fact in [
-        HistoryFact::RecoveryProgress(evidence.clone()),
+        HistoryFact::RecoveryProgress {
+            evidence: evidence.clone(),
+            baseline: vpt_domain::run::RecoveryBaseline::default(),
+        },
         HistoryFact::RecoverySummary {
             evidence,
             window: None,

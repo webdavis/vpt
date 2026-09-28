@@ -82,9 +82,13 @@ fn evidence() -> RecoveryEvidence {
         logging_restored_observed_at: Some(UtcInstant { secs: 14 }),
         failures: 1,
         recovered_records: 2,
-        completed: 3,
-        failed: 4,
-        unresolved: 5,
+        completed_work: 3,
+        failed_work: 4,
+        unknown_work: 5,
+        deferred_work: 0,
+        completed_effects: 6,
+        failed_effects: 7,
+        unresolved_effects: 8,
         missing_history: 6,
     }
 }
@@ -94,9 +98,72 @@ fn evidence_json(value: &RecoveryEvidence) -> Value {
         "affected_runs":[value.affected_runs[0].render()],
         "first_failure_observed_at":"1970-01-01T00:00:13Z",
         "logging_restored_observed_at":"1970-01-01T00:00:14Z",
-        "failures":1,"recovered_records":2,"completed":3,"failed":4,
-        "unresolved":5,"missing_history":6
+        "failures":1,"recovered_records":2,
+        "completed_work":3,"failed_work":4,"unknown_work":5,"deferred_work":0,
+        "completed_effects":6,"failed_effects":7,"unresolved_effects":8,
+        "missing_history":6
     })
+}
+
+#[test]
+fn recovery_wire_separates_work_and_effect_counts() {
+    let record = record(HistoryFact::RecoverySummary {
+        evidence: evidence(),
+        window: None,
+    });
+    let line = encode_history(&record, UtcInstant { secs: 12 }).unwrap();
+    let value: Value = serde_json::from_str(&line).unwrap();
+    let counts = &value["fact"]["evidence"];
+    for (field, expected) in [
+        ("completed_work", 3),
+        ("failed_work", 4),
+        ("unknown_work", 5),
+        ("completed_effects", 6),
+        ("failed_effects", 7),
+        ("unresolved_effects", 8),
+    ] {
+        assert_eq!(counts[field], expected, "{field}");
+    }
+    for ambiguous in ["completed", "failed", "unresolved"] {
+        assert!(counts.get(ambiguous).is_none(), "{ambiguous}");
+    }
+}
+
+#[test]
+fn recovery_wire_names_deferred_work_separately() {
+    let record = record(HistoryFact::RecoverySummary {
+        evidence: evidence(),
+        window: None,
+    });
+    let line = encode_history(&record, UtcInstant { secs: 12 }).unwrap();
+    let value: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(value["fact"]["evidence"]["deferred_work"], 0);
+    assert_eq!(value["fact"]["evidence"]["unknown_work"], 5);
+}
+
+#[test]
+fn recovery_progress_wire_exposes_fixed_backlog_baseline() {
+    let example = record(HistoryFact::RunStarted(RunKind::Recover));
+    let baseline = vpt_domain::run::RecoveryBaseline {
+        generation: Some(3),
+        pending_from: Some(example.id),
+        through: Some(example.id),
+    };
+    assert_fact(
+        HistoryFact::RecoveryProgress {
+            evidence: evidence(),
+            baseline,
+        },
+        json!({
+            "tag":"recovery_progress",
+            "evidence":evidence_json(&evidence()),
+            "baseline":{
+                "generation":3,
+                "pending_from":example.id.render(),
+                "through":example.id.render(),
+            }
+        }),
+    );
 }
 
 #[test]
@@ -242,8 +309,13 @@ fn history_document_pins_every_closed_fact_variant() {
     let recovery = evidence();
     let wire = evidence_json(&recovery);
     assert_fact(
-        HistoryFact::RecoveryProgress(recovery.clone()),
-        json!({"tag":"recovery_progress","evidence":wire}),
+        HistoryFact::RecoveryProgress {
+            evidence: recovery.clone(),
+            baseline: vpt_domain::run::RecoveryBaseline::default(),
+        },
+        json!({"tag":"recovery_progress","evidence":wire,"baseline":{
+            "generation":null,"pending_from":null,"through":null,
+        }}),
     );
     assert_fact(
         HistoryFact::RecoverySummary {

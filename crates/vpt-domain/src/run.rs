@@ -3,6 +3,9 @@ use crate::identity::RecordingId;
 use crate::time::UtcInstant;
 use std::path::PathBuf;
 
+mod recovery;
+pub use recovery::{FailureWindow, RecoveryBaseline, RecoveryEvidence, RecoveryView};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunKind {
     Ingest,
@@ -67,19 +70,6 @@ pub enum EffectOutcome {
     Unknown,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RecoveryEvidence {
-    pub affected_runs: Vec<RunId>,
-    pub first_failure_observed_at: Option<UtcInstant>,
-    pub logging_restored_observed_at: Option<UtcInstant>,
-    pub failures: u32,
-    pub recovered_records: u32,
-    pub completed: u32,
-    pub failed: u32,
-    pub unresolved: u32,
-    pub missing_history: u32,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HookFailureClass {
     Spawn,
@@ -89,12 +79,6 @@ pub enum HookFailureClass {
     Signaled(i32),
     DeadlineExceeded,
     Interrupted,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FailureWindow {
-    pub after: Option<ExportFailureId>,
-    pub through: ExportFailureId,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -121,7 +105,10 @@ pub enum HistoryFact {
         failure: HookFailureClass,
     },
     Event(Event),
-    RecoveryProgress(RecoveryEvidence),
+    RecoveryProgress {
+        evidence: RecoveryEvidence,
+        baseline: RecoveryBaseline,
+    },
     RecoverySummary {
         evidence: RecoveryEvidence,
         window: Option<FailureWindow>,
@@ -131,7 +118,7 @@ pub enum HistoryFact {
 impl HistoryFact {
     pub fn referenced_ids_are_nonzero(&self) -> bool {
         match self {
-            Self::RecoveryProgress(evidence) | Self::RecoverySummary { evidence, .. } => {
+            Self::RecoveryProgress { evidence, .. } | Self::RecoverySummary { evidence, .. } => {
                 evidence.affected_runs.iter().all(|run| run.sequence() != 0)
             }
             Self::MissingRetentionHistory { intent_id } => *intent_id != 0,
@@ -211,13 +198,4 @@ pub struct HistoryRecord {
     pub fact: HistoryFact,
     pub appended_at: Option<UtcInstant>,
     pub export_position: Option<ExportPosition>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct RecoveryView {
-    pub records: Vec<HistoryRecord>,
-    pub failures: Vec<SavedExportFailure>,
-    pub restarts: Vec<ExportRestart>,
-    pub active_cursor: Option<ExportCursor>,
-    pub summarized_through: Option<ExportFailureId>,
 }
