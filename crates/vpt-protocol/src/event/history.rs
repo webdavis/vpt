@@ -128,6 +128,7 @@ fn work_outcome(value: WorkOutcome) -> &'static str {
         WorkOutcome::Completed => "completed",
         WorkOutcome::Failed => "failed",
         WorkOutcome::Unknown => "unknown",
+        WorkOutcome::Deferred => "deferred",
     }
 }
 

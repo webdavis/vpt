@@ -6,6 +6,7 @@ use vpt_domain::history::{
     Event, EventCounts, EventDetail, EventKind, EventPath, EventPathKey, EventState,
     SafeFailureClass,
 };
+use vpt_domain::sweep::DeferralReason;
 use vpt_domain::time::UtcInstant;
 
 pub(super) fn encode(event: &Event) -> Result<Value, LedgerError> {
@@ -18,7 +19,9 @@ pub(super) fn encode(event: &Event) -> Result<Value, LedgerError> {
             json!({"tag":"review","spans":spans,"agreed_unverified":agreed_unverified})
         }
         EventDetail::Failure(class) => json!({"tag":"failure","class":failure_tag(class)}),
-        EventDetail::Deferred => json!({"tag":"deferred"}),
+        EventDetail::Deferred { reason, count } => {
+            json!({"tag":"deferred","reason":reason.as_str(),"count":count})
+        }
         EventDetail::Retention { completed, failed } => {
             json!({"tag":"retention","completed":completed,"failed":failed})
         }
@@ -90,6 +93,7 @@ pub(super) fn decode(value: &Value) -> Result<Event, LedgerError> {
                 "audio" => EventPathKey::Audio,
                 "brief" => EventPathKey::Brief,
                 "archive" => EventPathKey::Archive,
+                "source" => EventPathKey::Source,
                 _ => return Err(corrupt()),
             };
             Ok(EventPath {
@@ -141,7 +145,10 @@ fn decode_detail(value: &Value) -> Result<EventDetail, LedgerError> {
             };
             Ok(EventDetail::Failure(class))
         }
-        "deferred" => Ok(EventDetail::Deferred),
+        "deferred" => Ok(EventDetail::Deferred {
+            reason: DeferralReason::parse(string(value, "reason")?).ok_or_else(corrupt)?,
+            count: count(value, "count")?,
+        }),
         "retention" => Ok(EventDetail::Retention {
             completed: count(value, "completed")?,
             failed: count(value, "failed")?,

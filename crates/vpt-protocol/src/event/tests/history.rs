@@ -1,11 +1,53 @@
 use super::*;
 use serde_json::{Value, json};
 use std::path::PathBuf;
-use vpt_domain::history::{EventPathKey, ExportFailureId};
+use vpt_domain::history::{EventDetail, EventPathKey, ExportFailureId};
 use vpt_domain::run::{
     EffectKind, EffectOutcome, EffectReference, FailureWindow, HookFailureClass, RecoveryEvidence,
     RunKind, RunOutcome, WorkOutcome,
 };
+use vpt_domain::sweep::DeferralReason;
+
+#[test]
+fn deferred_work_has_distinct_outgoing_history_outcome() {
+    let result = std::panic::catch_unwind(|| {
+        assert_fact(
+            HistoryFact::WorkStep {
+                recording: None,
+                outcome: WorkOutcome::Deferred,
+            },
+            json!({"tag":"work_step","recording":null,"outcome":"deferred"}),
+        )
+    });
+    assert!(result.is_ok(), "deferred work outcome is unsupported");
+}
+
+#[test]
+fn deferred_event_history_keeps_reason_count_and_source_path() {
+    let mut value = event(EventKind::Deferred, EventState::NeedsAttention);
+    value.detail = EventDetail::Deferred {
+        reason: DeferralReason::AudioTooLarge,
+        count: 9,
+    };
+    value.paths.push(EventPath {
+        key: EventPathKey::Source,
+        path: PathBuf::from("/owned/recording.m4a"),
+    });
+    let result = std::panic::catch_unwind(|| {
+        assert_fact(
+            HistoryFact::Event(value),
+            json!({"tag":"event","event":{
+                "event":"deferred","state":"needs_attention","recording":null,
+                "detail":"deferred 9 times: audio_too_large",
+                "counts":{"numeric":0,"proper_noun":0,"low_confidence":0,"formatting":0,
+                    "other":0,"unsupported":0,"agreed_unverified":0,"diagnostics":0},
+                "paths":{"source":"/owned/recording.m4a"},
+                "occurred_at":"1970-01-01T00:00:00Z"
+            }}),
+        )
+    });
+    assert!(result.is_ok(), "deferred event metadata is unsupported");
+}
 
 fn assert_fact(fact: HistoryFact, expected: Value) {
     let record = record(fact);

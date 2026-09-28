@@ -23,6 +23,7 @@ pub enum WorkOutcome {
     Completed,
     Failed,
     Unknown,
+    Deferred,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

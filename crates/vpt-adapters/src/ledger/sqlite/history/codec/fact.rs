@@ -64,6 +64,7 @@ pub(super) fn decode(value: &Value) -> Result<HistoryFact, LedgerError> {
                 "completed" => WorkOutcome::Completed,
                 "failed" => WorkOutcome::Failed,
                 "unknown" => WorkOutcome::Unknown,
+                "deferred" => WorkOutcome::Deferred,
                 _ => return Err(corrupt()),
             },
         }),
@@ -171,6 +172,7 @@ fn work_outcome(outcome: WorkOutcome) -> &'static str {
         WorkOutcome::Completed => "completed",
         WorkOutcome::Failed => "failed",
         WorkOutcome::Unknown => "unknown",
+        WorkOutcome::Deferred => "deferred",
     }
 }
 
