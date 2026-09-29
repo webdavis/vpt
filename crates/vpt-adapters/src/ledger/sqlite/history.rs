@@ -3,6 +3,7 @@ use crate::database::AccessPolicy;
 use rusqlite::{Transaction, TransactionBehavior};
 mod codec;
 mod export;
+pub(super) mod retention;
 mod storage;
 mod store;
 use vpt_application::ports::{HistoryReceipt, HistoryWrite, LedgerError, RunHistory, WorkDelta};

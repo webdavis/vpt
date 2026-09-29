@@ -1,6 +1,7 @@
 mod inventory;
 pub mod ports;
 mod publication;
+mod retention;
 mod settings;
 mod setup;
 
@@ -8,4 +9,8 @@ pub use setup::{Setup, SetupError, SetupOutcome, SetupWriter};
 
 pub use inventory::{StoreInventory, inventory};
 pub use publication::{RepairError, RepairReport, repair_publications};
+pub use retention::{
+    Kept, KeptReason, Moved, ReconcileFailure, ReconcileProgress, Retention, RetentionCommit,
+    RetentionError, RetentionFailure, RetentionReport, reconcile_intents,
+};
 pub use settings::{RetentionSettings, Settings, SourceSettings, StorePaths};

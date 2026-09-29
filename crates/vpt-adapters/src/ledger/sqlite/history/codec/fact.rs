@@ -10,7 +10,7 @@ use vpt_domain::run::{
 };
 
 pub(super) fn encode(fact: &HistoryFact) -> Result<Value, LedgerError> {
-    if !fact.recovery_run_ids_are_nonzero() {
+    if !fact.referenced_ids_are_nonzero() {
         return Err(corrupt());
     }
     Ok(match fact {
@@ -29,6 +29,9 @@ pub(super) fn encode(fact: &HistoryFact) -> Result<Value, LedgerError> {
         }
         HistoryFact::EffectObserved { intent, outcome } => {
             json!({"tag":"effect_observed","intent":intent.render(),"outcome":effect_outcome(*outcome)})
+        }
+        HistoryFact::MissingRetentionHistory { intent_id } => {
+            json!({"tag":"missing_retention_history","intent_id":intent_id})
         }
         HistoryFact::HookFailed { event, failure } => {
             json!({"tag":"hook_failed","event":event.render(),"failure":encode_hook_failure(*failure)})
@@ -90,6 +93,13 @@ pub(super) fn decode(value: &Value) -> Result<HistoryFact, LedgerError> {
                 _ => return Err(corrupt()),
             },
         }),
+        "missing_retention_history" => {
+            let intent_id = unsigned(value, "intent_id")?;
+            if intent_id == 0 {
+                return Err(corrupt());
+            }
+            Ok(HistoryFact::MissingRetentionHistory { intent_id })
+        }
         "hook_failed" => Ok(HistoryFact::HookFailed {
             event: event_id(value, "event")?,
             failure: decode_hook_failure(field(value, "failure")?)?,

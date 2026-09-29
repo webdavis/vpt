@@ -16,7 +16,7 @@ fn column<T: FromSql>(row: &Row<'_>, index: usize, field: &str) -> Result<T, Led
     row.get(index).map_err(|_| corrupt(field))
 }
 
-fn intent_from_row(row: &Row<'_>) -> Result<RetentionIntent, LedgerError> {
+pub(super) fn intent_from_row(row: &Row<'_>) -> Result<RetentionIntent, LedgerError> {
     let id: i64 = column(row, 0, "identifier")?;
     if id <= 0 {
         return Err(corrupt("identifier"));

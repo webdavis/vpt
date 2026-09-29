@@ -228,6 +228,12 @@ mod tests {
     use vpt_application::ports::{LedgerError, RetentionJournal};
     use vpt_domain::time::UtcInstant;
 
+    impl contract::retention_history::RetentionPairFixture for MemoryLedger {
+        fn seed_retention_pair(&self) -> contract::retention_history::PendingPair {
+            contract::retention_history::pair_through_ports(self)
+        }
+    }
+
     mod recording_ledger_contract {
         use super::*;
 
@@ -313,5 +319,19 @@ mod tests {
             };
         }
         contract::history_cases!(case);
+    }
+
+    mod retention_history_contract {
+        use super::*;
+
+        macro_rules! case {
+            ($name:ident) => {
+                #[test]
+                fn $name() {
+                    contract::retention_history::$name(&MemoryLedger::new());
+                }
+            };
+        }
+        contract::retention_history_cases!(case);
     }
 }

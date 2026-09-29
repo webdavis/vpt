@@ -7,6 +7,7 @@ use vpt_domain::run::{
 };
 use vpt_domain::time::UtcInstant;
 
+mod retention;
 mod state;
 pub(super) use state::HistoryState;
 use state::{NAMESPACE, conflict};
@@ -54,8 +55,7 @@ impl RunHistory for MemoryLedger {
             if !state.history.has_run(run)
                 || facts.is_empty()
                 || facts.iter().any(|(_, fact)| {
-                    matches!(fact, HistoryFact::RunStarted(_))
-                        || !fact.recovery_run_ids_are_nonzero()
+                    matches!(fact, HistoryFact::RunStarted(_)) || !fact.referenced_ids_are_nonzero()
                 })
             {
                 return Err(conflict());

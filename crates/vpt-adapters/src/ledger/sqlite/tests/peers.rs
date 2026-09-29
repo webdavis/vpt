@@ -29,7 +29,6 @@ fn observation_reads_committed_rows_from_a_native_live_log_without_changes() {
     let started = Instant::now();
     let spawn =
         |scenario| child_for_root(scenario, temp.path(), std::process::id(), started).unwrap();
-    finish(spawn("ledger_peer_seed"));
     let mut writer = spawn("ledger_peer_live_writer");
     writer.ready().unwrap();
     finish(spawn("ledger_peer_live_reader"));
@@ -39,7 +38,6 @@ fn observation_reads_committed_rows_from_a_native_live_log_without_changes() {
 
 pub(super) fn run(scenario: &str, root: &RootDir, ready: fn(), native: fn(&Path) -> Connection) {
     match scenario {
-        "ledger_peer_seed" => drop(seed(root)),
         "ledger_peer_contender" => {
             let ledger = seed(root);
             ready();
@@ -55,6 +53,9 @@ pub(super) fn run(scenario: &str, root: &RootDir, ready: fn(), native: fn(&Path)
             assert!(started.elapsed() < Duration::from_millis(500));
         }
         "ledger_peer_holder" | "ledger_peer_live_writer" => {
+            if scenario == "ledger_peer_live_writer" {
+                drop(seed(root));
+            }
             let connection = native(&root.path().join("vpt.db"));
             if scenario == "ledger_peer_holder" {
                 connection.execute_batch("BEGIN IMMEDIATE").unwrap();

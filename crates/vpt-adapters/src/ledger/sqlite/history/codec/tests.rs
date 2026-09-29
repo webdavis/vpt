@@ -10,6 +10,8 @@ use vpt_domain::run::{
 };
 use vpt_domain::time::UtcInstant;
 
+mod missing_retention_history;
+
 #[test]
 fn every_fact_variant_round_trips_with_typed_safe_event_fields() {
     let namespace = LedgerNamespace::new([0xab; 16]);

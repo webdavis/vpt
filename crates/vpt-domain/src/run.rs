@@ -112,6 +112,9 @@ pub enum HistoryFact {
         intent: EventId,
         outcome: EffectOutcome,
     },
+    MissingRetentionHistory {
+        intent_id: u64,
+    },
     HookFailed {
         event: EventId,
         failure: HookFailureClass,
@@ -125,11 +128,12 @@ pub enum HistoryFact {
 }
 
 impl HistoryFact {
-    pub fn recovery_run_ids_are_nonzero(&self) -> bool {
+    pub fn referenced_ids_are_nonzero(&self) -> bool {
         match self {
             Self::RecoveryProgress(evidence) | Self::RecoverySummary { evidence, .. } => {
                 evidence.affected_runs.iter().all(|run| run.sequence() != 0)
             }
+            Self::MissingRetentionHistory { intent_id } => *intent_id != 0,
             _ => true,
         }
     }

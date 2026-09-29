@@ -39,11 +39,16 @@ pub(crate) fn second_record_preserves_first_seen<L: RecordingLedger>(ledger: &L)
 }
 
 pub(crate) fn seen_all_is_ordered_by_path<L: RecordingLedger>(ledger: &L) {
-    for name in ["c.m4a", "a/child.m4a", "a.m4a", "b.m4a"] {
-        ledger
-            .record_seen(&seen_row(&format!("/vm/Recordings/{name}")))
-            .unwrap();
-    }
+    let seen = ["c.m4a", "a/child.m4a", "a.m4a", "b.m4a"]
+        .into_iter()
+        .map(|name| seen_row(&format!("/vm/Recordings/{name}")))
+        .collect();
+    ledger
+        .commit(&LedgerCommit {
+            seen,
+            ..Default::default()
+        })
+        .unwrap();
     let paths: Vec<_> = ledger
         .seen_all()
         .unwrap()

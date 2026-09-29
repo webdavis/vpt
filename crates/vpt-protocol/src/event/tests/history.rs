@@ -7,6 +7,14 @@ use vpt_domain::run::{
     RunKind, RunOutcome, WorkOutcome,
 };
 
+#[test]
+fn missing_retention_history_has_exact_outgoing_fact_without_invented_identity() {
+    assert_fact(
+        HistoryFact::MissingRetentionHistory { intent_id: 71 },
+        json!({"tag":"missing_retention_history","intent_id":71}),
+    );
+}
+
 fn assert_fact(fact: HistoryFact, expected: Value) {
     let record = record(fact);
     let line = encode_history(&record, UtcInstant { secs: 12 }).unwrap();

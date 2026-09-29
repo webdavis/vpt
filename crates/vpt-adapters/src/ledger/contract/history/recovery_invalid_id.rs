@@ -68,3 +68,30 @@ pub(crate) fn zero_affected_run_windowless_summary_rolls_back_work<
         window: None,
     });
 }
+
+pub(crate) fn positive_missing_retention_id_is_saved<L: RunHistory>(ledger: &L) {
+    let started = committed(ledger.begin_run(RunKind::Recover, UtcInstant { secs: 10 }));
+    let fact = HistoryFact::MissingRetentionHistory { intent_id: 71 };
+    let saved = committed(ledger.commit_step(
+        started.run,
+        &WorkDelta::default(),
+        &[(UtcInstant { secs: 11 }, fact.clone())],
+    ));
+    assert_eq!(saved.records[0].fact, fact);
+    assert_eq!(
+        ledger.recovery_view().unwrap().records.last(),
+        saved.records.last()
+    );
+    assert_eq!(
+        ledger.pending_exports().unwrap().last(),
+        saved.records.last()
+    );
+}
+
+pub(crate) fn zero_missing_retention_id_rolls_back_work<L: RunHistory + RecordingLedger>(
+    ledger: &L,
+) {
+    reject_with_atomic_work(ledger, |_| HistoryFact::MissingRetentionHistory {
+        intent_id: 0,
+    });
+}
