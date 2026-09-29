@@ -73,25 +73,45 @@ fn owned_staging_is_only_trash_target_after_prepublication_failure() {
 }
 
 #[test]
-fn invalid_staged_container_cleanup_waits_for_failure_history() {
+fn invalid_staged_container_cleanup_waits_for_deferred_history() {
     let fixture = Fixture::new();
-    fixture.add_recording("a.m4a", b"invalid owned audio bytes");
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"whole source"));
     let mut parts = fixture.parts();
     parts.sink.watched_audio = Some(fixture.audio.clone());
+    let probe = support::gates::GateRecorder::new(&fixture.recordings);
+    probe
+        .clone_behavior
+        .set(support::gates::CloneBehavior::Truncated);
+    let mut ingest = Ingest {
+        recorder: &probe,
+        archive: &parts.archive,
+        ledger: &parts.ledger,
+        clock: &parts.clock,
+        trash: &parts.trash,
+        sink: &mut parts.sink,
+        settings: &parts.settings,
+    };
 
-    let error = parts.ingest().run(&Mode::default()).unwrap_err();
+    let report = ingest.run(&Mode::default()).unwrap();
 
-    assert!(matches!(error.failure, IngestFailure::Archive(_)));
-    assert_eq!(parts.sink.owned_stage_present_at_failure_event, Some(true));
+    assert_eq!(
+        report.deferred[0].reason,
+        vpt_domain::sweep::DeferralReason::InvalidContainer
+    );
+    assert_eq!(
+        parts.sink.owned_stage_present_at_deferred_export,
+        Some(true)
+    );
     assert_eq!(parts.trash.attempted.borrow().len(), 1);
     assert!(parts.archive.staged_leftovers().unwrap().is_empty());
     let history = parts.ledger.recovery_view().unwrap();
-    assert!(
-        history
-            .records
-            .iter()
-            .any(|record| matches!(record.fact, HistoryFact::RunFinished(RunOutcome::Failed)))
-    );
+    assert!(history.records.iter().any(|record| matches!(
+        record.fact,
+        HistoryFact::WorkStep {
+            outcome: vpt_domain::run::WorkOutcome::Deferred,
+            ..
+        }
+    )));
 }
 
 #[test]
@@ -220,12 +240,16 @@ fn required_intent_history_failure_stops_before_publish_and_cleanup() {
 #[test]
 fn required_failure_event_save_never_recurses_or_cleans_up() {
     let fixture = Fixture::new();
-    fixture.add_recording("a.m4a", b"invalid owned audio bytes");
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"whole source"));
     let mut parts = fixture.parts();
+    let archive = FaultArchive {
+        base: parts.archive,
+        fault: ArchiveFault::StageOwned,
+    };
     let ledger = FaultLedger::new(parts.ledger, HistoryFault::FailureEvent);
     let mut ingest = Ingest {
         recorder: &parts.store,
-        archive: &parts.archive,
+        archive: &archive,
         ledger: &ledger,
         clock: &parts.clock,
         trash: &parts.trash,
@@ -237,7 +261,7 @@ fn required_failure_event_save_never_recurses_or_cleans_up() {
 
     assert!(matches!(error.failure, IngestFailure::RequiredHistory(_)));
     assert_eq!(ledger.failed_calls.get(), 1);
-    assert_eq!(parts.archive.staged_leftovers().unwrap().len(), 1);
+    assert_eq!(archive.staged_leftovers().unwrap().len(), 1);
     assert!(parts.trash.attempted.borrow().is_empty());
     assert!(
         !ledger
@@ -251,20 +275,36 @@ fn required_failure_event_save_never_recurses_or_cleans_up() {
 }
 
 #[test]
-fn cleanup_helper_error_keeps_owned_staging_and_safe_diagnostic() {
+fn deferred_cleanup_helper_error_keeps_owned_staging_and_safe_diagnostic() {
     let fixture = Fixture::new();
-    fixture.add_recording("a.m4a", b"invalid owned audio bytes");
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"whole source"));
     let mut parts = fixture.parts();
     *parts.trash.failure.borrow_mut() = Some(TrashError::Failed("private helper canary".into()));
+    let probe = support::gates::GateRecorder::new(&fixture.recordings);
+    probe
+        .clone_behavior
+        .set(support::gates::CloneBehavior::Truncated);
+    let mut ingest = Ingest {
+        recorder: &probe,
+        archive: &parts.archive,
+        ledger: &parts.ledger,
+        clock: &parts.clock,
+        trash: &parts.trash,
+        sink: &mut parts.sink,
+        settings: &parts.settings,
+    };
 
-    let error = parts.ingest().run(&Mode::default()).unwrap_err();
+    let report = ingest.run(&Mode::default()).unwrap();
 
-    assert!(matches!(error.failure, IngestFailure::Archive(_)));
+    assert_eq!(
+        report.deferred[0].reason,
+        vpt_domain::sweep::DeferralReason::InvalidContainer
+    );
     assert_eq!(parts.trash.attempted.borrow().len(), 1);
     assert!(parts.trash.moved.borrow().is_empty());
     assert_eq!(parts.archive.staged_leftovers().unwrap().len(), 1);
-    assert!(!error.log.join(" ").contains("private helper canary"));
-    assert!(error.log.join(" ").contains("cleanup pending"));
+    assert!(!report.log.join(" ").contains("private helper canary"));
+    assert!(report.log.join(" ").contains("cleanup pending"));
 }
 
 #[test]

@@ -197,7 +197,7 @@ fn unsafe_title_copy_refuses_without_candidate_work() {
 }
 
 #[test]
-fn dataless_candidate_is_not_opened_before_gate_task() {
+fn dataless_candidate_is_deferred_without_opening() {
     let fixture = Fixture::new();
     fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"audio"));
     let mut parts = fixture.parts();
@@ -215,11 +215,12 @@ fn dataless_candidate_is_not_opened_before_gate_task() {
         settings: &parts.settings,
     };
 
-    let error = ingest.run(&Mode::default()).unwrap_err();
+    let report = ingest.run(&Mode::default()).unwrap();
 
+    assert_eq!(report.deferred.len(), 1);
     assert_eq!(
-        error.failure,
-        IngestFailure::DatalessUnavailable(fixture.recordings.join("a.m4a"))
+        report.deferred[0].reason,
+        vpt_domain::sweep::DeferralReason::Dataless
     );
     assert_eq!(store.opens.get(), 0);
     assert!(parts.ledger.recordings().unwrap().is_empty());

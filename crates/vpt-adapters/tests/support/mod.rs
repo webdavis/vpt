@@ -4,6 +4,7 @@
 )]
 
 pub mod faults;
+pub mod gates;
 
 use std::cell::RefCell;
 use std::collections::BTreeSet;
@@ -123,6 +124,7 @@ pub struct RecordingTrash {
     pub attempted: RefCell<Vec<PathBuf>>,
     pub moved: RefCell<Vec<PathBuf>>,
     pub failure: RefCell<Option<TrashError>>,
+    pub diagnostics: RefCell<Vec<String>>,
 }
 
 impl RecordingTrash {
@@ -133,6 +135,7 @@ impl RecordingTrash {
             attempted: RefCell::new(Vec::new()),
             moved: RefCell::new(Vec::new()),
             failure: RefCell::new(None),
+            diagnostics: RefCell::new(Vec::new()),
         }
     }
 }
@@ -151,7 +154,7 @@ impl Trash for RecordingTrash {
     }
 
     fn take_diagnostics(&self) -> Vec<String> {
-        Vec::new()
+        self.diagnostics.take()
     }
 }
 
@@ -163,6 +166,7 @@ pub struct RecordingSink {
     pub watched_audio: Option<PathBuf>,
     pub intent_before_publication: Option<bool>,
     pub owned_stage_present_at_failure_event: Option<bool>,
+    pub owned_stage_present_at_deferred_export: Option<bool>,
     pub stop_at: Option<StopAt>,
     pub warnings: BTreeSet<SinkWarning>,
 }
@@ -184,6 +188,24 @@ impl EventSink for RecordingSink {
             self.title_absent_at_start = self.title_copy.as_ref().map(|path| !path.exists());
         }
         for record in &committed.records {
+            if matches!(
+                record.fact,
+                HistoryFact::WorkStep {
+                    outcome: vpt_domain::run::WorkOutcome::Deferred,
+                    ..
+                }
+            ) {
+                self.owned_stage_present_at_deferred_export =
+                    self.watched_audio.as_ref().map(|audio| {
+                        std::fs::read_dir(audio).unwrap().any(|entry| {
+                            entry
+                                .unwrap()
+                                .file_name()
+                                .to_string_lossy()
+                                .starts_with(".vpt-staging-")
+                        })
+                    });
+            }
             if let HistoryFact::EffectIntent {
                 kind: EffectKind::Archive,
                 reference: EffectReference::ArchiveTarget(target),

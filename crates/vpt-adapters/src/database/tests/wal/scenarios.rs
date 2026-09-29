@@ -187,7 +187,7 @@ pub(in crate::database::tests) fn participant(
     } else {
         let mut db = open(&root, AccessPolicy::WritableLedger);
         if scenario == "rooted_rollback" {
-            sql(&mut db, "PRAGMA cache_size=1; CREATE TABLE item(value); INSERT INTO item VALUES(1); BEGIN IMMEDIATE; INSERT INTO item VALUES(2); CREATE TABLE spill(data); INSERT INTO spill VALUES(zeroblob(65536))").unwrap();
+            sql(&mut db, "PRAGMA cache_size=1; BEGIN IMMEDIATE; CREATE TABLE item(value); INSERT INTO item VALUES(1); COMMIT; BEGIN IMMEDIATE; INSERT INTO item VALUES(2); CREATE TABLE spill(data); INSERT INTO spill VALUES(zeroblob(65536))").unwrap();
         } else {
             initialize(&mut db);
             sql(&mut db, "BEGIN IMMEDIATE; INSERT INTO item VALUES(2),(3)").unwrap();

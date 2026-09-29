@@ -1,11 +1,12 @@
-use super::{Ingest, IngestError, IngestFailure, IngestReport};
+use super::deferral::Deferral;
+use super::{Ingest, IngestError, IngestFailure, IngestReport, Mode};
 use crate::ports::{
     Archive, Candidate, Clock, RecorderError, RecorderStore, RecordingLedger, RunHistory, SeenRow,
     Trash, WorkDelta,
 };
 use vpt_domain::history::RunId;
 use vpt_domain::run::{HistoryFact, WorkOutcome};
-use vpt_domain::sweep::{CandidateFacts, PreOpen, SeenFacts, pre_open};
+use vpt_domain::sweep::{CandidateFacts, DeferralReason, PreOpen, SeenFacts, pre_open};
 use vpt_domain::time::UtcInstant;
 
 impl<R, A, L, C, T, S> Ingest<'_, R, A, L, C, T, S>
@@ -22,6 +23,7 @@ where
         run: RunId,
         candidate: &Candidate,
         now: UtcInstant,
+        mode: &Mode,
         report: &mut IngestReport,
     ) -> Result<(), Box<IngestError>> {
         let seen = self
@@ -40,27 +42,35 @@ where
             deferred_size: row.deferred_size,
         });
         match pre_open(&facts, previous.as_ref()) {
-            PreOpen::Dataless => Err(Self::error(
+            PreOpen::Dataless => self.defer(
+                run,
+                Deferral {
+                    candidate,
+                    seen,
+                    reason: DeferralReason::Dataless,
+                },
+                now,
+                mode,
                 report,
-                IngestFailure::DatalessUnavailable(candidate.path.clone()),
-                None,
-            )),
+            ),
             PreOpen::Unchanged => match seen {
-                Some(row) => self.refresh_liveness(run, row, now, report),
-                None => self.open_and_publish(run, candidate, None, now, report),
+                Some(row) => self.refresh_liveness(run, candidate, row, now, report),
+                None => self.open_and_publish(run, candidate, None, now, mode, report),
             },
-            PreOpen::Open => self.open_and_publish(run, candidate, seen, now, report),
+            PreOpen::Open => self.open_and_publish(run, candidate, seen, now, mode, report),
         }
     }
 
     fn refresh_liveness(
         &mut self,
         run: RunId,
+        candidate: &Candidate,
         mut row: SeenRow,
         now: UtcInstant,
         report: &mut IngestReport,
     ) -> Result<(), Box<IngestError>> {
         row.last_seen = now;
+        row.flags = candidate.flags;
         row.source_gone_at = None;
         let recorded = row.recording.clone();
         let delta = WorkDelta {
