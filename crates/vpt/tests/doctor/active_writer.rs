@@ -63,7 +63,7 @@ fn doctor_reads_committed_seen_rows_during_native_write() {
         .env("VPT_TEST_DOCTOR_WRITER_SOURCE", source);
     let started = Instant::now();
     let mut child = support::spawn(&mut command);
-    while !state.join("writer-ready").exists() {
+    while !crate::observations_fixture::writer_ready(&state) {
         assert!(
             started.elapsed() < Duration::from_millis(250),
             "writer readiness timed out"
