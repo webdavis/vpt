@@ -1,6 +1,7 @@
 mod bounds;
 mod history;
 mod hook;
+mod retention;
 
 use super::*;
 use vpt_domain::history::{

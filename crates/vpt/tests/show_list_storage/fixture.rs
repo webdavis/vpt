@@ -132,6 +132,10 @@ pub(super) struct SnapshotEntry {
     link_target: Option<PathBuf>,
 }
 
+pub(super) fn writer_ready(state: &Path) -> bool {
+    matches!(std::fs::read(state.join("writer-ready")), Ok(bytes) if bytes == b"ready")
+}
+
 pub(super) fn snapshot(sandbox: &Sandbox) -> Vec<SnapshotEntry> {
     fn visit(path: &Path, rows: &mut Vec<SnapshotEntry>) {
         let metadata = match path.symlink_metadata() {

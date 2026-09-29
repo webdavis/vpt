@@ -72,7 +72,7 @@ fn show_and_list_read_committed_rows_while_another_process_writes() {
     let started = Instant::now();
     let mut child = support::spawn(&mut command);
     let deadline = started + Duration::from_millis(250);
-    while !state.join("writer-ready").exists() {
+    while !crate::fixture::writer_ready(&state) {
         assert!(
             Instant::now() < deadline,
             "writer child did not become ready"
@@ -99,4 +99,17 @@ fn show_and_list_read_committed_rows_while_another_process_writes() {
     std::fs::write(state.join("writer-release"), b"release").unwrap();
     let output = support::collect(child, started, None);
     assert!(output.status.success(), "{}", stderr(&output));
+}
+
+#[test]
+fn writer_readiness_waits_for_complete_marker() {
+    let state = tempfile::tempdir().unwrap();
+    let marker = state.path().join("writer-ready");
+    assert!(!crate::fixture::writer_ready(state.path()));
+    std::fs::write(&marker, b"").unwrap();
+    assert!(!crate::fixture::writer_ready(state.path()));
+    std::fs::write(&marker, b"rea").unwrap();
+    assert!(!crate::fixture::writer_ready(state.path()));
+    std::fs::write(&marker, b"ready").unwrap();
+    assert!(crate::fixture::writer_ready(state.path()));
 }

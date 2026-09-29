@@ -2,6 +2,7 @@ pub(crate) mod history;
 pub(crate) mod journal;
 pub(crate) mod recording;
 pub(crate) mod retention;
+pub(crate) mod retention_history;
 
 use std::path::{Path, PathBuf};
 use vpt_application::ports::{
@@ -128,6 +129,25 @@ macro_rules! retention_cases {
 }
 pub(crate) use retention_cases;
 
+macro_rules! retention_history_cases {
+    ($case:ident) => {
+        $case!(generated_intent_and_effect_are_one_confirmed_receipt);
+        $case!(unknown_run_preparation_leaves_no_journal_or_history);
+        $case!(non_utf8_preparation_leaves_no_journal_or_history);
+        $case!(completion_couples_audio_mark_journal_and_confirmed_facts);
+        $case!(repeated_completion_preserves_original_time_and_history);
+        $case!(recovery_run_observes_original_effect_without_minting_an_intent);
+        $case!(wrong_effect_refuses_without_audio_journal_or_history_change);
+        $case!(unrelated_valid_effect_refuses_without_audio_journal_or_history_change);
+        $case!(wrong_intent_path_refuses_without_audio_journal_or_history_change);
+        $case!(wrong_intent_digest_refuses_without_audio_journal_or_history_change);
+        $case!(missing_recording_refuses_completion_and_preserves_original_intent);
+        $case!(two_pending_intents_preserve_the_first_audio_mark_and_repeat_history);
+        $case!(two_pending_intents_preserve_first_audio_mark_when_clock_moves_backward);
+    };
+}
+pub(crate) use retention_history_cases;
+
 macro_rules! history_cases {
     ($case:ident) => {
         $case!(start_and_steps_have_stable_order_and_pending_export);
@@ -205,9 +225,18 @@ pub(crate) fn run_sqlite(scenario: &str, ledger: &crate::ledger::SqliteLedger) {
             }
         };
     }
+    macro_rules! run_retention_history {
+        ($name:ident) => {
+            if scenario == concat!("ledger_contract_history_retention_", stringify!($name)) {
+                retention_history::$name(ledger);
+                return;
+            }
+        };
+    }
     recording_cases!(run_recording);
     journal_cases!(run_journal);
     retention_cases!(run_retention);
     history_cases!(run_history);
+    retention_history_cases!(run_retention_history);
     panic!("unknown ledger contract scenario");
 }

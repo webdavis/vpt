@@ -7,6 +7,7 @@ use vpt_domain::run::{
 };
 use vpt_domain::time::UtcInstant;
 
+mod retention;
 mod state;
 pub(super) use state::HistoryState;
 use state::{NAMESPACE, conflict};

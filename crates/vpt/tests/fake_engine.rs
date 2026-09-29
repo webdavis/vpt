@@ -3,6 +3,8 @@
 #[path = "fake_engine/process.rs"]
 mod process;
 mod support;
+#[path = "fake_engine/version_modes.rs"]
+mod version_modes;
 
 use serde_json::{Value, json};
 use std::process::{Command, Stdio};

@@ -36,7 +36,7 @@ fn event_value(event: &Event) -> Result<Value, EventEncodeError> {
     for entry in &event.paths {
         paths.insert(entry.key.as_str().into(), json!(path(&entry.path)?));
     }
-    Ok(json!({
+    let mut value = json!({
         "event": event.kind.as_str(),
         "state": event.state.as_str(),
         "recording": event.recording.as_ref().map(|id| id.as_str()),
@@ -53,7 +53,13 @@ fn event_value(event: &Event) -> Result<Value, EventEncodeError> {
         },
         "paths": paths,
         "occurred_at": timestamp(event.occurred_at)?,
-    }))
+    });
+    if event.kind == vpt_domain::history::EventKind::Retention
+        && let vpt_domain::history::EventDetail::Retention { completed, .. } = event.detail
+    {
+        value["counts"]["audio"] = json!(completed);
+    }
+    Ok(value)
 }
 
 fn path(value: &std::path::Path) -> Result<&str, EventEncodeError> {

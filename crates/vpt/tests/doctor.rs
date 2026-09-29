@@ -79,14 +79,13 @@ fn incompatible_helper_keeps_additive_diagnostics() {
 
 fn helper_diagnostics(version: &str, code: i32) {
     let sandbox = configured("doctor-helper-diagnostics");
-    let helper = fixture::script(
-        &sandbox,
-        &format!(
-            "[ \"$#\" -eq 1 ] && [ \"$1\" = --version ] || exit 91\nprintf '%s\\n' '{{\"schema\":\"vpt.helper/1\",\"version\":\"{version}\",\"capabilities\":[]}}'\n"
-        ),
-    );
-    fixture::configure(&sandbox, &format!("[helper]\npath = {helper:?}\n"));
-    let checks = run_json(&sandbox, code);
+    let output = run(sandbox
+        .vpt()
+        .current_dir(sandbox.path())
+        .env("VPT_FAKE_VERSION", version)
+        .env("VPT_FAKE_VERSION_MODE", "additive")
+        .args(["doctor", "--json"]));
+    let checks = report(&output, code);
     assert_eq!(fixture::check(&checks, "helper")["ok"], code == 0);
     assert!(detail(&checks, "helper").contains("unknown additive helper field: capabilities"));
 }
@@ -94,12 +93,12 @@ fn helper_diagnostics(version: &str, code: i32) {
 #[test]
 fn helper_failure_never_exposes_child_streams() {
     let sandbox = configured("doctor-helper-streams");
-    let helper = fixture::script(
-        &sandbox,
-        "printf 'private-stdout-canary'; printf 'private-stderr-canary' >&2; exit 7\n",
-    );
-    fixture::configure(&sandbox, &format!("[helper]\npath = {helper:?}\n"));
-    let checks = run_json(&sandbox, 3);
+    let output = run(sandbox
+        .vpt()
+        .current_dir(sandbox.path())
+        .env("VPT_FAKE_VERSION_MODE", "private-failure")
+        .args(["doctor", "--json"]));
+    let checks = report(&output, 3);
     assert!(
         !checks
             .iter()
