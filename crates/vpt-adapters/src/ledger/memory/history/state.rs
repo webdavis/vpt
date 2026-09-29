@@ -1,7 +1,9 @@
+use vpt_application::ports::HistoryReceipt;
 use vpt_application::ports::LedgerError;
 use vpt_domain::history::{EventId, ExportFailureId, LedgerNamespace, RunId};
 use vpt_domain::run::{
-    ExportCursor, ExportRestart, HistoryFact, HistoryRecord, SavedExportFailure,
+    ExportCursor, ExportRestart, HistoryFact, HistoryRecord, RecoveryBaseline, RecoveryEvidence,
+    RunKind, SavedExportFailure,
 };
 use vpt_domain::time::UtcInstant;
 
@@ -23,6 +25,60 @@ pub(super) fn conflict() -> LedgerError {
 }
 
 impl HistoryState {
+    pub(super) fn begin_recovery(
+        &mut self,
+        at: UtcInstant,
+        evidence: RecoveryEvidence,
+    ) -> Result<HistoryReceipt, LedgerError> {
+        if evidence.affected_runs.iter().any(|run| run.sequence() == 0) {
+            return Err(conflict());
+        }
+        let baseline = self.snapshot_baseline();
+        if !baseline.is_valid_for(NAMESPACE) {
+            return Err(conflict());
+        }
+        self.next_run = self.next_run.checked_add(1).ok_or_else(conflict)?;
+        let run = RunId::new(NAMESPACE, self.next_run);
+        let started = self.append(run, at, HistoryFact::RunStarted(RunKind::Recover))?;
+        let progress = self.append(
+            run,
+            at,
+            HistoryFact::RecoveryProgress { evidence, baseline },
+        )?;
+        Ok(HistoryReceipt {
+            run,
+            records: vec![started, progress],
+            completed: vec![],
+        })
+    }
+
+    pub(super) fn snapshot_baseline(&self) -> RecoveryBaseline {
+        RecoveryBaseline {
+            generation: self.cursor.map(|cursor| cursor.generation),
+            pending_from: self
+                .records
+                .iter()
+                .find(|record| record.appended_at.is_none())
+                .map(|record| record.id),
+            through: self.records.last().map(|record| record.id),
+        }
+    }
+
+    pub(super) fn expected_baseline(&self, run: RunId) -> RecoveryBaseline {
+        self.records
+            .iter()
+            .find_map(|record| {
+                if record.run == run
+                    && let HistoryFact::RecoveryProgress { baseline, .. } = &record.fact
+                {
+                    Some(*baseline)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| self.snapshot_baseline())
+    }
+
     pub(super) fn summarized_through(&self) -> Option<ExportFailureId> {
         self.records
             .iter()
@@ -65,6 +121,11 @@ impl HistoryState {
                         && record.run == run
                         && matches!(record.fact, HistoryFact::Event(_))
                 }))
+        {
+            return Err(conflict());
+        }
+        if let HistoryFact::RecoveryProgress { baseline, .. } = &fact
+            && !baseline.is_valid_for(NAMESPACE)
         {
             return Err(conflict());
         }

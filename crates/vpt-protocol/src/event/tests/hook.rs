@@ -2,6 +2,7 @@ use super::*;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use vpt_domain::history::{EventPathKey, SafeFailureClass};
+use vpt_domain::sweep::DeferralReason;
 
 fn hook(event: &Event) -> Value {
     serde_json::from_slice(&encode_hook(event).unwrap()).unwrap()
@@ -122,7 +123,13 @@ fn all_event_kinds_choose_the_approved_channel() {
             EventDetail::Failure(SafeFailureClass::ConfigurationRefused),
             "configuration refused",
         ),
-        (EventDetail::Deferred, "recording deferred"),
+        (
+            EventDetail::Deferred {
+                reason: DeferralReason::Dataless,
+                count: 4,
+            },
+            "deferred 4 times: dataless",
+        ),
         (
             EventDetail::Retention {
                 completed: 4,
@@ -135,4 +142,25 @@ fn all_event_kinds_choose_the_approved_channel() {
         value.detail = detail;
         assert_eq!(hook(&value)["detail"], expected, "{:?}", detail);
     }
+}
+
+#[test]
+fn deferred_hook_document_pins_source_path_and_safe_detail() {
+    let mut value = event(EventKind::Deferred, EventState::NeedsAttention);
+    value.detail = EventDetail::Deferred {
+        reason: DeferralReason::InvalidContainer,
+        count: 7,
+    };
+    value.paths = vec![EventPath {
+        key: EventPathKey::Source,
+        path: PathBuf::from("/owned/recording.m4a"),
+    }];
+
+    let wire = std::panic::catch_unwind(|| hook(&value));
+    assert!(wire.is_ok(), "deferred hook source path is unsupported");
+    let wire = wire.unwrap();
+    assert_eq!(wire["schema"], "vpt.event/1");
+    assert_eq!(wire["channel"], "alert");
+    assert_eq!(wire["detail"], "deferred 7 times: invalid_container");
+    assert_eq!(wire["paths"], json!({"source":"/owned/recording.m4a"}));
 }

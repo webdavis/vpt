@@ -148,6 +148,12 @@ macro_rules! history_cases {
         $case!(failure_immediately_after_reset_has_no_confirmed_position);
         $case!(failure_after_first_replay_ack_uses_receipt_position);
         $case!(recovery_progress_and_summary_are_saved_facts);
+        $case!(atomic_recovery_begin_snapshots_pending_frontier);
+        $case!(atomic_recovery_begin_retains_all_acked_frontier);
+        $case!(atomic_recovery_begin_on_empty_ledger_has_no_frontier);
+        $case!(first_recovery_progress_rejects_fabricated_snapshot);
+        $case!(later_recovery_progress_keeps_first_snapshot_after_ack);
+        $case!(invalid_recovery_baseline_rolls_back_work_delta);
         $case!(recreated_safe_log_replays_stable_event_ids);
         $case!(stale_acknowledgement_token_is_refused_after_recreated_log);
         $case!(identical_stale_restart_does_not_erase_replay_progress);
@@ -162,7 +168,10 @@ macro_rules! history_cases {
         $case!(summary_window_rejects_stale_missing_and_foreign_ids);
         $case!(work_only_recovery_summary_preserves_absent_failure_time);
         $case!(zero_affected_run_progress_rolls_back_work);
+        $case!(zero_affected_run_atomic_begin_has_no_partial_history);
         $case!(zero_affected_run_windowless_summary_rolls_back_work);
+        $case!(positive_missing_retention_id_is_saved);
+        $case!(zero_missing_retention_id_rolls_back_work);
         $case!(invalid_summary_window_rolls_back_work_delta);
         $case!(hook_failure_requires_event_in_same_run);
     };

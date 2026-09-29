@@ -1,13 +1,14 @@
-use super::{MemoryLedger, State, apply_commit, with};
+use super::{MemoryLedger, State, with};
 use vpt_application::ports::{HistoryReceipt, HistoryWrite, LedgerError, RunHistory, WorkDelta};
 use vpt_domain::history::{EventId, ExportFailureId, RunId};
 use vpt_domain::run::{
     ExportCursor, ExportFailure, ExportPosition, ExportRestart, HistoryFact, HistoryRecord,
-    RecoveryView, RunKind, SavedExportFailure,
+    RecoveryEvidence, RecoveryView, RunKind, SavedExportFailure,
 };
 use vpt_domain::time::UtcInstant;
 
 mod state;
+mod step;
 pub(super) use state::HistoryState;
 use state::{NAMESPACE, conflict};
 
@@ -44,60 +45,21 @@ impl RunHistory for MemoryLedger {
         })
     }
 
+    fn begin_recovery(
+        &self,
+        at: UtcInstant,
+        evidence: RecoveryEvidence,
+    ) -> HistoryWrite<HistoryReceipt> {
+        self.history_write(|state| state.history.begin_recovery(at, evidence))
+    }
+
     fn commit_step(
         &self,
         run: RunId,
         delta: &WorkDelta,
         facts: &[(UtcInstant, HistoryFact)],
     ) -> HistoryWrite<HistoryReceipt> {
-        self.history_write(|state| {
-            if !state.history.has_run(run)
-                || facts.is_empty()
-                || facts.iter().any(|(_, fact)| {
-                    matches!(fact, HistoryFact::RunStarted(_))
-                        || !fact.recovery_run_ids_are_nonzero()
-                })
-            {
-                return Err(conflict());
-            }
-            apply_commit(state, &delta.commit)?;
-            for (id, path) in &delta.source_updates {
-                let recording = state
-                    .recordings
-                    .iter_mut()
-                    .find(|recording| recording.id == *id)
-                    .ok_or_else(conflict)?;
-                recording.source_path = Some(path.clone());
-            }
-            for target in &delta.publication_clears {
-                state
-                    .publications
-                    .retain(|publication| publication.target != *target);
-            }
-            for (id, at) in &delta.audio_trash_marks {
-                let recording = state
-                    .recordings
-                    .iter_mut()
-                    .find(|recording| recording.id == *id)
-                    .ok_or_else(conflict)?;
-                recording.audio_trashed_at = Some(*at);
-            }
-            let records = facts
-                .iter()
-                .map(|(at, fact)| state.history.append(run, *at, fact.clone()))
-                .collect::<Result<Vec<_>, _>>()?;
-            let completed = delta
-                .commit
-                .recordings
-                .iter()
-                .map(|recording| recording.id.clone())
-                .collect();
-            Ok(HistoryReceipt {
-                run,
-                records,
-                completed,
-            })
-        })
+        self.history_write(|state| step::apply(state, run, delta, facts))
     }
 
     fn recovery_view(&self) -> Result<RecoveryView, LedgerError> {

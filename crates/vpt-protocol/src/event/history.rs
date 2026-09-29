@@ -2,7 +2,7 @@ use super::{EventEncodeError, event_value, path, timestamp};
 use serde_json::{Value, json};
 use vpt_domain::run::{
     EffectKind, EffectOutcome, EffectReference, FailureWindow, HistoryFact, HistoryRecord,
-    HookFailureClass, RecoveryEvidence, RunKind, RunOutcome, WorkOutcome,
+    HookFailureClass, RecoveryBaseline, RecoveryEvidence, RunKind, RunOutcome, WorkOutcome,
 };
 use vpt_domain::time::UtcInstant;
 
@@ -46,6 +46,9 @@ fn fact_value(fact: &HistoryFact) -> Result<Value, EventEncodeError> {
             "intent": intent.render(),
             "outcome": effect_outcome(*outcome),
         }),
+        HistoryFact::MissingRetentionHistory { intent_id } => json!({
+            "tag": "missing_retention_history", "intent_id": intent_id,
+        }),
         HistoryFact::HookFailed { event, failure } => json!({
             "tag": "hook_failed",
             "event": event.render(),
@@ -54,14 +57,23 @@ fn fact_value(fact: &HistoryFact) -> Result<Value, EventEncodeError> {
         HistoryFact::Event(event) => json!({
             "tag": "event", "event": event_value(event)?,
         }),
-        HistoryFact::RecoveryProgress(evidence) => json!({
+        HistoryFact::RecoveryProgress { evidence, baseline } => json!({
             "tag": "recovery_progress", "evidence": evidence_value(evidence)?,
+            "baseline": baseline_value(*baseline),
         }),
         HistoryFact::RecoverySummary { evidence, window } => json!({
             "tag": "recovery_summary",
             "evidence": evidence_value(evidence)?,
             "window": window.map(window_value),
         }),
+    })
+}
+
+fn baseline_value(baseline: RecoveryBaseline) -> Value {
+    json!({
+        "generation": baseline.generation,
+        "pending_from": baseline.pending_from.map(|id| id.render()),
+        "through": baseline.through.map(|id| id.render()),
     })
 }
 
@@ -92,9 +104,13 @@ fn evidence_value(evidence: &RecoveryEvidence) -> Result<Value, EventEncodeError
         "logging_restored_observed_at": evidence.logging_restored_observed_at.map(timestamp).transpose()?,
         "failures": evidence.failures,
         "recovered_records": evidence.recovered_records,
-        "completed": evidence.completed,
-        "failed": evidence.failed,
-        "unresolved": evidence.unresolved,
+        "completed_work": evidence.completed_work,
+        "failed_work": evidence.failed_work,
+        "unknown_work": evidence.unknown_work,
+        "deferred_work": evidence.deferred_work,
+        "completed_effects": evidence.completed_effects,
+        "failed_effects": evidence.failed_effects,
+        "unresolved_effects": evidence.unresolved_effects,
         "missing_history": evidence.missing_history,
     }))
 }
@@ -128,6 +144,7 @@ fn work_outcome(value: WorkOutcome) -> &'static str {
         WorkOutcome::Completed => "completed",
         WorkOutcome::Failed => "failed",
         WorkOutcome::Unknown => "unknown",
+        WorkOutcome::Deferred => "deferred",
     }
 }
 

@@ -1,12 +1,22 @@
 use super::{committed, record};
 use std::path::PathBuf;
 use vpt_application::ports::{HistoryWrite, LedgerCommit, RecordingLedger, RunHistory, WorkDelta};
-use vpt_domain::history::{EventId, ExportFailureId};
+use vpt_domain::history::{EventId, ExportFailureId, LedgerNamespace};
 use vpt_domain::run::{
     ExportFailure, ExportFailureClass, FailureWindow, HistoryFact, ObservedLogFile,
-    RecoveryEvidence, RunKind,
+    RecoveryBaseline, RecoveryEvidence, RunKind,
 };
 use vpt_domain::time::UtcInstant;
+
+mod baseline;
+pub(crate) use baseline::{
+    atomic_recovery_begin_on_empty_ledger_has_no_frontier,
+    atomic_recovery_begin_retains_all_acked_frontier,
+    atomic_recovery_begin_snapshots_pending_frontier,
+    first_recovery_progress_rejects_fabricated_snapshot,
+    invalid_recovery_baseline_rolls_back_work_delta,
+    later_recovery_progress_keeps_first_snapshot_after_ack,
+};
 
 fn failure(event: EventId) -> ExportFailure {
     ExportFailure {
@@ -26,9 +36,13 @@ fn evidence(run: vpt_domain::history::RunId) -> RecoveryEvidence {
         logging_restored_observed_at: None,
         failures: 1,
         recovered_records: 0,
-        completed: 0,
-        failed: 0,
-        unresolved: 1,
+        completed_work: 0,
+        failed_work: 0,
+        unknown_work: 1,
+        deferred_work: 0,
+        completed_effects: 0,
+        failed_effects: 0,
+        unresolved_effects: 0,
         missing_history: 0,
     }
 }
@@ -101,7 +115,14 @@ pub(crate) fn recovery_progress_does_not_advance_failure_watermark<L: RunHistory
     let failure = failure(started.records[0].id);
     committed(ledger.note_export_failure(&failure));
     committed(ledger.note_export_failure(&failure));
-    let progress = HistoryFact::RecoveryProgress(evidence(started.run));
+    let progress = HistoryFact::RecoveryProgress {
+        evidence: evidence(started.run),
+        baseline: RecoveryBaseline {
+            generation: None,
+            pending_from: Some(started.records[0].id),
+            through: Some(started.records[0].id),
+        },
+    };
     committed(ledger.commit_step(
         started.run,
         &WorkDelta::default(),

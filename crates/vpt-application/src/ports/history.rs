@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use vpt_domain::history::RunId;
 use vpt_domain::identity::RecordingId;
 use vpt_domain::run::{
-    ExportCursor, ExportFailure, ExportPosition, HistoryFact, HistoryRecord, RecoveryView, RunKind,
+    ExportCursor, ExportFailure, ExportPosition, HistoryFact, HistoryRecord, RecoveryEvidence,
+    RecoveryView, RunKind,
 };
 use vpt_domain::time::UtcInstant;
 
@@ -32,6 +33,13 @@ pub enum HistoryWrite<T> {
 
 pub trait RunHistory {
     fn begin_run(&self, kind: RunKind, at: UtcInstant) -> HistoryWrite<HistoryReceipt>;
+    fn begin_recovery(
+        &self,
+        _at: UtcInstant,
+        _evidence: RecoveryEvidence,
+    ) -> HistoryWrite<HistoryReceipt> {
+        HistoryWrite::Unconfirmed(LedgerError::Conflict("recovery unsupported".into()))
+    }
     fn commit_step(
         &self,
         run: RunId,
