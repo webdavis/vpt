@@ -15,6 +15,21 @@ mod run_history_contract {
     crate::ledger::contract::history_cases!(case);
 }
 
+mod retention_history_contract {
+    macro_rules! case {
+        ($name:ident) => {
+            #[test]
+            fn $name() {
+                super::super::supervised(concat!(
+                    "ledger_contract_history_retention_",
+                    stringify!($name)
+                ));
+            }
+        };
+    }
+    crate::ledger::contract::retention_history_cases!(case);
+}
+
 #[test]
 fn a_reopened_ledger_preserves_recording_seen_and_publication() {
     super::supervised("ledger_contract_sqlite_reopen");

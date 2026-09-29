@@ -27,7 +27,7 @@ fn finish(child: ChildGuard) -> std::process::Output {
     output
 }
 
-fn supervised(scenario: &str) {
+pub(super) fn supervised(scenario: &str) {
     let (temp, _root) = root();
     let started = Instant::now();
     let output =
@@ -87,6 +87,12 @@ pub(crate) fn run_scenario(
 ) {
     eprintln!("VPT_PHASE {scenario}");
     match scenario {
+        s if s.starts_with("ledger_contract_history_pair_fixture_") => {
+            super::history::retention::tests::pair_fixture::run(s, &root);
+        }
+        s if s.starts_with("ledger_contract_history_retention_fault_") => {
+            super::history::retention::tests::run(s, &root);
+        }
         "ledger_contract_schema_trace" => schema_diagnostics::run(&root),
         s if s.starts_with("ledger_migration_") => migration::run(s, &root),
         s if s.starts_with("ledger_schema_") => schema::run(s, &root),
