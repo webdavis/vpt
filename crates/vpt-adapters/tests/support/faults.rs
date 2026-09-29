@@ -25,6 +25,8 @@ pub enum HistoryFault {
     RecordUnconfirmed,
     RecordPostCommit,
     FailureEvent,
+    DeferredUnconfirmed,
+    DeferredPostCommit,
 }
 
 pub struct FaultLedger {
@@ -68,15 +70,27 @@ impl RunHistory for FaultLedger {
         let failure_event = facts
             .iter()
             .any(|(_, fact)| matches!(fact, HistoryFact::Event(_)));
+        let deferred = facts.iter().any(|(_, fact)| {
+            matches!(
+                fact,
+                HistoryFact::WorkStep {
+                    outcome: vpt_domain::run::WorkOutcome::Deferred,
+                    ..
+                }
+            )
+        });
         if (self.fault == HistoryFault::Intent && intent)
             || (self.fault == HistoryFault::RecordUnconfirmed
                 && !delta.commit.recordings.is_empty())
             || (self.fault == HistoryFault::FailureEvent && failure_event)
+            || (self.fault == HistoryFault::DeferredUnconfirmed && deferred)
         {
             return HistoryWrite::Unconfirmed(self.failure());
         }
         let write = self.base.commit_step(run, delta, facts);
-        if self.fault == HistoryFault::RecordPostCommit && !delta.commit.recordings.is_empty() {
+        if (self.fault == HistoryFault::RecordPostCommit && !delta.commit.recordings.is_empty())
+            || (self.fault == HistoryFault::DeferredPostCommit && deferred)
+        {
             return match write {
                 HistoryWrite::Committed(receipt) => HistoryWrite::CommittedWithFailure {
                     receipt,

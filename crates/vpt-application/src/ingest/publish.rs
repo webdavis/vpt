@@ -1,14 +1,16 @@
 use super::candidate::{fresh_seen, recorder_failure};
-use super::{Ingest, IngestError, IngestFailure, IngestReport};
+use super::deferral::Deferral;
+use super::{Ingest, IngestError, IngestFailure, IngestReport, Mode};
 use crate::ports::{
     Archive, ArchiveError, Candidate, Clock, LedgerCommit, Published, RecorderStore,
     RecordingLedger, RecordingRecord, RunHistory, SeenRow, StageStates, TitleLookup, TitleOrigin,
-    Trash, TrashError, WorkDelta,
+    Trash, WorkDelta,
 };
 use vpt_domain::container::inspect;
 use vpt_domain::history::RunId;
 use vpt_domain::identity::RecordingId;
 use vpt_domain::run::{EffectKind, EffectOutcome, EffectReference, HistoryFact, WorkOutcome};
+use vpt_domain::sweep::{DeferralReason, SeenFacts, SweepLimits, rest_gate, size_gate};
 use vpt_domain::time::UtcInstant;
 
 impl<R, A, L, C, T, S> Ingest<'_, R, A, L, C, T, S>
@@ -26,6 +28,7 @@ where
         candidate: &Candidate,
         seen: Option<SeenRow>,
         now: UtcInstant,
+        mode: &Mode,
         report: &mut IngestReport,
     ) -> Result<(), Box<IngestError>> {
         let source = self
@@ -36,6 +39,59 @@ where
             .recorder
             .metadata(&source)
             .map_err(|error| Self::error(report, recorder_failure(error), None))?;
+        let limits = SweepLimits {
+            max_audio_bytes: self.settings.max_audio_bytes,
+            quiet_period_secs: self.settings.quiet_period_secs,
+        };
+        if let Err(reason) = size_gate(before.size, &limits) {
+            return self.defer(
+                run,
+                Deferral {
+                    candidate,
+                    seen,
+                    reason,
+                },
+                now,
+                mode,
+                report,
+            );
+        }
+        if inspect(before.size, |offset, buffer| {
+            self.recorder.read_at(&source, offset, buffer)
+        })
+        .is_err()
+        {
+            return self.defer(
+                run,
+                Deferral {
+                    candidate,
+                    seen,
+                    reason: DeferralReason::InvalidContainer,
+                },
+                now,
+                mode,
+                report,
+            );
+        }
+        let previous = seen.as_ref().map(|row| SeenFacts {
+            size: row.size,
+            mtime: row.mtime,
+            ingested: row.recording.is_some() && row.deferral_reason.is_none(),
+            deferred_size: row.deferred_size,
+        });
+        if let Err(reason) = rest_gate(before.mtime, before.size, now, previous.as_ref(), &limits) {
+            return self.defer(
+                run,
+                Deferral {
+                    candidate,
+                    seen,
+                    reason,
+                },
+                now,
+                mode,
+                report,
+            );
+        }
         let staged = self
             .archive
             .stage(|directory, identity, name| {
@@ -52,11 +108,18 @@ where
             Self::owned_error(report, recorder_failure(error), staged.path.clone())
         })?;
         if after != before {
-            return Err(Self::owned_error(
+            return self.defer_staged(
+                run,
+                Deferral {
+                    candidate,
+                    seen,
+                    reason: DeferralReason::ChangedDuringRead,
+                },
+                &staged.path,
+                now,
+                mode,
                 report,
-                IngestFailure::Recorder("source changed during staging".into()),
-                staged.path.clone(),
-            ));
+            );
         }
         let archived = self.archive.open(&staged.path).map_err(|error| {
             Self::owned_error(report, archive_failure(error), staged.path.clone())
@@ -66,23 +129,37 @@ where
         })?;
         let container = inspect(size, |offset, buffer| {
             self.archive.read_at(&archived, offset, buffer)
-        })
-        .map_err(|_| {
-            Self::owned_error(
+        });
+        let Ok(container) = container else {
+            return self.defer_staged(
+                run,
+                Deferral {
+                    candidate,
+                    seen,
+                    reason: DeferralReason::InvalidContainer,
+                },
+                &staged.path,
+                now,
+                mode,
                 report,
-                IngestFailure::Archive("staged container invalid".into()),
-                staged.path.clone(),
-            )
-        })?;
+            );
+        };
         let offset = self.clock.offset_at(container.creation_time);
-        let id =
-            RecordingId::derive(container.creation_time, offset, &staged.digest).map_err(|_| {
-                Self::owned_error(
-                    report,
-                    IngestFailure::Archive("capture instant invalid".into()),
-                    staged.path.clone(),
-                )
-            })?;
+        let id = RecordingId::derive(container.creation_time, offset, &staged.digest);
+        let Ok(id) = id else {
+            return self.defer_staged(
+                run,
+                Deferral {
+                    candidate,
+                    seen,
+                    reason: DeferralReason::InvalidContainer,
+                },
+                &staged.path,
+                now,
+                mode,
+                report,
+            );
+        };
         let target_name = format!("{id}.m4a");
         let intent = Self::required(
             self.ledger.commit_step(
@@ -196,34 +273,6 @@ where
         self.export(&receipt, report)?;
         report.ingested.push(record);
         Ok(())
-    }
-
-    pub(super) fn discard_owned(&self, staged: &std::path::Path, report: &mut IngestReport) {
-        if self.archive.validate_trash_path(staged).is_err() {
-            report
-                .log
-                .push("staged cleanup pending: ownership validation failed".into());
-            return;
-        }
-        let outcome = self.trash.trash(staged);
-        if !self.trash.take_diagnostics().is_empty() {
-            report.log.push("trash reported a diagnostic".into());
-        }
-        match outcome {
-            Ok(_) => {}
-            Err(TrashError::HelperAbsent) => report
-                .log
-                .push("staged cleanup pending: helper unavailable".into()),
-            Err(TrashError::HelperVersion { found }) => report.log.push(format!(
-                "staged cleanup pending: incompatible helper major {found}"
-            )),
-            Err(TrashError::Failed(_)) => report
-                .log
-                .push("staged cleanup pending: helper failed".into()),
-            Err(TrashError::Unknown(_)) => report
-                .log
-                .push("staged cleanup pending: helper reply unknown".into()),
-        }
     }
 }
 

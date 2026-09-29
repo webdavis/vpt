@@ -2,6 +2,7 @@ mod support;
 
 use std::cell::Cell;
 use std::collections::BTreeSet;
+use support::faults::{ArchiveFault, FaultArchive};
 use support::{CAPTURED, Fixture, StopAt};
 use vpt_application::ports::{Archive, Clock, RecordingLedger, RunHistory, SinkWarning};
 use vpt_application::{Ingest, IngestFailure, Mode};
@@ -113,12 +114,19 @@ impl Clock for TickClock {
 #[test]
 fn ordinary_failure_saves_one_safe_event_with_original_time() {
     let fixture = Fixture::new();
-    fixture.add_recording("private-name.m4a", b"private invalid media canary");
+    fixture.add_recording(
+        "private-name.m4a",
+        &m4a(CAPTURED, 1, b"private media canary"),
+    );
     let mut parts = fixture.parts();
+    let archive = FaultArchive {
+        base: parts.archive,
+        fault: ArchiveFault::StageOwned,
+    };
     let clock = TickClock(Cell::new(0));
     let mut ingest = Ingest {
         recorder: &parts.store,
-        archive: &parts.archive,
+        archive: &archive,
         ledger: &parts.ledger,
         clock: &clock,
         trash: &parts.trash,
@@ -128,7 +136,7 @@ fn ordinary_failure_saves_one_safe_event_with_original_time() {
 
     let error = ingest.run(&Mode::default()).unwrap_err();
 
-    assert!(matches!(error.failure, IngestFailure::Archive(_)));
+    assert_eq!(error.failure, IngestFailure::NoSpace);
     let history = parts.ledger.recovery_view().unwrap();
     let events: Vec<_> = history
         .records
@@ -154,7 +162,7 @@ fn ordinary_failure_saves_one_safe_event_with_original_time() {
     assert!(event.paths.is_empty());
     assert!(event.recording.is_none());
     assert!(!format!("{event:?}").contains("private-name"));
-    assert!(!format!("{event:?}").contains("private invalid media"));
+    assert!(!format!("{event:?}").contains("private media canary"));
     assert!(
         history
             .records

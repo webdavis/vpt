@@ -1,4 +1,5 @@
 mod candidate;
+mod deferral;
 mod failure;
 mod publish;
 
@@ -58,7 +59,6 @@ pub struct IngestReport {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IngestFailure {
     DryRunUnavailable,
-    DatalessUnavailable(PathBuf),
     StoreUnreadable(String),
     EmptyStore,
     NoSpace,
@@ -132,7 +132,9 @@ where
         };
         for candidate in &candidates {
             let now = self.clock.now();
-            if let Err(error) = self.process_candidate(started.run, candidate, now, &mut report) {
+            if let Err(error) =
+                self.process_candidate(started.run, candidate, now, mode, &mut report)
+            {
                 return Err(self.finish_failure(started.run, now, error, &mut report));
             }
         }
