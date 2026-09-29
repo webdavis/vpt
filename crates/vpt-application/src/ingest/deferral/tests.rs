@@ -7,7 +7,8 @@ use vpt_domain::digest::Sha256Digest;
 use vpt_domain::history::{EventId, LedgerNamespace};
 use vpt_domain::identity::RecordingId;
 use vpt_domain::run::{
-    ExportCursor, ExportFailure, ExportPosition, HistoryFact, RecoveryView, RunKind,
+    ExportCursor, ExportFailure, ExportPosition, HistoryFact, RecoveryEvidence, RecoveryView,
+    RunKind,
 };
 use vpt_domain::time::{FileTime, UtcOffset};
 
@@ -123,6 +124,9 @@ impl RecordingLedger for Silent {
 impl RunHistory for Silent {
     fn begin_run(&self, _: RunKind, _: UtcInstant) -> HistoryWrite<HistoryReceipt> {
         panic!("run start")
+    }
+    fn begin_recovery(&self, _: UtcInstant, _: RecoveryEvidence) -> HistoryWrite<HistoryReceipt> {
+        panic!("recovery start")
     }
     fn commit_step(
         &self,

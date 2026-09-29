@@ -6,7 +6,8 @@ use vpt_domain::digest::Sha256Digest;
 use vpt_domain::history::{EventId, RunId};
 use vpt_domain::identity::RecordingId;
 use vpt_domain::run::{
-    ExportCursor, ExportFailure, ExportPosition, HistoryFact, HistoryRecord, RecoveryView, RunKind,
+    ExportCursor, ExportFailure, ExportPosition, HistoryFact, HistoryRecord, RecoveryEvidence,
+    RecoveryView, RunKind,
 };
 use vpt_domain::time::UtcInstant;
 
@@ -116,6 +117,14 @@ impl RunHistory for Calls<'_> {
     fn begin_run(&self, kind: RunKind, at: UtcInstant) -> HistoryWrite<HistoryReceipt> {
         self.writes.set(self.writes.get() + 1);
         self.ledger.begin_run(kind, at)
+    }
+    fn begin_recovery(
+        &self,
+        at: UtcInstant,
+        evidence: RecoveryEvidence,
+    ) -> HistoryWrite<HistoryReceipt> {
+        self.writes.set(self.writes.get() + 1);
+        self.ledger.begin_recovery(at, evidence)
     }
     fn commit_step(
         &self,

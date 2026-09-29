@@ -7,7 +7,8 @@ use vpt_domain::digest::Sha256Digest;
 use vpt_domain::history::{EventId, RunId};
 use vpt_domain::identity::RecordingId;
 use vpt_domain::run::{
-    ExportCursor, ExportFailure, ExportPosition, HistoryFact, HistoryRecord, RecoveryView, RunKind,
+    ExportCursor, ExportFailure, ExportPosition, HistoryFact, HistoryRecord, RecoveryEvidence,
+    RecoveryView, RunKind,
 };
 use vpt_domain::time::UtcInstant;
 
@@ -73,6 +74,9 @@ impl RetentionHistory for ReadOnly<'_> {
 impl RunHistory for ReadOnly<'_> {
     fn begin_run(&self, _: RunKind, _: UtcInstant) -> HistoryWrite<HistoryReceipt> {
         panic!("observation began a run")
+    }
+    fn begin_recovery(&self, _: UtcInstant, _: RecoveryEvidence) -> HistoryWrite<HistoryReceipt> {
+        panic!("observation began recovery")
     }
     fn commit_step(
         &self,
