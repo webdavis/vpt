@@ -92,6 +92,14 @@ impl RecordingId {
         &self.0[..TIMESTAMP_LEN]
     }
 
+    pub fn archived_offset(&self, captured: UtcInstant) -> Option<UtcOffset> {
+        let local = parse_local_timestamp(self.local_timestamp()).ok()?;
+        let as_utc = local.instant(UtcOffset { secs: 0 })?;
+        let difference = i128::from(as_utc.secs) - i128::from(captured.secs);
+        let secs = i32::try_from(difference).ok()?;
+        (secs.unsigned_abs() < 86_400).then_some(UtcOffset { secs })
+    }
+
     pub fn capture_date(&self) -> &str {
         &self.0[..10]
     }
@@ -109,6 +117,8 @@ impl std::fmt::Display for RecordingId {
 
 #[cfg(test)]
 mod tests {
+    mod archived_offset;
+
     use super::*;
 
     fn digest() -> Sha256Digest {
