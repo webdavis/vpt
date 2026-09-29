@@ -48,13 +48,6 @@ pub(super) fn configure(sandbox: &Sandbox, extra: &str) {
     );
 }
 
-pub(super) fn script(sandbox: &Sandbox, body: &str) -> PathBuf {
-    let script = sandbox.path().join("helper-script");
-    std::fs::write(&script, format!("#!/bin/bash\nset -euo pipefail\n{body}")).unwrap();
-    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o700)).unwrap();
-    script
-}
-
 pub(super) fn run_json(sandbox: &Sandbox, code: i32) -> Vec<Value> {
     report(
         &run(sandbox

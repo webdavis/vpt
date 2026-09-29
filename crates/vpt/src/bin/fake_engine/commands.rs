@@ -4,14 +4,41 @@ use std::path::Path;
 
 pub(super) fn run(args: &[String]) -> i32 {
     match args.first().map(String::as_str) {
-        Some("--version") => {
-            let version = std::env::var("VPT_FAKE_VERSION").unwrap_or_else(|_| "1.0.0".into());
-            emit(json!({"schema": "vpt.helper/1", "version": version}))
-        }
+        Some("--version") => version(args),
         Some("trash") => trash(args.get(1)),
         Some("command-sink") => command_sink(&args[1..]),
         Some("process-exchange") => super::exchange::run(&args[1..]),
         _ => 2,
+    }
+}
+
+fn version(args: &[String]) -> i32 {
+    if args.len() != 1 {
+        return 91;
+    }
+    let mode = std::env::var("VPT_FAKE_VERSION_MODE").unwrap_or_default();
+    let version = std::env::var("VPT_FAKE_VERSION").unwrap_or_else(|_| "1.0.0".into());
+    match mode.as_str() {
+        "" => emit(json!({"schema": "vpt.helper/1", "version": version})),
+        "additive" => {
+            emit(json!({"schema": "vpt.helper/1", "version": version, "capabilities": []}))
+        }
+        "private-failure" => private_failure(),
+        _ => 2,
+    }
+}
+
+fn private_failure() -> i32 {
+    let mut output = io::stdout().lock();
+    if output
+        .write_all(b"private-stdout-canary")
+        .and_then(|()| output.flush())
+        .is_err()
+        || io::stderr().write_all(b"private-stderr-canary").is_err()
+    {
+        1
+    } else {
+        7
     }
 }
 
