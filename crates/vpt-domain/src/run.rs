@@ -6,28 +6,8 @@ use std::path::PathBuf;
 mod recovery;
 pub use recovery::{FailureWindow, RecoveryBaseline, RecoveryEvidence, RecoveryView};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RunKind {
-    Ingest,
-    Recover,
-    Publish,
-    Retain,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RunOutcome {
-    Completed,
-    Failed,
-    Interrupted,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WorkOutcome {
-    Completed,
-    Failed,
-    Unknown,
-    Deferred,
-}
+mod kinds;
+pub use kinds::{RunKind, RunOutcome, WorkOutcome};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EffectKind {
@@ -81,51 +61,8 @@ pub enum HookFailureClass {
     Interrupted,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum HistoryFact {
-    RunStarted(RunKind),
-    RunFinished(RunOutcome),
-    WorkStep {
-        recording: Option<RecordingId>,
-        outcome: WorkOutcome,
-    },
-    EffectIntent {
-        kind: EffectKind,
-        reference: EffectReference,
-    },
-    EffectObserved {
-        intent: EventId,
-        outcome: EffectOutcome,
-    },
-    MissingRetentionHistory {
-        intent_id: u64,
-    },
-    HookFailed {
-        event: EventId,
-        failure: HookFailureClass,
-    },
-    Event(Event),
-    RecoveryProgress {
-        evidence: RecoveryEvidence,
-        baseline: RecoveryBaseline,
-    },
-    RecoverySummary {
-        evidence: RecoveryEvidence,
-        window: Option<FailureWindow>,
-    },
-}
-
-impl HistoryFact {
-    pub fn referenced_ids_are_nonzero(&self) -> bool {
-        match self {
-            Self::RecoveryProgress { evidence, .. } | Self::RecoverySummary { evidence, .. } => {
-                evidence.affected_runs.iter().all(|run| run.sequence() != 0)
-            }
-            Self::MissingRetentionHistory { intent_id } => *intent_id != 0,
-            _ => true,
-        }
-    }
-}
+mod facts;
+pub use facts::HistoryFact;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExportPosition {
