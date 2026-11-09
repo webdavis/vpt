@@ -11,7 +11,7 @@ use verbs::parse_verb;
 pub const USAGE: &str = "usage: vpt [--json] [--config <file>] <verb>\n\
 verbs: setup [--force] | doctor | ingest [--dry-run] [--once <path>] | show <id> |\n\
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
-       synthesize <id> [--dry-run] | note write <id> | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
+       synthesize <id> [--dry-run] | note write <id> | verify-note <path> --recording <id> | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
        symlink deploy | symlink verify | --version\n";
 
 #[derive(Debug, PartialEq, Eq)]
@@ -19,6 +19,10 @@ pub enum Verb {
     Synthesize {
         id: String,
         dry_run: bool,
+    },
+    VerifyNote {
+        path: PathBuf,
+        recording: String,
     },
     ReviewResolve {
         id: String,
@@ -99,6 +103,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
                 | "--stage"
                 | "--language"
                 | "--resolve"
+                | "--recording"
         ) && words
             .get(index + 1)
             .is_none_or(|value| value.starts_with("--"))

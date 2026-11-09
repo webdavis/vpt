@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod confirm;
 mod relation;
 mod synthesize;
+mod verify;
 
 fn parsed(line: &str) -> Result<Invocation, UsageError> {
     parse(std::iter::once(OsString::from("vpt")).chain(line.split(' ').map(OsString::from)))
