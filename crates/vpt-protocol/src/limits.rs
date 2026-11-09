@@ -42,6 +42,10 @@ pub(crate) fn read_engine(bytes: &[u8]) -> Result<Value, LimitViolation> {
     read_large(bytes, Profile::Engine)
 }
 
+pub(crate) fn read_whisply(bytes: &[u8]) -> Result<Value, LimitViolation> {
+    read_large(bytes, Profile::Whisply)
+}
+
 fn read_large(bytes: &[u8], profile: Profile) -> Result<Value, LimitViolation> {
     read_profile(
         bytes,
