@@ -10,11 +10,15 @@ use verbs::parse_verb;
 pub const USAGE: &str = "usage: vpt [--json] [--config <file>] <verb>\n\
 verbs: setup [--force] | doctor | ingest [--dry-run] [--once <path>] | show <id> |\n\
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] |\n\
-       note write <id> | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
+       synthesize <id> [--dry-run] | note write <id> | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
        symlink deploy | symlink verify | --version\n";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Verb {
+    Synthesize {
+        id: String,
+        dry_run: bool,
+    },
     ReviewResolve {
         id: String,
         flag: String,
