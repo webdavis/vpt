@@ -17,6 +17,7 @@ pub use retention::{
     RetentionError, RetentionFailure, RetentionReport, reconcile_intents,
 };
 pub use settings::{
-    RetentionSettings, Settings,
-    SourceSettings, StorePaths,
+    BriefSettings, ContextSettings, ContextSource, GoogleCredentials, LinkStyle, NoteProfile,
+    NoteSettings, ObsidianSettings, ReconcileSettings, RetentionSettings, Settings, ShareSettings,
+    SourceSettings, StorePaths, SynthesisSettings, TagSettings,
 };
