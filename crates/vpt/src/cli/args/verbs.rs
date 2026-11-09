@@ -11,6 +11,12 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
             force: take_flag(words, "--force"),
         }),
         "doctor" => Ok(Verb::Doctor),
+        "note" => match take_positional(words, "write")?.as_str() {
+            "write" => Ok(Verb::NoteWrite {
+                id: take_positional(words, "<id>")?,
+            }),
+            other => Err(UsageError(format!("unknown note subcommand {other}"))),
+        },
         "ingest" => Ok(Verb::Ingest {
             dry_run: take_flag(words, "--dry-run"),
             once: take_value(words, "--once")?.map(PathBuf::from),
