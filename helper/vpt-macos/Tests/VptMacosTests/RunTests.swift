@@ -70,10 +70,10 @@ private struct FailingDocument: Encodable {
         return base
     }
 
-    func testVersionPrintsExactDocumentAndEmptyError() throws {
+    func testVersionPrintsExactDocumentAndEmptyError() async throws {
         let base = try scratch()
         let trasher = makeSUT(directory: base.appendingPathComponent("trash"))
-        let outcome = VptMacos.run(.version, trasher: trasher)
+        let outcome = await VptMacos.run(.version, trasher: trasher)
         XCTAssertEqual(
             outcome,
             Outcome(
@@ -85,13 +85,13 @@ private struct FailingDocument: Encodable {
         XCTAssertTrue(trasher.received.isEmpty)
     }
 
-    func testTrashMovesOnlyOwnedFixtureThroughTheProtocol() throws {
+    func testTrashMovesOnlyOwnedFixtureThroughTheProtocol() async throws {
         let base = try scratch()
         let victim = base.appendingPathComponent("victim.txt")
         try Data("fixture".utf8).write(to: victim)
         let trasher = makeSUT(directory: base.appendingPathComponent("trash"))
 
-        let outcome = VptMacos.run(.trash(path: victim.path), trasher: trasher)
+        let outcome = await VptMacos.run(.trash(path: victim.path), trasher: trasher)
 
         XCTAssertEqual(
             outcome,
@@ -105,12 +105,12 @@ private struct FailingDocument: Encodable {
         )
     }
 
-    func testTrashFailureKeepsSourceAndWritesOnlyError() throws {
+    func testTrashFailureKeepsSourceAndWritesOnlyError() async throws {
         let base = try scratch()
         let victim = base.appendingPathComponent("victim.txt")
         try Data("fixture".utf8).write(to: victim)
 
-        let outcome = VptMacos.run(.trash(path: victim.path), trasher: FailingTrasher())
+        let outcome = await VptMacos.run(.trash(path: victim.path), trasher: FailingTrasher())
 
         XCTAssertEqual(
             outcome,
@@ -119,13 +119,13 @@ private struct FailingDocument: Encodable {
         XCTAssertEqual(try Data(contentsOf: victim), Data("fixture".utf8))
     }
 
-    func testTrashDocumentEscapesHostilePathAndRoundTrips() throws {
+    func testTrashDocumentEscapesHostilePathAndRoundTrips() async throws {
         let base = try scratch()
         let victim = base.appendingPathComponent("quote\"back\\line\n.txt")
         try Data("fixture".utf8).write(to: victim)
         let trasher = makeSUT(directory: base.appendingPathComponent("trash"))
 
-        let outcome = VptMacos.run(.trash(path: victim.path), trasher: trasher)
+        let outcome = await VptMacos.run(.trash(path: victim.path), trasher: trasher)
 
         XCTAssertEqual(outcome.exitCode, 0)
         XCTAssertEqual(outcome.stderr, "")
@@ -147,12 +147,13 @@ private struct FailingDocument: Encodable {
         }
     }
 
-    func testExecutableCompositionDispatchesVersionWithoutTrash() throws {
+    func testExecutableCompositionDispatchesVersionWithoutTrash() async throws {
         let base = try scratch()
         let trasher = makeSUT(directory: base.appendingPathComponent("trash"))
 
+        let outcome = await execute(arguments: ["--version"], trasher: trasher)
         XCTAssertEqual(
-            execute(arguments: ["--version"], trasher: trasher),
+            outcome,
             Outcome(
                 stdout: "{\"schema\":\"vpt.helper/1\",\"version\":\"1.0.0\"}\n",
                 stderr: "",
@@ -162,13 +163,13 @@ private struct FailingDocument: Encodable {
         XCTAssertTrue(trasher.received.isEmpty)
     }
 
-    func testExecutableCompositionDispatchesTrashThroughTheAdapter() throws {
+    func testExecutableCompositionDispatchesTrashThroughTheAdapter() async throws {
         let base = try scratch()
         let victim = base.appendingPathComponent("victim.txt")
         try Data("fixture".utf8).write(to: victim)
         let trasher = makeSUT(directory: base.appendingPathComponent("trash"))
 
-        let outcome = execute(arguments: ["trash", victim.path], trasher: trasher)
+        let outcome = await execute(arguments: ["trash", victim.path], trasher: trasher)
 
         XCTAssertEqual(
             outcome,
@@ -182,11 +183,11 @@ private struct FailingDocument: Encodable {
         )
     }
 
-    func testExecutableCompositionReportsEveryUsageFailureOnStderr() {
+    func testExecutableCompositionReportsEveryUsageFailureOnStderr() async {
         let cases: [([String], String)] = [
             ([], "unknown subcommand"),
             (["notify", "--title", "x"], "unknown subcommand"),
-            (["transcribe", "x"], "unknown subcommand"),
+            (["transcribe", "x"], "transcribe requires one audio path and --locale <tag>"),
             (["--version", "extra"], "--version takes no arguments"),
             (["trash"], "trash takes exactly one path"),
             (["trash", "a", "b"], "trash takes exactly one path"),
@@ -194,8 +195,9 @@ private struct FailingDocument: Encodable {
         ]
 
         for (arguments, message) in cases {
+            let outcome = await execute(arguments: arguments, trasher: FailingTrasher())
             XCTAssertEqual(
-                execute(arguments: arguments, trasher: FailingTrasher()),
+                outcome,
                 Outcome(stdout: "", stderr: "vpt-macos: \(message)\n\(usage)\n", exitCode: 2),
                 "arguments: \(arguments)"
             )
