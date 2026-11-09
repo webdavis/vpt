@@ -29,6 +29,19 @@ fn a_fractional_duration_floors_to_whole_seconds() {
 }
 
 #[test]
+fn fractional_duration_is_preserved_for_engine_timestamp_validation() {
+    let mut version_zero = mvhd(CAPTURED, 7);
+    version_zero[24..28].copy_from_slice(&7_999u32.to_be_bytes());
+    let mut version_one = mvhd_v1(CAPTURED, 7);
+    version_one[32..40].copy_from_slice(&7_999u64.to_be_bytes());
+    for movie in [version_zero, version_one] {
+        let container = inspect_bytes(&with_movie(&movie)).unwrap();
+        assert!((container.precise_duration_secs() - 7.999).abs() < 1e-12);
+        assert_eq!(container.duration_secs, 7);
+    }
+}
+
+#[test]
 fn a_truncated_download_is_refused_past_end() {
     let mut bytes = m4a(CAPTURED, 612, b"audio");
     bytes.truncate(bytes.len() - 10);
