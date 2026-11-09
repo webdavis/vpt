@@ -132,6 +132,16 @@ pub(super) struct SnapshotEntry {
     link_target: Option<PathBuf>,
 }
 
+#[allow(
+    dead_code,
+    reason = "source preservation checks use the shared snapshot"
+)]
+impl SnapshotEntry {
+    pub(super) fn is_within(&self, root: &Path) -> bool {
+        self.path.starts_with(root)
+    }
+}
+
 pub(super) fn writer_ready(state: &Path) -> bool {
     matches!(std::fs::read(state.join("writer-ready")), Ok(bytes) if bytes == b"ready")
 }

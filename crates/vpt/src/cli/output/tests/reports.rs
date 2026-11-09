@@ -13,6 +13,8 @@ impl Write for Broken {
 
 fn success() -> Outcome {
     Outcome::Success {
+        completed: Vec::new(),
+        diagnostics: Vec::new(),
         document: json!({"schema":"vpt.result/1", "command":"doctor", "checks":[]}),
         human: "ok config\n".into(),
     }

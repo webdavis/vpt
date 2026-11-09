@@ -38,6 +38,7 @@ mod tests {
 
     fn fixture() -> (tempfile::TempDir, Environment, PathBuf) {
         let temp = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(temp.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
         let home = temp.path().join("home");
         let config = temp.path().join("config.toml");
         std::fs::create_dir(&home).unwrap();

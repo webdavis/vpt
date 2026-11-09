@@ -1,17 +1,18 @@
 use crate::cli::output::Outcome;
-use crate::documents::record_json;
-use vpt_application::ports::RecordingLedger;
+use crate::documents::observation_json;
+use vpt_application::ports::ObservationLedger;
 use vpt_domain::identity::RecordingId;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
-pub(crate) fn run(ledger: &dyn RecordingLedger, id: &str) -> Outcome {
+pub(crate) fn run(ledger: &dyn ObservationLedger, id: &str) -> Outcome {
     let Ok(identity) = RecordingId::parse(id) else {
         return Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, "invalid recording id"));
     };
-    match ledger.by_id(&identity) {
-        Ok(Some(record)) => {
-            let json = match record_json(&record) {
+    match ledger.observe_recordings(Some(&identity)) {
+        Ok(records) if !records.is_empty() => {
+            let record = &records[0];
+            let json = match observation_json(record) {
                 Ok(json) => json,
                 Err(error) => return Outcome::Failure(error),
             };
@@ -25,11 +26,13 @@ pub(crate) fn run(ledger: &dyn RecordingLedger, id: &str) -> Outcome {
                 }
             };
             Outcome::Success {
+                completed: Vec::new(),
+                diagnostics: Vec::new(),
                 human,
                 document: document("show", json),
             }
         }
-        Ok(None) => Outcome::Failure(
+        Ok(_) => Outcome::Failure(
             ErrorDocument::new(ErrorKind::Usage, "recording not found").ids(vec![id.to_owned()]),
         ),
         Err(error) => Outcome::Failure(crate::compose::errors::ledger_error(error)),

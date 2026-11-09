@@ -26,6 +26,13 @@ pub fn broken_output() -> (OwnedFd, UnixStream) {
     (writer.into(), peer)
 }
 
+#[allow(dead_code, reason = "shared fixture used by mutating command tests")]
+pub fn run_with_broken_stdout(command: &mut Command, budget: Duration) -> Output {
+    let (descriptor, _peer) = broken_output();
+    command.stdout(Stdio::from(descriptor));
+    run_with_budget(command, budget)
+}
+
 pub struct Sandbox {
     root: tempfile::TempDir,
 }
@@ -130,13 +137,39 @@ pub fn collect(child: ProcessGroup, started: Instant, spawn_return: Option<Insta
 }
 
 pub fn collect_with(
+    group: ProcessGroup,
+    started: Instant,
+    spawn_return: Option<Instant>,
+    drive: impl FnMut(),
+) -> Output {
+    collect_with_budget(
+        group,
+        started,
+        spawn_return,
+        drive,
+        Duration::from_millis(500),
+    )
+}
+
+#[allow(
+    dead_code,
+    reason = "durable recovery scenarios allow multiple filesystem synchronizations"
+)]
+pub fn run_with_budget(command: &mut Command, budget: Duration) -> Output {
+    let started = Instant::now();
+    let child = spawn(command);
+    collect_with_budget(child, started, Some(Instant::now()), || {}, budget)
+}
+
+fn collect_with_budget(
     mut group: ProcessGroup,
     started: Instant,
     spawn_return: Option<Instant>,
     mut drive: impl FnMut(),
+    budget: Duration,
 ) -> Output {
     let mut diagnostic = Diagnostic::new(started, group.id(), spawn_return);
-    group.set_deadline(started + Duration::from_millis(900));
+    group.set_deadline(started + budget + Duration::from_millis(400));
     let stdout_piped = group.stdout.is_some();
     let stderr_piped = group.stderr.is_some();
     let mut stdout = Capture::new(group.stdout.take());
@@ -144,7 +177,7 @@ pub fn collect_with(
     let status = loop {
         let poll_started = Instant::now();
         diagnostic.poll_started(poll_started);
-        if poll_started.duration_since(started) >= Duration::from_millis(500) {
+        if poll_started.duration_since(started) >= budget {
             diagnostic.deadline(poll_started);
             break None;
         }
@@ -172,7 +205,7 @@ pub fn collect_with(
         if let Some(status) = observed {
             diagnostic.child_exit(observed_at, status);
         }
-        if observed_at.duration_since(started) >= Duration::from_millis(500) {
+        if observed_at.duration_since(started) >= budget {
             diagnostic.deadline(observed_at);
             break None;
         }
@@ -186,17 +219,20 @@ pub fn collect_with(
     let cleaned_at = Instant::now();
     diagnostic.cleanup(cleaned_at);
     let elapsed = cleaned_at.duration_since(started);
-    if elapsed >= Duration::from_secs(1) || status.is_none() {
+    if elapsed >= budget + Duration::from_millis(500) || status.is_none() {
         let record = diagnostic.render(
             &stdout.bytes,
             &stderr.bytes,
             stdout.finished(),
             stderr.finished(),
         );
-        if elapsed >= Duration::from_secs(1) {
+        if budget == Duration::from_millis(500) && elapsed >= Duration::from_secs(1) {
             panic!("command exceeded one second: {record}");
         }
-        panic!("command exceeded 500 ms deadline: {record}");
+        panic!(
+            "command exceeded {} ms deadline: {record}",
+            budget.as_millis()
+        );
     }
     if elapsed > Duration::from_millis(200) {
         eprintln!("slow command: {elapsed:?}");

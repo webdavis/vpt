@@ -281,3 +281,58 @@ fn setup_refusal_with_broken_stderr_exits_one() {
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(stdout(&output), "");
 }
+
+#[test]
+fn setup_refuses_shared_home_state_or_store_before_prompt_or_config_write() {
+    use std::os::unix::fs::MetadataExt;
+    for leaf in [
+        "home/.vpt",
+        "state/vpt",
+        "home/.vpt/audio",
+        "home/.vpt/released",
+    ] {
+        let sandbox = Sandbox::new("setup-shared-directory");
+        let home = sandbox.path().join("home/.vpt");
+        std::fs::create_dir(&home).unwrap();
+        std::fs::set_permissions(&home, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let shared = sandbox.path().join(leaf);
+        std::fs::create_dir_all(&shared).unwrap();
+        std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::write(shared.join("operator"), b"keep").unwrap();
+        let before = std::fs::metadata(&shared).unwrap();
+        for structured in [false, true] {
+            let mut command = sandbox.vpt();
+            command.arg("setup");
+            if structured {
+                command.arg("--json");
+            }
+            let output = run(&mut command);
+            assert_eq!(output.status.code(), Some(3), "{leaf}: {}", stderr(&output));
+            assert!(output.stdout.is_empty());
+            assert!(!stderr(&output).contains("terminal"));
+            if structured {
+                let error: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
+                assert_eq!(error["error"]["rule"], "nonprivate_directory");
+            }
+            let after = std::fs::metadata(&shared).unwrap();
+            assert_eq!(
+                (
+                    after.mode(),
+                    after.ctime(),
+                    after.ctime_nsec(),
+                    after.mtime(),
+                    after.mtime_nsec()
+                ),
+                (
+                    before.mode(),
+                    before.ctime(),
+                    before.ctime_nsec(),
+                    before.mtime(),
+                    before.mtime_nsec()
+                )
+            );
+            assert_eq!(std::fs::read(shared.join("operator")).unwrap(), b"keep");
+            assert!(!sandbox.config_path().exists());
+        }
+    }
+}
