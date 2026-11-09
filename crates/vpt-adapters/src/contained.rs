@@ -1,5 +1,6 @@
 mod directory;
 mod file;
+mod owned_directory;
 mod private_log;
 mod private_state;
 mod rename;
