@@ -10,6 +10,7 @@ pub mod identity;
 pub mod layout;
 pub mod normalize;
 pub mod note;
+pub mod occasion;
 pub mod proposal;
 pub mod readability;
 pub mod redaction;
