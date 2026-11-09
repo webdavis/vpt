@@ -140,3 +140,27 @@ fn non_utf8_paths_are_refused_without_substitution() {
         );
     }
 }
+
+#[test]
+fn transcribe_accepts_language_and_dry_run_flags_around_the_identity() {
+    for line in [
+        "transcribe --language fr-CA id --dry-run",
+        "transcribe id --dry-run --language fr-CA",
+    ] {
+        assert_eq!(
+            parsed(line).unwrap().verb,
+            Verb::Transcribe {
+                id: "id".into(),
+                language: Some("fr-CA".into()),
+                dry_run: true
+            }
+        );
+    }
+    for line in [
+        "transcribe id --language",
+        "transcribe --language --json id",
+        "transcribe",
+    ] {
+        assert!(parsed(line).is_err());
+    }
+}

@@ -5,6 +5,7 @@ pub(crate) mod setup;
 pub(crate) mod show;
 pub(crate) mod storage;
 pub(crate) mod symlink;
+pub(crate) mod transcribe;
 pub(crate) mod version;
 
 pub(crate) mod ingest;
