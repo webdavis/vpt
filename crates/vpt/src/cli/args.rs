@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use verbs::parse_verb;
 
 pub const USAGE: &str = "usage: vpt [--json] [--config <file>] <verb>\n\
-verbs: setup [--force] | doctor | show <id> |\n\
+verbs: setup [--force] | doctor | ingest [--dry-run] [--once <path>] | show <id> |\n\
        list [--stage <stage>] | storage | retention run [--dry-run] |\n\
        symlink deploy | symlink verify | --version\n";
 
@@ -18,6 +18,10 @@ pub enum Verb {
         force: bool,
     },
     Doctor,
+    Ingest {
+        dry_run: bool,
+        once: Option<PathBuf>,
+    },
     Show {
         id: String,
     },
@@ -56,6 +60,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
         if matches!(
             word.as_str(),
                 | "--config"
+                | "--once"
                 | "--stage"
         ) && words
             .get(index + 1)

@@ -11,6 +11,10 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
             force: take_flag(words, "--force"),
         }),
         "doctor" => Ok(Verb::Doctor),
+        "ingest" => Ok(Verb::Ingest {
+            dry_run: take_flag(words, "--dry-run"),
+            once: take_value(words, "--once")?.map(PathBuf::from),
+        }),
         "show" => Ok(Verb::Show {
             id: take_positional(words, "<id>")?,
         }),

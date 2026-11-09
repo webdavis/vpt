@@ -8,6 +8,7 @@ use vpt_adapters::config::{ConfigError, default_state_dir, from_table, load_file
 use vpt_application::Settings;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
+pub(crate) mod config_refusal;
 pub(crate) mod errors;
 pub(crate) mod events;
 pub(crate) mod history;
