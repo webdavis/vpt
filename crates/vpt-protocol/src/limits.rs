@@ -1,4 +1,6 @@
+mod shape;
 mod visitor;
+use shape::{Location, Profile};
 
 use serde::de::DeserializeSeed;
 use serde_json::Value;
@@ -33,17 +35,23 @@ pub enum LimitViolation {
 }
 
 pub fn read_bounded(bytes: &[u8], limits: &Limits) -> Result<Value, LimitViolation> {
+    read_profile(bytes, limits, Profile::General)
+}
+
+fn read_profile(bytes: &[u8], limits: &Limits, profile: Profile) -> Result<Value, LimitViolation> {
     if bytes.len() > limits.bytes {
         return Err(LimitViolation::Bytes(bytes.len()));
     }
     let context = visitor::Context {
         limits,
+        profile,
         violation: RefCell::new(None),
     };
     let mut decoder = serde_json::Deserializer::from_slice(bytes);
     let value = visitor::Node {
         context: &context,
         depth: 0,
+        location: Location::Root,
         overflow: None,
     }
     .deserialize(&mut decoder)

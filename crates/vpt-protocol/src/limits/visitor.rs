@@ -1,4 +1,7 @@
+mod key;
+use super::shape::{Location, Profile};
 use super::{LimitViolation, Limits};
+use key::Key;
 use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Number, Value};
 use std::cell::RefCell;
@@ -6,6 +9,7 @@ use std::fmt;
 
 pub(super) struct Context<'a> {
     pub limits: &'a Limits,
+    pub profile: Profile,
     pub violation: RefCell<Option<LimitViolation>>,
 }
 
@@ -27,6 +31,7 @@ impl Context<'_> {
 pub(super) struct Node<'a, 'b> {
     pub context: &'a Context<'b>,
     pub depth: usize,
+    pub location: Location,
     pub overflow: Option<usize>,
 }
 
@@ -94,11 +99,15 @@ impl<'de> Visitor<'de> for Node<'_, '_> {
         let depth = self.enter()?;
         let mut items = Vec::new();
         loop {
-            let overflow = (items.len() >= self.context.limits.array_len)
-                .then_some(items.len().saturating_add(1));
+            let overflow = (items.len()
+                >= self
+                    .location
+                    .limit(self.context.profile, self.context.limits.array_len))
+            .then_some(items.len().saturating_add(1));
             let next = sequence.next_element_seed(Node {
                 context: self.context,
                 depth,
+                location: self.location.element(),
                 overflow,
             })?;
             match next {
@@ -112,36 +121,17 @@ impl<'de> Visitor<'de> for Node<'_, '_> {
         let depth = self.enter()?;
         let mut fields = Map::new();
         while let Some(key) = object.next_key_seed(Key(self.context))? {
+            if fields.contains_key(&key) {
+                return Err(de::Error::custom("duplicate object field"));
+            }
             let value = object.next_value_seed(Node {
                 context: self.context,
                 depth,
+                location: self.location.field(&key),
                 overflow: None,
             })?;
             fields.insert(key, value);
         }
         Ok(Value::Object(fields))
-    }
-}
-
-struct Key<'a, 'b>(&'a Context<'b>);
-
-impl<'de> DeserializeSeed<'de> for Key<'_, '_> {
-    type Value = String;
-
-    fn deserialize<D: de::Deserializer<'de>>(self, decoder: D) -> Result<String, D::Error> {
-        decoder.deserialize_str(self)
-    }
-}
-
-impl<'de> Visitor<'de> for Key<'_, '_> {
-    type Value = String;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("a bounded object key")
-    }
-
-    fn visit_str<E: de::Error>(self, value: &str) -> Result<String, E> {
-        self.0.text(value)?;
-        Ok(value.to_owned())
     }
 }
