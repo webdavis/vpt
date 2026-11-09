@@ -9,9 +9,10 @@ use vpt_domain::time::{FileTime, UtcInstant};
 
 pub(super) use crate::observations_fixture::snapshot;
 
-pub(super) const NAMES: [&str; 18] = [
+pub(super) const NAMES: [&str; 20] = [
     "config",
     "stores",
+    "vault",
     "git_tree:audio",
     "git_tree:transcripts",
     "git_tree:analysis",
@@ -20,6 +21,7 @@ pub(super) const NAMES: [&str; 18] = [
     "git_tree:drafts",
     "git_tree:released",
     "helper",
+    "engines",
     "recordings_dir",
     "symlink",
     "subdirectory:Capture",
@@ -61,7 +63,7 @@ pub(super) fn run_json(sandbox: &Sandbox, code: i32) -> Vec<Value> {
 pub(super) fn report(output: &Output, code: i32) -> Vec<Value> {
     assert_eq!(output.status.code(), Some(code), "{}", stderr(output));
     let text = if code == 0 {
-        assert!(output.stderr.is_empty());
+        assert!(output.stderr.is_empty(), "{}", stderr(output));
         stdout(output)
     } else {
         assert!(output.stdout.is_empty());
@@ -79,7 +81,7 @@ pub(super) fn report(output: &Output, code: i32) -> Vec<Value> {
         .map(|check| check["name"].as_str().unwrap())
         .collect();
     assert_eq!(names, NAMES.into_iter().collect());
-    assert_eq!(checks.len(), 18);
+    assert_eq!(checks.len(), NAMES.len());
     let failed = checks.iter().filter(|check| check["ok"] == false).count();
     if code == 0 {
         assert_eq!(failed, 0);

@@ -1,5 +1,7 @@
 mod checks;
+mod engines;
 mod probes;
+mod vault;
 
 use crate::cli::output::Outcome;
 use crate::compose::Environment;
