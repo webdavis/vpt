@@ -1,3 +1,4 @@
+pub(crate) mod briefs;
 pub(crate) mod engine_outputs;
 pub(crate) mod flags;
 pub(crate) mod history;

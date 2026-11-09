@@ -26,3 +26,5 @@ pub(crate) mod contract;
 pub(crate) use sqlite::tests::{run_scenario, schema_diagnostics};
 
 pub(crate) use verification::prepare_findings as prepare_verification_findings;
+pub(crate) mod brief;
+pub use brief::prepare as prepare_brief_artifact;

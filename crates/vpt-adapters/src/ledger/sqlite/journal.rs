@@ -81,6 +81,17 @@ impl PublicationJournal for SqliteLedger {
 
     fn clear_publication(&self, target: &Path) -> Result<(), LedgerError> {
         self.transaction(|transaction| {
+            let owned: bool = transaction
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM owned_briefs WHERE target=?1)",
+                    [target.to_string_lossy()],
+                    |row| row.get(0),
+                )
+                .map_err(map)?;
+            if owned {
+                return Err(crate::ledger::brief::conflict());
+            }
+
             transaction
                 .execute(
                     "DELETE FROM dirty_publications WHERE target = ?1",

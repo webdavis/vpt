@@ -15,6 +15,9 @@ impl PublicationJournal for MemoryLedger {
 
     fn clear_publication(&self, target: &Path) -> Result<(), LedgerError> {
         with(self, |state| {
+            if state.briefs.iter().any(|row| row.target == target) {
+                return Err(crate::ledger::brief::conflict());
+            }
             state
                 .vocabulary
                 .retain(|entry| entry.entry.target != target);

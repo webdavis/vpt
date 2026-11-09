@@ -104,6 +104,9 @@ impl RecordingLedger for SqliteLedger {
 
     fn commit(&self, batch: &LedgerCommit) -> Result<(), LedgerError> {
         self.transaction(|transaction| {
+            crate::ledger::brief::reservations::commit(batch, |path| {
+                super::briefs::owns(transaction, path)
+            })?;
             apply_commit(transaction, batch)
         })
     }
