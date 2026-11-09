@@ -1,4 +1,5 @@
 pub mod alignment;
+pub mod brief;
 pub mod container;
 pub mod digest;
 pub mod duration;
