@@ -8,6 +8,12 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
     if text.correction.is_some() && first != "review" {
         return Err(UsageError("--correct requires review".into()));
     }
+    if first != "brief" && (text.title.is_some() || !text.participants.is_empty()) {
+        return Err(UsageError("--title and --participant require brief".into()));
+    }
+    if first == "brief" {
+        return brief::parse(words, text);
+    }
     if first == "confirm" {
         return confirm::parse(words, text);
     }
