@@ -10,6 +10,7 @@ pub mod layout;
 pub mod normalize;
 pub mod readability;
 pub mod redaction;
+pub mod relations;
 pub mod retention;
 pub mod review;
 pub mod run;
