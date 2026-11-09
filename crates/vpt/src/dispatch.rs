@@ -13,6 +13,16 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             invocation.config.as_deref(),
             options,
         ),
+        Verb::Occasions | Verb::OccasionPath { .. } => match compose::ledger_from(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+        ) {
+            Ok(ledger) => match &invocation.verb {
+                Verb::OccasionPath { id, stage } => commands::occasions::path(&ledger, id, stage),
+                _ => commands::occasions::run(&ledger),
+            },
+            Err(error) => Outcome::Failure(*error),
+        },
         Verb::Synthesize { id, dry_run } => commands::synthesize::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
@@ -76,6 +86,13 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
         ),
+        Verb::Path { id, stage } => match compose::ledger_from(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+        ) {
+            Ok(ledger) => commands::path::run(&ledger, id, stage),
+            Err(error) => Outcome::Failure(*error),
+        },
         Verb::Show { id } => match compose::ledger_from(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

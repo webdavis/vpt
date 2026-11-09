@@ -27,6 +27,7 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
         return Err(UsageError("--tag and --reject-tag require confirm".into()));
     }
     match first.as_str() {
+        "occasions" => Ok(Verb::Occasions),
         "synthesize" => {
             let dry_run = take_flag(words, "--dry-run");
             Ok(Verb::Synthesize {
@@ -65,6 +66,17 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
                 language,
                 dry_run,
             })
+        }
+        "path" => {
+            let stage = take_value(words, "--stage")?
+                .ok_or_else(|| UsageError("--stage is required".into()))?;
+            match take_value(words, "--occasion")? {
+                Some(id) => Ok(Verb::OccasionPath { id, stage }),
+                None => Ok(Verb::Path {
+                    id: take_positional(words, "<id>")?,
+                    stage,
+                }),
+            }
         }
         "show" => Ok(Verb::Show {
             id: take_positional(words, "<id>")?,

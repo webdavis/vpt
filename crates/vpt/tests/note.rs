@@ -6,6 +6,8 @@ mod fixture;
 mod mentions;
 #[path = "note/output.rs"]
 mod output;
+#[path = "note/path.rs"]
+mod path;
 #[path = "note/relation_confirm.rs"]
 mod relation_confirm;
 #[path = "note/relations.rs"]
