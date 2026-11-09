@@ -14,6 +14,12 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             id,
             *dry_run,
         ),
+        Verb::VerifyNote { path, recording } => commands::verify::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            path,
+            recording,
+        ),
         Verb::ReviewResolve { id, flag, action } => commands::review::resolve(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

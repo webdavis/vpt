@@ -28,6 +28,14 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
                 dry_run,
             })
         }
+        "verify-note" => {
+            let recording = take_value(words, "--recording")?
+                .ok_or_else(|| UsageError("--recording is required".into()))?;
+            Ok(Verb::VerifyNote {
+                path: take_positional(words, "<path>")?.into(),
+                recording,
+            })
+        }
         "--version" => Ok(Verb::Version),
         "setup" => Ok(Verb::Setup {
             force: take_flag(words, "--force"),

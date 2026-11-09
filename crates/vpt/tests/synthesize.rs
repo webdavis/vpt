@@ -4,6 +4,8 @@
 mod filenames;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
+#[path = "synthesize/freshness.rs"]
+mod freshness;
 #[path = "synthesize/links.rs"]
 mod links;
 #[path = "synthesize/metadata.rs"]
