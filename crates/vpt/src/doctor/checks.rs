@@ -81,7 +81,8 @@ pub(super) fn all(environment: &Environment, config: Option<&Path>) -> Vec<Check
             ),
         }
     }));
-    checks.push(probes::helper(&settings));
+    let helper = probes::helper(&settings);
+    checks.push(helper);
     let source = if settings.source.recordings_dir.is_absolute() {
         settings
             .source

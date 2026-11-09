@@ -37,7 +37,7 @@ pub(crate) fn record_json(record: &RecordingRecord) -> Result<Value, ErrorDocume
     clippy::result_large_err,
     reason = "CLI outcomes own the error document directly"
 )]
-fn checked_path(path: &std::path::Path) -> Result<&str, ErrorDocument> {
+pub(super) fn checked_path(path: &std::path::Path) -> Result<&str, ErrorDocument> {
     path.to_str()
         .ok_or_else(|| ErrorDocument::new(ErrorKind::Ledger, "record path is not UTF-8"))
 }

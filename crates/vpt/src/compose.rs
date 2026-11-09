@@ -66,10 +66,11 @@ pub(crate) fn settings_from(
         .map_or_else(|| environment.config_path().map_err(config_error), Ok)?;
     let table = load_file(&selected).map_err(config_error)?;
     let home = environment.home_dir().map_err(config_error)?;
-    from_table(&table, &home).map_err(config_error)
+    let settings = from_table(&table, &home).map_err(config_error)?;
+    Ok(settings)
 }
 
-fn config_error(error: ConfigError) -> Box<ErrorDocument> {
+pub(crate) fn config_error(error: ConfigError) -> Box<ErrorDocument> {
     let document = match error {
         ConfigError::Missing(path) => ErrorDocument::new(
             ErrorKind::Config,
@@ -107,3 +108,5 @@ fn config_error(error: ConfigError) -> Box<ErrorDocument> {
     };
     Box::new(document)
 }
+
+

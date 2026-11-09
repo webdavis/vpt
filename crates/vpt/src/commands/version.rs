@@ -50,6 +50,8 @@ pub fn run(environment: &Environment, config: Option<&Path>) -> Outcome {
         }
     }
     Outcome::Success {
+        completed: Vec::new(),
+        diagnostics,
         document: result,
         human: text,
     }

@@ -1,3 +1,6 @@
+mod observation;
+mod occasions;
+mod retention_artifacts;
 use std::path::Path;
 use vpt_adapters::{MemoryLedger, SqliteLedger};
 use vpt_application::ports::{
@@ -8,6 +11,9 @@ use vpt_domain::digest::Sha256Digest;
 use vpt_domain::identity::RecordingId;
 use vpt_domain::time::UtcInstant;
 use vpt_protocol::error::ErrorDocument;
+mod notes;
+mod proposals;
+mod review;
 
 pub(crate) enum RuntimeLedger {
     Sqlite(SqliteLedger),
@@ -91,7 +97,7 @@ mod tests {
 
     use super::*;
     use vpt_adapters::RootDir;
-    use vpt_application::ports::{StageStates, TitleOrigin};
+    use vpt_application::ports::{ProposalLedger, StageStates, TitleOrigin};
     use vpt_domain::time::UtcOffset;
 
     #[test]
@@ -99,6 +105,9 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let absent = RuntimeLedger::read_only(&temp.path().join("absent")).unwrap();
         assert_eq!(absent.recordings(), Ok(vec![]));
+        let id = RecordingId::parse("2026-08-24T144736-4f3ab19c02de").unwrap();
+        assert_eq!(absent.accepted_proposal(&id), Ok(None));
+        assert_eq!(absent.grounding_basis(&id), Ok(None));
         assert!(!temp.path().join("absent").exists());
     }
 
@@ -144,6 +153,8 @@ mod tests {
             .unwrap();
         drop(ledger);
         let observed = RuntimeLedger::read_only(temp.path()).unwrap();
+        assert_eq!(observed.accepted_proposal(&record.id), Ok(None));
+        assert_eq!(observed.grounding_basis(&record.id), Ok(None));
         assert_eq!(observed.by_id(&record.id), Ok(Some(record)));
     }
 }

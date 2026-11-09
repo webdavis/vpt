@@ -54,6 +54,8 @@ fn outcome(
 ) -> Outcome {
     match result {
         Ok(()) => Outcome::Success {
+            completed: Vec::new(),
+            diagnostics: Vec::new(),
             human: format!("{} -> {}\n", link.display(), target.display()),
             document: document(verb, json!({"link": link, "target": target, "ok": true})),
         },

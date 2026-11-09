@@ -54,6 +54,8 @@ pub(crate) fn run(paths: &StorePaths, source: &dyn Stores) -> Outcome {
         );
     }
     Outcome::Success {
+        completed: Vec::new(),
+        diagnostics: Vec::new(),
         human,
         document: document("storage", json!({"stores": stores})),
     }

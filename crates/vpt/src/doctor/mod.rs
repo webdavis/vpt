@@ -26,6 +26,8 @@ pub(crate) fn run(environment: &Environment, config: Option<&Path>) -> Outcome {
     let failed = checks.iter().filter(|check| !check.ok).count();
     if failed == 0 {
         return Outcome::Success {
+            completed: Vec::new(),
+            diagnostics: Vec::new(),
             document: document("doctor", serde_json::json!({"checks": checks})),
             human,
         };

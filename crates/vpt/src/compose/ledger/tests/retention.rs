@@ -15,7 +15,7 @@ fn intent(root: &Path, seed: u8) -> NewIntent {
     };
     NewIntent {
         kind: ArtifactKind::Audio,
-        recording: RecordingId::derive(recorded_at, UtcOffset { secs: 0 }, &expected).unwrap(),
+        owner: (RecordingId::derive(recorded_at, UtcOffset { secs: 0 }, &expected).unwrap()).into(),
         path: root.join(format!("{seed}.m4a")),
         expected,
         recorded_at,
@@ -26,7 +26,7 @@ fn saved(id: i64, new: NewIntent) -> RetentionIntent {
     RetentionIntent {
         id,
         kind: new.kind,
-        recording: new.recording,
+        owner: new.owner,
         path: new.path,
         expected: new.expected,
         recorded_at: new.recorded_at,

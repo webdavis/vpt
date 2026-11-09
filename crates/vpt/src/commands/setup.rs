@@ -60,6 +60,8 @@ fn prepare(
         .run(&mut prompt, &writer, force)
         .map_err(setup_error)?;
     Ok(Outcome::Success {
+        completed: Vec::new(),
+        diagnostics: Vec::new(),
         document: document(
             "setup",
             json!({"written": outcome.written, "main_engine": outcome.main_engine}),
@@ -92,9 +94,20 @@ fn setup_error(error: SetupError) -> ErrorDocument {
         .rule("path_escape"),
         SetupError::NonPrivateConfig(path) => ErrorDocument::new(
             ErrorKind::Refused,
-            format!("{} must already be private (mode 0700)", path.display()),
+            format!(
+                "{} must already be private (mode 0700) and owned by the current user",
+                path.display()
+            ),
         )
         .rule("nonprivate_config_directory"),
+        SetupError::NonPrivateDirectory(path) => ErrorDocument::new(
+            ErrorKind::Refused,
+            format!(
+                "{} must already be private (mode 0700) and owned by the current user",
+                path.display()
+            ),
+        )
+        .rule("nonprivate_directory"),
         SetupError::MultiplyLinkedConfig(path) => ErrorDocument::new(
             ErrorKind::Refused,
             format!("{} has multiple hard links", path.display()),

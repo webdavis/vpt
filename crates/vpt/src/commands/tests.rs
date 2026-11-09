@@ -51,7 +51,12 @@ impl Stores for EmptyStores {
     fn digest_bytes(&self, _bytes: &[u8]) -> Sha256Digest {
         Sha256Digest([0; 32])
     }
-    fn publish(&self, _target: &Path, _bytes: &[u8]) -> Result<(), StoreError> {
+    fn publish(
+        &self,
+        _target: &Path,
+        _expected: Option<Sha256Digest>,
+        _bytes: &[u8],
+    ) -> Result<(), StoreError> {
         Ok(())
     }
     fn sync_directory_of(&self, _path: &Path) -> Result<(), StoreError> {
@@ -70,7 +75,9 @@ fn show_directly_returns_a_known_record_and_typed_missing_id() {
         })
         .unwrap();
     match show::run(&ledger, row.id.as_str()) {
-        Outcome::Success { document, human } => {
+        Outcome::Success {
+            document, human, ..
+        } => {
             assert_eq!(document["id"], row.id.as_str());
             assert!(human.contains(row.id.as_str()));
         }
@@ -166,7 +173,9 @@ fn storage_directly_reports_named_stores_from_entries() {
     };
     let stores = FilesystemStores::open_read_only(std::slice::from_ref(&root)).unwrap();
     match storage::run(&paths, &stores) {
-        Outcome::Success { document, human } => {
+        Outcome::Success {
+            document, human, ..
+        } => {
             assert_eq!(document["stores"].as_object().unwrap().len(), 7);
             assert_eq!(document["stores"]["audio"]["files"], 1);
             assert_eq!(document["stores"]["audio"]["bytes"], 3);
