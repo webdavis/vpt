@@ -3,7 +3,11 @@ mod stage;
 use crate::{review::ReviewFlag, transcript::Transcript};
 pub use rendered::{OpenSpan, RenderedTranscript, transcript_with_spans};
 pub use stage::NoteStage;
+mod analysis;
 mod annotations;
+pub use analysis::{
+    FINDING_CORRECTION_MARKER, analysis_content, finding_annotation, resolved_finding_annotation,
+};
 pub mod document;
 pub mod filename;
 pub mod links;
