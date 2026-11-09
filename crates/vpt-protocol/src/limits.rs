@@ -38,6 +38,21 @@ pub fn read_bounded(bytes: &[u8], limits: &Limits) -> Result<Value, LimitViolati
     read_profile(bytes, limits, Profile::General)
 }
 
+pub(crate) fn read_engine(bytes: &[u8]) -> Result<Value, LimitViolation> {
+    read_large(bytes, Profile::Engine)
+}
+
+fn read_large(bytes: &[u8], profile: Profile) -> Result<Value, LimitViolation> {
+    read_profile(
+        bytes,
+        &Limits {
+            bytes: 16_777_216,
+            ..Limits::incoming()
+        },
+        profile,
+    )
+}
+
 fn read_profile(bytes: &[u8], limits: &Limits, profile: Profile) -> Result<Value, LimitViolation> {
     if bytes.len() > limits.bytes {
         return Err(LimitViolation::Bytes(bytes.len()));
