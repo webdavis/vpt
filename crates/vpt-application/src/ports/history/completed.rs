@@ -7,6 +7,16 @@ impl WorkDelta {
             .iter()
             .map(|row| row.id.clone())
             .collect();
+        if let Some(change) = &self.verification
+            && !completed.contains(&change.recording)
+        {
+            completed.push(change.recording.clone());
+        }
+        if let Some(crate::ports::ProposalChange::Accept(accepted)) = &self.proposal
+            && !completed.contains(&accepted.recording)
+        {
+            completed.push(accepted.recording.clone());
+        }
         if let Some(crate::ports::TranscriptionChange::Accept(accepted)) = &self.transcription
             && !completed.contains(&accepted.recording)
         {
@@ -16,6 +26,21 @@ impl WorkDelta {
             && !completed.contains(&change.recording)
         {
             completed.push(change.recording.clone());
+        }
+        if let Some(change) = &self.tags
+            && !completed.contains(&change.recording)
+        {
+            completed.push(change.recording.clone());
+        }
+        if let Some(change) = &self.relations
+            && !completed.contains(&change.recording)
+        {
+            completed.push(change.recording.clone());
+        }
+        for change in &self.notes {
+            if !completed.contains(&change.artifact.recording) {
+                completed.push(change.artifact.recording.clone());
+            }
         }
         completed
     }
