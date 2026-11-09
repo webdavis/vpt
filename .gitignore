@@ -6,3 +6,4 @@ helper/vpt-macos/.build/
 *.mp3
 *.opus
 *.caf
+.DS_Store
