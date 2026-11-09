@@ -1,4 +1,5 @@
 mod options;
+mod review;
 mod text;
 mod verbs;
 use options::{take_flag, take_positional, take_value};
@@ -8,12 +9,17 @@ use verbs::parse_verb;
 
 pub const USAGE: &str = "usage: vpt [--json] [--config <file>] <verb>\n\
 verbs: setup [--force] | doctor | ingest [--dry-run] [--once <path>] | show <id> |\n\
-       transcribe <id> [--language <tag>] [--dry-run] |\n\
+       transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] |\n\
        note write <id> | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
        symlink deploy | symlink verify | --version\n";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Verb {
+    ReviewResolve {
+        id: String,
+        flag: String,
+        action: vpt_domain::review::ReviewAction,
+    },
     Version,
     Setup {
         force: bool,
@@ -32,6 +38,9 @@ pub enum Verb {
         once: Option<PathBuf>,
     },
     Show {
+        id: String,
+    },
+    Review {
         id: String,
     },
     List {
@@ -72,6 +81,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
                 | "--once"
                 | "--stage"
                 | "--language"
+                | "--resolve"
         ) && words
             .get(index + 1)
             .is_none_or(|value| value.starts_with("--"))

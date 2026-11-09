@@ -2,6 +2,8 @@
 #![allow(dead_code, reason = "shared CLI fixtures")]
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
+#[path = "transcribe/lexical.rs"]
+mod lexical;
 #[path = "transcribe/output.rs"]
 mod output;
 #[path = "transcribe/pair_fixture.rs"]
@@ -84,4 +86,6 @@ fn ledger(sandbox: &Sandbox) -> SqliteLedger {
         .unwrap()
 }
 
+#[path = "transcribe/notes.rs"]
+mod notes;
 
