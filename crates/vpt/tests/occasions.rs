@@ -1,6 +1,8 @@
 #![allow(dead_code, reason = "shared CLI fixtures")]
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
+#[path = "occasions/recovery.rs"]
+mod recovery;
 mod support;
 use support::{Sandbox, stderr, stdout};
 use vpt_adapters::{RootDir, SqliteLedger};

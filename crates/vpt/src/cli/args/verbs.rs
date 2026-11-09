@@ -47,6 +47,9 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
                 recording,
             })
         }
+        "run" => Ok(Verb::Run {
+            dry_run: take_flag(words, "--dry-run"),
+        }),
         "--version" => Ok(Verb::Version),
         "setup" => Ok(Verb::Setup {
             force: take_flag(words, "--force"),
