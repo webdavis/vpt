@@ -27,6 +27,8 @@ pub mod proposal;
 mod spawn;
 mod stores;
 mod symlink;
+mod synthesis;
+pub use synthesis::CommandAgent;
 mod transcript_document;
 pub mod transcription;
 pub mod verification;
