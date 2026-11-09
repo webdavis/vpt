@@ -1,7 +1,9 @@
 pub(crate) mod publication;
 pub(crate) mod releases;
+pub(crate) mod review_notice;
 pub(crate) mod run_outcome;
 pub(crate) mod startup;
+pub(crate) mod synthesis_state;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use vpt_adapters::config::{ConfigError, default_state_dir, from_table, load_file};
@@ -119,6 +121,8 @@ pub(crate) fn config_error(error: ConfigError) -> Box<ErrorDocument> {
     Box::new(document)
 }
 
+pub(crate) mod relation_target;
+pub(crate) mod tag_vocabulary;
 
 #[cfg(test)]
 mod history_tests;

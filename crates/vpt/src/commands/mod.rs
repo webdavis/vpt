@@ -15,5 +15,6 @@ mod tests;
 
 
 
+pub(crate) mod synthesize;
 
 

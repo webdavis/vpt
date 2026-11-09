@@ -8,6 +8,12 @@ use crate::{
 
 pub(crate) fn run(invocation: &Invocation) -> i32 {
     let outcome = match &invocation.verb {
+        Verb::Synthesize { id, dry_run } => commands::synthesize::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            id,
+            *dry_run,
+        ),
         Verb::ReviewResolve { id, flag, action } => commands::review::resolve(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

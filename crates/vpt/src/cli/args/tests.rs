@@ -1,6 +1,7 @@
 use super::*;
 use std::ffi::OsString;
 use std::path::PathBuf;
+mod synthesize;
 
 fn parsed(line: &str) -> Result<Invocation, UsageError> {
     parse(std::iter::once(OsString::from("vpt")).chain(line.split(' ').map(OsString::from)))

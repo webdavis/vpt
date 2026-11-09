@@ -9,6 +9,13 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
         return Err(UsageError("--correct requires review".into()));
     }
     match first.as_str() {
+        "synthesize" => {
+            let dry_run = take_flag(words, "--dry-run");
+            Ok(Verb::Synthesize {
+                id: take_positional(words, "<id>")?,
+                dry_run,
+            })
+        }
         "--version" => Ok(Verb::Version),
         "setup" => Ok(Verb::Setup {
             force: take_flag(words, "--force"),
