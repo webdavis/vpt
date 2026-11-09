@@ -1,11 +1,16 @@
+mod verification;
+pub use verification::{VerifiedClaims};
 mod archive;
 mod clock;
 mod engine;
 mod engine_artifact;
 mod history;
 mod ledger;
+mod note_artifact;
 mod prompt;
 mod recorder;
+mod resolution;
+pub use resolution::FlagResolutionChange;
 mod retention;
 mod retention_history;
 mod stores;
@@ -39,8 +44,9 @@ pub use stores::{RetentionEntries, StoreEntry, StoreError, Stores};
 pub use trash::{Trash, TrashError};
 
 pub use transcript::{
-    AcceptedTranscript, FlagLedger, TranscriptLedger,
+    AcceptedTranscript, FlagLedger, ReviewLedger, ReviewSnapshot, TranscriptLedger,
     TranscriptionChange,
 };
 
 pub use engine_artifact::{EngineArtifact, EngineOutputLedger};
+pub use note_artifact::{NoteStage};

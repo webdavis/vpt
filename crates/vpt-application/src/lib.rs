@@ -4,6 +4,7 @@ mod inventory;
 pub mod ports;
 mod publication;
 mod retention;
+pub mod review;
 mod settings;
 mod setup;
 pub mod transcribe;
