@@ -1,9 +1,13 @@
 #![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared CLI fixtures")]
+#[path = "synthesize/filenames.rs"]
+mod filenames;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
 #[path = "synthesize/links.rs"]
 mod links;
+#[path = "synthesize/metadata.rs"]
+mod metadata;
 #[path = "note/setup.rs"]
 mod note;
 #[path = "synthesize/note_boundaries.rs"]
@@ -16,6 +20,10 @@ mod output;
 mod profiles;
 #[path = "synthesize/protocol.rs"]
 mod protocol;
+#[path = "synthesize/recovery.rs"]
+mod recovery;
+#[path = "synthesize/related.rs"]
+mod related;
 mod support;
 #[path = "synthesize/tag_defaults.rs"]
 mod tag_defaults;

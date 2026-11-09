@@ -89,3 +89,5 @@ fn ledger(sandbox: &Sandbox) -> SqliteLedger {
 #[path = "transcribe/notes.rs"]
 mod notes;
 
+#[path = "transcribe/alerts.rs"]
+mod alerts;

@@ -19,6 +19,7 @@ mod ledger;
 pub(crate) mod mentions;
 pub(crate) mod mutation;
 mod observations;
+mod terms;
 pub(crate) use ledger::RuntimeLedger;
 pub(crate) use observations::{ledger_from, storage_from};
 
@@ -79,6 +80,7 @@ pub(crate) fn settings_from(
     let table = load_file(&selected).map_err(config_error)?;
     let home = environment.home_dir().map_err(config_error)?;
     let settings = from_table(&table, &home).map_err(config_error)?;
+    terms::protect_config(&settings, &selected)?;
     Ok(settings)
 }
 

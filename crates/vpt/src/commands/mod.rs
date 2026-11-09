@@ -1,3 +1,4 @@
+pub(crate) mod confirm;
 pub(crate) mod list;
 pub(crate) mod note;
 pub(crate) mod retention;
