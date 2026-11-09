@@ -9,3 +9,4 @@ fixtures = []
 [dependencies]
 caseless = "=0.2.2"
 unicode-normalization = "=0.1.25"
+unicode-general-category = "=1.1.0"
