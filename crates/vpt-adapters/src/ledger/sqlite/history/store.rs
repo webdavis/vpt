@@ -71,7 +71,15 @@ pub(super) fn step(
                 return Err(storage::conflict());
             }
         }
+        crate::ledger::sqlite::verification::apply(transaction, delta, facts)?;
+        crate::ledger::sqlite::proposals::apply(transaction, delta, facts)?;
+        crate::ledger::sqlite::engine_outputs::check(transaction, delta)?;
+        crate::ledger::sqlite::vocabulary::apply(transaction, delta, facts)?;
+        crate::ledger::sqlite::notes::apply(transaction, delta, facts)?;
+        crate::ledger::sqlite::tags::apply(transaction, delta, facts)?;
+        crate::ledger::sqlite::relations::apply(transaction, delta, facts)?;
         recordings::apply_commit(transaction, &delta.commit)?;
+        crate::ledger::sqlite::engine_outputs::apply(transaction, delta)?;
         for (id, path) in &delta.source_updates {
             let path = path.to_str().ok_or_else(storage::corrupt)?;
             let changed = transaction
@@ -85,6 +93,7 @@ pub(super) fn step(
             }
         }
         for target in &delta.publication_clears {
+            crate::ledger::sqlite::notes::published(transaction, target)?;
             let target = target.to_str().ok_or_else(storage::corrupt)?;
             transaction
                 .execute("DELETE FROM dirty_publications WHERE target = ?1", [target])
@@ -101,7 +110,13 @@ pub(super) fn step(
                 return Err(storage::conflict());
             }
         }
+        if let Some(change) = &delta.transcription {
+            crate::ledger::transcript::check_history(change, facts)?;
+            crate::ledger::sqlite::transcript::apply(transaction, change)?;
+        }
         crate::ledger::sqlite::expirations::regenerated(transaction, delta)?;
+        crate::ledger::sqlite::flags::resolve::apply(transaction, delta, facts)?;
+        crate::ledger::sqlite::verification::state::refresh(transaction, delta)?;
         let records = facts
             .iter()
             .map(|(at, fact)| storage::record(transaction, run, *at, fact.clone()))

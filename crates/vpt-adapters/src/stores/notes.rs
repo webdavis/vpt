@@ -58,3 +58,6 @@ impl FilesystemStores {
             .transpose()
     }
 }
+
+#[cfg(test)]
+mod tests;

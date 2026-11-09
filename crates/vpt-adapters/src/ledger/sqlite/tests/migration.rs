@@ -1,4 +1,13 @@
+mod claims;
+mod engine_outputs;
 mod expirations;
+mod known_terms;
+mod notes;
+mod relations;
+mod tags;
+mod verification;
+mod vocabulary;
+mod window;
 use super::super::{error, migrations};
 use super::{database, supervised, tables, version};
 use crate::RootDir;
@@ -32,6 +41,42 @@ fn version_one_rows_and_pending_intents_survive_history_migration() {
 }
 
 pub(super) fn run(scenario: &str, root: &RootDir) {
+    if scenario == "ledger_migration_preserve_v10" {
+        window::run(root);
+        return;
+    }
+    if scenario == "ledger_migration_preserve_v9" {
+        claims::run(root);
+        return;
+    }
+    if scenario == "ledger_migration_preserve_v8" {
+        verification::run(root);
+        return;
+    }
+    if scenario == "ledger_migration_preserve_v7" {
+        relations::run(root);
+        return;
+    }
+    if scenario == "ledger_migration_preserve_v6" {
+        vocabulary::run(root);
+        return;
+    }
+    if scenario == "ledger_migration_preserve_v5" {
+        tags::run(root);
+        return;
+    }
+    if scenario == "ledger_migration_preserve_v4" {
+        known_terms::run(root);
+        return;
+    }
+    if scenario == "ledger_migration_preserve_v3" {
+        notes::run(root);
+        return;
+    }
+    if scenario == "ledger_migration_preserve_v2" {
+        engine_outputs::run(root);
+        return;
+    }
     if scenario == "ledger_migration_preserve_v1" {
         database(root, |connection| {
             let fixture = Transaction::new_unchecked(connection, TransactionBehavior::Immediate)

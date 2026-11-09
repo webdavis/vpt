@@ -1,8 +1,17 @@
+mod engine_outputs;
 mod expirations;
+mod flags;
+mod notes;
+mod proposals;
 mod publications;
 mod recordings;
+mod relations;
 mod retention;
 mod retention_artifacts;
+mod tags;
+mod transcript;
+mod verification;
+mod vocabulary;
 use std::sync::Mutex;
 use vpt_application::ports::{
     DirtyPublication, LedgerCommit, LedgerError, NewIntent, RecordingLedger, RecordingRecord,
@@ -19,9 +28,16 @@ struct State {
     expirations: Vec<vpt_application::ports::RetentionArtifact>,
     releases: Vec<vpt_application::ports::ReleaseRecord>,
     briefs: Vec<vpt_application::ports::BriefArtifact>,
+    verification: Vec<super::verification::state::VerifiedArtifact>,
+    proposals: Vec<vpt_application::ports::AcceptedProposal>,
+    ambiguities: Vec<(RecordingId, Vec<vpt_domain::relations::MentionAmbiguity>)>,
+    relations: Vec<(RecordingId, Vec<vpt_domain::relations::Relation>)>,
+    tags: Vec<(RecordingId, Vec<vpt_domain::tags::Tag>)>,
     vocabulary: Vec<vpt_application::ports::VocabularyPublication>,
     notes: Vec<vpt_application::ports::NoteArtifact>,
+    flags: Vec<(RecordingId, vpt_domain::review::ReviewFlag)>,
     engine_outputs: Vec<vpt_application::ports::EngineArtifact>,
+    transcripts: Vec<vpt_application::ports::AcceptedTranscript>,
     seen: Vec<SeenRow>,
     recordings: Vec<RecordingRecord>,
     publications: Vec<DirtyPublication>,
@@ -64,6 +80,13 @@ fn upsert_seen(state: &mut State, row: &SeenRow) {
 }
 
 fn upsert_publication(state: &mut State, entry: &DirtyPublication) -> Result<(), LedgerError> {
+    if state
+        .vocabulary
+        .iter()
+        .any(|row| row.entry.target == entry.target)
+    {
+        return Err(super::vocabulary::conflict());
+    }
     match state
         .publications
         .iter_mut()

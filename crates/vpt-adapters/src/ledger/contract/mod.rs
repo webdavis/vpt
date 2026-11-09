@@ -1,8 +1,17 @@
+pub(crate) mod engine_outputs;
+pub(crate) mod flags;
 pub(crate) mod history;
 pub(crate) mod journal;
+pub(crate) mod known_terms;
+pub(crate) mod notes;
+pub(crate) mod proposals;
 pub(crate) mod recording;
+pub(crate) mod relations;
 pub(crate) mod retention;
 pub(crate) mod retention_history;
+pub(crate) mod tags;
+pub(crate) mod transcript;
+pub(crate) mod verification;
 
 use std::path::{Path, PathBuf};
 use vpt_application::ports::{
@@ -203,6 +212,24 @@ macro_rules! history_cases {
 pub(crate) use history_cases;
 
 pub(crate) fn run_sqlite(scenario: &str, ledger: &crate::ledger::SqliteLedger) {
+    macro_rules! run_proposals {
+        ($name:ident) => {
+            if scenario == concat!("ledger_contract_proposals_", stringify!($name)) {
+                proposals::$name(ledger);
+                return;
+            }
+        };
+    }
+    proposals::cases!(run_proposals);
+    macro_rules! run_flags {
+        ($name:ident) => {
+            if scenario == concat!("ledger_contract_flags_", stringify!($name)) {
+                flags::$name(ledger);
+                return;
+            }
+        };
+    }
+    flags::cases!(run_flags);
     macro_rules! run_recording {
         ($name:ident) => {
             if scenario == concat!("ledger_contract_recording_", stringify!($name)) {
@@ -243,6 +270,24 @@ pub(crate) fn run_sqlite(scenario: &str, ledger: &crate::ledger::SqliteLedger) {
             }
         };
     }
+    macro_rules! run_transcript {
+        ($name:ident) => {
+            if scenario == concat!("ledger_contract_transcript_", stringify!($name)) {
+                transcript::$name(ledger);
+                return;
+            }
+        };
+    }
+    transcript::cases!(run_transcript);
+    macro_rules! run_outputs {
+        ($name:ident) => {
+            if scenario == concat!("ledger_contract_engine_outputs_", stringify!($name)) {
+                engine_outputs::$name(ledger);
+                return;
+            }
+        };
+    }
+    engine_outputs::cases!(run_outputs);
     recording_cases!(run_recording);
     journal_cases!(run_journal);
     retention_cases!(run_retention);

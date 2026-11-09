@@ -108,7 +108,16 @@ pub(crate) fn run_scenario(
         s if s.starts_with("ledger_contract_history_retention_fault_") => {
             super::history::retention::tests::run(s, &root);
         }
+        s if s.starts_with("ledger_verification_") => super::verification::tests::run(s, &root),
+        "ledger_engine_output_corrupt" => super::engine_outputs::tests::corrupt_saved(&root),
+        s if s.starts_with("ledger_notes_") => super::notes::tests::run(s, &root),
+        s if s.starts_with("ledger_relations_") => super::relations::tests::run(s, &root),
+        s if s.starts_with("ledger_tags_") => super::tags::tests::run(s, &root),
+        s if s.starts_with("ledger_proposals_") => super::proposals::tests::run(s, &root),
+        s if s.starts_with("ledger_terms_") => super::vocabulary::tests::run(s, &root),
+        s if s.starts_with("ledger_flags_") => super::flags::tests::run(s, &root),
         "ledger_contract_schema_trace" => schema_diagnostics::run(&root),
+        s if s.starts_with("ledger_transcript_") => super::transcript::tests::run(s, &root),
         s if s.starts_with("ledger_migration_") => migration::run(s, &root),
         s if s.starts_with("ledger_schema_") => schema::run(s, &root),
         s if s.starts_with("ledger_observe_") => observation::run(s, &root),

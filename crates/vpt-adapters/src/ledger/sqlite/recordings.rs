@@ -1,4 +1,6 @@
 mod codec;
+mod predecessor;
+pub(super) use predecessor::read as predecessor;
 pub(super) mod write;
 
 use super::{SqliteLedger, journal, map};
