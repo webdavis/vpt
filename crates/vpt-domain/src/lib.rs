@@ -1,3 +1,4 @@
+pub mod alignment;
 pub mod container;
 pub mod digest;
 pub mod duration;
