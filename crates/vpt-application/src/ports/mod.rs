@@ -1,5 +1,7 @@
 mod archive;
 mod clock;
+mod engine;
+mod engine_artifact;
 mod history;
 mod ledger;
 mod prompt;
@@ -7,10 +9,12 @@ mod recorder;
 mod retention;
 mod retention_history;
 mod stores;
+mod transcript;
 mod trash;
 
 pub use archive::{Archive, ArchiveError, Published, StageFailure, Staged};
 pub use clock::Clock;
+pub use engine::{Engine, EngineFailure, EngineOutput, EngineRequest};
 pub use history::{
     EventSink, HistoryReceipt, HistoryWrite, RunHistory, SinkError, SinkOutcome, SinkStop,
     SinkWarning, WorkDelta,
@@ -33,3 +37,10 @@ pub use retention_files::{RetentionCheck, RetentionFiles};
 pub use retention_history::{PreparedRetention, RetentionHistory};
 pub use stores::{RetentionEntries, StoreEntry, StoreError, Stores};
 pub use trash::{Trash, TrashError};
+
+pub use transcript::{
+    AcceptedTranscript, FlagLedger, TranscriptLedger,
+    TranscriptionChange,
+};
+
+pub use engine_artifact::{EngineArtifact, EngineOutputLedger};

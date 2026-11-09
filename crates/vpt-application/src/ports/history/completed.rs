@@ -7,6 +7,11 @@ impl WorkDelta {
             .iter()
             .map(|row| row.id.clone())
             .collect();
+        if let Some(crate::ports::TranscriptionChange::Accept(accepted)) = &self.transcription
+            && !completed.contains(&accepted.recording)
+        {
+            completed.push(accepted.recording.clone());
+        }
         completed
     }
 }

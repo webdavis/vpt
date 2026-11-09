@@ -6,6 +6,7 @@ mod publication;
 mod retention;
 mod settings;
 mod setup;
+pub mod transcribe;
 
 pub use setup::{Setup, SetupError, SetupOutcome, SetupWriter};
 

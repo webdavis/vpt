@@ -11,6 +11,8 @@ use vpt_domain::time::UtcInstant;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WorkDelta {
+    pub engine_outputs: Vec<super::EngineArtifact>,
+    pub transcription: Option<super::TranscriptionChange>,
     pub commit: LedgerCommit,
     pub source_updates: Vec<(RecordingId, PathBuf)>,
     pub publication_clears: Vec<PathBuf>,
