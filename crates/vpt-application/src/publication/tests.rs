@@ -38,6 +38,7 @@ struct FakeStores {
     contents: RefCell<HashMap<PathBuf, Vec<u8>>>,
     synced: RefCell<Vec<PathBuf>>,
     sync_fails: bool,
+    change_on_sync: bool,
 }
 
 impl Stores for FakeStores {
@@ -57,7 +58,15 @@ impl Stores for FakeStores {
         digest(bytes)
     }
 
-    fn publish(&self, target: &Path, bytes: &[u8]) -> Result<(), StoreError> {
+    fn publish(
+        &self,
+        target: &Path,
+        expected: Option<Sha256Digest>,
+        bytes: &[u8],
+    ) -> Result<(), StoreError> {
+        if self.digest_of(target)? != expected {
+            return Err(StoreError::Changed(target.to_path_buf()));
+        }
         self.contents
             .borrow_mut()
             .insert(target.into(), bytes.into());
@@ -67,6 +76,11 @@ impl Stores for FakeStores {
     fn sync_directory_of(&self, path: &Path) -> Result<(), StoreError> {
         if self.sync_fails {
             return Err(StoreError::Io("sync failed".into()));
+        }
+        if self.change_on_sync {
+            self.contents
+                .borrow_mut()
+                .insert(path.to_path_buf(), b"operator".to_vec());
         }
         self.synced.borrow_mut().push(path.into());
         Ok(())
@@ -97,6 +111,7 @@ fn stores(current: Option<&[u8]>, sync_fails: bool) -> FakeStores {
         contents: RefCell::new(contents),
         synced: RefCell::new(Vec::new()),
         sync_fails,
+        change_on_sync: false,
     }
 }
 
@@ -256,4 +271,24 @@ fn mismatched_render_digest_leaves_target_pending() {
     );
     assert!(stores.synced.borrow().is_empty());
     assert_eq!(journal.entries.borrow().len(), 1);
+}
+
+#[test]
+fn changes_during_publication_sync_preserve_the_journal_and_operator_content() {
+    for initial in [b"old".as_slice(), b"new".as_slice()] {
+        let journal = journal(Some(b"old"), b"new", false);
+        let mut stores = stores(Some(initial), false);
+        stores.change_on_sync = true;
+        assert_eq!(
+            repair_publications(&journal, &stores, render_new),
+            Err(RepairError::TargetModified(PathBuf::from(
+                "/synthetic/note.md"
+            )))
+        );
+        assert_eq!(journal.entries.borrow().len(), 1);
+        assert_eq!(
+            stores.contents.borrow()[Path::new("/synthetic/note.md")],
+            b"operator"
+        );
+    }
 }

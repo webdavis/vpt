@@ -15,6 +15,7 @@ pub struct Staged {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArchiveError {
     NoSpace,
+    Changed(PathBuf),
     Sync(String),
     PlacedUnsynced(PathBuf),
     Escape(PathBuf),
@@ -49,9 +50,15 @@ pub trait Archive {
     ) -> Result<(), ReadFailure>;
     fn validate_trash_path(&self, path: &Path) -> Result<(), ArchiveError>;
     fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError>;
+    fn digest_handle(&self, handle: &Self::Handle) -> Result<Sha256Digest, ArchiveError>;
     fn target(&self, name: &str) -> PathBuf;
     fn archived(&self) -> Result<Vec<PathBuf>, ArchiveError>;
     fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError>;
-    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError>;
-    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError>;
+    fn publish(
+        &self,
+        staged: &Staged,
+        handle: &Self::Handle,
+        target_name: &str,
+    ) -> Result<Published, ArchiveError>;
+    fn sync_existing(&self, path: &Path, expected: &Sha256Digest) -> Result<(), ArchiveError>;
 }

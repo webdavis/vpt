@@ -71,6 +71,7 @@ where
                 HistoryFact::Event(Event {
                     kind: EventKind::Deferred,
                     state: EventState::NeedsAttention,
+                    occasion: None,
                     recording: None,
                     detail: EventDetail::Deferred {
                         reason,

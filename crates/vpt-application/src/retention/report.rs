@@ -1,14 +1,14 @@
+use crate::ports::ArtifactOwner;
 use crate::ports::{
     HistoryReceipt, LedgerError, PreparedRetention, SinkError, SinkWarning, StoreError, TrashError,
 };
 use std::collections::BTreeSet;
 use std::path::PathBuf;
-use vpt_domain::identity::RecordingId;
 use vpt_domain::layout::StoreKey;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Moved {
-    pub recording: RecordingId,
+    pub owner: ArtifactOwner,
     pub store: StoreKey,
     pub path: PathBuf,
 }
@@ -17,6 +17,11 @@ pub struct Moved {
 pub enum KeptReason {
     Untracked,
     DigestMismatch,
+    PathEscape,
+    OwnershipMismatch,
+    PublicationPending,
+    Expired,
+    Missing,
 }
 
 impl KeptReason {
@@ -24,6 +29,11 @@ impl KeptReason {
         match self {
             Self::Untracked => "untracked",
             Self::DigestMismatch => "digest_mismatch",
+            Self::PathEscape => "path_escape",
+            Self::OwnershipMismatch => "ownership_mismatch",
+            Self::PublicationPending => "publication_pending",
+            Self::Expired => "expired",
+            Self::Missing => "missing",
         }
     }
 }
@@ -37,7 +47,7 @@ pub struct Kept {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ReconcileProgress {
     pub moved: Vec<Moved>,
-    pub completed: Vec<RecordingId>,
+    pub completed: Vec<ArtifactOwner>,
     pub warnings: BTreeSet<SinkWarning>,
     pub diagnostics: Vec<String>,
 }
@@ -46,7 +56,7 @@ pub struct ReconcileProgress {
 pub struct RetentionReport {
     pub moved: Vec<Moved>,
     pub kept: Vec<Kept>,
-    pub completed: Vec<RecordingId>,
+    pub completed: Vec<ArtifactOwner>,
     pub warnings: BTreeSet<SinkWarning>,
     pub diagnostics: Vec<String>,
 }
@@ -96,7 +106,18 @@ impl From<ReconcileProgress> for RetentionReport {
 }
 
 impl RetentionReport {
-    pub(super) fn completed(&mut self, id: &RecordingId) {
+    pub(super) fn store_counts(&self) -> Result<vpt_domain::history::RetentionCounts, LedgerError> {
+        let mut counts = vpt_domain::history::RetentionCounts::default();
+        for store in StoreKey::all() {
+            counts.set(
+                store,
+                moved_count(self.moved.iter().filter(|m| m.store == store).count())?,
+            );
+        }
+        Ok(counts)
+    }
+
+    pub(super) fn completed(&mut self, id: &ArtifactOwner) {
         if !self.completed.contains(id) {
             self.completed.push(id.clone());
         }
@@ -121,22 +142,4 @@ pub(super) fn moved_count(count: usize) -> Result<u32, LedgerError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn move_count_is_exact_for_zero_and_largest_wire_count() {
-        assert_eq!(moved_count(0), Ok(0));
-        assert_eq!(moved_count(u32::MAX as usize), Ok(u32::MAX));
-    }
-
-    #[test]
-    fn move_count_refuses_above_wire_range() {
-        assert_eq!(
-            moved_count(u32::MAX as usize + 1),
-            Err(LedgerError::Corrupt(
-                "retention move count out of range".into()
-            ))
-        );
-    }
-}
+mod tests;

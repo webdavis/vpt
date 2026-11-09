@@ -6,7 +6,7 @@ use crate::ports::{
 };
 use vpt_domain::history::RunId;
 use vpt_domain::run::{HistoryFact, WorkOutcome};
-use vpt_domain::sweep::{CandidateFacts, DeferralReason, PreOpen, SeenFacts, pre_open};
+use vpt_domain::sweep::{DeferralReason, PreOpen};
 use vpt_domain::time::UtcInstant;
 
 impl<R, A, L, C, T, S> Ingest<'_, R, A, L, C, T, S>
@@ -30,18 +30,7 @@ where
             .ledger
             .seen(&candidate.path)
             .map_err(|error| Self::error(report, IngestFailure::Ledger(error), None))?;
-        let facts = CandidateFacts {
-            size: candidate.size,
-            mtime: candidate.mtime,
-            flags: candidate.flags,
-        };
-        let previous = seen.as_ref().map(|row| SeenFacts {
-            size: row.size,
-            mtime: row.mtime,
-            ingested: row.recording.is_some() && row.deferral_reason.is_none(),
-            deferred_size: row.deferred_size,
-        });
-        match pre_open(&facts, previous.as_ref()) {
+        match super::gates::selection(candidate, seen.as_ref()) {
             PreOpen::Dataless => self.defer(
                 run,
                 Deferral {

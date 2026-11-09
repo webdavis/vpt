@@ -1,9 +1,8 @@
 use super::{Ingest, IngestError, IngestFailure, IngestReport};
 use crate::ports::{
-    Archive, Clock, EventSink, HistoryReceipt, HistoryWrite, RecorderStore, RecordingLedger,
-    RunHistory, SinkOutcome, Trash, TrashError, WorkDelta,
+    Archive, ArchiveError, Clock, EventSink, RecorderStore, RecordingLedger, RunHistory, Trash,
+    WorkDelta,
 };
-use std::path::PathBuf;
 use vpt_domain::history::{
     Event, EventCounts, EventDetail, EventKind, EventState, RunId, SafeFailureClass,
 };
@@ -19,90 +18,6 @@ where
     T: Trash + ?Sized,
     S: EventSink + ?Sized,
 {
-    pub(super) fn required(
-        write: HistoryWrite<HistoryReceipt>,
-        report: &IngestReport,
-    ) -> Result<HistoryReceipt, Box<IngestError>> {
-        match write {
-            HistoryWrite::Committed(receipt) => Ok(receipt),
-            HistoryWrite::CommittedWithFailure { receipt, error } => Err(Self::error(
-                report,
-                IngestFailure::RequiredHistory(error),
-                Some(receipt),
-            )),
-            HistoryWrite::Unconfirmed(error) => Err(Self::error(
-                report,
-                IngestFailure::RequiredHistory(error),
-                None,
-            )),
-        }
-    }
-
-    pub(super) fn export(
-        &mut self,
-        receipt: &HistoryReceipt,
-        report: &mut IngestReport,
-    ) -> Result<(), Box<IngestError>> {
-        match self.sink.after_commit(receipt) {
-            SinkOutcome::Continue { warnings } => {
-                report.warnings.extend(warnings);
-                Ok(())
-            }
-            SinkOutcome::Stop(stop) => {
-                report.warnings.extend(stop.warnings);
-                let mut error = Self::error(
-                    report,
-                    IngestFailure::SinkStopped(stop.reason),
-                    stop.committed,
-                );
-                for id in &receipt.completed {
-                    if !error.completed.contains(id) {
-                        error.completed.push(id.clone());
-                    }
-                }
-                Err(error)
-            }
-        }
-    }
-
-    pub(super) fn error(
-        report: &IngestReport,
-        failure: IngestFailure,
-        known_receipt: Option<HistoryReceipt>,
-    ) -> Box<IngestError> {
-        let mut completed = report.recovered.clone();
-        for record in &report.ingested {
-            if !completed.contains(&record.id) {
-                completed.push(record.id.clone());
-            }
-        }
-        if let Some(receipt) = &known_receipt {
-            for id in &receipt.completed {
-                if !completed.contains(id) {
-                    completed.push(id.clone());
-                }
-            }
-        }
-        Box::new(IngestError {
-            failure,
-            completed,
-            known_receipt,
-            warnings: report.warnings.clone(),
-            log: report.log.clone(),
-            owned_staging: None,
-        })
-    }
-
-    pub(super) fn owned_error(
-        report: &IngestReport,
-        failure: IngestFailure,
-        owned_staging: PathBuf,
-    ) -> Box<IngestError> {
-        let mut error = Self::error(report, failure, None);
-        error.owned_staging = Some(owned_staging);
-        error
-    }
-
     pub(super) fn finish_failure(
         &mut self,
         run: RunId,
@@ -122,6 +37,7 @@ where
         let event = Event {
             kind: EventKind::IngestFailed,
             state: EventState::Failed,
+            occasion: None,
             recording: None,
             detail: EventDetail::Failure(safe_failure_class(&error.failure)),
             counts: EventCounts::default(),
@@ -149,51 +65,6 @@ where
         error.log = report.log.clone();
         error
     }
-
-    pub(super) fn discard_owned(
-        &self,
-        staged: &std::path::Path,
-        report: &mut IngestReport,
-    ) -> Option<TrashError> {
-        if self.archive.validate_trash_path(staged).is_err() {
-            report
-                .log
-                .push("staged cleanup pending: ownership validation failed".into());
-            return None;
-        }
-        let outcome = self.trash.trash(staged);
-        for diagnostic in self.trash.take_diagnostics().into_iter().take(16) {
-            let field = diagnostic.strip_prefix("unknown additive helper field: ");
-            if diagnostic.len() <= 400
-                && field.is_some_and(|field| {
-                    field
-                        .bytes()
-                        .all(|byte| byte.is_ascii() && !byte.is_ascii_control())
-                })
-            {
-                report.log.push(diagnostic);
-            } else {
-                report.log.push("trash reported a diagnostic".into());
-            }
-        }
-        let error = outcome.err();
-        match &error {
-            None => {}
-            Some(TrashError::HelperAbsent) => report
-                .log
-                .push("staged cleanup pending: helper unavailable".into()),
-            Some(TrashError::HelperVersion { found }) => report.log.push(format!(
-                "staged cleanup pending: incompatible helper major {found}"
-            )),
-            Some(TrashError::Failed(_)) => report
-                .log
-                .push("staged cleanup pending: helper failed".into()),
-            Some(TrashError::Unknown(_)) => report
-                .log
-                .push("staged cleanup pending: helper reply unknown".into()),
-        }
-        error
-    }
 }
 
 fn safe_failure_class(failure: &IngestFailure) -> SafeFailureClass {
@@ -211,8 +82,22 @@ fn safe_failure_class(failure: &IngestFailure) -> SafeFailureClass {
             SafeFailureClass::LedgerUnavailable
         }
         IngestFailure::SinkStopped(_) => SafeFailureClass::ExportUnavailable,
-        IngestFailure::DryRunUnavailable | IngestFailure::PathEscape(_) => {
-            SafeFailureClass::ConfigurationRefused
+        IngestFailure::PathEscape(_) => SafeFailureClass::ConfigurationRefused,
+    }
+}
+
+pub(super) fn archive_failure(error: ArchiveError) -> IngestFailure {
+    match error {
+        ArchiveError::NoSpace => IngestFailure::NoSpace,
+        ArchiveError::Changed(_) => {
+            IngestFailure::Sync("archive changed during publication".into())
         }
+        ArchiveError::Sync(detail) => IngestFailure::Sync(detail),
+        ArchiveError::PlacedUnsynced(path) => IngestFailure::Sync(format!(
+            "archive placed without directory sync at {}",
+            path.display()
+        )),
+        ArchiveError::Escape(path) => IngestFailure::PathEscape(path),
+        ArchiveError::Io(detail) => IngestFailure::Archive(detail),
     }
 }

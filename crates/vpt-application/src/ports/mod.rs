@@ -24,6 +24,12 @@ pub use recorder::{
     Candidate, CloneError, CloneKind, RecorderError, RecorderStore, SourceMetadata, TitleLookup,
 };
 pub use retention::{ArtifactKind, NewIntent, RetentionIntent, RetentionJournal};
+mod retention_artifact;
+mod retention_files;
+pub use retention_artifact::{
+    ArtifactOwner, RetentionArtifact, RetentionArtifacts, RetentionStatus,
+};
+pub use retention_files::{RetentionCheck, RetentionFiles};
 pub use retention_history::{PreparedRetention, RetentionHistory};
-pub use stores::{StoreEntry, StoreError, Stores};
+pub use stores::{RetentionEntries, StoreEntry, StoreError, Stores};
 pub use trash::{Trash, TrashError};

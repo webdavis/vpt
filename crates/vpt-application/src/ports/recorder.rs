@@ -55,6 +55,11 @@ pub trait RecorderStore {
     fn candidate(&self, path: &Path) -> Result<Candidate, RecorderError>;
     fn open(&self, path: &Path) -> Result<Self::Handle, RecorderError>;
     fn metadata(&self, handle: &Self::Handle) -> Result<SourceMetadata, RecorderError>;
+    fn digest(
+        &self,
+        handle: &Self::Handle,
+        size: u64,
+    ) -> Result<vpt_domain::digest::Sha256Digest, RecorderError>;
     fn read_at(
         &self,
         handle: &Self::Handle,

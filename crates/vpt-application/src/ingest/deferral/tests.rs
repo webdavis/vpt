@@ -16,6 +16,9 @@ struct Silent;
 
 impl RecorderStore for Silent {
     type Handle = ();
+    fn digest(&self, _: &(), _: u64) -> Result<Sha256Digest, RecorderError> {
+        panic!("source digest")
+    }
     fn candidates(&self) -> Result<Vec<Candidate>, RecorderError> {
         panic!("candidate list")
     }
@@ -74,6 +77,9 @@ impl Archive for Silent {
     fn digest(&self, _: &Path) -> Result<Sha256Digest, ArchiveError> {
         panic!("digest")
     }
+    fn digest_handle(&self, _: &()) -> Result<Sha256Digest, ArchiveError> {
+        panic!("digest handle")
+    }
     fn target(&self, _: &str) -> PathBuf {
         panic!("target")
     }
@@ -83,10 +89,10 @@ impl Archive for Silent {
     fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError> {
         panic!("stage listing")
     }
-    fn publish(&self, _: &Path, _: &str) -> Result<Published, ArchiveError> {
+    fn publish(&self, _: &Staged, _: &(), _: &str) -> Result<Published, ArchiveError> {
         panic!("publish")
     }
-    fn sync_existing(&self, _: &Path) -> Result<(), ArchiveError> {
+    fn sync_existing(&self, _: &Path, _: &Sha256Digest) -> Result<(), ArchiveError> {
         panic!("sync")
     }
 }
