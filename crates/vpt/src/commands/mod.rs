@@ -24,3 +24,4 @@ pub(crate) mod synthesize;
 
 pub(crate) mod redact;
 
+pub(crate) mod handoff;

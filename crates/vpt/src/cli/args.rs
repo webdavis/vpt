@@ -1,5 +1,6 @@
 pub(crate) mod brief;
 mod confirm;
+pub(crate) mod handoff;
 mod options;
 pub(crate) mod redact;
 mod review;
@@ -15,12 +16,13 @@ verbs: setup [--force] | doctor | ingest [--dry-run] [--once <path>] | show <id>
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
        synthesize <id> [--dry-run] | path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
        brief <occasion-id> [--dry-run] [--explain] | brief --title <title> --at <RFC3339> [--duration-minutes <n>] [--participant <name>]... [--tag <tag>]... | brief --upcoming |\n\
-       redact <id> [--stage transcript|analysis] [--to <dir>] [--title <title>] | symlink deploy | symlink verify | --version\n";
+       handoff <id> --stage released|transcript|analysis|brief | redact <id> [--stage transcript|analysis] [--to <dir>] [--title <title>] | symlink deploy | symlink verify | --version\n";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Verb {
     Brief(brief::Options),
     Redact(redact::Options),
+    Handoff(handoff::Options),
     Occasions,
     OccasionPath {
         id: String,

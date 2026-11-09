@@ -30,6 +30,7 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
         return Err(UsageError("--tag and --reject-tag require confirm".into()));
     }
     match first.as_str() {
+        "handoff" => handoff::parse(words),
         "occasions" => Ok(Verb::Occasions),
         "synthesize" => {
             let dry_run = take_flag(words, "--dry-run");
