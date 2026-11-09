@@ -3,6 +3,7 @@ pub(super) enum Profile {
     General,
     Engine,
     Whisply,
+    Proposal,
 }
 
 #[derive(Clone, Copy)]
@@ -44,6 +45,7 @@ impl Location {
 
     pub(super) fn limit(self, profile: Profile, general: usize) -> usize {
         match (profile, self) {
+            (Profile::Proposal, Self::Claims) => 65_536,
             (Profile::Engine, Self::Segments | Self::Words) => 65_536,
             (Profile::Whisply, Self::Chunks | Self::ChunkWords) => 65_536,
             _ => general,
