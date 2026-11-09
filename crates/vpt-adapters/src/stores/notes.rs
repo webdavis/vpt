@@ -24,6 +24,19 @@ impl FilesystemStores {
         self.read_note_with_limit(path, vpt_domain::note::MAX_RENDERED, None, after_read)
     }
 
+    pub(crate) fn read_note_bounded(
+        &self,
+        path: &Path,
+        maximum: usize,
+    ) -> Result<Option<StoredNote>, StoreError> {
+        self.read_note_with_limit(
+            path,
+            maximum.min(vpt_domain::note::MAX_RENDERED),
+            None,
+            || {},
+        )
+    }
+
     pub fn read_note_version(
         &self,
         path: &Path,

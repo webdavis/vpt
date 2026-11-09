@@ -16,6 +16,7 @@ pub mod known_terms;
 mod ledger;
 mod lock;
 pub mod note_document;
+pub mod note_index;
 mod prompt;
 pub mod proposal;
 mod spawn;
