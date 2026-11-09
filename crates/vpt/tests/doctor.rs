@@ -1,5 +1,7 @@
 #[path = "doctor/active_writer.rs"]
 mod active_writer;
+#[path = "doctor/engines.rs"]
+mod engines;
 #[path = "doctor/fixture.rs"]
 mod fixture;
 #[path = "doctor/independence.rs"]
@@ -13,12 +15,14 @@ mod observations_fixture;
     reason = "shared integration support serves other test targets"
 )]
 mod support;
+#[path = "doctor/vault.rs"]
+mod vault;
 
 use fixture::{configured, detail, report, run_json, snapshot};
 use support::{run, stderr, stdout};
 
 #[test]
-fn healthy_doctor_reports_all_eighteen_checks() {
+fn healthy_doctor_reports_all_checks() {
     let sandbox = configured("doctor-healthy");
     let before = snapshot(&sandbox);
     let checks = run_json(&sandbox, 0);
@@ -39,7 +43,7 @@ fn healthy_human_doctor_lists_every_check() {
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert!(output.stderr.is_empty());
     let text = stdout(&output);
-    assert_eq!(text.lines().count(), 18);
+    assert_eq!(text.lines().count(), fixture::NAMES.len());
     for name in fixture::NAMES {
         assert!(
             text.lines()

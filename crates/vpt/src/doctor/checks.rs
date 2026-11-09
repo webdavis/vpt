@@ -16,9 +16,9 @@ pub(super) fn check(name: impl Into<String>, ok: bool, detail: impl Into<String>
 }
 
 fn unavailable_config(detail: &str) -> Vec<Check> {
-    let mut names: Vec<String> = ["config", "stores"].map(str::to_owned).into();
+    let mut names: Vec<String> = ["config", "stores", "vault"].map(str::to_owned).into();
     names.extend(StoreKey::all().map(|key| format!("git_tree:{}", key.key_name())));
-    names.extend(["helper", "recordings_dir", "symlink"].map(str::to_owned));
+    names.extend(["helper", "engines", "recordings_dir", "symlink"].map(str::to_owned));
     names.extend(APPLE_SUBDIRECTORIES.map(|name| format!("subdirectory:{name}")));
     names.extend(["cleanup_pending", "source_gone"].map(str::to_owned));
     names
@@ -56,6 +56,7 @@ pub(super) fn all(environment: &Environment, config: Option<&Path>) -> Vec<Check
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
     let roots = resolve(&settings, config_dir);
+    checks.push(super::vault::inspect(&settings));
     checks.push(match &roots {
         Ok(roots) => check("stores", true, format!("home {}", roots.home.display())),
         Err(error) => check(
@@ -82,6 +83,7 @@ pub(super) fn all(environment: &Environment, config: Option<&Path>) -> Vec<Check
         }
     }));
     let helper = probes::helper(&settings);
+    checks.push(super::engines::inspect(&settings.engines, helper.ok));
     checks.push(helper);
     let source = if settings.source.recordings_dir.is_absolute() {
         settings
