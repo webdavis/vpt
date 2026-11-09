@@ -176,5 +176,6 @@ impl SqliteLedger {
     }
 }
 
+mod briefs;
 #[cfg(test)]
 pub(super) mod tests;

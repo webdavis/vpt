@@ -72,6 +72,7 @@ pub(super) fn step(
             }
         }
         crate::ledger::sqlite::occasions::apply(transaction, delta, facts)?;
+        crate::ledger::sqlite::briefs::apply(transaction, delta, facts)?;
         crate::ledger::sqlite::eligibility::apply(transaction, delta, facts)?;
         crate::ledger::sqlite::verification::apply(transaction, delta, facts)?;
         crate::ledger::sqlite::proposals::apply(transaction, delta, facts)?;

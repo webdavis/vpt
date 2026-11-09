@@ -48,6 +48,9 @@ impl RecordingLedger for MemoryLedger {
 
     fn commit(&self, batch: &LedgerCommit) -> Result<(), LedgerError> {
         with(self, |state| {
+            crate::ledger::brief::reservations::commit(batch, |path| {
+                Ok(state.briefs.iter().any(|row| row.target == path))
+            })?;
             let mut next = state.clone();
             apply_commit(&mut next, batch)?;
             *state = next;
