@@ -2,6 +2,35 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HistoryFact {
+    BriefSaved {
+        occasion: crate::occasion::OccasionId,
+    },
+    BriefPublished {
+        occasion: crate::occasion::OccasionId,
+    },
+    OccasionSaved {
+        occasion: crate::occasion::OccasionId,
+    },
+    SynthesisStateChanged {
+        recording: RecordingId,
+        from: crate::stage::StageState,
+        to: crate::stage::StageState,
+    },
+    TagRejected {
+        recording: RecordingId,
+        index: u32,
+        reason: crate::tags::Rejection,
+    },
+    FlagResolved {
+        recording: RecordingId,
+        flag: crate::digest::Sha256Digest,
+        resolution: crate::review::ResolutionKind,
+    },
+    NoteMoved {
+        recording: RecordingId,
+        from: PathBuf,
+        to: PathBuf,
+    },
     RunStarted(RunKind),
     RunFinished(RunOutcome),
     WorkStep {
@@ -37,6 +66,7 @@ pub enum HistoryFact {
 impl HistoryFact {
     pub fn referenced_ids_are_nonzero(&self) -> bool {
         match self {
+            Self::TagRejected { index, .. } => *index < 256,
             Self::RecoveryProgress { evidence, .. } | Self::RecoverySummary { evidence, .. } => {
                 evidence.affected_runs.iter().all(|run| run.sequence() != 0)
             }

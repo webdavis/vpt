@@ -1,5 +1,14 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunKind {
+    Redact,
+    Brief,
+    Pipeline,
+    Review,
+    VerifyNote,
+    Synthesize,
+    Confirm,
+    Note,
+    Transcribe,
     Ingest,
     Recover,
     Publish,
