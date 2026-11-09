@@ -2,17 +2,16 @@ use super::{
     Kept, KeptReason, Moved, Retention, RetentionCommit, RetentionError, RetentionReport, history,
 };
 use crate::ports::{
-    ArtifactKind, Clock, EventSink, HistoryWrite, NewIntent, RecordingLedger, RecordingRecord,
+    ArtifactKind, Clock, EventSink, HistoryWrite, NewIntent, RetentionArtifact, RetentionCheck,
     RetentionHistory, RetentionJournal, RunHistory, Stores, Trash, TrashError,
 };
 use vpt_domain::history::RunId;
-use vpt_domain::layout::StoreKey;
 use vpt_domain::run::{EffectOutcome, HistoryFact, WorkOutcome};
 
 impl<L, S, T, C, E> Retention<'_, L, S, T, C, E>
 where
-    L: RecordingLedger + RetentionJournal + RetentionHistory + RunHistory,
-    S: Stores,
+    L: RetentionJournal + RetentionHistory + RunHistory + crate::ports::RetentionArtifacts,
+    S: Stores + crate::ports::RetentionFiles,
     T: Trash,
     C: Clock,
     E: EventSink,
@@ -20,28 +19,40 @@ where
     pub(super) fn expire(
         &mut self,
         run: Option<RunId>,
-        record: &RecordingRecord,
+        artifact: &RetentionArtifact,
         report: &mut RetentionReport,
     ) -> Result<(), Box<history::Failure>> {
-        let path = &record.audio_path;
+        let path = &artifact.path;
         self.stores
             .validate_path(path)
             .map_err(|error| history::failure(RetentionError::Stores(error)))?;
-        if self
+        let expected = match self
             .stores
-            .digest_of(path)
+            .check_retention(artifact)
             .map_err(|error| history::failure(RetentionError::Stores(error)))?
-            != Some(record.digest)
         {
-            report.kept.push(Kept {
-                path: path.clone(),
-                reason: KeptReason::DigestMismatch,
-            });
-            return Ok(());
-        }
+            RetentionCheck::Owned(digest) => digest,
+            other => {
+                let reason = if other == RetentionCheck::Missing {
+                    KeptReason::Missing
+                } else if matches!(
+                    artifact.kind,
+                    ArtifactKind::Transcript | ArtifactKind::Analysis | ArtifactKind::Brief
+                ) {
+                    KeptReason::OwnershipMismatch
+                } else {
+                    KeptReason::DigestMismatch
+                };
+                report.kept.push(Kept {
+                    path: path.clone(),
+                    reason,
+                });
+                return Ok(());
+            }
+        };
         let moved = Moved {
-            recording: record.id.clone(),
-            store: StoreKey::Audio,
+            owner: artifact.owner.clone(),
+            store: artifact.kind.store(),
             path: path.clone(),
         };
         let Some(run) = run else {
@@ -49,10 +60,10 @@ where
             return Ok(());
         };
         let intent = NewIntent {
-            kind: ArtifactKind::Audio,
-            recording: record.id.clone(),
+            kind: artifact.kind,
+            owner: artifact.owner.clone(),
             path: path.clone(),
-            expected: record.digest,
+            expected,
             recorded_at: self.clock.now(),
         };
         let prepared = match self.ledger.prepare_retention(run, &intent) {
@@ -73,7 +84,7 @@ where
             .stores
             .digest_of(path)
             .map_err(|error| history::failure(RetentionError::Stores(error)))?
-            != Some(record.digest)
+            != Some(expected)
         {
             return Err(history::failure(RetentionError::TargetModified(
                 path.clone(),
@@ -105,7 +116,7 @@ where
                     (
                         at,
                         HistoryFact::WorkStep {
-                            recording: Some(record.id.clone()),
+                            recording: artifact.owner.recording().cloned(),
                             outcome: work,
                         },
                     ),
@@ -115,7 +126,7 @@ where
             return Err(history::failure(RetentionError::Trash(error)));
         }
         report.moved.push(moved);
-        report.completed(&record.id);
+        report.completed(&artifact.owner);
         let receipt = history::required(self.ledger.complete_retention(
             run,
             prepared.intent_id,
@@ -123,7 +134,7 @@ where
             self.clock.now(),
         ))?;
         for id in &receipt.completed {
-            report.completed(id);
+            report.completed(&id.clone().into());
         }
         history::export(self.sink, &receipt, &mut report.warnings)
     }

@@ -1,4 +1,4 @@
-use crate::ports::{LedgerError, PublicationJournal, StoreError, Stores};
+use crate::ports::{DirtyPublication, LedgerError, PublicationJournal, StoreError, Stores};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -27,34 +27,54 @@ pub fn repair_publications<J: PublicationJournal, S: Stores>(
         .pending_publications()
         .map_err(RepairError::Ledger)?
     {
-        let current = stores
-            .digest_of(&entry.target)
-            .map_err(RepairError::Stores)?;
-        if current == Some(entry.intended) {
-            sync(stores, &entry.target)?;
-            journal
-                .clear_publication(&entry.target)
-                .map_err(RepairError::Ledger)?;
-            report.completed.push(entry.target);
-        } else if current == entry.expected_previous {
-            let bytes =
-                render(&entry.target).ok_or_else(|| RepairError::Render(entry.target.clone()))?;
-            if stores.digest_bytes(&bytes) != entry.intended {
-                return Err(RepairError::RenderedDigestMismatch(entry.target));
-            }
-            stores
-                .publish(&entry.target, &bytes)
-                .map_err(RepairError::Stores)?;
-            sync(stores, &entry.target)?;
-            journal
-                .clear_publication(&entry.target)
-                .map_err(RepairError::Ledger)?;
+        let republished = repair_publication(stores, &entry, &render)?;
+        journal
+            .clear_publication(&entry.target)
+            .map_err(RepairError::Ledger)?;
+        if republished {
             report.republished.push(entry.target);
         } else {
-            return Err(RepairError::TargetModified(entry.target));
+            report.completed.push(entry.target);
         }
     }
     Ok(report)
+}
+
+pub fn repair_publication<S: Stores>(
+    stores: &S,
+    entry: &DirtyPublication,
+    render: &impl Fn(&Path) -> Option<Vec<u8>>,
+) -> Result<bool, RepairError> {
+    let current = stores
+        .digest_of(&entry.target)
+        .map_err(RepairError::Stores)?;
+    let republished = if current == Some(entry.intended) {
+        false
+    } else if current == entry.expected_previous {
+        let bytes =
+            render(&entry.target).ok_or_else(|| RepairError::Render(entry.target.clone()))?;
+        if stores.digest_bytes(&bytes) != entry.intended {
+            return Err(RepairError::RenderedDigestMismatch(entry.target.clone()));
+        }
+        stores
+            .publish(&entry.target, entry.expected_previous, &bytes)
+            .map_err(|error| match error {
+                StoreError::Changed(path) => RepairError::TargetModified(path),
+                other => RepairError::Stores(other),
+            })?;
+        true
+    } else {
+        return Err(RepairError::TargetModified(entry.target.clone()));
+    };
+    sync(stores, &entry.target)?;
+    if stores
+        .digest_of(&entry.target)
+        .map_err(RepairError::Stores)?
+        != Some(entry.intended)
+    {
+        return Err(RepairError::TargetModified(entry.target.clone()));
+    }
+    Ok(republished)
 }
 
 fn sync<S: Stores>(stores: &S, path: &Path) -> Result<(), RepairError> {
