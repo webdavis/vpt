@@ -61,3 +61,6 @@ impl Inventory {
         Ok(self.rows)
     }
 }
+
+#[cfg(test)]
+mod tests;
