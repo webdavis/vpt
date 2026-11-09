@@ -1,4 +1,4 @@
-use super::{MemoryLedger, with};
+use super::{MemoryLedger, releases, with};
 use std::path::Path;
 use vpt_application::ports::{DirtyPublication, LedgerError, PublicationJournal};
 impl PublicationJournal for MemoryLedger {
@@ -15,6 +15,9 @@ impl PublicationJournal for MemoryLedger {
 
     fn clear_publication(&self, target: &Path) -> Result<(), LedgerError> {
         with(self, |state| {
+            if releases::owns(state, target) {
+                return Err(crate::ledger::release::conflict());
+            }
             if state.briefs.iter().any(|row| row.target == target) {
                 return Err(crate::ledger::brief::conflict());
             }

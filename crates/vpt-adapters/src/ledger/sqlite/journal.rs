@@ -21,6 +21,9 @@ pub(super) fn upsert_publication(
     connection: &Connection,
     entry: &DirtyPublication,
 ) -> Result<(), LedgerError> {
+    if super::releases::owns(connection, &entry.target)? {
+        return Err(crate::ledger::release::conflict());
+    }
     if super::migrations::current(connection)? >= 5
         && connection
             .query_row(
@@ -81,6 +84,9 @@ impl PublicationJournal for SqliteLedger {
 
     fn clear_publication(&self, target: &Path) -> Result<(), LedgerError> {
         self.transaction(|transaction| {
+            if super::releases::owns(transaction, target)? {
+                return Err(crate::ledger::release::conflict());
+            }
             let owned: bool = transaction
                 .query_row(
                     "SELECT EXISTS(SELECT 1 FROM owned_briefs WHERE target=?1)",

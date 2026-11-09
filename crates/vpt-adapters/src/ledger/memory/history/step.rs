@@ -52,6 +52,9 @@ pub(super) fn apply(
         recording.source_path = Some(path.clone());
     }
     for target in &delta.publication_clears {
+        if super::super::releases::owns(state, target) {
+            return Err(crate::ledger::release::conflict());
+        }
         state.vocabulary.retain(|row| &row.entry.target != target);
         super::super::notes::published(state, target)?;
         state

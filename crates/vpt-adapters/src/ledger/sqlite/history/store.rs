@@ -96,6 +96,9 @@ pub(super) fn step(
             }
         }
         for target in &delta.publication_clears {
+            if crate::ledger::sqlite::releases::owns(transaction, target)? {
+                return Err(crate::ledger::release::conflict());
+            }
             crate::ledger::sqlite::notes::published(transaction, target)?;
             let target = target.to_str().ok_or_else(storage::corrupt)?;
             transaction

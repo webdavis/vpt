@@ -10,6 +10,7 @@ mod proposals;
 mod publications;
 mod recordings;
 mod relations;
+mod releases;
 mod retention;
 mod retention_artifacts;
 mod tags;
@@ -31,6 +32,8 @@ mod history;
 struct State {
     expirations: Vec<vpt_application::ports::RetentionArtifact>,
     releases: Vec<vpt_application::ports::ReleaseRecord>,
+    release_payloads: Vec<vpt_application::ports::ReleasePayload>,
+    next_release: i64,
     briefs: Vec<vpt_application::ports::BriefArtifact>,
     occasions: Vec<vpt_application::ports::OccasionRecord>,
     verification: Vec<super::verification::state::VerifiedArtifact>,
@@ -85,6 +88,9 @@ fn upsert_seen(state: &mut State, row: &SeenRow) {
 }
 
 fn upsert_publication(state: &mut State, entry: &DirtyPublication) -> Result<(), LedgerError> {
+    if releases::owns(state, &entry.target) {
+        return Err(super::release::conflict());
+    }
     if state
         .vocabulary
         .iter()

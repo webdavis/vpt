@@ -113,6 +113,7 @@ pub(crate) fn run_scenario(
         s if s.starts_with("ledger_notes_") => super::notes::tests::run(s, &root),
         s if s.starts_with("ledger_relations_") => super::relations::tests::run(s, &root),
         s if s.starts_with("ledger_briefs_") => super::briefs::tests::run(s, &root),
+        s if s.starts_with("ledger_releases_") => super::releases::tests::run(s, &root),
         s if s.starts_with("ledger_occasions_") => super::occasions::tests::run(s, &root),
         s if s.starts_with("ledger_tags_") => super::tags::tests::run(s, &root),
         s if s.starts_with("ledger_proposals_") => super::proposals::tests::run(s, &root),

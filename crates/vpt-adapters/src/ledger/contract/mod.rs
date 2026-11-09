@@ -9,6 +9,7 @@ pub(crate) mod occasions;
 pub(crate) mod proposals;
 pub(crate) mod recording;
 pub(crate) mod relations;
+pub(crate) mod releases;
 pub(crate) mod retention;
 pub(crate) mod retention_history;
 pub(crate) mod tags;
