@@ -5,6 +5,7 @@ pub mod error;
 mod event;
 mod helper;
 mod limits;
+pub mod proposal;
 pub mod result;
 pub mod whisply;
 

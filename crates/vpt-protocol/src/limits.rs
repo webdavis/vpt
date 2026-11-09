@@ -46,6 +46,17 @@ pub(crate) fn read_whisply(bytes: &[u8]) -> Result<Value, LimitViolation> {
     read_large(bytes, Profile::Whisply)
 }
 
+pub(crate) fn read_proposal(bytes: &[u8]) -> Result<Value, LimitViolation> {
+    read_profile(
+        bytes,
+        &Limits {
+            bytes: 1_048_576,
+            ..Limits::incoming()
+        },
+        Profile::Proposal,
+    )
+}
+
 fn read_large(bytes: &[u8], profile: Profile) -> Result<Value, LimitViolation> {
     read_profile(
         bytes,
