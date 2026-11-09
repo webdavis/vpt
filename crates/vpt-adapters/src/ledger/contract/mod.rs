@@ -4,6 +4,7 @@ pub(crate) mod history;
 pub(crate) mod journal;
 pub(crate) mod known_terms;
 pub(crate) mod notes;
+pub(crate) mod occasions;
 pub(crate) mod proposals;
 pub(crate) mod recording;
 pub(crate) mod relations;
