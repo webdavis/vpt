@@ -1,6 +1,7 @@
 #[derive(Clone, Copy)]
 pub(super) enum Profile {
     General,
+    Engine,
 }
 
 #[derive(Clone, Copy)]
@@ -42,6 +43,7 @@ impl Location {
 
     pub(super) fn limit(self, profile: Profile, general: usize) -> usize {
         match (profile, self) {
+            (Profile::Engine, Self::Segments | Self::Words) => 65_536,
             _ => general,
         }
     }
