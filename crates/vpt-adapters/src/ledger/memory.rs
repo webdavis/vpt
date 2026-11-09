@@ -3,6 +3,7 @@ mod engine_outputs;
 mod expirations;
 mod flags;
 mod notes;
+mod occasions;
 mod proposals;
 mod publications;
 mod recordings;
@@ -29,6 +30,7 @@ struct State {
     expirations: Vec<vpt_application::ports::RetentionArtifact>,
     releases: Vec<vpt_application::ports::ReleaseRecord>,
     briefs: Vec<vpt_application::ports::BriefArtifact>,
+    occasions: Vec<vpt_application::ports::OccasionRecord>,
     verification: Vec<super::verification::state::VerifiedArtifact>,
     proposals: Vec<vpt_application::ports::AcceptedProposal>,
     ambiguities: Vec<(RecordingId, Vec<vpt_domain::relations::MentionAmbiguity>)>,

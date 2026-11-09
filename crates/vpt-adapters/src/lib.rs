@@ -39,6 +39,7 @@ pub use contained::{
 pub use events::LoggedEvents;
 pub use ledger::{
     MemoryLedger, OpenError, SCHEMA_VERSION, SqliteLedger, grounding_basis_for,
+    prepare_occasion,
 };
 pub use lock::{LockError, WriteLock};
 pub use stores::{BUFFER, FilesystemStores, digest_open};

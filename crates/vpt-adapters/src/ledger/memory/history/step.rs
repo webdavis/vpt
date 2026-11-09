@@ -31,6 +31,7 @@ pub(super) fn apply(
             return Err(conflict());
         }
     }
+    super::super::occasions::apply(state, delta, facts)?;
     super::super::eligibility::apply(state, delta, facts)?;
     super::super::verification::apply(state, delta, facts)?;
     super::super::proposals::apply(state, delta, facts)?;

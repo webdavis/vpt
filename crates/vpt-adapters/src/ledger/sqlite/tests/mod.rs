@@ -112,6 +112,7 @@ pub(crate) fn run_scenario(
         "ledger_engine_output_corrupt" => super::engine_outputs::tests::corrupt_saved(&root),
         s if s.starts_with("ledger_notes_") => super::notes::tests::run(s, &root),
         s if s.starts_with("ledger_relations_") => super::relations::tests::run(s, &root),
+        s if s.starts_with("ledger_occasions_") => super::occasions::tests::run(s, &root),
         s if s.starts_with("ledger_tags_") => super::tags::tests::run(s, &root),
         s if s.starts_with("ledger_proposals_") => super::proposals::tests::run(s, &root),
         s if s.starts_with("ledger_terms_") => super::vocabulary::tests::run(s, &root),
