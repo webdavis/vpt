@@ -15,6 +15,7 @@ pub mod retention;
 pub mod review;
 pub mod run;
 pub mod sweep;
+pub mod tags;
 pub mod time;
 pub mod transcript;
 pub mod uncertainty;
