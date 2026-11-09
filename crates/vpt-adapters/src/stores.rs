@@ -7,8 +7,10 @@ use vpt_domain::digest::Sha256Digest;
 mod inventory;
 mod notes;
 mod publication;
+mod releases;
 mod retention;
 mod roots;
+pub use releases::{ReleaseFileError, ReleaseFiles, ReleaseTarget};
 
 mod digest;
 pub(crate) use digest::digest_reader;

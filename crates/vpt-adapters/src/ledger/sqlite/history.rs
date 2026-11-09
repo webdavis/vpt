@@ -4,6 +4,7 @@ use rusqlite::{Transaction, TransactionBehavior};
 mod baseline;
 mod codec;
 mod export;
+pub(super) mod releases;
 pub(super) mod retention;
 pub(super) mod storage;
 mod store;

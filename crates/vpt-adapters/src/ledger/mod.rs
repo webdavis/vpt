@@ -1,4 +1,5 @@
 mod occasion;
+mod release;
 mod retention_artifacts;
 pub use occasion::prepare as prepare_occasion;
 mod eligibility;

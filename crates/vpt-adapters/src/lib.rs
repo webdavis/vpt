@@ -43,6 +43,7 @@ pub use ledger::{
 };
 pub use lock::{LockError, WriteLock};
 pub use stores::{BUFFER, FilesystemStores, digest_open};
+pub use stores::{ReleaseFileError, ReleaseFiles, ReleaseTarget};
 pub use symlink::{
     LinkState, SymlinkError, deploy as deploy_symlink, inspect as inspect_symlink,
     verify as verify_symlink,

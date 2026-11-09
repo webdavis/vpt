@@ -7,6 +7,7 @@ use vpt_domain::run::{
 };
 use vpt_domain::time::UtcInstant;
 
+mod releases;
 mod retention;
 mod state;
 mod step;
