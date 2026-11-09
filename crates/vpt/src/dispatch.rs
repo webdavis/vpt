@@ -8,6 +8,13 @@ use crate::{
 
 pub(crate) fn run(invocation: &Invocation) -> i32 {
     let outcome = match &invocation.verb {
+        Verb::ReviewResolve { id, flag, action } => commands::review::resolve(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            id,
+            flag,
+            action,
+        ),
         Verb::NoteWrite { id } => commands::note::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
@@ -39,6 +46,13 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             invocation.config.as_deref(),
         ) {
             Ok(ledger) => commands::show::run(&ledger, id),
+            Err(error) => Outcome::Failure(*error),
+        },
+        Verb::Review { id } => match compose::ledger_from(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+        ) {
+            Ok(ledger) => commands::review::run(&ledger, id),
             Err(error) => Outcome::Failure(*error),
         },
         Verb::List { stage } => match compose::ledger_from(

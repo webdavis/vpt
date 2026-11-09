@@ -29,6 +29,23 @@ fn an_unknown_verb_is_a_usage_error_naming_it() {
 }
 
 #[test]
+fn review_accepts_global_options_and_requires_exactly_one_identity() {
+    for line in [
+        "review memo --json",
+        "--json review memo",
+        "review --config custom.toml memo",
+    ] {
+        assert_eq!(
+            parsed(line).unwrap().verb,
+            Verb::Review { id: "memo".into() }
+        );
+    }
+    for line in ["review", "review --json", "review memo extra"] {
+        assert!(parsed(line).is_err(), "{line}");
+    }
+}
+
+#[test]
 fn a_trailing_unknown_argument_is_refused() {
     assert_eq!(
         parsed("doctor --loud"),
@@ -164,3 +181,5 @@ fn transcribe_accepts_language_and_dry_run_flags_around_the_identity() {
         assert!(parsed(line).is_err());
     }
 }
+
+mod review;

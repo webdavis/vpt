@@ -5,6 +5,9 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
         return Err(UsageError("a verb is required".into()));
     }
     let first = words.remove(0);
+    if text.correction.is_some() && first != "review" {
+        return Err(UsageError("--correct requires review".into()));
+    }
     match first.as_str() {
         "--version" => Ok(Verb::Version),
         "setup" => Ok(Verb::Setup {
@@ -33,6 +36,7 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
         "show" => Ok(Verb::Show {
             id: take_positional(words, "<id>")?,
         }),
+        "review" => review::parse(words, text.correction),
         "list" => Ok(Verb::List {
             stage: take_value(words, "--stage")?,
         }),
