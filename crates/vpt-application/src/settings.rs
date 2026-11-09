@@ -1,10 +1,31 @@
 use std::path::{Path, PathBuf};
 use vpt_domain::layout::StoreKey;
 use vpt_domain::retention::Hold;
+mod brief;
+mod context;
+pub use context::{ContextSettings, ContextSource, GoogleCredentials};
+mod note;
+pub use brief::BriefSettings;
+mod share;
+mod synthesis;
+pub use note::{LinkStyle, NoteProfile, NoteSettings, ObsidianSettings};
+pub use share::ShareSettings;
+pub use synthesis::SynthesisSettings;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Settings {
     pub config_version: u32,
+    pub engines: crate::engines::EngineSettings,
+    pub reconcile: ReconcileSettings,
+    pub readability_enabled: bool,
+    pub note: NoteSettings,
+    pub tags: TagSettings,
+    pub relations: vpt_domain::relations::Options,
+    pub synthesis: SynthesisSettings,
+    pub brief: BriefSettings,
+    pub context: ContextSettings,
+    pub share: ShareSettings,
+    pub handoff_allow_private: bool,
     pub home: PathBuf,
     pub state_dir: PathBuf,
     pub symlink_target: Option<PathBuf>,
@@ -15,6 +36,18 @@ pub struct Settings {
     pub alert_command: Vec<String>,
     pub alert_aggregate_after: u32,
     pub retention: RetentionSettings,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReconcileSettings {
+    pub options: vpt_domain::uncertainty::Options,
+    pub known_terms_path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TagSettings {
+    pub options: vpt_domain::tags::Options,
+    pub known_tags_path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
