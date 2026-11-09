@@ -11,7 +11,13 @@ use vpt_domain::time::UtcInstant;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WorkDelta {
+    pub verification: Option<super::VerificationChange>,
+    pub proposal: Option<super::ProposalChange>,
+    pub relations: Option<super::RelationChange>,
+    pub tags: Option<super::TagChange>,
+    pub vocabulary: Option<super::VocabularyPublication>,
     pub resolution: Option<super::FlagResolutionChange>,
+    pub notes: Vec<super::NoteChange>,
     pub engine_outputs: Vec<super::EngineArtifact>,
     pub transcription: Option<super::TranscriptionChange>,
     pub commit: LedgerCommit,

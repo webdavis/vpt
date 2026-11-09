@@ -1,6 +1,7 @@
 pub mod engines;
 mod ingest;
 mod inventory;
+pub mod note;
 pub mod pipeline;
 pub mod ports;
 mod publication;

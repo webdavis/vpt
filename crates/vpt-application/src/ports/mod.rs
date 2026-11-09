@@ -1,20 +1,32 @@
 mod verification;
-pub use verification::{VerifiedClaims};
+pub use verification::{VerificationChange, VerifiedClaims};
 mod archive;
 mod clock;
 mod engine;
+mod proposal;
+pub use proposal::{AcceptedProposal, GroundingBasis, ProposalChange, ProposalLedger};
 mod engine_artifact;
 mod history;
 mod ledger;
+mod vocabulary;
+pub use vocabulary::{VocabularyKind, VocabularyLedger, VocabularyPublication};
+mod note;
 mod note_artifact;
 mod prompt;
 mod recorder;
+mod relations;
+pub use relations::{
+    AmbiguityChange, MentionDerivation, NotePredecessor, NoteRelation, RelationChange,
+    RelationLedger,
+};
 mod resolution;
 pub use resolution::FlagResolutionChange;
 mod retention;
 mod retention_history;
 mod stores;
+mod tags;
 mod transcript;
+pub use tags::{TagChange, TagLedger};
 mod trash;
 
 pub use archive::{Archive, ArchiveError, Published, StageFailure, Staged};
@@ -49,4 +61,5 @@ pub use transcript::{
 };
 
 pub use engine_artifact::{EngineArtifact, EngineOutputLedger};
-pub use note_artifact::{NoteStage};
+pub use note::{NoteFiles, NoteFormat, NoteFormatError, NoteInputs, NoteInputsLedger, StoredNote};
+pub use note_artifact::{NoteArtifact, NoteChange, NoteLedger, NoteStage};
