@@ -19,6 +19,7 @@ mod tests;
 
 pub(crate) mod path;
 
+pub(crate) mod pipeline;
 
 pub(crate) mod synthesize;
 

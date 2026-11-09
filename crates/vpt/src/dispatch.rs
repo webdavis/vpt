@@ -45,6 +45,11 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             path,
             recording,
         ),
+        Verb::Run { dry_run } => commands::pipeline::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            *dry_run,
+        ),
         Verb::ReviewResolve { id, flag, action } => commands::review::resolve(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

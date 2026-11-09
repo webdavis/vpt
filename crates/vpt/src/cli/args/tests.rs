@@ -211,3 +211,23 @@ fn path_requires_one_identity_and_an_explicit_stage_with_global_options() {
 }
 
 mod review;
+
+#[test]
+fn run_accepts_dry_run_and_global_flags_but_no_recording_or_once() {
+    assert_eq!(
+        parsed("run --dry-run --json").unwrap().verb,
+        Verb::Run { dry_run: true }
+    );
+    assert_eq!(
+        parsed("--config settings.toml run").unwrap().verb,
+        Verb::Run { dry_run: false }
+    );
+    for line in [
+        "run memo",
+        "run --once memo",
+        "run --language fr",
+        "run --dry-run --dry-run",
+    ] {
+        assert!(parsed(line).is_err());
+    }
+}

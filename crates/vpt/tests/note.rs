@@ -1,5 +1,7 @@
 #![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared CLI fixtures")]
+#[path = "note/analysis.rs"]
+mod analysis;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
 #[path = "note/mentions.rs"]
