@@ -181,7 +181,10 @@ pub(super) fn completion(ledger: &SqliteLedger, root: &RootDir) {
         ))
     );
     assert_eq!(failed.report.moved.len(), 1);
-    assert_eq!(failed.report.completed, vec![fixture.record.id.clone()]);
+    assert_eq!(
+        failed.report.completed,
+        vec![(fixture.record.id.clone()).into()]
+    );
     assert_eq!(
         counted.writes.get(),
         3,

@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use vpt_adapters::{ClonefileArchive, SqliteLedger, VoiceMemosStore};
+use vpt_adapters::{ArchiveReader, ClonefileArchive, SqliteLedger, VoiceMemosStore};
 use vpt_application::ports::{
     Archive, ArchiveError, Candidate, CloneError, CloneKind, HistoryReceipt, HistoryWrite,
     LedgerCommit, LedgerError, Published, RecorderError, RecorderStore, RecordingLedger,
@@ -173,9 +173,19 @@ impl RecordingLedger for FaultLedger {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ArchiveFault {
     StageOwned,
+    ChangedAfterStage,
+    ChangedBeforePublish,
+    ReplacedBeforePublish,
+    ChangedAfterStagedOpen,
+    ReplacedAfterStagedOpen,
     StageUnowned,
     BeforePublish,
+    NoSpaceAfterFirst,
+    SyncAfterFirst,
+    PlacedUnsyncedAfterFirst,
     EscapeBeforePublish,
+    ChangedBeforeExistingSync,
+    ReplacedAfterOpen,
     PlacedUnsynced,
 }
 
@@ -185,7 +195,7 @@ pub struct FaultArchive {
 }
 
 impl Archive for FaultArchive {
-    type Handle = File;
+    type Handle = ArchiveReader;
 
     fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>
     where
@@ -204,16 +214,44 @@ impl Archive for FaultArchive {
                 owned_staging: Some(staged.path),
             });
         }
+        if self.fault == ArchiveFault::ChangedAfterStage {
+            std::fs::write(&staged.path, altered_staged_bytes()).unwrap();
+        }
         Ok(staged)
     }
 
-    fn open(&self, path: &Path) -> Result<File, ArchiveError> {
-        self.base.open(path)
+    fn open(&self, path: &Path) -> Result<ArchiveReader, ArchiveError> {
+        let handle = self.base.open(path)?;
+        if path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with(".vpt-staging-")
+        {
+            if self.fault == ArchiveFault::ChangedAfterStagedOpen {
+                std::fs::write(path, altered_staged_bytes()).unwrap();
+            }
+            if self.fault == ArchiveFault::ReplacedAfterStagedOpen {
+                std::fs::rename(path, path.with_extension("held")).unwrap();
+                std::fs::copy(path.with_extension("held"), path).unwrap();
+            }
+        }
+        let replacement = path.with_extension("replacement");
+        if self.fault == ArchiveFault::ReplacedAfterOpen && replacement.exists() {
+            std::fs::rename(path, path.with_extension("before")).unwrap();
+            std::fs::rename(replacement, path).unwrap();
+        }
+        Ok(handle)
     }
-    fn size(&self, handle: &File) -> Result<u64, ArchiveError> {
+    fn size(&self, handle: &ArchiveReader) -> Result<u64, ArchiveError> {
         self.base.size(handle)
     }
-    fn read_at(&self, handle: &File, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
+    fn read_at(
+        &self,
+        handle: &ArchiveReader,
+        offset: u64,
+        buf: &mut [u8],
+    ) -> Result<(), ReadFailure> {
         self.base.read_at(handle, offset, buf)
     }
     fn validate_trash_path(&self, path: &Path) -> Result<(), ArchiveError> {
@@ -221,6 +259,9 @@ impl Archive for FaultArchive {
     }
     fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError> {
         self.base.digest(path)
+    }
+    fn digest_handle(&self, handle: &ArchiveReader) -> Result<Sha256Digest, ArchiveError> {
+        self.base.digest_handle(handle)
     }
     fn target(&self, name: &str) -> PathBuf {
         self.base.target(name)
@@ -231,23 +272,50 @@ impl Archive for FaultArchive {
     fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError> {
         self.base.staged_leftovers()
     }
-    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError> {
-        if self.fault == ArchiveFault::BeforePublish {
+    fn publish(
+        &self,
+        staged: &Staged,
+        handle: &ArchiveReader,
+        target_name: &str,
+    ) -> Result<Published, ArchiveError> {
+        let later = matches!(
+            self.fault,
+            ArchiveFault::NoSpaceAfterFirst
+                | ArchiveFault::SyncAfterFirst
+                | ArchiveFault::PlacedUnsyncedAfterFirst
+        ) && !self.base.archived()?.is_empty();
+        if self.fault == ArchiveFault::BeforePublish
+            || (later && self.fault == ArchiveFault::NoSpaceAfterFirst)
+        {
             return Err(ArchiveError::NoSpace);
         }
         if self.fault == ArchiveFault::EscapeBeforePublish {
-            return Err(ArchiveError::Escape(staged.to_path_buf()));
+            return Err(ArchiveError::Escape(staged.path.clone()));
         }
-        let result = self.base.publish(staged, target_name)?;
-        if self.fault == ArchiveFault::PlacedUnsynced
+        if later && self.fault == ArchiveFault::SyncAfterFirst {
+            return Err(ArchiveError::Sync("private sync failure".into()));
+        }
+        if self.fault == ArchiveFault::ChangedBeforePublish {
+            std::fs::write(&staged.path, altered_staged_bytes()).unwrap();
+        }
+        if self.fault == ArchiveFault::ReplacedBeforePublish {
+            std::fs::rename(&staged.path, staged.path.with_extension("held")).unwrap();
+            std::fs::copy(staged.path.with_extension("held"), &staged.path).unwrap();
+        }
+        let result = self.base.publish(staged, handle, target_name)?;
+        if (self.fault == ArchiveFault::PlacedUnsynced
+            || (later && self.fault == ArchiveFault::PlacedUnsyncedAfterFirst))
             && let Published::Placed(path) = &result
         {
             return Err(ArchiveError::PlacedUnsynced(path.clone()));
         }
         Ok(result)
     }
-    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError> {
-        self.base.sync_existing(path)
+    fn sync_existing(&self, path: &Path, expected: &Sha256Digest) -> Result<(), ArchiveError> {
+        if self.fault == ArchiveFault::ChangedBeforeExistingSync {
+            std::fs::write(path, b"changed before archive sync").unwrap();
+        }
+        self.base.sync_existing(path, expected)
     }
 }
 
@@ -258,6 +326,10 @@ pub struct DatalessRecorder {
 
 impl RecorderStore for DatalessRecorder {
     type Handle = File;
+
+    fn digest(&self, handle: &File, size: u64) -> Result<Sha256Digest, RecorderError> {
+        self.base.digest(handle, size)
+    }
 
     fn candidates(&self) -> Result<Vec<Candidate>, RecorderError> {
         self.base.candidates().map(|mut candidates| {
@@ -301,4 +373,8 @@ impl RecorderStore for DatalessRecorder {
     fn refresh_titles(&self) -> Result<(), RecorderError> {
         self.base.refresh_titles()
     }
+}
+
+pub fn altered_staged_bytes() -> Vec<u8> {
+    vpt_domain::fixtures::m4a(super::CAPTURED + 60, 9, b"modified bytes")
 }

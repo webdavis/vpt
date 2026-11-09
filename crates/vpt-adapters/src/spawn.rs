@@ -89,7 +89,7 @@ pub fn install_interrupt_handlers() {
     }
 }
 
-fn interrupted() -> bool {
+pub(crate) fn interrupted() -> bool {
     INTERRUPTED.load(Ordering::SeqCst)
 }
 

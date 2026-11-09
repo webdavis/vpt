@@ -39,14 +39,19 @@ impl RootDir {
 
     pub fn names_strict(&self) -> Result<Vec<String>, ContainedError> {
         self.revalidate()?;
-        self.scan_names(true)
+        self.scan_names(true, usize::MAX)
+    }
+
+    pub(crate) fn names_bounded(&self, maximum: usize) -> Result<Vec<String>, ContainedError> {
+        self.revalidate()?;
+        self.scan_names(true, maximum)
     }
 
     pub(super) fn retained_names(&self) -> Result<Vec<String>, ContainedError> {
-        self.scan_names(false)
+        self.scan_names(false, usize::MAX)
     }
 
-    fn scan_names(&self, strict: bool) -> Result<Vec<String>, ContainedError> {
+    fn scan_names(&self, strict: bool, maximum: usize) -> Result<Vec<String>, ContainedError> {
         let flags = libc::O_RDONLY | libc::O_DIRECTORY | NO_FOLLOW;
         // SAFETY: the retained descriptor is live; dot opens that directory with an independent offset.
         let fd = unsafe { libc::openat(self.file.as_raw_fd(), c".".as_ptr(), flags) };
@@ -79,6 +84,9 @@ impl RootDir {
                 entry_name(name)
             };
             if let Some(name) = decoded {
+                if names.len() >= maximum {
+                    return Err(io(&self.path, std::io::ErrorKind::FileTooLarge.into()));
+                }
                 names.push(name.to_owned());
             }
         }

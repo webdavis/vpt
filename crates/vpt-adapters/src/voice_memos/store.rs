@@ -1,7 +1,11 @@
 mod cloning;
+mod errors;
+use errors::{listing_error, recorder_error};
+mod digest;
+mod selection;
 mod titles;
 
-use crate::{Access, ContainedError, Kind, RootDir};
+use crate::{Access, ContainedError, RootDir};
 use std::fs::File;
 use std::os::unix::fs::{FileExt, MetadataExt};
 use std::path::{Path, PathBuf};
@@ -12,12 +16,7 @@ use vpt_application::ports::{
 use vpt_domain::container::ReadFailure;
 use vpt_domain::time::FileTime;
 
-pub const APPLE_SUBDIRECTORIES: [&str; 4] = [
-    "Capture",
-    "CaptureRecovery",
-    "CloudRecordings_ckAssets",
-    "EncryptedCloudRecordings",
-];
+pub use selection::APPLE_SUBDIRECTORIES;
 
 pub struct VoiceMemosStore {
     recordings: RootDir,
@@ -41,35 +40,18 @@ impl VoiceMemosStore {
             titles: None,
         })
     }
-
-    fn candidate_named(&self, name: &str) -> Result<Option<Candidate>, RecorderError> {
-        if !name.ends_with(".m4a") {
-            return Ok(None);
-        }
-        let path = self.recordings.path().join(name);
-        let stat = self
-            .recordings
-            .stat(Path::new(name))
-            .map_err(|error| recorder_error(&path, error))?;
-        match stat.kind {
-            Kind::File => Ok(Some(Candidate {
-                path,
-                file_name: name.into(),
-                size: stat.size,
-                mtime: FileTime {
-                    secs: stat.mtime_secs,
-                    nanos: stat.mtime_nanos,
-                },
-                flags: stat.flags,
-            })),
-            Kind::Link => Err(RecorderError::NotRegular(path)),
-            Kind::Directory | Kind::Other => Ok(None),
-        }
-    }
 }
 
 impl RecorderStore for VoiceMemosStore {
     type Handle = File;
+
+    fn digest(
+        &self,
+        handle: &File,
+        size: u64,
+    ) -> Result<vpt_domain::digest::Sha256Digest, RecorderError> {
+        digest::bounded(handle, size)
+    }
 
     fn title(&self, file_name: &str) -> TitleLookup {
         self.titles
@@ -90,7 +72,7 @@ impl RecorderStore for VoiceMemosStore {
             .map_err(|error| listing_error(self.recordings.path(), error))?;
         let mut candidates = Vec::new();
         for name in names {
-            match self.candidate_named(&name) {
+            match selection::named(&self.recordings, &name) {
                 Ok(Some(candidate)) => candidates.push(candidate),
                 Ok(None) | Err(RecorderError::NotRegular(_)) => {}
                 Err(error) => return Err(error),
@@ -108,7 +90,7 @@ impl RecorderStore for VoiceMemosStore {
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or_else(|| RecorderError::Escape(path.into()))?;
-        self.candidate_named(name)?
+        selection::named(&self.recordings, name)?
             .ok_or_else(|| RecorderError::NotFound(path.into()))
     }
 
@@ -160,29 +142,6 @@ impl RecorderStore for VoiceMemosStore {
                 ((*name).into(), count)
             })
             .collect()
-    }
-}
-
-fn recorder_error(path: &Path, error: ContainedError) -> RecorderError {
-    match error {
-        ContainedError::Escape { .. } | ContainedError::NotADirectory(_) => {
-            RecorderError::Escape(path.into())
-        }
-        ContainedError::NotRegular(leaf) => RecorderError::NotRegular(leaf),
-        ContainedError::Io {
-            kind: std::io::ErrorKind::NotFound,
-            ..
-        } => RecorderError::NotFound(path.into()),
-        ContainedError::Io { kind, .. } => RecorderError::Io(kind.to_string()),
-    }
-}
-
-fn listing_error(path: &Path, error: ContainedError) -> RecorderError {
-    match error {
-        ContainedError::Io { kind, .. } => RecorderError::Unreadable(kind.to_string()),
-        ContainedError::Escape { .. }
-        | ContainedError::NotRegular(_)
-        | ContainedError::NotADirectory(_) => RecorderError::Escape(path.into()),
     }
 }
 

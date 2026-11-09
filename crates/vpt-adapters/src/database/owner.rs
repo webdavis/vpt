@@ -8,6 +8,7 @@ use std::path::Path;
 use std::ptr;
 use std::rc::Rc;
 use std::time::Duration;
+mod identity;
 
 pub(crate) struct Database {
     connection: Option<Connection>,

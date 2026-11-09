@@ -1,3 +1,4 @@
+mod artifacts;
 use super::{MemoryLedger, state::conflict};
 use vpt_application::ports::{
     HistoryReceipt, HistoryWrite, LedgerError, NewIntent, PreparedRetention, RetentionHistory,
@@ -10,6 +11,9 @@ use vpt_domain::time::UtcInstant;
 impl RetentionHistory for MemoryLedger {
     fn prepare_retention(&self, run: RunId, intent: &NewIntent) -> HistoryWrite<PreparedRetention> {
         self.history_write(|state| {
+            if !intent.owner.matches_kind(intent.kind) {
+                return Err(conflict());
+            }
             if !state.history.has_run(run) {
                 return Err(conflict());
             }
@@ -26,7 +30,7 @@ impl RetentionHistory for MemoryLedger {
                 RetentionIntent {
                     id,
                     kind: intent.kind,
-                    recording: intent.recording.clone(),
+                    owner: intent.owner.clone(),
                     path: intent.path.clone(),
                     expected: intent.expected,
                     recorded_at: intent.recorded_at,
@@ -67,11 +71,22 @@ impl RetentionHistory for MemoryLedger {
             if !state.history.has_run(run) {
                 return Err(conflict());
             }
+            if let Some((intent, completed)) = state
+                .intents
+                .iter()
+                .find(|(intent, _)| intent.id == intent_id)
+                && intent.kind != vpt_application::ports::ArtifactKind::Audio
+            {
+                return artifacts::complete(state, run, &intent.clone(), *completed, effect_id, at);
+            }
             let (intent, completed) = state
                 .intents
                 .iter_mut()
                 .find(|(intent, _)| intent.id == intent_id)
                 .ok_or_else(conflict)?;
+            if intent.kind != vpt_application::ports::ArtifactKind::Audio {
+                return Err(conflict());
+            }
             let expected = HistoryFact::EffectIntent {
                 kind: EffectKind::RetentionTrash,
                 reference: EffectReference::RetentionIntent {
@@ -90,7 +105,7 @@ impl RetentionHistory for MemoryLedger {
             let recording = state
                 .recordings
                 .iter_mut()
-                .find(|recording| recording.id == intent.recording)
+                .find(|recording| intent.owner.recording() == Some(&recording.id))
                 .ok_or_else(conflict)?;
             if recording.audio_path != intent.path || recording.digest != intent.expected {
                 return Err(conflict());

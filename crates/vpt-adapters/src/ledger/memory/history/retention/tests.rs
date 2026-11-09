@@ -14,7 +14,7 @@ fn new_intent() -> NewIntent {
     let record = contract::record(127);
     NewIntent {
         kind: vpt_application::ports::ArtifactKind::Audio,
-        recording: record.id,
+        owner: (record.id).into(),
         path: record.audio_path,
         expected: record.digest,
         recorded_at: UtcInstant { secs: 120 },

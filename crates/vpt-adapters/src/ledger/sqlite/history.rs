@@ -1,10 +1,11 @@
-use super::{SqliteLedger, connection, error, map};
+use super::{SqliteLedger, error, map};
 use crate::database::AccessPolicy;
 use rusqlite::{Transaction, TransactionBehavior};
+mod baseline;
 mod codec;
 mod export;
 pub(super) mod retention;
-mod storage;
+pub(super) mod storage;
 mod store;
 use vpt_application::ports::{HistoryReceipt, HistoryWrite, LedgerError, RunHistory, WorkDelta};
 use vpt_domain::history::{EventId, RunId};
@@ -31,7 +32,7 @@ impl SqliteLedger {
         if self.policy != AccessPolicy::WritableLedger {
             return HistoryWrite::Unconfirmed(LedgerError::Io("read-only ledger".into()));
         }
-        let mut owner = match connection::open(&self.state, self.busy, self.policy) {
+        let mut owner = match self.open_connection() {
             Ok(owner) => owner,
             Err(error) => return HistoryWrite::Unconfirmed(error),
         };

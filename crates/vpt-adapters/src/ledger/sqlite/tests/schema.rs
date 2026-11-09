@@ -5,7 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 use vpt_application::ports::LedgerError;
 
 #[test]
-fn open_creates_a_private_version_two_database_in_write_ahead_mode() {
+fn open_creates_a_private_current_database_in_write_ahead_mode() {
     supervised("ledger_schema_create");
 }
 
@@ -52,7 +52,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
     let ledger = seed(root);
     assert_eq!(ledger.database_path(), root.path().join("vpt.db"));
     assert_eq!(ledger.schema_version().unwrap(), SCHEMA_VERSION);
-    assert_eq!(SCHEMA_VERSION, 2);
+    assert_eq!(SCHEMA_VERSION, 15);
     match scenario {
         "ledger_schema_create" | "ledger_schema_reopen" => {
             if scenario == "ledger_schema_reopen" {
@@ -75,22 +75,31 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                     assert_eq!(
                         tables(c),
                         [
+                            "artifact_expirations",
                             "dirty_publications",
+                            "engine_outputs",
                             "flags",
                             "history_export_failures",
                             "history_export_restarts",
                             "history_identity",
                             "history_records",
                             "history_runs",
+                            "known_term_publications",
+                            "mention_ambiguities",
                             "occasions",
+                            "owned_briefs",
+                            "owned_notes",
                             "proposals",
                             "recordings",
                             "relations",
+                            "release_completions",
+                            "release_payloads",
                             "releases",
                             "retention_intents",
                             "seen",
                             "tags",
-                            "transcripts"
+                            "transcripts",
+                            "verified_artifacts"
                         ]
                     );
                     Ok(())
@@ -122,7 +131,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                     .unwrap();
                 let result = ledger.transaction(|t| {
                     t.execute(
-                        "INSERT INTO tags VALUES('absent', 'tag', 'accepted', 'test')",
+                        "INSERT INTO tags (recording, tag, state, provenance) VALUES('absent', 'tag', 'confirmed', 'test')",
                         [],
                     )
                     .map(|_| ())

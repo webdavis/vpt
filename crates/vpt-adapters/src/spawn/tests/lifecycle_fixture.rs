@@ -69,7 +69,7 @@ impl Fixture {
     }
 
     pub fn ready(&self) -> bool {
-        self.root.path().join("ready").exists()
+        std::fs::metadata(self.root.path().join("ready")).is_ok_and(|entry| entry.len() != 0)
     }
 
     pub fn leader_terminal(&self) -> bool {
@@ -221,7 +221,7 @@ fn pending_leader() {
     let lifetime = Duration::from_millis(600);
     // SAFETY: this post-exec fixture changes only its own TERM disposition.
     unsafe { libc::signal(libc::SIGTERM, libc::SIG_IGN) };
-    std::fs::write(std::path::Path::new(&root).join("ready"), b"ready").expect("owned readiness");
+    publish_ready(std::path::Path::new(&root), b"ready").expect("owned readiness");
     while let Some(remaining) = lifetime.checked_sub(started.elapsed()) {
         std::thread::park_timeout(remaining);
     }
@@ -231,4 +231,18 @@ fn pending_leader() {
     } else {
         76
     });
+}
+
+pub(super) fn publish_ready(root: &std::path::Path, bytes: &[u8]) -> io::Result<()> {
+    std::fs::write(root.join("ready.pending"), bytes)?;
+    std::fs::rename(root.join("ready.pending"), root.join("ready"))
+}
+
+#[test]
+fn an_empty_readiness_marker_does_not_allow_cleanup_to_kill_its_writer() {
+    let fixture = Fixture::new();
+    std::fs::write(fixture.root.path().join("ready"), b"").unwrap();
+    assert!(!fixture.ready());
+    std::fs::write(fixture.root.path().join("ready"), b"12345").unwrap();
+    assert!(fixture.ready());
 }

@@ -1,4 +1,4 @@
-use super::schema::{KEYS, Kind};
+use super::schema::{Kind, keys};
 
 pub fn template(main_engine: &str, state_dir: &str) -> String {
     render(Some((main_engine, state_dir)))
@@ -7,7 +7,7 @@ pub fn template(main_engine: &str, state_dir: &str) -> String {
 pub(super) fn render(overrides: Option<(&str, &str)>) -> String {
     let mut text = String::new();
     let mut current_table = String::new();
-    for key in KEYS {
+    for key in keys() {
         let (table, leaf) = split_table(key.path);
         if table != current_table {
             if !table.is_empty() {

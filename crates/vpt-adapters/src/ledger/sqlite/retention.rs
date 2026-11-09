@@ -2,10 +2,9 @@ use super::{SqliteLedger, map};
 use rusqlite::{Row, Transaction, params, types::FromSql};
 use std::path::PathBuf;
 use vpt_application::ports::{
-    ArtifactKind, LedgerError, NewIntent, RetentionIntent, RetentionJournal,
+    ArtifactKind, ArtifactOwner, LedgerError, NewIntent, RetentionIntent, RetentionJournal,
 };
 use vpt_domain::digest::Sha256Digest;
-use vpt_domain::identity::RecordingId;
 use vpt_domain::time::UtcInstant;
 
 fn corrupt(field: &str) -> LedgerError {
@@ -16,21 +15,38 @@ fn column<T: FromSql>(row: &Row<'_>, index: usize, field: &str) -> Result<T, Led
     row.get(index).map_err(|_| corrupt(field))
 }
 
+fn text<'a>(
+    row: &'a Row<'_>,
+    index: usize,
+    field: &str,
+    max: usize,
+) -> Result<&'a str, LedgerError> {
+    let value = row
+        .get_ref(index)
+        .map_err(|_| corrupt(field))?
+        .as_str()
+        .map_err(|_| corrupt(field))?;
+    if value.len() > max {
+        return Err(corrupt(field));
+    }
+    Ok(value)
+}
+
 pub(super) fn intent_from_row(row: &Row<'_>) -> Result<RetentionIntent, LedgerError> {
     let id: i64 = column(row, 0, "identifier")?;
     if id <= 0 {
         return Err(corrupt("identifier"));
     }
-    let kind: String = column(row, 1, "kind")?;
-    let recording: String = column(row, 2, "recording")?;
-    let path: String = column(row, 3, "path")?;
-    let expected: String = column(row, 4, "digest")?;
+    let kind = ArtifactKind::parse(text(row, 1, "kind", 32)?).ok_or_else(|| corrupt("kind"))?;
+    let owner = text(row, 2, "owner", 30)?;
+    let path = text(row, 3, "path", 65_536)?;
+    let expected = text(row, 4, "digest", 64)?;
     Ok(RetentionIntent {
         id,
-        kind: ArtifactKind::parse(&kind).ok_or_else(|| corrupt("kind"))?,
-        recording: RecordingId::parse(&recording).map_err(|_| corrupt("recording"))?,
+        kind,
+        owner: ArtifactOwner::parse(kind, owner).ok_or_else(|| corrupt("owner"))?,
         path: PathBuf::from(path),
-        expected: Sha256Digest::from_hex(&expected).ok_or_else(|| corrupt("digest"))?,
+        expected: Sha256Digest::from_hex(expected).ok_or_else(|| corrupt("digest"))?,
         recorded_at: UtcInstant {
             secs: column(row, 5, "recorded time")?,
         },
@@ -41,13 +57,18 @@ pub(super) fn insert(
     transaction: &Transaction<'_>,
     intent: &NewIntent,
 ) -> Result<i64, LedgerError> {
+    if !intent.owner.matches_kind(intent.kind) {
+        return Err(LedgerError::Conflict(
+            "retention owner kind mismatch".into(),
+        ));
+    }
     let path = intent.path.to_str().ok_or_else(|| corrupt("path"))?;
     transaction
         .execute(
             "INSERT INTO retention_intents (artifact_kind, recording, path, expected, recorded_at) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
                 intent.kind.as_str(),
-                intent.recording.as_str(),
+                intent.owner.as_str(),
                 path,
                 intent.expected.hex(),
                 intent.recorded_at.secs,

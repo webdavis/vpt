@@ -40,7 +40,9 @@ pub(super) fn parse_unsigned(text: &str) -> Result<u64, LedgerError> {
         .ok_or_else(corrupt)
 }
 
-pub(super) fn namespace(connection: &Connection) -> Result<LedgerNamespace, LedgerError> {
+pub(in crate::ledger::sqlite) fn namespace(
+    connection: &Connection,
+) -> Result<LedgerNamespace, LedgerError> {
     let bytes: Vec<u8> = connection
         .query_row(
             "SELECT namespace FROM history_identity WHERE id = 1",

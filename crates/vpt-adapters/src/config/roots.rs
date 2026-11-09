@@ -1,8 +1,11 @@
 mod directory;
+mod vault;
+mod vocabulary;
 
 pub use directory::planned_directory;
 use directory::{private_dir, prospective};
 use std::path::{Component, Path, PathBuf};
+pub use vault::resolve_vault;
 use vpt_application::{Settings, StorePaths};
 use vpt_domain::layout::{RootName, StoreKey, check_overlaps};
 
@@ -27,6 +30,7 @@ pub struct Roots {
 }
 
 pub fn resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootError> {
+    resolve_vault(settings)?;
     let home = planned_directory(&settings.home, "home.path")?;
     let state_dir = planned_directory(&settings.state_dir, "home.state_dir")?;
     let recordings_dir =
@@ -58,17 +62,20 @@ pub fn resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootErro
             .map(|key| (RootName::Store(*key), stores.get(*key))),
     );
     validate_overlaps(&roots)?;
-    Ok(Roots {
+    let roots = Roots {
         home,
         state_dir,
         stores,
         recordings_dir,
         container,
         config_dir,
-    })
+    };
+    vocabulary::validate(settings, &roots)?;
+    Ok(roots)
 }
 
 pub fn resolve_stores(settings: &Settings) -> Result<StorePaths, RootError> {
+    resolve_vault(settings)?;
     let home = planned_directory(&settings.home, "home.path")?;
     let stores = store_paths(settings, &home)?;
     let roots = StoreKey::all()

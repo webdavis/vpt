@@ -159,9 +159,9 @@ fn group_participant() {
             .write_all(b"{}")
             .expect("owned retained output");
     }
-    std::fs::write(
-        Path::new(&root).join("ready"),
-        std::process::id().to_string(),
+    super::lifecycle_fixture::publish_ready(
+        Path::new(&root),
+        std::process::id().to_string().as_bytes(),
     )
     .expect("participant readiness");
     loop {

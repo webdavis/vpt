@@ -1,7 +1,9 @@
 mod boundaries;
+mod reader;
 mod staging;
 
 use super::*;
+use std::fs::File;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use vpt_application::ports::RecorderStore;

@@ -1,4 +1,4 @@
-use super::{KEYS, Kind};
+use super::{Kind, keys};
 
 pub struct DynamicTable {
     pub prefix: &'static str,
@@ -24,7 +24,7 @@ pub const DYNAMIC_TABLES: &[DynamicTable] = &[
 ];
 
 pub fn spec_for(path: &str) -> Option<Kind> {
-    if let Some(known) = KEYS.iter().find(|key| key.path == path) {
+    if let Some(known) = keys().find(|key| key.path == path) {
         return Some(known.kind);
     }
     for table in DYNAMIC_TABLES {
@@ -47,7 +47,7 @@ pub fn spec_for(path: &str) -> Option<Kind> {
 
 pub(crate) fn table_is_declared(path: &str) -> bool {
     let as_prefix = format!("{path}.");
-    KEYS.iter().any(|key| key.path.starts_with(&as_prefix))
+    keys().any(|key| key.path.starts_with(&as_prefix))
         || DYNAMIC_TABLES.iter().any(|table| {
             table.prefix.starts_with(&as_prefix)
                 || path

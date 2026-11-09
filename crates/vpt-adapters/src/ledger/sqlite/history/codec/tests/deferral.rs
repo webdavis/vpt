@@ -19,6 +19,7 @@ fn deferred_event_reason_count_and_source_path_round_trip() {
     let event = Event {
         kind: EventKind::Deferred,
         state: EventState::NeedsAttention,
+        occasion: None,
         recording: None,
         detail: EventDetail::Deferred {
             reason: DeferralReason::ChangedDuringRead,
@@ -63,6 +64,7 @@ fn malformed_deferred_metadata_is_content_free_corruption() {
         HistoryFact::Event(Event {
             kind: EventKind::Deferred,
             state: EventState::NeedsAttention,
+            occasion: None,
             recording: None,
             detail: EventDetail::Deferred {
                 reason: DeferralReason::Dataless,
@@ -129,6 +131,7 @@ fn all_deferred_reasons_use_their_exact_private_wire_spellings() {
         let fact = HistoryFact::Event(Event {
             kind: EventKind::Deferred,
             state: EventState::NeedsAttention,
+            occasion: None,
             recording: None,
             detail: EventDetail::Deferred { reason, count: 1 },
             counts: EventCounts::default(),

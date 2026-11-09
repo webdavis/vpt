@@ -26,7 +26,7 @@ fn an_expired_clone_has_a_committed_exported_intent_before_the_move() {
     let mut world = World::new();
     let record = world.record("expired.m4a", b"expired owned audio");
     let report = run(&mut world, false, ReconcileProgress::default()).unwrap();
-    assert_eq!(report.completed, vec![record.id.clone()]);
+    assert_eq!(report.completed, vec![(record.id.clone()).into()]);
     assert_eq!(report.moved.len(), 1);
     assert_eq!(report.moved[0].path, record.audio_path);
     assert_eq!(
@@ -140,12 +140,19 @@ fn retention_combines_recovery_and_new_moves_in_one_report_and_event() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap();
     let report = run(&mut world, false, progress).unwrap();
-    assert_eq!(report.completed, vec![recovered.id, absent.id, current.id]);
+    assert_eq!(
+        report.completed,
+        vec![
+            (recovered.id).into(),
+            (absent.id).into(),
+            (current.id).into()
+        ]
+    );
     assert_eq!(report.moved.len(), 2);
     let events = report_events(&world.sink.trace);
     assert_eq!(events.len(), 1);
@@ -176,12 +183,12 @@ fn absent_reconciliation_does_not_invent_a_move_or_report_event() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap();
     let report = run(&mut world, false, progress).unwrap();
-    assert_eq!(report.completed, vec![record.id]);
+    assert_eq!(report.completed, vec![(record.id).into()]);
     assert!(report.moved.is_empty());
     assert!(report_events(&world.sink.trace).is_empty());
 }

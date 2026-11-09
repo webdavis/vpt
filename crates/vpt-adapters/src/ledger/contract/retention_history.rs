@@ -28,7 +28,7 @@ pub(in crate::ledger) fn intent() -> NewIntent {
     let recording = record(120);
     NewIntent {
         kind: ArtifactKind::Audio,
-        recording: recording.id,
+        owner: (recording.id).into(),
         path: recording.audio_path,
         expected: recording.digest,
         recorded_at: UtcInstant { secs: 120 },
@@ -43,7 +43,7 @@ fn recorded(id: i64, value: NewIntent) -> RetentionIntent {
     RetentionIntent {
         id,
         kind: value.kind,
-        recording: value.recording,
+        owner: value.owner,
         path: value.path,
         expected: value.expected,
         recorded_at: value.recorded_at,
@@ -78,7 +78,7 @@ fn seeded<L: RunHistory + RetentionJournal>(
             (
                 UtcInstant { secs: 119 },
                 HistoryFact::WorkStep {
-                    recording: Some(new.recording.clone()),
+                    recording: Some(new.owner.recording().unwrap().clone()),
                     outcome: WorkOutcome::Completed,
                 },
             ),

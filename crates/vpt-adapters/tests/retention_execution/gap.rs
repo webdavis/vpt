@@ -32,7 +32,7 @@ fn missing_history_receipt_names_the_known_intent_at_detection_time() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap_err();
@@ -97,7 +97,7 @@ fn repeated_missing_history_observations_keep_the_same_intent_and_current_times(
             &world.stores,
             &world.trash,
             &ObservedAt(at),
-            &world.paths.audio,
+            &world.paths,
             &mut world.sink,
         )
         .unwrap_err();

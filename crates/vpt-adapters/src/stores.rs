@@ -1,33 +1,24 @@
 use crate::contained::{Access, ContainedError, Kind, RootDir};
 use sha2::{Digest, Sha256};
-use std::fs::File;
-use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use vpt_application::ports::{StoreEntry, StoreError, Stores};
+use std::sync::atomic::AtomicU64;
+use vpt_application::ports::{RetentionEntries, StoreEntry, StoreError, Stores};
 use vpt_domain::digest::Sha256Digest;
-use vpt_domain::time::FileTime;
+mod inventory;
+mod notes;
+mod publication;
+mod retention;
+mod roots;
 
-pub const BUFFER: usize = 64 * 1024;
+mod digest;
+pub(crate) use digest::digest_reader;
+pub use digest::{BUFFER, digest_open};
 
 pub struct FilesystemStores {
     roots: Vec<RootDir>,
     configured: Vec<PathBuf>,
+    private: Vec<PathBuf>,
     sequence: AtomicU64,
-}
-
-pub fn digest_open(file: &mut File) -> std::io::Result<Sha256Digest> {
-    file.seek(SeekFrom::Start(0))?;
-    let mut hasher = Sha256::new();
-    let mut buffer = vec![0; BUFFER];
-    loop {
-        let read = file.read(&mut buffer)?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(Sha256Digest(hasher.finalize().into()))
 }
 
 fn store_error(path: &Path, error: ContainedError) -> StoreError {
@@ -43,108 +34,17 @@ fn io(path: &Path, error: &std::io::Error) -> StoreError {
     StoreError::Io(format!("{} at {}", error.kind(), path.display()))
 }
 
-impl FilesystemStores {
-    pub fn open(roots: &[PathBuf]) -> Result<Self, ContainedError> {
-        Ok(Self {
-            roots: roots
-                .iter()
-                .map(|path| RootDir::open(path))
-                .collect::<Result<Vec<_>, _>>()?,
-            configured: roots.to_vec(),
-            sequence: AtomicU64::new(0),
-        })
-    }
-
-    pub fn open_read_only(paths: &[PathBuf]) -> Result<Self, ContainedError> {
-        let mut roots = Vec::new();
-        for path in paths {
-            match RootDir::open(path) {
-                Ok(root) => roots.push(root),
-                Err(ContainedError::Io {
-                    kind: std::io::ErrorKind::NotFound,
-                    ..
-                }) => {}
-                Err(error) => return Err(error),
-            }
-        }
-        Ok(Self {
-            roots,
-            configured: paths.to_vec(),
-            sequence: AtomicU64::new(0),
-        })
-    }
-
-    fn owner(&self, path: &Path) -> Result<(&RootDir, PathBuf), StoreError> {
-        if !self
-            .configured
-            .iter()
-            .any(|configured| path.parent() == Some(configured.as_path()))
-        {
-            return Err(StoreError::Escape(path.to_path_buf()));
-        }
-        let root = self
-            .roots
-            .iter()
-            .find(|root| path.parent() == Some(root.path()))
-            .ok_or_else(|| StoreError::Escape(path.to_path_buf()))?;
-        let leaf = root.leaf(path).map_err(|error| store_error(path, error))?;
-        root.revalidate()
-            .map_err(|error| store_error(path, error))?;
-        Ok((root, leaf))
-    }
-
-    fn create_temporary(&self, root: &RootDir, name: &str) -> Result<(File, PathBuf), StoreError> {
-        loop {
-            let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
-            let temporary = PathBuf::from(format!(".{name}.vpt-{}-{sequence}", std::process::id()));
-            match root.create_file(&temporary, 0o644) {
-                Ok(file) => return Ok((file, temporary)),
-                Err(ContainedError::Io {
-                    kind: std::io::ErrorKind::AlreadyExists,
-                    ..
-                }) => continue,
-                Err(error) => return Err(store_error(&root.path().join(temporary), error)),
-            }
-        }
-    }
-}
-
 impl Stores for FilesystemStores {
     fn entries(&self, path: &Path) -> Result<Vec<StoreEntry>, StoreError> {
-        if !self.configured.iter().any(|configured| configured == path) {
-            return Err(StoreError::Escape(path.to_path_buf()));
+        let scanned = self.scan(path)?;
+        if let Some(path) = scanned.redirected.first() {
+            return Err(StoreError::Escape(path.clone()));
         }
-        let Some(root) = self.roots.iter().find(|root| root.path() == path) else {
-            return Ok(Vec::new());
-        };
-        let mut entries = Vec::new();
-        for name in root
-            .names_strict()
-            .map_err(|error| store_error(path, error))?
-        {
-            let stat = root
-                .stat(Path::new(&name))
-                .map_err(|error| store_error(path, error))?;
-            if stat.kind == Kind::Link {
-                return Err(StoreError::Escape(path.join(name)));
-            }
-            if stat.kind != Kind::File {
-                continue;
-            }
-            entries.push(StoreEntry {
-                path: root
-                    .leaf(Path::new(&name))
-                    .map_err(|error| store_error(path, error))?,
-                size: stat.size,
-                mtime: FileTime {
-                    secs: stat.mtime_secs,
-                    nanos: stat.mtime_nanos,
-                },
-            });
-        }
-        root.revalidate()
-            .map_err(|error| store_error(path, error))?;
-        Ok(entries)
+        Ok(scanned.files)
+    }
+
+    fn retention_entries(&self, path: &Path) -> Result<RetentionEntries, StoreError> {
+        self.scan_bounded(path, 65_536)
     }
 
     fn validate_path(&self, path: &Path) -> Result<(), StoreError> {
@@ -178,31 +78,13 @@ impl Stores for FilesystemStores {
         Sha256Digest(Sha256::digest(bytes).into())
     }
 
-    fn publish(&self, target: &Path, bytes: &[u8]) -> Result<(), StoreError> {
-        let (root, leaf) = self.owner(target)?;
-        match root.stat(&leaf) {
-            Ok(stat) if stat.kind == Kind::Link => {
-                return Err(StoreError::Escape(target.to_path_buf()));
-            }
-            Ok(_) => {}
-            Err(ContainedError::Io {
-                kind: std::io::ErrorKind::NotFound,
-                ..
-            }) => {}
-            Err(error) => return Err(store_error(target, error)),
-        }
-        let name = leaf
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or_else(|| StoreError::Escape(target.to_path_buf()))?;
-        let (mut file, temporary) = self.create_temporary(root, name)?;
-        file.write_all(bytes)
-            .and_then(|()| file.sync_all())
-            .map_err(|error| io(target, &error))?;
-        drop(file);
-        root.rename_over(&temporary, &leaf)
-            .map_err(|error| store_error(target, error))?;
-        root.sync().map_err(|error| store_error(target, error))
+    fn publish(
+        &self,
+        target: &Path,
+        expected: Option<Sha256Digest>,
+        bytes: &[u8],
+    ) -> Result<(), StoreError> {
+        self.publish_bytes(target, expected, bytes)
     }
 
     fn sync_directory_of(&self, path: &Path) -> Result<(), StoreError> {

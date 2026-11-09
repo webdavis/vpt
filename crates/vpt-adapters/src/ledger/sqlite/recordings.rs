@@ -13,7 +13,7 @@ use vpt_domain::identity::RecordingId;
 use vpt_domain::time::UtcInstant;
 use write::{insert_recording, upsert_seen};
 
-fn one_record(
+pub(super) fn one_record(
     connection: &Connection,
     key_column: &str,
     key: &str,
@@ -101,7 +101,9 @@ impl RecordingLedger for SqliteLedger {
     }
 
     fn commit(&self, batch: &LedgerCommit) -> Result<(), LedgerError> {
-        self.transaction(|transaction| apply_commit(transaction, batch))
+        self.transaction(|transaction| {
+            apply_commit(transaction, batch)
+        })
     }
 
     fn set_source_path(&self, id: &RecordingId, path: &Path) -> Result<(), LedgerError> {

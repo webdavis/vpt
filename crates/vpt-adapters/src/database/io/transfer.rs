@@ -140,6 +140,8 @@ pub(super) unsafe extern "C" fn sync(file: *mut sqlite3_file, flags: i32) -> i32
             }
             let synchronization = state.files.faults.check("file sync").and_then(|()| {
                 let file = file.locks.file();
+                #[cfg(test)]
+                let syncing = crate::ledger::schema_diagnostics::start("file.sync.start");
                 let result = if flags & 0x0f == SQLITE_SYNC_FULL {
                     if libc::fcntl(file.as_raw_fd(), libc::F_FULLFSYNC) == -1 {
                         Err(std::io::Error::last_os_error())
@@ -151,6 +153,8 @@ pub(super) unsafe extern "C" fn sync(file: *mut sqlite3_file, flags: i32) -> i32
                 } else {
                     file.sync_all()
                 };
+                #[cfg(test)]
+                crate::ledger::schema_diagnostics::end(syncing, "file.sync.end");
                 result.map_err(|error| io_error("file sync", error))
             });
             synchronization?;

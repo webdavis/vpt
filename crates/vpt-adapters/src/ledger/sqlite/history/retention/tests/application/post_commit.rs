@@ -1,5 +1,6 @@
 use super::*;
 use crate::ledger::sqlite::history::retention::tests::application_calls::{Calls, PostCommit};
+use vpt_application::ports::ArtifactOwner;
 use vpt_application::{RetentionCommit, reconcile_intents};
 
 pub(in crate::ledger::sqlite::history::retention::tests) fn preparation(
@@ -54,9 +55,17 @@ pub(in crate::ledger::sqlite::history::retention::tests) fn completion(
     };
     assert_eq!(receipt.completed, vec![fixture.record.id.clone()]);
     assert_eq!(receipt.records.len(), 2);
-    assert_eq!(failed.report.completed, receipt.completed);
+    assert_eq!(
+        failed.report.completed,
+        receipt
+            .completed
+            .iter()
+            .cloned()
+            .map(ArtifactOwner::from)
+            .collect::<Vec<_>>()
+    );
     assert_eq!(failed.report.moved.len(), 1);
-    assert_eq!(failed.report.moved[0].recording, fixture.record.id);
+    assert_eq!(failed.report.moved[0].owner, (fixture.record.id).into());
     assert_eq!(fixture.trash.calls.get(), 1);
     assert_eq!(counted.writes.get(), 3);
     assert_eq!(sink.receipts.len(), 2);
@@ -81,7 +90,7 @@ pub(in crate::ledger::sqlite::history::retention::tests) fn absent(
         run,
         &NewIntent {
             kind: ArtifactKind::Audio,
-            recording: fixture.record.id.clone(),
+            owner: (fixture.record.id.clone()).into(),
             path: fixture.record.audio_path.clone(),
             expected: fixture.record.digest,
             recorded_at: UtcInstant { secs: 121 },
@@ -102,7 +111,7 @@ pub(in crate::ledger::sqlite::history::retention::tests) fn absent(
         &fixture.stores,
         &fixture.trash,
         &FixedClock,
-        &fixture.paths.audio,
+        &fixture.paths,
         &mut sink,
     )
     .unwrap_err();
@@ -122,7 +131,15 @@ pub(in crate::ledger::sqlite::history::retention::tests) fn absent(
             outcome: EffectOutcome::Completed
         }
     );
-    assert_eq!(failed.progress.completed, receipt.completed);
+    assert_eq!(
+        failed.progress.completed,
+        receipt
+            .completed
+            .iter()
+            .cloned()
+            .map(ArtifactOwner::from)
+            .collect::<Vec<_>>()
+    );
     assert!(failed.progress.moved.is_empty());
     assert_eq!(fixture.trash.calls.get(), 0);
     assert_eq!(counted.writes.get(), 1);

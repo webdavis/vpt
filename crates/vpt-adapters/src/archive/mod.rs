@@ -1,8 +1,11 @@
+mod port;
 mod publish;
+mod reader;
+pub use reader::ArchiveReader;
 mod staging;
+mod verified;
 
 use crate::{Access, ContainedError, Kind, RootDir};
-use std::fs::File;
 use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -97,67 +100,6 @@ fn io(error: &std::io::Error) -> ArchiveError {
         ArchiveError::NoSpace
     } else {
         ArchiveError::Io(error.kind().to_string())
-    }
-}
-
-impl Archive for ClonefileArchive {
-    type Handle = File;
-
-    fn stage<C>(&self, clone: C) -> Result<Staged, StageFailure>
-    where
-        C: FnOnce(&Path, (u64, u64), &str) -> Result<CloneKind, CloneError>,
-    {
-        self.stage_with(clone)
-    }
-
-    fn open(&self, path: &Path) -> Result<File, ArchiveError> {
-        self.root()?
-            .open_file(path, Access::Read)
-            .map_err(|error| archive_error(path, error))
-    }
-
-    fn size(&self, handle: &File) -> Result<u64, ArchiveError> {
-        handle
-            .metadata()
-            .map(|metadata| metadata.len())
-            .map_err(|error| io(&error))
-    }
-
-    fn read_at(&self, handle: &File, offset: u64, buf: &mut [u8]) -> Result<(), ReadFailure> {
-        handle.read_exact_at(buf, offset).map_err(|_| ReadFailure)
-    }
-
-    fn validate_trash_path(&self, path: &Path) -> Result<(), ArchiveError> {
-        let root = self.root()?;
-        root.regular(path)
-            .map_err(|error| archive_error(path, error))?;
-        root.revalidate()
-            .map_err(|error| archive_error(&self.directory, error))
-    }
-
-    fn digest(&self, path: &Path) -> Result<Sha256Digest, ArchiveError> {
-        let mut file = self.open(path)?;
-        crate::digest_open(&mut file).map_err(|error| io(&error))
-    }
-
-    fn target(&self, name: &str) -> PathBuf {
-        self.directory.join(name)
-    }
-
-    fn archived(&self) -> Result<Vec<PathBuf>, ArchiveError> {
-        self.list(|name| name.ends_with(".m4a") && !name.starts_with('.'))
-    }
-
-    fn staged_leftovers(&self) -> Result<Vec<PathBuf>, ArchiveError> {
-        self.list(|name| name.starts_with(STAGING_PREFIX))
-    }
-
-    fn publish(&self, staged: &Path, target_name: &str) -> Result<Published, ArchiveError> {
-        publish::exclusive(self.root()?, staged, target_name)
-    }
-
-    fn sync_existing(&self, path: &Path) -> Result<(), ArchiveError> {
-        publish::sync_file_and_directory(self.root()?, path)
     }
 }
 

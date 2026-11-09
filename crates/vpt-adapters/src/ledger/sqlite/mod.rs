@@ -1,10 +1,14 @@
 mod connection;
 mod error;
+mod expirations;
 mod history;
 mod journal;
 mod migrations;
 mod recordings;
 mod retention;
+mod retention_artifacts;
+mod snapshot;
+mod wal_lifetime;
 
 use crate::database::AccessPolicy;
 use crate::{ContainedError, RootDir};
@@ -41,6 +45,7 @@ pub struct SqliteLedger {
     path: PathBuf,
     busy: Duration,
     policy: AccessPolicy,
+    wal_lifetime: Option<wal_lifetime::WalIndexLifetime>,
 }
 
 impl SqliteLedger {
@@ -54,17 +59,14 @@ impl SqliteLedger {
         #[cfg(test)]
         let opening = tests::schema_diagnostics::start("ledger.open.start");
         connection::present(state)?;
-        let ledger = Self {
+        let mut ledger = Self {
             state: state.try_clone()?,
             path: state.path().join(DATABASE),
             busy,
             policy: AccessPolicy::WritableLedger,
+            wal_lifetime: None,
         };
-        ledger.read(|connection| {
-            migrations::migrate(connection, || {
-                ledger.state.revalidate().map_err(error::contained)
-            })
-        })?;
+        ledger.wal_lifetime = Some(wal_lifetime::WalIndexLifetime::initialize(&ledger)?);
         #[cfg(test)]
         tests::schema_diagnostics::end(opening, "ledger.open.end");
         Ok(ledger)
@@ -87,6 +89,7 @@ impl SqliteLedger {
             state,
             busy: Self::BUSY_TIMEOUT,
             policy: AccessPolicy::ObservationalLedger,
+            wal_lifetime: None,
         };
         let version = ledger.read(|connection| {
             let version = migrations::current(connection)?;
@@ -104,6 +107,14 @@ impl SqliteLedger {
 
     pub fn schema_version(&self) -> Result<u32, LedgerError> {
         self.read(migrations::current)
+    }
+
+    fn open_connection(&self) -> Result<crate::database::Database, LedgerError> {
+        let retained = self
+            .wal_lifetime
+            .as_ref()
+            .map(wal_lifetime::WalIndexLifetime::connection);
+        connection::open(&self.state, self.busy, self.policy, retained)
     }
 
     pub(crate) fn transaction<T>(
@@ -134,7 +145,7 @@ impl SqliteLedger {
         let reading = tests::schema_diagnostics::start("repo.read.start");
         #[cfg(test)]
         let opening = tests::schema_diagnostics::start("db.open.start");
-        let mut owner = connection::open(&self.state, self.busy, self.policy)?;
+        let mut owner = self.open_connection()?;
         #[cfg(test)]
         tests::schema_diagnostics::end(opening, "db.open.end");
         #[cfg(test)]

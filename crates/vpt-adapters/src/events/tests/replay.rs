@@ -24,6 +24,7 @@ fn replay_preserves_ids_sequence_and_occurrence_times_without_hooks() {
     let event = Event {
         kind: EventKind::BriefWritten,
         state: EventState::Done,
+        occasion: None,
         recording: None,
         detail: EventDetail::None,
         counts: EventCounts::default(),

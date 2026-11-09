@@ -1,8 +1,11 @@
+use super::complete::apply as complete;
 use super::*;
 use crate::RootDir;
 use crate::ledger::contract;
+use crate::ledger::sqlite::map;
+use rusqlite::params;
 use vpt_application::ports::{ArtifactKind, LedgerCommit, RetentionJournal, RunHistory, WorkDelta};
-use vpt_domain::run::RunKind;
+use vpt_domain::run::{EffectOutcome, RunKind};
 
 mod application;
 mod application_calls;
@@ -46,7 +49,7 @@ fn new_intent() -> NewIntent {
     let record = contract::record(125);
     NewIntent {
         kind: ArtifactKind::Audio,
-        recording: record.id,
+        owner: (record.id).into(),
         path: record.audio_path,
         expected: record.digest,
         recorded_at: UtcInstant { secs: 120 },

@@ -1,10 +1,16 @@
+mod brief;
+mod context;
+mod engines;
+mod note;
+mod reconcile;
+mod retention;
+mod share;
+mod synthesis;
+mod tags;
 use super::{ConfigError, get};
 use std::path::{Path, PathBuf};
 use toml::{Table, Value};
-use vpt_application::{RetentionSettings, Settings, SourceSettings, StorePaths};
-use vpt_domain::duration::parse_duration;
-use vpt_domain::layout::StoreKey;
-use vpt_domain::retention::Hold;
+use vpt_application::{Settings, SourceSettings, StorePaths};
 
 pub const DEFAULT_HOME: &str = "~/.vpt";
 
@@ -33,14 +39,22 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         drafts: store("stores.drafts")?,
         released: store("stores.released")?,
     };
-    let holds = StoreKey::all()
-        .into_iter()
-        .map(|key| {
-            hold(table, &format!("retention.hold.{}", key.key_name())).map(|hold| (key, hold))
-        })
-        .collect::<Result<_, _>>()?;
     Ok(Settings {
         config_version: small(table, "config_version")?,
+        engines: engines::from_table(table)?,
+        reconcile: reconcile::from_table(table, home_dir)?,
+        readability_enabled: boolean(table, "readability.enabled")?,
+        note: note::from_table(table, home_dir)?,
+        tags: tags::from_table(table, home_dir)?,
+        synthesis: synthesis::from_table(table)?,
+        brief: brief::from_table(table)?,
+        context: context::from_table(table)?,
+        share: share::from_table(table)?,
+        handoff_allow_private: boolean(table, "handoff.allow_private")?,
+        relations: vpt_domain::relations::Options {
+            session_gap_minutes: small(table, "relations.session_gap_minutes")?,
+            max_suggested: small(table, "relations.max_suggested")?,
+        },
         home,
         state_dir: expand(text(table, "home.state_dir")?, home_dir, None),
         symlink_target,
@@ -56,11 +70,7 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         report_command: strings(table, "report.command")?,
         alert_command: strings(table, "alert.command")?,
         alert_aggregate_after: small(table, "alert.aggregate_after")?,
-        retention: RetentionSettings {
-            enabled: boolean(table, "retention.enabled")?,
-            include_audio: boolean(table, "retention.include_audio")?,
-            holds,
-        },
+        retention: retention::from_table(table)?,
     })
 }
 
@@ -119,21 +129,6 @@ fn strings(table: &Table, key: &str) -> Result<Vec<String>, ConfigError> {
                 .ok_or_else(|| wrong(key, "list of strings"))
         })
         .collect()
-}
-
-fn hold(table: &Table, key: &str) -> Result<Hold, ConfigError> {
-    match leaf(table, key)? {
-        Value::Integer(0) => Ok(Hold::never()),
-        Value::String(duration) => {
-            parse_duration(duration)
-                .map(Hold::of_seconds)
-                .map_err(|_| ConfigError::OutOfRange {
-                    key: key.into(),
-                    rule: "0 or <n>s|m|h|d".into(),
-                })
-        }
-        _ => Err(wrong(key, "duration")),
-    }
 }
 
 fn wrong(key: &str, expected: &str) -> ConfigError {

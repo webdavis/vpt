@@ -6,6 +6,7 @@ mod peers;
 mod retention;
 mod schema;
 pub(crate) mod schema_diagnostics;
+mod wal_lifetime;
 
 use super::{SqliteLedger, error, map};
 use crate::RootDir;
@@ -43,6 +44,13 @@ pub(super) fn supervised(scenario: &str) {
     }
 }
 
+pub(super) fn supervised_prepared(scenario: &str, prepare: impl FnOnce(&RootDir)) {
+    let (temp, root) = root();
+    prepare(&root);
+    let started = Instant::now();
+    finish(child_for_root(scenario, temp.path(), std::process::id(), started).unwrap());
+}
+
 fn database<T>(
     root: &RootDir,
     operation: impl FnOnce(&Connection) -> Result<T, LedgerError>,
@@ -62,6 +70,12 @@ fn version(connection: &Connection) -> u32 {
     connection
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap()
+}
+
+pub(in crate::ledger::sqlite) fn remove_release_extension(
+    connection: &Connection,
+) -> Result<(), LedgerError> {
+    connection.execute_batch("DROP TABLE artifact_expirations; DROP TABLE release_payloads; DROP TABLE release_completions; DROP INDEX release_recording_sequence; DROP INDEX release_destination; DROP INDEX release_report_path; ALTER TABLE releases DROP COLUMN report_digest;").map_err(map)
 }
 
 fn tables(connection: &Connection) -> Vec<String> {
@@ -87,6 +101,7 @@ pub(crate) fn run_scenario(
 ) {
     eprintln!("VPT_PHASE {scenario}");
     match scenario {
+        s if s.starts_with("ledger_wal_lifetime_") => wal_lifetime::run(s, &root),
         s if s.starts_with("ledger_contract_history_pair_fixture_") => {
             super::history::retention::tests::pair_fixture::run(s, &root);
         }

@@ -1,10 +1,10 @@
 use super::*;
-use crate::config::{KEYS, template};
+use crate::config::{keys, template};
 
 #[test]
 fn the_rendered_template_loads_and_every_key_of_the_table_is_present() {
     let table = load_text(&template("apple", "~/.local/state/vpt")).expect("template loads");
-    for key in KEYS {
+    for key in keys() {
         assert!(
             get(&table, key.path).is_some(),
             "{} missing after load",
@@ -270,7 +270,9 @@ fn language_table_cannot_be_used_as_an_engine() {
 
 #[test]
 fn file_loading_reads_only_the_selected_fixture_and_classifies_failures() {
+    use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     let path = dir.path().join("config.toml");
     assert_eq!(
         load_file(&path),
@@ -281,6 +283,7 @@ fn file_loading_reads_only_the_selected_fixture_and_classifies_failures() {
         "config_version = 1\n[source]\nquiet_period_secs = 91",
     )
     .unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     let table = load_file(&path).unwrap();
     assert_eq!(
         get(&table, "source.quiet_period_secs").and_then(Value::as_integer),

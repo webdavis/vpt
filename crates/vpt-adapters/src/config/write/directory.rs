@@ -1,9 +1,6 @@
-use super::{contained, io};
-use crate::{ContainedError, RootDir};
+use super::contained;
+use crate::{ContainedError, PrivateStateError, RootDir};
 use std::ffi::OsString;
-use std::fs::{File, Permissions};
-use std::os::fd::AsFd;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use vpt_application::SetupError;
 
@@ -51,13 +48,11 @@ impl PlannedDirectory {
 
     pub fn create(&self) -> Result<RootDir, SetupError> {
         let directory = self.walk()?;
-        let file = File::from(directory.as_fd().try_clone_to_owned().map_err(io)?);
-        file.set_permissions(Permissions::from_mode(0o700))
-            .map_err(io)?;
+        self.check_private(&directory)?;
         Ok(directory)
     }
 
-    pub fn capture_config(path: &Path) -> Result<Self, SetupError> {
+    pub fn capture_private(path: &Path) -> Result<Self, SetupError> {
         let planned = Self::capture(path)?;
         if planned.missing.is_empty() {
             planned.check_private(&planned.anchor)?;
@@ -65,19 +60,23 @@ impl PlannedDirectory {
         Ok(planned)
     }
 
+    pub fn capture_config(path: &Path) -> Result<Self, SetupError> {
+        Self::capture_private(path).map_err(config_error)
+    }
+
     pub fn create_config(&self) -> Result<RootDir, SetupError> {
-        let directory = self.walk()?;
-        self.check_private(&directory)?;
-        Ok(directory)
+        self.create().map_err(config_error)
     }
 
     fn check_private(&self, directory: &RootDir) -> Result<(), SetupError> {
-        directory.revalidate().map_err(contained)?;
-        let file = File::from(directory.as_fd().try_clone_to_owned().map_err(io)?);
-        if file.metadata().map_err(io)?.permissions().mode() & 0o777 != 0o700 {
-            return Err(SetupError::NonPrivateConfig(self.path.clone()));
-        }
-        Ok(())
+        directory
+            .validate_private_state()
+            .map_err(|error| match error {
+                PrivateStateError::Contained(error) => contained(error),
+                PrivateStateError::Owner | PrivateStateError::Mode => {
+                    SetupError::NonPrivateDirectory(self.path.clone())
+                }
+            })
     }
 
     fn walk(&self) -> Result<RootDir, SetupError> {
@@ -92,5 +91,12 @@ impl PlannedDirectory {
         }
         directory.revalidate().map_err(contained)?;
         Ok(directory)
+    }
+}
+
+fn config_error(error: SetupError) -> SetupError {
+    match error {
+        SetupError::NonPrivateDirectory(path) => SetupError::NonPrivateConfig(path),
+        other => other,
     }
 }

@@ -59,11 +59,12 @@ fn publication_refuses_a_replaced_root_before_returning_either_outcome() {
         if already_exists {
             write(&root, "id.m4a", b"original");
         }
+        let (verified, handle) = prepared(&root, &staged).unwrap();
         let saved = audio.with_extension("saved");
         std::fs::rename(&audio, &saved).expect("move root");
         std::fs::create_dir(&audio).expect("replacement");
         assert_eq!(
-            exclusive(&root, &staged, "id.m4a"),
+            super::super::exclusive(&root, &verified, &handle, "id.m4a"),
             Err(ArchiveError::Escape(audio.join("id.m4a")))
         );
         assert_eq!(
@@ -83,7 +84,7 @@ fn publication_refuses_a_replaced_root_before_returning_either_outcome() {
 fn exists_outcome_revalidates_after_root_replacement() {
     let (_temp, audio, root) = audio();
     let staged = write(&root, ".vpt-staging-exists.m4a", b"staged");
-    let target = write(&root, "id.m4a", b"original");
+    write(&root, "id.m4a", b"original");
     let saved = audio.with_extension("saved");
     let result = exclusive_with(
         &root,
@@ -96,7 +97,7 @@ fn exists_outcome_revalidates_after_root_replacement() {
         },
         |_| panic!("directory sync must not run for a duplicate"),
     );
-    assert_eq!(result, Err(ArchiveError::Escape(target)));
+    assert_eq!(result, Err(ArchiveError::Escape(staged)));
     assert_eq!(
         std::fs::read(saved.join("id.m4a")).expect("old target"),
         b"original"
@@ -125,16 +126,72 @@ fn duplicate_sync_refuses_links_and_outside_paths() {
     let link = audio.join("link.m4a");
     std::os::unix::fs::symlink(&outside, &link).expect("link");
     assert_eq!(
-        sync_file_and_directory(&root, &outside),
+        sync_file_and_directory(&root, &outside, &digest(b"outside")),
         Err(ArchiveError::Escape(outside.clone()))
     );
     assert_eq!(
-        sync_file_and_directory(&root, &link),
+        sync_file_and_directory(&root, &link, &digest(b"outside")),
         Err(ArchiveError::Escape(link))
     );
     let archive = ClonefileArchive::open(&audio).expect("archive");
     assert_eq!(
-        archive.sync_existing(&outside),
+        archive.sync_existing(&outside, &digest(b"outside")),
         Err(ArchiveError::Escape(outside))
     );
+}
+
+#[test]
+fn publication_refuses_stage_changes_during_file_sync() {
+    for replace in [false, true] {
+        let (_temp, audio, root) = audio();
+        let staged = write(&root, ".vpt-staging-sync.m4a", b"original");
+        let held = audio.join("held.m4a");
+        let result = exclusive_with(
+            &root,
+            &staged,
+            "id.m4a",
+            |_, _| {
+                if replace {
+                    std::fs::rename(&staged, &held).unwrap();
+                }
+                std::fs::write(&staged, b"modified").unwrap();
+                Ok(())
+            },
+            |_| panic!("changed staging must not be published"),
+        );
+        assert!(result.is_err(), "{result:?}");
+        assert!(!audio.join("id.m4a").exists());
+        assert_eq!(std::fs::read(&staged).unwrap(), b"modified");
+        if replace {
+            assert_eq!(std::fs::read(&held).unwrap(), b"original");
+        }
+    }
+}
+
+#[test]
+fn publication_refuses_archive_changes_during_directory_sync() {
+    for replace in [false, true] {
+        let (_temp, audio, root) = audio();
+        let staged = write(&root, ".vpt-staging-sync.m4a", b"original");
+        let target = audio.join("id.m4a");
+        let held = audio.join("held.m4a");
+        let result = exclusive_with(
+            &root,
+            &staged,
+            "id.m4a",
+            |_, _| Ok(()),
+            |_| {
+                if replace {
+                    std::fs::rename(&target, &held).unwrap();
+                }
+                std::fs::write(&target, b"modified").unwrap();
+                Ok(())
+            },
+        );
+        assert!(result.is_err(), "{result:?}");
+        assert_eq!(std::fs::read(&target).unwrap(), b"modified");
+        if replace {
+            assert_eq!(std::fs::read(&held).unwrap(), b"original");
+        }
+    }
 }

@@ -134,3 +134,9 @@ fn dry_run_never_consults_mutating_journal_or_history_capabilities() {
     assert!(report.completed.is_empty());
     assert!(world.sink.trace.borrow().is_empty());
 }
+
+impl RetentionArtifacts for ReadOnly<'_> {
+    fn retention_artifacts(&self) -> Result<Vec<RetentionArtifact>, LedgerError> {
+        self.0.retention_artifacts()
+    }
+}

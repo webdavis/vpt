@@ -9,6 +9,7 @@ pub use private_log::{
     LogRefusal, TailRepair,
 };
 pub use private_state::PrivateStateError;
+pub(crate) use private_state::effective_user;
 
 use std::ffi::CString;
 use std::fs::File;

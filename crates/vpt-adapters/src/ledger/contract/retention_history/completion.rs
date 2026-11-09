@@ -34,11 +34,14 @@ fn two_pending<L: RecordingLedger + RetentionHistory + RetentionPairFixture>(
         second_effect,
         UtcInstant { secs: second_at },
     ));
-    assert_eq!(first.completed, vec![new.recording.clone()]);
+    assert_eq!(
+        first.completed,
+        vec![new.owner.recording().unwrap().clone()]
+    );
     assert_eq!(second.completed, first.completed);
     assert_eq!(
         ledger
-            .by_id(&new.recording)
+            .by_id(new.owner.recording().unwrap())
             .unwrap()
             .unwrap()
             .audio_trashed_at,
@@ -67,7 +70,10 @@ pub(crate) fn completion_couples_audio_mark_journal_and_confirmed_facts<
         at,
     ));
     assert_eq!(receipt.run, prepared.receipt.run);
-    assert_eq!(receipt.completed, vec![intent().recording.clone()]);
+    assert_eq!(
+        receipt.completed,
+        vec![intent().owner.recording().unwrap().clone()]
+    );
     assert_eq!(
         receipt
             .records
@@ -80,7 +86,7 @@ pub(crate) fn completion_couples_audio_mark_journal_and_confirmed_facts<
                 outcome: EffectOutcome::Completed
             },
             &HistoryFact::WorkStep {
-                recording: Some(intent().recording.clone()),
+                recording: Some(intent().owner.recording().unwrap().clone()),
                 outcome: WorkOutcome::Completed
             },
         ]
@@ -94,7 +100,7 @@ pub(crate) fn completion_couples_audio_mark_journal_and_confirmed_facts<
     assert!(ledger.pending_intents().unwrap().is_empty());
     assert_eq!(
         ledger
-            .by_id(&intent().recording)
+            .by_id(intent().owner.recording().unwrap())
             .unwrap()
             .unwrap()
             .audio_trashed_at,
@@ -129,7 +135,7 @@ pub(crate) fn repeated_completion_preserves_original_time_and_history<
     );
     assert_eq!(
         ledger
-            .by_id(&intent().recording)
+            .by_id(intent().owner.recording().unwrap())
             .unwrap()
             .unwrap()
             .audio_trashed_at,
@@ -154,7 +160,10 @@ pub(crate) fn recovery_run_observes_original_effect_without_minting_an_intent<
         UtcInstant { secs: 140 },
     ));
     assert_eq!(receipt.run, recovered.run);
-    assert_eq!(receipt.completed, vec![intent().recording]);
+    assert_eq!(
+        receipt.completed,
+        vec![intent().owner.recording().unwrap().clone()]
+    );
     assert_eq!(
         receipt.records[0].fact,
         HistoryFact::EffectObserved {

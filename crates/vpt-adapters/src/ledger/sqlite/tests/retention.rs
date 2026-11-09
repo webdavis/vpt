@@ -141,7 +141,7 @@ fn recorded(id: i64, new: vpt_application::ports::NewIntent) -> RetentionIntent 
     RetentionIntent {
         id,
         kind: new.kind,
-        recording: new.recording,
+        owner: new.owner,
         path: new.path,
         expected: new.expected,
         recorded_at: new.recorded_at,
@@ -152,7 +152,7 @@ fn malformed(ledger: &SqliteLedger, scenario: &str) {
     let new = contract::retention::fixture(24);
     let valid = [
         Value::Text("audio".into()),
-        Value::Text(new.recording.as_str().into()),
+        Value::Text(new.owner.as_str().into()),
         Value::Text(new.path.to_str().expect("fixture path").into()),
         Value::Text(new.expected.hex()),
         Value::Integer(new.recorded_at.secs),
@@ -196,7 +196,7 @@ fn nonpositive_id(ledger: &SqliteLedger, id: i64) {
     ledger.transaction(|transaction| {
         transaction.execute(
             "INSERT INTO retention_intents (id, artifact_kind, recording, path, expected, recorded_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            rusqlite::params![id, "audio", new.recording.as_str(), new.path.to_str().expect("fixture path"), new.expected.hex(), new.recorded_at.secs],
+            rusqlite::params![id, "audio", new.owner.as_str(), new.path.to_str().expect("fixture path"), new.expected.hex(), new.recorded_at.secs],
         ).map_err(map)?;
         Ok(())
     }).expect("inject owned identifier");
