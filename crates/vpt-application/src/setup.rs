@@ -7,6 +7,7 @@ pub enum SetupError {
     Exists(PathBuf),
     PathEscape(PathBuf),
     NonPrivateConfig(PathBuf),
+    NonPrivateDirectory(PathBuf),
     MultiplyLinkedConfig(PathBuf),
     Io(String),
 }
