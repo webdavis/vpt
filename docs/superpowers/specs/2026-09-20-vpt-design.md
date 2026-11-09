@@ -219,6 +219,11 @@ result and the next run recomputes it. A run selects every recording with an ena
 next run; an `expired` stage (retention moved its artifact) is never retried by `run`, and a released
 copy is immutable whatever changes upstream.
 
+Configuration and input-driven synthesis state changes commit with a `synthesis_state_changed`
+history fact naming the recording and its previous/next states. Scheduling work is not completed
+synthesis. If an engine or agent is interrupted, its child run and parent pipeline finish as
+`interrupted`; known committed work remains in the command result.
+
 ### 3.4 The macOS helper
 
 Apple speech and the system Trash use one Swift executable, `vpt-macos`, built from
@@ -354,6 +359,7 @@ runs the same contract tests:
 | `transcripts`          | per recording: the accepted transcript of record, segments and word timings, with the engine that produced it                                                                                                                                                                                                                                             |
 | `proposals`            | per recording: the accepted `Proposal` (summary, actions, tags, relations) with the digest of the content-region bytes the command received, and per claim its source ranges and inherited uncertainty with the lexical-flag state it was computed against                                                                                                |
 | `flags`                | per flag: recording, identifier, shape (lexical, diagnostic or verification), class, occurrence ranges (null for a verification finding without a source), the artifact, claim index and claim digest of a verification finding, record text, alternative text, confidence, state, resolution text, resolved_at                                           |
+| `verified_artifacts` | per recording and owned artifact: exact checked input digest, fingerprint of ordered annotation-stripped claims, transcript and lexical-state digests, grounding window, and check time; present even when a check found no findings |
 | `occasions`            | per occasion: identity, provider key (unique), source (`manual`, `dam`, `google`), at, duration, title, participants, tags, the assembled pack with its source identities and digests, brief path, briefed_at                                                                                                                                             |
 | `tags` and `relations` | per recording: tag, state (`confirmed`, `suggested`, `rejected`), provenance; relation kind, target, state, provenance, rule                                                                                                                                                                                                                              |
 | `releases`             | per released copy: recording, source stage, absolute destination, content digest, source-artifact digest, creation sequence, report path, and a provenance snapshot (capture instant, engines, open lexical flags, the complete `open_flags` count with its verification findings, diagnostics, reviewed state) taken from the source artifact at release |
@@ -363,6 +369,12 @@ brief pack commit before the artifact they render is published, and they survive
 engine outputs, so a note can always be regenerated from the ledger. A note is a rendering of that state
 and `vpt note write` reads nothing else. `vpt show <id> --json` prints a recording's full record;
 `vpt list --json` prints the recordings table.
+
+An accepted proposal also retains the exact vocabulary publication created by its transaction, when
+automatic tag learning adds entries. A synthesis retry recognizes this dependency even after both
+notes have finished publishing. Once recovery completes, unchanged source and grounding inputs allow
+returning the saved result without rerunning the agent. Unrelated pending vocabulary work does not
+suppress an explicit synthesis request.
 
 Every mutating command takes one advisory lock on `<state_dir>/write.lock` (`flock`, close on exec),
 waiting at most five seconds and exiting 1 when it cannot; a read-only verb takes none. A mutation
@@ -548,6 +560,13 @@ language; the pair for a run is chosen by `[recording] language` (default `en-US
 invocation with `vpt transcribe --language`. An engine that reports a language different from the one it
 was asked for produces a `language-mismatch` flag on the whole recording.
 
+VPT retains the requested regional tag (for example, `en-US`) in its settings and accepted state.
+Apple receives that tag unchanged through `--locale`; generic commands receive it unchanged through
+`{language}`. The Whisply adapter maps the tag to the backend's supported base language code (`en-US`
+and `en-GB` become `en`), validates backend support, and refuses an unsupported language before
+spawning. An echoed backend option is not independent language detection. For independently detected
+base-language results, compare base codes; a result of `en` alone cannot establish a regional mismatch.
+
 ### 6.2 The engine contract
 
 Every engine adapter produces one `vpt.engine/1` document:
@@ -624,8 +643,10 @@ remembered), digit groups lose separators (`12,400` becomes `12400`), ordinal su
 (`23rd` becomes `23`). Nothing else: no stemming, no stop words, no number-word conversion.
 
 Alignment is a Myers-style word diff over the normalized streams. When the edit distance exceeds
-`[reconcile] max_divergence_ratio` (default 0.35) of the token count, span comparison stops and one
-whole-recording `divergent` flag is raised instead of a span list.
+`[reconcile] max_divergence_ratio` (default 0.35) of the longer normalized stream's token count, span
+comparison stops and one whole-recording `divergent` flag is raised instead of a span list. The
+denominator is `max(main_token_count, checker_token_count)`; when both streams normalize to empty,
+their divergence is zero. Equality with the configured threshold does not trigger divergence.
 
 Flags come in three shapes. A lexical flag covers one or more word ranges of the transcript. A diagnostic
 flag covers the whole recording and has no range: `single-engine`, `language-mismatch` and `divergent`. A
@@ -766,6 +787,17 @@ rewritten, and the mismatch is reported. `createdDate` and `createdTime` are nev
 
 `[note] link_style` is `markdown` (default; `[Name](relative/path.md)`, destination URL-encoded) or
 `wiki` (`[[Name]]`). The `obsidian` profile does not force `wiki`; the operator sets both.
+
+Wiki destinations retain the target's path from the link root, with the filename as display text:
+`[[analysis/Name|Name]]`. For the Obsidian profile, the link root is the configured vault root.
+For portable notes, it is the common ancestor directory of the configured transcript, analysis, and
+brief stores. This distinguishes reciprocal links when transcript and analysis filenames match and
+keeps indexed targets with duplicate basenames distinct. Root-level targets can use `[[Name]]`.
+Markdown extensions are omitted from wiki destinations; audio and other extensions remain.
+Targets outside that root, or names containing characters that cannot safely appear in a wiki
+destination, use a Markdown link with an encoded relative destination. This also applies to audio
+references, hub links, and saved relations. Link rendering never changes an indexed target.
+The vault-relative folder syntax follows the [Obsidian internal links guide](https://obsidian.md/help/links).
 
 ### 7.2 The body
 
@@ -970,7 +1002,19 @@ SHA-256 of the claim text with its annotations stripped, so a changed claim neve
 its source range is null for `unsourced` and `bad-reference`. Each invocation replaces only the selected
 artifact's finding set, keeps a resolution only for an identifier that is unchanged, and recomputes the
 recording's `open_flags` from the current transcript flags and the findings of every artifact the ledger
-owns for that recording. Findings alone exit 0; a read or write failure exits 1. `vpt synthesize` runs
+owns for that recording. A resolved finding correction keeps the visible `[corrected: <text>]`
+annotation and immediately appends `<!-- vpt:verification-correction -->`. This role marker is invisible
+in rendered Markdown and distinguishes it from an inline lexical correction, which remains claim text.
+Owned transcript parsing recognizes an older unmarked finding correction only when its suffix, claim
+index, annotation-stripped claim, and saved correction match. Unrecognized unmarked corrections remain
+claim text. Newly marked finding corrections are excluded even after their claim is edited, so they
+cannot become evidence or acquire a resolution on the edited claim.
+Each saved check records its grounding window, including checks with no findings. Automatic runs
+recheck live artifacts when that window differs from the configured value, even with synthesis
+disabled. Rechecking retains unchanged claim resolutions and updates both owned notes' counts.
+Legacy checks without a recorded window require rechecking rather than assuming the default;
+expired artifacts remain expired.
+Findings alone exit 0; a read or write failure exits 1. `vpt synthesize` runs
 `verify-note` on the analysis note it just wrote before it notifies.
 
 ### 8.3 Briefs
@@ -994,6 +1038,13 @@ so a rescheduled event keeps its identity and its file. Re-running a brief rewri
 creating a second. A brief's file is named `{occasion-date}-{slug}-{hash8}.md` from the occasion's own
 date, sanitized title and identity hash, pinned at first write.
 
+Canonical keys use UTF-8 byte-length framing: the source name plus `:`, followed by each field's
+byte length, `:`, and exact value, in the order above. Provider identifiers preserve case. The manual
+title uses the same Unicode normalization and separator policy as note filenames, without the
+configured filename truncation. RFC 3339 starts normalize `t`/`z` to uppercase, `+00:00` to `Z`, and
+remove trailing fractional zeros; other offsets, including `-00:00`, are retained. All nonzero
+fractional digits participate in identity. Occasion identity is a distinct type from recording identity.
+
 Candidates are recordings that have a transcript artifact, deduplicated by identity. Selection is four
 exact selectors over confirmed data, capped at `[brief] max_notes` (default 12), ordered by selector rank
 then capture time newest first, the remainder counted and reported:
@@ -1004,6 +1055,13 @@ then capture time newest first, the remainder counted and reported:
 | `term`        | a confirmed known term in the occasion title resolves to exactly one indexed note, and the recording carries a `mentions` relation to that note              |
 | `tag`         | the recording carries a confirmed tag that `occasion.tags` also carries (the `--tag` values or the provider's labels, persisted on the occasion)             |
 | `recent`      | the recording was captured inside `[brief] lookback_days` (default 180) and shares a `continues` chain or a confirmed tag with an already selected recording |
+
+Recent selection expands from direct matches until no further eligible recording can be added.
+A recent match can anchor another recent match. The lookback ends at the generation instant,
+includes its lower boundary, and excludes future captures. Continuation chains may pass through
+older recordings or recordings without transcript artifacts; those intermediates do not become
+shared-tag anchors unless independently eligible. Selection expands before ranking and applying
+`max_notes`, so an eligible recording omitted by that limit can still explain another match.
 
 Quoted spans come from the accepted transcript: for `participant` and `term`, the segments containing the
 term, in start-time order; for `tag` and `recent`, segments in start-time order. `max_spans_per_note` is
@@ -1027,6 +1085,11 @@ note, and `selector`; an item without `certainty` and `sources` fails to seriali
 `{status: present|absent, reason: null|disabled|unsupported|failed, detail}`), and `generated_at`. This
 is the consumer contract for an assistant reading vpt.
 
+An additive `tasks` array carries the normalized open task records from section 8.4, with their
+provider source, project, identity, exact content, due value, priority, and `completed: false`.
+Completed tasks are excluded from both this array and the Markdown Open tasks section. Task data
+requires a present task-context status; an absent or failed half does not supply task records.
+
 A requested brief notifies nothing. The calendar trigger is `[brief.trigger] enabled` (default false)
 with `lead_time` (default `24h`): `vpt brief --upcoming` asks the context source for occasions starting
 inside the lead time, writes a brief for each not yet briefed (by occasion identity), and delivers one
@@ -1039,7 +1102,7 @@ handed off.
 
 `[context] type` is `none` (default), `dam` or `google`. The context source answers two questions,
 occasions in a window and open tasks, and every answer is normalized into one `vpt.context/1` document
-(`occasions` with source, id, title, at, duration_secs, participants of name and email; `tasks` with
+(`occasions` with source, id, title, at, duration_secs, participants of name and email, and optional `tags` preserving provider labels; `tasks` with
 source, project, id, content, due, completed, priority) before anything reads it.
 
 Selection is the only scope that exists, because no provider offers a per-calendar or per-project
@@ -1242,11 +1305,20 @@ Each configured hook receives one documented `vpt.event/1` JSON document on stan
 }
 ```
 
+Verification alerts also include nonzero `unsourced`, `bad_reference`, and
+`built_on_flagged_text` counts as additive fields. `unsupported` retains its specific grounding
+class. Per-recording and aggregate events count all four classes without including claim text.
+
 Event names are `review_needed`, `transcribe_failed`, `ingest_failed`, `deferred`, `brief_written`,
 `retention` and `config_refused`. `state` is `needs_attention`, `failed` or `done`. Completed briefs and
 retention summaries are reports; the other events are alerts. `counts` carries one entry per lexical
 class plus `diagnostics`. Logs and hook input contain identities, counts, classes and paths, never a
 transcript span, an alternative, a title, a tag, a mask value or a brief line.
+
+For `brief_written`, `occasion` carries the distinct occasion identity and `recording` is null.
+The additive counts `notes`, `spans`, `tasks`, and `unresolved` describe the published evidence pack;
+`paths.brief` is the pinned published file. The event and briefed marker commit together after durable
+publication. Startup repair does not replay report hooks.
 
 VPT logs the event independently of hook configuration, then invokes only its configured channel's
 command. The argument list is passed directly; event values are supplied in JSON, not interpolated
