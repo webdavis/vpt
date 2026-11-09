@@ -1,3 +1,4 @@
+mod completed;
 mod reports;
 use super::*;
 use vpt_application::ports::LedgerError;

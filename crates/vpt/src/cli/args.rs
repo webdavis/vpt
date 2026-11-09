@@ -8,7 +8,7 @@ use verbs::parse_verb;
 
 pub const USAGE: &str = "usage: vpt [--json] [--config <file>] <verb>\n\
 verbs: setup [--force] | doctor | show <id> |\n\
-       list [--stage <stage>] | storage |\n\
+       list [--stage <stage>] | storage | retention run [--dry-run] |\n\
        symlink deploy | symlink verify | --version\n";
 
 #[derive(Debug, PartialEq, Eq)]
@@ -25,6 +25,9 @@ pub enum Verb {
         stage: Option<String>,
     },
     Storage,
+    RetentionRun {
+        dry_run: bool,
+    },
     SymlinkDeploy,
     SymlinkVerify,
 }

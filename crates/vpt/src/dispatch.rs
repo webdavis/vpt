@@ -43,6 +43,11 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             Ok(ledger) => commands::list::run(&ledger, stage.as_deref()),
             Err(error) => Outcome::Failure(*error),
         },
+        Verb::RetentionRun { dry_run } => commands::retention::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            *dry_run,
+        ),
         Verb::Storage => match compose::storage_from(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
