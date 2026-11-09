@@ -11,6 +11,9 @@ use vpt_domain::time::UtcInstant;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WorkDelta {
+    pub brief: Option<super::BriefChange>,
+    pub brief_published: Option<super::BriefPublication>,
+    pub occasion: Option<super::OccasionChange>,
     pub synthesis_state: Option<super::SynthesisStateChange>,
     pub verification: Option<super::VerificationChange>,
     pub proposal: Option<super::ProposalChange>,

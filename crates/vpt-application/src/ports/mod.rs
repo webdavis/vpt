@@ -69,3 +69,10 @@ pub use transcript::{
 pub use engine_artifact::{EngineArtifact, EngineOutputLedger};
 pub use note::{NoteFiles, NoteFormat, NoteFormatError, NoteInputs, NoteInputsLedger, StoredNote};
 pub use note_artifact::{NoteArtifact, NoteChange, NoteLedger, NoteStage};
+
+mod occasion;
+pub use occasion::{OccasionChange, OccasionLedger, OccasionRecord};
+mod brief;
+pub use brief::{BriefArtifact, BriefChange, BriefLedger, BriefPublication, BriefVersion};
+mod brief_inputs;
+pub use brief_inputs::{BriefInput, BriefInputsLedger};
