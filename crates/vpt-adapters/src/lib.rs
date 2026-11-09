@@ -6,8 +6,13 @@ pub use clock::SystemClock;
 pub mod config;
 mod contained;
 mod database;
+mod engines;
 mod events;
 mod flag_identity;
+pub use engines::{
+    AppleEngine, AudioError, CommandEngine, EngineAdapters, GuardedEngines, WhisplyEngine,
+    inspect_archived_audio,
+};
 pub use flag_identity::{diagnostic_flag_id, lexical_flag_id, verification_flag_id};
 mod git_tree;
 mod helper;
