@@ -71,6 +71,7 @@ pub(super) fn step(
                 return Err(storage::conflict());
             }
         }
+        crate::ledger::sqlite::eligibility::apply(transaction, delta, facts)?;
         crate::ledger::sqlite::verification::apply(transaction, delta, facts)?;
         crate::ledger::sqlite::proposals::apply(transaction, delta, facts)?;
         crate::ledger::sqlite::engine_outputs::check(transaction, delta)?;

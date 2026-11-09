@@ -10,6 +10,8 @@ use vpt_domain::run::{
 use vpt_domain::time::UtcInstant;
 
 mod ack;
+mod eligibility;
+pub(crate) use eligibility::*;
 mod export;
 mod hook;
 mod recovery;

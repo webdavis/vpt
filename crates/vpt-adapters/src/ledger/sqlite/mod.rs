@@ -1,4 +1,5 @@
 mod connection;
+mod eligibility;
 mod engine_outputs;
 mod error;
 mod expirations;
