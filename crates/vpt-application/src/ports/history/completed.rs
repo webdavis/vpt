@@ -12,6 +12,11 @@ impl WorkDelta {
         {
             completed.push(accepted.recording.clone());
         }
+        if let Some(change) = &self.resolution
+            && !completed.contains(&change.recording)
+        {
+            completed.push(change.recording.clone());
+        }
         completed
     }
 }
