@@ -56,7 +56,7 @@ pub(crate) fn unrelated_valid_effect_refuses_without_audio_journal_or_history_ch
         ]
     );
     assert_eq!(
-        ledger.by_id(&intent().recording).unwrap(),
+        ledger.by_id(intent().owner.recording().unwrap()).unwrap(),
         Some(record(120))
     );
     let mut expected = started.records;
@@ -97,7 +97,10 @@ fn assert_refused<L: RecordingLedger + RunHistory + RetentionHistory + Retention
         vec![recorded(prepared.intent_id, new.clone())]
     );
     assert_eq!(
-        ledger.by_id(&intent().recording).unwrap().unwrap(),
+        ledger
+            .by_id(intent().owner.recording().unwrap())
+            .unwrap()
+            .unwrap(),
         record(120)
     );
     let records = ledger.recovery_view().unwrap().records;

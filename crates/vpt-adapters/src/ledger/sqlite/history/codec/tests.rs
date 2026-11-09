@@ -11,10 +11,14 @@ use vpt_domain::run::{
 use vpt_domain::sweep::DeferralReason;
 use vpt_domain::time::UtcInstant;
 
+mod brief_event;
 mod deferral;
+mod finding_counts;
 mod missing_retention_history;
 mod recovery_baseline;
 mod recovery_counts;
+mod retention_counts;
+mod synthesis_state;
 mod vocabulary;
 
 #[test]
@@ -40,12 +44,14 @@ fn every_fact_variant_round_trips_with_typed_safe_event_fields() {
     let event = Event {
         kind: EventKind::ReviewNeeded,
         state: EventState::NeedsAttention,
+        occasion: None,
         recording: None,
         detail: EventDetail::Review {
             spans: 6,
             agreed_unverified: 11,
         },
         counts: EventCounts {
+            retention: None,
             numeric: 1,
             proper_noun: 2,
             low_confidence: 3,
@@ -54,6 +60,9 @@ fn every_fact_variant_round_trips_with_typed_safe_event_fields() {
             unsupported: 6,
             agreed_unverified: 7,
             diagnostics: 8,
+            unsourced: 9,
+            bad_reference: 10,
+            built_on_flagged_text: 11,
         },
         paths: vec![EventPath {
             key: EventPathKey::Note,
@@ -62,10 +71,33 @@ fn every_fact_variant_round_trips_with_typed_safe_event_fields() {
         occurred_at: UtcInstant { secs: 8 },
     };
     let cases = [
+        HistoryFact::FlagResolved {
+            recording: crate::ledger::contract::record(2).id,
+            flag: vpt_domain::digest::Sha256Digest([2; 32]),
+            resolution: vpt_domain::review::ResolutionKind::Corrected,
+        },
+        HistoryFact::NoteMoved {
+            recording: crate::ledger::contract::record(2).id,
+            from: "/notes/original.md".into(),
+            to: "/notes/renamed.md".into(),
+        },
         HistoryFact::RunStarted(RunKind::Ingest),
+        HistoryFact::RunStarted(RunKind::Redact),
         HistoryFact::RunStarted(RunKind::Recover),
         HistoryFact::RunStarted(RunKind::Publish),
         HistoryFact::RunStarted(RunKind::Retain),
+        HistoryFact::RunStarted(RunKind::Transcribe),
+        HistoryFact::RunStarted(RunKind::Note),
+        HistoryFact::RunStarted(RunKind::Confirm),
+        HistoryFact::RunStarted(RunKind::Review),
+        HistoryFact::RunStarted(RunKind::VerifyNote),
+        HistoryFact::RunStarted(RunKind::Synthesize),
+        HistoryFact::TagRejected {
+            recording: crate::ledger::contract::record(2).id,
+            index: 3,
+            reason: vpt_domain::tags::Rejection::Syntax,
+        },
+        HistoryFact::RunStarted(RunKind::Pipeline),
         HistoryFact::RunFinished(RunOutcome::Completed),
         HistoryFact::RunFinished(RunOutcome::Failed),
         HistoryFact::RunFinished(RunOutcome::Interrupted),
@@ -136,6 +168,7 @@ fn safe_failure_detail_round_trips_without_raw_error_text() {
     let event = Event {
         kind: EventKind::IngestFailed,
         state: EventState::Failed,
+        occasion: None,
         recording: None,
         detail: EventDetail::Failure(SafeFailureClass::ArchiveFailed),
         counts: EventCounts::default(),
@@ -311,6 +344,7 @@ fn non_utf8_effect_and_event_paths_are_refused_without_lossy_replacement() {
     let event = Event {
         kind: EventKind::ReviewNeeded,
         state: EventState::NeedsAttention,
+        occasion: None,
         recording: None,
         detail: EventDetail::None,
         counts: EventCounts::default(),

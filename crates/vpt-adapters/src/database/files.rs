@@ -6,12 +6,15 @@ use std::io::ErrorKind;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
+mod identity;
 
 pub(super) struct DatabaseFiles {
     root: RootDir,
     leaf: CString,
     policy: AccessPolicy,
     pub(super) faults: super::faults::FaultState,
+    opened: std::cell::Cell<[Option<(u64, u64)>; 3]>,
+    expected: std::cell::Cell<[Option<(u64, u64)>; 3]>,
 }
 
 impl DatabaseFiles {
@@ -33,6 +36,8 @@ impl DatabaseFiles {
             leaf,
             policy,
             faults: Default::default(),
+            opened: Default::default(),
+            expected: Default::default(),
         })
     }
 
@@ -51,7 +56,7 @@ impl DatabaseFiles {
         let name = self.name(role);
         let path = Path::new(&name);
         let writable = self.policy.writable(role);
-        if writable && create {
+        if writable && create && !self.requires_existing(role) {
             match self.create(role) {
                 Ok(file) => return Ok(file),
                 Err(DatabaseError::Contained(ContainedError::Io {
@@ -66,7 +71,24 @@ impl DatabaseFiles {
         } else {
             Access::Read
         };
-        let file = self.root.open_file(path, access)?;
+        let file = self.root.open_file(path, access).map_err(|error| {
+            if self.requires_existing(role)
+                && matches!(
+                    &error,
+                    ContainedError::Io {
+                        kind: ErrorKind::NotFound,
+                        ..
+                    }
+                )
+            {
+                ContainedError::Escape {
+                    root: self.root.path().into(),
+                    path: self.root.path().join(path),
+                }
+            } else {
+                error
+            }
+        })?;
         let metadata = file.metadata().map_err(|error| DatabaseError::Io {
             operation: "file metadata",
             kind: error.kind(),
@@ -78,7 +100,8 @@ impl DatabaseFiles {
             }
             .into());
         }
-        if writable {
+        self.record_identity(role, &metadata)?;
+        if writable && metadata.mode() & 0o7777 != 0o600 {
             file.set_permissions(Permissions::from_mode(0o600))
                 .map_err(|error| DatabaseError::Io {
                     operation: "file permissions",
@@ -89,12 +112,21 @@ impl DatabaseFiles {
     }
 
     pub(super) fn create(&self, role: FileRole) -> Result<File, DatabaseError> {
+        if self.requires_existing(role) {
+            return Err(self.identity_changed(role));
+        }
         if !self.policy.writable(role) {
             return Err(super::sqlite_error(rusqlite::ffi::SQLITE_READONLY));
         }
         let file = self
             .root
             .create_read_write_file(Path::new(&self.name(role)), 0o600)?;
+        self.record_identity(
+            role,
+            &file
+                .metadata()
+                .map_err(|error| super::io_error("file metadata", error))?,
+        )?;
         self.sync()?;
         Ok(file)
     }
@@ -119,7 +151,12 @@ impl DatabaseFiles {
 
     pub(super) fn sync(&self) -> Result<(), DatabaseError> {
         self.faults.check("directory sync")?;
-        self.root.sync().map_err(Into::into)
+        #[cfg(test)]
+        let syncing = crate::ledger::schema_diagnostics::start("directory.sync.start");
+        let result = self.root.sync().map_err(Into::into);
+        #[cfg(test)]
+        crate::ledger::schema_diagnostics::end(syncing, "directory.sync.end");
+        result
     }
 
     pub(super) fn policy(&self) -> AccessPolicy {
@@ -143,7 +180,13 @@ impl DatabaseFiles {
             Err(ContainedError::Io {
                 kind: ErrorKind::NotFound,
                 ..
-            }) => return Ok(None),
+            }) => {
+                return if self.requires_existing(role) {
+                    Err(self.identity_changed(role))
+                } else {
+                    Ok(None)
+                };
+            }
             Err(error) => return Err(error.into()),
         };
         let metadata = file
@@ -156,6 +199,7 @@ impl DatabaseFiles {
             }
             .into());
         }
+        self.check_identity(role, &metadata)?;
         Ok(Some(metadata))
     }
 

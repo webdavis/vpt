@@ -1,3 +1,5 @@
+mod retention_artifacts;
+pub(crate) mod json;
 mod memory;
 mod sqlite;
 

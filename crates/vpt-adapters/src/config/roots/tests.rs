@@ -5,6 +5,7 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 use vpt_domain::layout::StoreKey;
 
 mod boundaries;
+mod vault;
 
 fn fixture() -> tempfile::TempDir {
     let temp = tempfile::tempdir().expect("owned fixture");
@@ -205,4 +206,29 @@ fn creating_stores_refuses_a_link_in_the_parent_or_leaf() {
         })
     );
     assert!(!roots.stores.released.exists());
+}
+#[test]
+fn known_tags_refuse_protected_roots_and_overlapping_confirmation_lists() {
+    let temp = fixture();
+    let mut settings = settings_in(temp.path());
+    let paths = [
+        settings.state_dir.join("tags"),
+        settings.source.recordings_dir.join("tags"),
+        settings.stores.released.join("tags"),
+        settings.reconcile.known_terms_path.clone(),
+        settings.reconcile.known_terms_path.join("tags"),
+    ];
+    for path in paths {
+        settings.tags.known_tags_path = path;
+        assert!(
+            matches!(resolve(&settings, &temp.path().join("cfg")), Err(RootError::Overlap { first, .. }) if first == "tags.known_tags_path")
+        );
+    }
+    settings.tags.known_tags_path = "relative-tags".into();
+    assert_eq!(
+        resolve(&settings, &temp.path().join("cfg")),
+        Err(RootError::NotAbsolute {
+            key: "tags.known_tags_path".into()
+        })
+    );
 }

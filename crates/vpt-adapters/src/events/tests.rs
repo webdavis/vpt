@@ -46,6 +46,7 @@ impl Fixture {
         let event = Event {
             kind,
             state,
+            occasion: None,
             recording: None,
             detail: EventDetail::None,
             counts: EventCounts::default(),
@@ -90,7 +91,7 @@ fn committed<T: std::fmt::Debug>(write: HistoryWrite<T>) -> T {
 fn write_hook(path: &Path) {
     fs::write(
         path,
-        b"#!/bin/bash\nset -euo pipefail\ncapture=$1\nlog=$2\nmode=$3\nshift 3\nprintf x >> \"${capture}.calls\"\nprintf '%s\\0' \"$@\" > \"${capture}.argv\"\ncat > \"${capture}.stdin\"\nif [[ -f \"$log\" ]]; then cat \"$log\" > \"${capture}.seenlog\"; fi\nprintf 'child-private-sentinel' >&2\ncase \"$mode\" in\n  exit7) exit 7 ;;\n  signal) kill -TERM $$ ;;\n  *) exit 0 ;;\nesac\n",
+        b"#!/bin/bash\nset -euo pipefail\ncapture=$1\nlog=$2\nmode=$3\nshift 3\nprintf x >> \"${capture}.calls\"\nprintf '%s\\0' \"$@\" > \"${capture}.argv\"\ncat > \"${capture}.stdin\"\nif [[ -f \"$log\" ]]; then cat \"$log\" > \"${capture}.seenlog\"; fi\nprintf 'child-private-sentinel' >&2\ncase \"$mode\" in\n  exit7) exit 7 ;;\n  signal) kill -TERM $$ ;;\n  hang) /bin/sleep 30 ;;\n  *) exit 0 ;;\nesac\n",
     )
     .expect("owned hook fixture");
     fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("executable fixture");

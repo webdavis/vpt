@@ -5,6 +5,7 @@ fn event_wire_vocabulary_and_safe_detail_branches_round_trip() {
     let mut event = Event {
         kind: EventKind::ReviewNeeded,
         state: EventState::NeedsAttention,
+        occasion: None,
         recording: None,
         detail: EventDetail::None,
         counts: EventCounts {
@@ -41,6 +42,7 @@ fn event_wire_vocabulary_and_safe_detail_branches_round_trip() {
         );
     }
     for detail in [
+        EventDetail::ReviewAggregate { recordings: 4 },
         EventDetail::None,
         EventDetail::Review {
             spans: 0,

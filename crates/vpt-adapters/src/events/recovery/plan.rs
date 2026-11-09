@@ -53,6 +53,13 @@ impl RecoveryPlan {
                     HistoryFact::RecoverySummary { .. } => state.summary = true,
                     HistoryFact::EffectObserved { .. }
                     | HistoryFact::WorkStep { .. }
+                    | HistoryFact::OccasionSaved { .. }
+                    | HistoryFact::BriefSaved { .. }
+                    | HistoryFact::BriefPublished { .. }
+                    | HistoryFact::NoteMoved { .. }
+                    | HistoryFact::TagRejected { .. }
+                    | HistoryFact::SynthesisStateChanged { .. }
+                    | HistoryFact::FlagResolved { .. }
                     | HistoryFact::EffectIntent { .. } => {
                         state.work_bearing = true;
                         state.latest_activity = sequence;

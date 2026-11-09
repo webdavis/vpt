@@ -53,7 +53,7 @@ pub(super) fn prospective(
     }
 }
 
-fn existing_directory(path: &Path, key: &str) -> Result<Option<PathBuf>, RootError> {
+pub(super) fn existing_directory(path: &Path, key: &str) -> Result<Option<PathBuf>, RootError> {
     match path.canonicalize() {
         Ok(canonical) => {
             if !canonical.is_dir() {

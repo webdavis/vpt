@@ -1,3 +1,4 @@
+mod expirations;
 use super::super::{error, migrations};
 use super::{database, supervised, tables, version};
 use crate::RootDir;
@@ -58,7 +59,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
             assert!(connection.is_autocommit());
             assert_eq!(version(connection), 1);
             migrations::migrate(connection, || Ok(()))?;
-            assert_eq!(version(connection), 2);
+            assert_eq!(version(connection), 15);
             assert_eq!(connection.query_row("SELECT count(*) FROM dirty_publications", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
             assert_eq!(connection.query_row("SELECT count(*) FROM retention_intents WHERE completed_at IS NULL", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
             assert_eq!(connection.query_row("SELECT count(*) FROM seen WHERE path = '/vm/Recordings/v1.m4a'", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
@@ -120,8 +121,8 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                     },
                     2
                 );
-                assert_eq!(version(connection), 2);
-                assert_eq!(tables(connection).len(), 16);
+                assert_eq!(version(connection), 15);
+                assert_eq!(tables(connection).len(), 25);
                 if scenario == "ledger_migration_rollback" {
                     Err(injected.clone())
                 } else {
@@ -139,13 +140,39 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                 assert_eq!(version(connection), 0);
             } else {
                 result.unwrap();
-                assert_eq!(migrations::current(connection).unwrap(), 2);
-                assert_eq!(tables(connection).len(), 16);
+                assert_eq!(migrations::current(connection).unwrap(), 15);
+                assert_eq!(tables(connection).len(), 25);
                 migrations::migrate(connection, || Ok(())).unwrap();
-                assert_eq!(tables(connection).len(), 16);
+                assert_eq!(tables(connection).len(), 25);
             }
         }
         Ok(())
     })
     .unwrap();
+}
+
+fn remove_tag_extension(connection: &rusqlite::Connection) -> Result<(), LedgerError> {
+    remove_vocabulary_extension(connection)?;
+    connection.execute_batch("DROP INDEX tags_order; ALTER TABLE tags DROP COLUMN ordinal; ALTER TABLE tags DROP COLUMN updated_at; ALTER TABLE recordings DROP COLUMN tags_initialized;").map_err(super::map)
+}
+
+fn remove_vocabulary_extension(connection: &rusqlite::Connection) -> Result<(), LedgerError> {
+    remove_relation_extension(connection)?;
+    connection
+        .execute_batch("ALTER TABLE known_term_publications DROP COLUMN kind;")
+        .map_err(super::map)
+}
+
+fn remove_relation_extension(connection: &rusqlite::Connection) -> Result<(), LedgerError> {
+    if version(connection) >= 9 {
+        connection
+            .execute_batch("DROP TABLE verified_artifacts;")
+            .map_err(super::map)?;
+    }
+    if version(connection) >= 8 {
+        connection
+            .execute_batch("DROP TABLE mention_ambiguities; DROP INDEX recordings_capture_order;")
+            .map_err(super::map)?;
+    }
+    Ok(())
 }

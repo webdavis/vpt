@@ -97,6 +97,7 @@ fn hook_status_failures_save_only_typed_content_free_facts() {
         ("exit7", HookFailureClass::Exited(7)),
         ("signal", HookFailureClass::Signaled(libc::SIGTERM)),
         ("absent", HookFailureClass::Spawn),
+        ("hang", HookFailureClass::DeadlineExceeded),
     ] {
         let fixture = Fixture::new();
         let script = fixture.path("status-hook");
@@ -147,6 +148,7 @@ fn encoding_failures_preserve_work_and_save_only_closed_failure_classes() {
     let event = Event {
         kind: EventKind::BriefWritten,
         state: EventState::Done,
+        occasion: None,
         recording: None,
         detail: EventDetail::None,
         counts: EventCounts::default(),

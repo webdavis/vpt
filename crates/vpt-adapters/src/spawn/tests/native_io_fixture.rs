@@ -34,7 +34,7 @@ fn exchange(root: &Path, started: Instant) -> io::Result<()> {
         if unsafe { libc::close(libc::STDIN_FILENO) } == -1 {
             return Err(io::Error::last_os_error());
         }
-        std::fs::write(root.join("ready"), b"closed-input")?;
+        super::lifecycle_fixture::publish_ready(root, b"closed-input")?;
         loop {
             check_bound(root, started);
             std::thread::yield_now();
@@ -85,7 +85,7 @@ fn exchange(root: &Path, started: Instant) -> io::Result<()> {
             std::thread::yield_now();
         }
     }
-    std::fs::write(root.join("ready"), b"exchange")?;
+    super::lifecycle_fixture::publish_ready(root, b"exchange")?;
     let mut received = Vec::new();
     let mut eof = false;
     while !eof || written < output_bytes.len() || error_written < error_bytes.len() {

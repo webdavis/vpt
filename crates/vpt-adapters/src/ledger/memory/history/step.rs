@@ -41,6 +41,7 @@ pub(super) fn apply(
         recording.source_path = Some(path.clone());
     }
     for target in &delta.publication_clears {
+        state.vocabulary.retain(|row| &row.entry.target != target);
         state
             .publications
             .retain(|publication| publication.target != *target);
@@ -53,16 +54,12 @@ pub(super) fn apply(
             .ok_or_else(conflict)?;
         recording.audio_trashed_at = Some(*at);
     }
+    super::super::expirations::regenerated(state, delta);
     let records = facts
         .iter()
         .map(|(at, fact)| state.history.append(run, *at, fact.clone()))
         .collect::<Result<Vec<_>, _>>()?;
-    let completed = delta
-        .commit
-        .recordings
-        .iter()
-        .map(|recording| recording.id.clone())
-        .collect();
+    let completed = delta.completed_recordings();
     Ok(HistoryReceipt {
         run,
         records,

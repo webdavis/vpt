@@ -24,7 +24,7 @@ impl FilesystemSetupWriter {
             config_path,
             directories: directories
                 .iter()
-                .map(|path| PlannedDirectory::capture(path))
+                .map(|path| PlannedDirectory::capture_private(path))
                 .collect::<Result<_, _>>()?,
         })
     }

@@ -19,6 +19,7 @@ pub struct GateRecorder {
     pub inner: VoiceMemosStore,
     pub extra_flags: Cell<u32>,
     pub opens: Cell<u32>,
+    pub fail_open_after: Cell<Option<u32>>,
     pub reads: Cell<u32>,
     pub clones: Cell<u32>,
     pub metadata_calls: Cell<u32>,
@@ -32,6 +33,7 @@ impl GateRecorder {
             inner: VoiceMemosStore::open(recordings).unwrap(),
             extra_flags: Cell::new(0),
             opens: Cell::new(0),
+            fail_open_after: Cell::new(None),
             reads: Cell::new(0),
             clones: Cell::new(0),
             metadata_calls: Cell::new(0),
@@ -43,6 +45,15 @@ impl GateRecorder {
 
 impl RecorderStore for GateRecorder {
     type Handle = File;
+
+    fn digest(
+        &self,
+        handle: &File,
+        size: u64,
+    ) -> Result<vpt_domain::digest::Sha256Digest, RecorderError> {
+        self.reads.set(self.reads.get() + 1);
+        self.inner.digest(handle, size)
+    }
 
     fn candidates(&self) -> Result<Vec<Candidate>, RecorderError> {
         self.inner.candidates().map(|mut candidates| {
@@ -62,6 +73,13 @@ impl RecorderStore for GateRecorder {
 
     fn open(&self, path: &Path) -> Result<File, RecorderError> {
         self.opens.set(self.opens.get() + 1);
+        if self
+            .fail_open_after
+            .get()
+            .is_some_and(|limit| self.opens.get() > limit)
+        {
+            return Err(RecorderError::Unreadable("private source failure".into()));
+        }
         self.inner.open(path)
     }
 

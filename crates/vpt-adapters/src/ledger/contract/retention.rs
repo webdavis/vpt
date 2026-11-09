@@ -6,7 +6,7 @@ use vpt_domain::time::UtcInstant;
 pub(crate) fn fixture(seed: u8) -> NewIntent {
     NewIntent {
         kind: ArtifactKind::Audio,
-        recording: record(seed).id,
+        owner: (record(seed).id).into(),
         path: PathBuf::from(format!("/store/audio/{seed}.m4a")),
         expected: digest(seed.wrapping_add(80)),
         recorded_at: UtcInstant {
@@ -19,7 +19,7 @@ fn recorded(id: i64, new: NewIntent) -> RetentionIntent {
     RetentionIntent {
         id,
         kind: new.kind,
-        recording: new.recording,
+        owner: new.owner,
         path: new.path,
         expected: new.expected,
         recorded_at: new.recorded_at,

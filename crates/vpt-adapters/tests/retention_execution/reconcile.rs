@@ -4,6 +4,54 @@ use vpt_application::{RetentionError, reconcile_intents};
 use vpt_domain::run::{EffectOutcome, HistoryFact, WorkOutcome};
 
 #[test]
+fn a_different_artifact_kind_cannot_move_or_expire_audio_during_recovery() {
+    let mut world = World::new();
+    let record = world.record("kind.m4a", b"owned audio");
+    let run = world.run();
+    let intent = NewIntent {
+        kind: ArtifactKind::Transcript,
+        owner: (record.id.clone()).into(),
+        path: record.audio_path.clone(),
+        expected: record.digest,
+        recorded_at: NOW,
+    };
+    assert!(matches!(
+        world.ledger.prepare_retention(run, &intent),
+        HistoryWrite::Committed(_)
+    ));
+    let failure = reconcile_intents(
+        run,
+        &world.ledger,
+        &world.stores,
+        &world.trash,
+        &FixedClock,
+        &world.paths,
+        &mut world.sink,
+    )
+    .unwrap_err();
+    assert!(matches!(failure.error, RetentionError::TargetModified(_)));
+    assert_eq!(std::fs::read(&record.audio_path).unwrap(), b"owned audio");
+    assert!(
+        world
+            .ledger
+            .by_id(&record.id)
+            .unwrap()
+            .unwrap()
+            .audio_trashed_at
+            .is_none()
+    );
+    assert_eq!(world.ledger.pending_intents().unwrap().len(), 1);
+    assert!(
+        !world
+            .sink
+            .trace
+            .borrow()
+            .iter()
+            .any(|action| matches!(action, Action::Trash(_)))
+    );
+}
+
+#[test]
 fn failed_reconciliation_trash_keeps_intent_and_saves_failed_work_and_effect() {
     super::failures::reconciliation_helper_failure(
         TrashMode::Failed,
@@ -38,12 +86,12 @@ fn an_absent_path_completes_the_expiration_without_the_trash() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap();
     assert!(progress.moved.is_empty());
-    assert_eq!(progress.completed, vec![record.id.clone()]);
+    assert_eq!(progress.completed, vec![(record.id.clone()).into()]);
     assert!(world.ledger.pending_intents().unwrap().is_empty());
     assert_eq!(
         world
@@ -90,13 +138,13 @@ fn an_unchanged_original_is_moved_again_and_completed() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap();
-    assert_eq!(progress.completed, vec![record.id.clone()]);
+    assert_eq!(progress.completed, vec![(record.id.clone()).into()]);
     assert_eq!(progress.moved.len(), 1);
-    assert_eq!(progress.moved[0].recording, record.id);
+    assert_eq!(progress.moved[0].owner, (record.id).into());
     assert!(!record.audio_path.exists());
     assert_eq!(
         std::fs::read(world.trash.destination.join("original.m4a")).unwrap(),
@@ -118,7 +166,7 @@ fn replaced_content_is_a_refusal_naming_the_path_and_stays_pending() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap_err();
@@ -157,7 +205,7 @@ fn a_later_refusal_retains_the_first_move_and_its_recording_identity() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap_err();
@@ -165,8 +213,8 @@ fn a_later_refusal_retains_the_first_move_and_its_recording_identity() {
         failed.error,
         RetentionError::TargetModified(second.audio_path)
     );
-    assert_eq!(failed.progress.completed, vec![first.id.clone()]);
-    assert_eq!(failed.progress.moved[0].recording, first.id);
+    assert_eq!(failed.progress.completed, vec![(first.id.clone()).into()]);
+    assert_eq!(failed.progress.moved[0].owner, (first.id).into());
     assert_eq!(
         std::fs::read(world.trash.destination.join("first.m4a")).unwrap(),
         b"first original"
@@ -186,7 +234,7 @@ fn an_old_unmatched_journal_is_observed_without_inventing_an_original_effect() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap_err();
@@ -224,7 +272,7 @@ fn linked_intent_target_never_reaches_trash_or_referent_content() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap_err();

@@ -36,11 +36,12 @@ fn the_archive_publishes_and_syncs_through_its_port() {
     let archive = ClonefileArchive::open(&audio).expect("archive");
     let staged = write(&root, ".vpt-staging-4.m4a", b"bytes");
     let target = audio.join("id.m4a");
+    let (verified, handle) = prepared(&root, &staged).unwrap();
     assert_eq!(
-        archive.publish(&staged, "id.m4a"),
+        archive.publish(&verified, &handle, "id.m4a"),
         Ok(Published::Placed(target.clone()))
     );
-    assert_eq!(archive.sync_existing(&target), Ok(()));
+    assert_eq!(archive.sync_existing(&target, &digest(b"bytes")), Ok(()));
     assert_eq!(archive.archived().expect("list"), vec![target]);
 }
 

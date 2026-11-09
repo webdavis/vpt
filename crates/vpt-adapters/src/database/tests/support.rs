@@ -37,6 +37,15 @@ pub(crate) struct Snapshot {
     bytes: Vec<u8>,
 }
 
+impl Snapshot {
+    pub(crate) fn ignore_mapping_release_time(&mut self, mapped: &Path) {
+        if self.path == mapped {
+            // macOS updates ctime when the final mapping closes after prior mapped writes.
+            self.metadata[9..11].fill(0);
+        }
+    }
+}
+
 pub(crate) fn snapshot(path: &Path) -> Vec<Snapshot> {
     let file = fs::OpenOptions::new()
         .read(true)

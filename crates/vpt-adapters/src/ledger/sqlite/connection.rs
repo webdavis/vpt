@@ -25,13 +25,13 @@ pub(super) fn open(
     state: &RootDir,
     busy: Duration,
     policy: AccessPolicy,
+    retained: Option<&Database>,
 ) -> Result<Database, LedgerError> {
-    let mut owner = Database::open(
-        state.try_clone().map_err(error::contained)?,
-        Path::new(DATABASE),
-        policy,
-        busy,
-    )?;
+    let root = state.try_clone().map_err(error::contained)?;
+    let mut owner = match retained {
+        Some(retained) => Database::open_pinned(root, Path::new(DATABASE), policy, busy, retained),
+        None => Database::open(root, Path::new(DATABASE), policy, busy),
+    }?;
     let result = owner.with_connection(|connection| {
         connection
             .pragma_update(None, "foreign_keys", "ON")

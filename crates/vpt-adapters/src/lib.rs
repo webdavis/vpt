@@ -1,4 +1,6 @@
 mod archive;
+mod arguments;
+pub mod markdown_claims;
 pub mod config;
 mod contained;
 mod database;
@@ -7,6 +9,7 @@ mod git_tree;
 mod helper;
 mod ledger;
 mod lock;
+pub mod note_document;
 mod prompt;
 mod spawn;
 mod stores;
@@ -19,7 +22,7 @@ pub use spawn::{
     GRACE, OUTPUT_LIMIT, Outcome, SpawnError, Status, install_interrupt_handlers, run, run_with_env,
 };
 
-pub use archive::{ClonefileArchive, STAGING_PREFIX};
+pub use archive::{ArchiveReader, ClonefileArchive, STAGING_PREFIX};
 pub use config::{RootError, Roots};
 pub use contained::{
     Access, AppendEffects, AppendFailure, AppendReceipt, AppendSync, ContainedError, EventLog,
@@ -27,7 +30,9 @@ pub use contained::{
     leaf_below,
 };
 pub use events::LoggedEvents;
-pub use ledger::{MemoryLedger, OpenError, SCHEMA_VERSION, SqliteLedger};
+pub use ledger::{
+    MemoryLedger, OpenError, SCHEMA_VERSION, SqliteLedger,
+};
 pub use lock::{LockError, WriteLock};
 pub use stores::{BUFFER, FilesystemStores, digest_open};
 pub use symlink::{

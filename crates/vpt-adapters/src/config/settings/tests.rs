@@ -1,6 +1,17 @@
 use super::*;
 use crate::config::load_text;
 use vpt_domain::layout::StoreKey;
+#[path = "tests/brief.rs"]
+mod brief;
+
+#[path = "tests/relations.rs"]
+mod relations;
+#[path = "tests/share.rs"]
+mod share;
+#[path = "tests/synthesis.rs"]
+mod synthesis;
+#[path = "tests/tags.rs"]
+mod tags;
 
 fn settings(text: &str) -> Result<Settings, ConfigError> {
     from_table(
@@ -42,6 +53,27 @@ fn defaults_expand_into_typed_settings() {
     assert_eq!(value.alert_aggregate_after, 3);
     assert!(!value.retention.enabled);
     assert!(!value.retention.include_audio);
+    assert_eq!(
+        value.reconcile.options,
+        vpt_domain::uncertainty::Options::default()
+    );
+    assert_eq!(
+        value.reconcile.known_terms_path,
+        Path::new("/u/.config/vpt/known-terms.txt")
+    );
+    assert!(!value.readability_enabled);
+}
+
+#[test]
+fn configured_reconciliation_and_readability_reach_runtime_settings() {
+    let value = settings("[reconcile]\nconfidence_floor = 0.2\nmax_divergence_ratio = 1\nknown_terms_path = '~/confirmed.txt'\n[readability]\nenabled = true").unwrap();
+    assert_eq!(value.reconcile.options.confidence_floor, 0.2);
+    assert_eq!(value.reconcile.options.max_divergence_ratio, 1.0);
+    assert_eq!(
+        value.reconcile.known_terms_path,
+        Path::new("/u/confirmed.txt")
+    );
+    assert!(value.readability_enabled);
 }
 
 #[test]

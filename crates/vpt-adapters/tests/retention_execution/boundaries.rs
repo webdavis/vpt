@@ -191,7 +191,7 @@ fn later_helper_failure_retains_recovered_moves_in_one_safe_report_event() {
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap();
@@ -209,7 +209,7 @@ fn later_helper_failure_retains_recovered_moves_in_one_safe_report_event() {
     .run(false, progress)
     .unwrap_err();
     assert!(matches!(failed.error, RetentionError::Trash(_)));
-    assert_eq!(failed.report.completed, vec![recovered.id]);
+    assert_eq!(failed.report.completed, vec![(recovered.id).into()]);
     assert_eq!(failed.report.moved.len(), 1);
     let events = report_events(&world.sink.trace);
     assert_eq!(events.len(), 1);

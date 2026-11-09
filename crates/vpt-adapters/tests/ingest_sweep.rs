@@ -2,13 +2,11 @@ mod support;
 
 use std::os::unix::fs::PermissionsExt;
 use support::{CAPTURED, Fixture};
-use vpt_application::ports::{
-    Archive, Clock, RecordingLedger, RunHistory, StageStates, TitleOrigin,
-};
-use vpt_application::{Ingest, IngestFailure, Mode};
+use vpt_application::Mode;
+use vpt_application::ports::{Archive, RecordingLedger, RunHistory, StageStates, TitleOrigin};
 use vpt_domain::fixtures::m4a;
 use vpt_domain::run::{EffectKind, EffectOutcome, HistoryFact, RunOutcome, WorkOutcome};
-use vpt_domain::time::{UtcInstant, UtcOffset};
+use vpt_domain::time::UtcInstant;
 
 #[test]
 fn whole_recording_archives_bytes_mode_and_identity() {
@@ -78,38 +76,20 @@ fn run_start_is_committed_and_exported_before_title_refresh() {
 }
 
 #[test]
-fn dry_run_refuses_before_any_port_or_history_effect() {
+fn dry_run_checks_candidates_without_side_effects() {
     let fixture = Fixture::new();
     fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"audio"));
     let mut parts = fixture.parts();
     let before = std::fs::read_dir(&fixture.audio).unwrap().count();
 
-    struct PanicClock;
-    impl Clock for PanicClock {
-        fn now(&self) -> UtcInstant {
-            panic!("dry run consulted the clock")
-        }
-        fn offset_at(&self, _: UtcInstant) -> UtcOffset {
-            panic!("dry run consulted the clock")
-        }
-    }
-    let mut ingest = Ingest {
-        recorder: &parts.store,
-        archive: &parts.archive,
-        ledger: &parts.ledger,
-        clock: &PanicClock,
-        trash: &parts.trash,
-        sink: &mut parts.sink,
-        settings: &parts.settings,
-    };
-    let error = ingest
+    let report = parts
+        .ingest()
         .run(&Mode {
             dry_run: true,
             once: None,
         })
-        .unwrap_err();
-
-    assert_eq!(error.failure, IngestFailure::DryRunUnavailable);
+        .unwrap();
+    assert_eq!(report.would_ingest.len(), 1);
     assert!(parts.sink.receipts.is_empty());
     assert!(parts.ledger.recordings().unwrap().is_empty());
     assert_eq!(std::fs::read_dir(&fixture.audio).unwrap().count(), before);

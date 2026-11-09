@@ -24,6 +24,30 @@ const POLICIES: [(AccessPolicy, [bool; 4]); 4] = [
 ];
 
 #[test]
+fn reopening_already_private_files_preserves_their_metadata_and_bytes() {
+    for (policy, _) in POLICIES {
+        let (_temp, root) = root();
+        for (_, name) in ROLES {
+            let path = root.path().join(name);
+            fs::write(&path, b"private bytes").unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let before = snapshot(root.path());
+        let files =
+            DatabaseFiles::new(root.try_clone().unwrap(), Path::new("vpt.db"), policy).unwrap();
+        for (role, _) in ROLES {
+            for create in [false, true] {
+                drop(files.open(role, create).unwrap());
+            }
+        }
+        assert!(
+            snapshot(root.path()) == before,
+            "opening private files changed metadata for {policy:?}"
+        );
+    }
+}
+
+#[test]
 fn observation_neither_creates_nor_repairs() {
     for policy in [
         AccessPolicy::ObservationalLedger,

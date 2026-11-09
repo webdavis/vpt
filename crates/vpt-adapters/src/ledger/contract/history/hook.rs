@@ -9,6 +9,7 @@ pub(crate) fn hook_failure_requires_event_in_same_run<L: RunHistory>(ledger: &L)
     let event = Event {
         kind: EventKind::IngestFailed,
         state: EventState::Failed,
+        occasion: None,
         recording: None,
         detail: EventDetail::None,
         counts: EventCounts::default(),

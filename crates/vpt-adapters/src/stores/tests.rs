@@ -1,8 +1,10 @@
 use super::*;
+use std::fs::File;
 use std::io::{Seek, SeekFrom};
 use std::os::unix::fs::PermissionsExt;
+mod publication;
 
-fn store() -> (tempfile::TempDir, PathBuf, FilesystemStores) {
+pub(super) fn store() -> (tempfile::TempDir, PathBuf, FilesystemStores) {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("store");
     std::fs::create_dir(&root).unwrap();
@@ -10,7 +12,7 @@ fn store() -> (tempfile::TempDir, PathBuf, FilesystemStores) {
     (temp, root, stores)
 }
 
-fn entries(root: &Path) -> Vec<String> {
+pub(super) fn entries(root: &Path) -> Vec<String> {
     let mut names: Vec<_> = std::fs::read_dir(root)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
@@ -51,7 +53,9 @@ fn publish_replaces_target_with_mode_0644_and_no_temporary_leftover() {
     let (_temp, root, stores) = store();
     let target = root.join("a.md");
     std::fs::write(&target, b"old").unwrap();
-    stores.publish(&target, b"new").unwrap();
+    stores
+        .publish(&target, Some(stores.digest_bytes(b"old")), b"new")
+        .unwrap();
     assert_eq!(std::fs::read(&target).unwrap(), b"new");
     assert_eq!(entries(&root), ["a.md"]);
     assert_eq!(
@@ -72,7 +76,7 @@ fn existing_temporary_names_are_preserved_and_skipped() {
         )
         .unwrap();
     }
-    stores.publish(&root.join("a.md"), b"new").unwrap();
+    stores.publish(&root.join("a.md"), None, b"new").unwrap();
     assert_eq!(std::fs::read(root.join("a.md")).unwrap(), b"new");
     for sequence in 0..2 {
         assert_eq!(
@@ -84,21 +88,19 @@ fn existing_temporary_names_are_preserved_and_skipped() {
 }
 
 #[test]
-fn failed_rename_leaves_temporary_and_retry_uses_a_new_sequence() {
+fn directory_target_is_refused_before_staging_and_retry_can_publish_after_its_removal() {
     let (_temp, root, stores) = store();
     let target = root.join("a.md");
     std::fs::create_dir(&target).unwrap();
-    assert!(matches!(
-        stores.publish(&target, b"first"),
-        Err(StoreError::Io(_))
-    ));
-    let abandoned = root.join(format!(".a.md.vpt-{}-0", std::process::id()));
-    assert_eq!(std::fs::read(&abandoned).unwrap(), b"first");
+    assert_eq!(
+        stores.publish(&target, None, b"first"),
+        Err(StoreError::Escape(target.clone()))
+    );
+    assert_eq!(entries(&root), ["a.md"]);
     std::fs::remove_dir(&target).unwrap();
-    stores.publish(&target, b"second").unwrap();
+    stores.publish(&target, None, b"second").unwrap();
     assert_eq!(std::fs::read(&target).unwrap(), b"second");
-    assert_eq!(std::fs::read(&abandoned).unwrap(), b"first");
-    assert_eq!(entries(&root).len(), 2);
+    assert_eq!(entries(&root), ["a.md"]);
 }
 
 #[test]
@@ -106,7 +108,7 @@ fn outside_nested_and_link_paths_are_refused() {
     let (temp, root, stores) = store();
     let outside = temp.path().join("outside.md");
     assert_eq!(
-        stores.publish(&outside, b"x"),
+        stores.publish(&outside, None, b"x"),
         Err(StoreError::Escape(outside.clone()))
     );
     assert_eq!(
@@ -120,7 +122,7 @@ fn outside_nested_and_link_paths_are_refused() {
 
     let nested = root.join("sub/a.md");
     assert_eq!(
-        stores.publish(&nested, b"x"),
+        stores.publish(&nested, None, b"x"),
         Err(StoreError::Escape(nested))
     );
     let real = root.join("real.md");
@@ -148,7 +150,7 @@ fn direct_publish_refuses_symlink_target_before_creating_temporary() {
     std::os::unix::fs::symlink(&real, &link).unwrap();
     let before = entries(&root);
     assert_eq!(
-        stores.publish(&link, b"new"),
+        stores.publish(&link, None, b"new"),
         Err(StoreError::Escape(link.clone()))
     );
     assert_eq!(std::fs::read_link(&link).unwrap(), real);
@@ -236,7 +238,7 @@ fn replaced_root_is_refused_for_digest_publish_and_sync() {
         Err(StoreError::Escape(target.clone()))
     );
     assert_eq!(
-        stores.publish(&target, b"new"),
+        stores.publish(&target, None, b"new"),
         Err(StoreError::Escape(target.clone()))
     );
     assert_eq!(
@@ -247,4 +249,23 @@ fn replaced_root_is_refused_for_digest_publish_and_sync() {
     assert_eq!(std::fs::read(old_root.join("a.md")).unwrap(), b"original");
     assert_eq!(entries(&root), ["a.md"]);
     assert_eq!(entries(&old_root), ["a.md"]);
+}
+
+#[test]
+fn private_output_roots_publish_mode_0600_without_changing_shared_directories() {
+    let (_temp, root, stores) = store();
+    std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let stores = stores.with_private_roots(std::slice::from_ref(&root));
+    let target = root.join("output.json");
+    stores
+        .publish(&target, None, b"private transcript")
+        .unwrap();
+    assert_eq!(
+        std::fs::metadata(target).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    assert_eq!(
+        std::fs::metadata(root).unwrap().permissions().mode() & 0o777,
+        0o755
+    );
 }

@@ -200,7 +200,7 @@ impl World {
 pub fn new_intent(record: &RecordingRecord) -> NewIntent {
     NewIntent {
         kind: ArtifactKind::Audio,
-        recording: record.id.clone(),
+        owner: (record.id.clone()).into(),
         path: record.audio_path.clone(),
         expected: record.digest,
         recorded_at: UtcInstant { secs: 201 },

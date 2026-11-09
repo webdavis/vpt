@@ -7,6 +7,7 @@ use std::io::{Read, Write};
 use std::os::unix::fs::symlink;
 use std::path::Path;
 
+mod identity;
 mod names;
 mod policies;
 mod refusal;

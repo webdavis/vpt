@@ -132,7 +132,7 @@ pub(super) fn reconciliation_helper_failure(
         &world.stores,
         &world.trash,
         &FixedClock,
-        &world.paths.audio,
+        &world.paths,
         &mut world.sink,
     )
     .unwrap_err();

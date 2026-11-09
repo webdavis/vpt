@@ -6,6 +6,8 @@ use rusqlite::Connection;
 use std::path::Path;
 use std::time::{Duration, Instant};
 use vpt_application::ports::LedgerError;
+mod snapshot;
+mod wal_lifetime;
 
 #[test]
 fn a_native_write_lock_returns_busy_within_the_shared_watchdog_budget() {
@@ -37,6 +39,14 @@ fn observation_reads_committed_rows_from_a_native_live_log_without_changes() {
 }
 
 pub(super) fn run(scenario: &str, root: &RootDir, ready: fn(), native: fn(&Path) -> Connection) {
+    if scenario.starts_with("ledger_peer_idle_wal_") {
+        wal_lifetime::run(scenario, root, ready, native);
+        return;
+    }
+    if scenario.starts_with("ledger_peer_snapshot_") {
+        snapshot::run(scenario, root, ready, native);
+        return;
+    }
     match scenario {
         "ledger_peer_contender" => {
             let ledger = seed(root);

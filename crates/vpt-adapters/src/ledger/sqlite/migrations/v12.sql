@@ -1,0 +1,1 @@
+ALTER TABLE occasions ADD COLUMN at_rfc3339 TEXT;

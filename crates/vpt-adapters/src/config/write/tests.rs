@@ -47,7 +47,7 @@ fn exclusive_creation_preserves_a_file_created_after_preparation() {
     assert_eq!(fs::read_to_string(path).expect("kept"), "old");
 }
 #[test]
-fn force_truncates_and_repairs_existing_file_and_directory_modes() {
+fn force_truncates_and_repairs_config_without_changing_private_directory_metadata() {
     let (_temp, base) = sandbox();
     let path = base.join("config/config.toml");
     let dir = base.join("home");
@@ -60,11 +60,13 @@ fn force_truncates_and_repairs_existing_file_and_directory_modes() {
     fs::create_dir(&dir).expect("home");
     fs::write(&path, "long original").expect("existing");
     fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).expect("file mode");
-    fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).expect("dir mode");
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).expect("dir mode");
+    let before = fs::metadata(&dir).unwrap();
     let writer =
         FilesystemSetupWriter::new(path.clone(), std::slice::from_ref(&dir)).expect("prepared");
     writer.write_config("new", true).expect("forced");
-    writer.create_private_dir(&dir).expect("repair");
+    writer.create_private_dir(&dir).expect("private directory");
+    assert_directory_metadata_unchanged(&dir, &before);
     assert_eq!(fs::read_to_string(&path).expect("text"), "new");
     assert_eq!(mode(&path), 0o600);
     assert_eq!(mode(&dir), 0o700);
@@ -210,4 +212,74 @@ fn an_unprepared_directory_is_refused() {
         Err(SetupError::PathEscape(path.clone()))
     );
     assert!(!path.exists());
+}
+
+#[test]
+fn existing_shared_directory_is_refused_during_preparation_without_chmod() {
+    let (_temp, base) = sandbox();
+    let dir = base.join("shared");
+    fs::create_dir(&dir).unwrap();
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::write(dir.join("operator"), b"keep").unwrap();
+    let before = fs::metadata(&dir).unwrap();
+    let config = base.join("new-config/config.toml");
+    let result = FilesystemSetupWriter::new(config.clone(), std::slice::from_ref(&dir));
+    assert!(
+        result.is_err(),
+        "shared directory must be refused before writing configuration"
+    );
+    assert_directory_metadata_unchanged(&dir, &before);
+    assert_eq!(fs::read(dir.join("operator")).unwrap(), b"keep");
+    assert!(!config.parent().unwrap().exists());
+}
+
+#[test]
+fn directory_made_shared_after_preparation_is_refused_without_chmod() {
+    for exists_at_preparation in [false, true] {
+        let (_temp, base) = sandbox();
+        let dir = base.join("store");
+        if exists_at_preparation {
+            fs::create_dir(&dir).unwrap();
+            fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let writer =
+            FilesystemSetupWriter::new(base.join("config.toml"), std::slice::from_ref(&dir))
+                .unwrap();
+        if !exists_at_preparation {
+            fs::create_dir(&dir).unwrap();
+        }
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(dir.join("operator"), b"keep").unwrap();
+        let before = fs::metadata(&dir).unwrap();
+        assert!(
+            writer.create_private_dir(&dir).is_err(),
+            "late shared directory must not be made private"
+        );
+        assert_directory_metadata_unchanged(&dir, &before);
+        assert_eq!(fs::read(dir.join("operator")).unwrap(), b"keep");
+    }
+}
+
+fn assert_directory_metadata_unchanged(path: &Path, before: &fs::Metadata) {
+    let after = fs::metadata(path).unwrap();
+    assert_eq!(
+        (
+            after.dev(),
+            after.ino(),
+            after.mode(),
+            after.ctime(),
+            after.ctime_nsec(),
+            after.mtime(),
+            after.mtime_nsec()
+        ),
+        (
+            before.dev(),
+            before.ino(),
+            before.mode(),
+            before.ctime(),
+            before.ctime_nsec(),
+            before.mtime(),
+            before.mtime_nsec()
+        )
+    );
 }

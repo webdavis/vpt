@@ -162,3 +162,9 @@ impl RunHistory for Calls<'_> {
         panic!("unexpected export reset")
     }
 }
+
+impl RetentionArtifacts for Calls<'_> {
+    fn retention_artifacts(&self) -> Result<Vec<RetentionArtifact>, LedgerError> {
+        self.ledger.retention_artifacts()
+    }
+}

@@ -78,7 +78,10 @@ pub(super) fn completed_after_root(ledger: &SqliteLedger, root: &RootDir) {
         panic!("confirmed completion receipt lost: {result:?}");
     };
     assert!(matches!(error, LedgerError::PathEscape(_)), "{error:?}");
-    assert_eq!(receipt.completed, vec![new_intent().recording]);
+    assert_eq!(
+        receipt.completed,
+        vec![new_intent().owner.recording().unwrap().clone()]
+    );
     assert_eq!(receipt.records.len(), 2);
     let retained = RootDir::open(&held).unwrap();
     let reopened = SqliteLedger::open(&retained).unwrap();

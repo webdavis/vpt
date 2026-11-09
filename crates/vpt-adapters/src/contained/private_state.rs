@@ -14,7 +14,7 @@ impl RootDir {
     }
 }
 
-pub(super) fn effective_user() -> u32 {
+pub(crate) fn effective_user() -> u32 {
     // SAFETY: geteuid has no arguments and only observes this process's effective identity.
     unsafe { libc::geteuid() }
 }

@@ -30,3 +30,45 @@ fn mode(path: &Path) -> u32 {
         .mode()
         & 0o777
 }
+
+fn digest(mut bytes: &[u8]) -> vpt_domain::digest::Sha256Digest {
+    crate::stores::digest_reader(&mut bytes).unwrap()
+}
+
+fn prepared(root: &RootDir, path: &Path) -> Result<(Staged, ArchiveReader), ArchiveError> {
+    let handle = ArchiveReader::open(root, path)?;
+    let staged = Staged {
+        path: path.into(),
+        digest: handle.digest(root)?,
+        size: handle.initial.len(),
+        copy_on_write: false,
+    };
+    Ok((staged, handle))
+}
+
+fn exclusive(root: &RootDir, path: &Path, target: &str) -> Result<Published, ArchiveError> {
+    let (staged, handle) = prepared(root, path)?;
+    super::exclusive(root, &staged, &handle, target)
+}
+
+fn exclusive_with<F, D>(
+    root: &RootDir,
+    path: &Path,
+    target: &str,
+    sync_file: F,
+    sync_directory: D,
+) -> Result<Published, ArchiveError>
+where
+    F: FnOnce(&RootDir, &Path) -> Result<(), ArchiveError>,
+    D: FnOnce(&RootDir) -> Result<(), ArchiveError>,
+{
+    let (staged, handle) = prepared(root, path)?;
+    super::exclusive_with(
+        root,
+        &staged,
+        &handle,
+        target,
+        |_| sync_file(root, path),
+        sync_directory,
+    )
+}
