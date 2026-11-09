@@ -22,4 +22,5 @@ pub(crate) mod path;
 
 pub(crate) mod synthesize;
 
+pub(crate) mod redact;
 
