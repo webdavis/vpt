@@ -5,6 +5,7 @@ mod engine_outputs;
 mod expirations;
 mod flags;
 mod notes;
+mod observation;
 mod occasions;
 mod proposals;
 mod publications;

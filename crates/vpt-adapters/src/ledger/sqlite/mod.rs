@@ -8,6 +8,7 @@ mod history;
 mod journal;
 mod migrations;
 mod notes;
+mod observation;
 mod occasions;
 mod proposals;
 mod recordings;

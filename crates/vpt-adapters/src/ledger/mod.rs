@@ -1,3 +1,4 @@
+mod observation;
 mod occasion;
 mod release;
 mod retention_artifacts;
