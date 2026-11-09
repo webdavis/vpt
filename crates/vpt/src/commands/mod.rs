@@ -2,6 +2,7 @@ pub(crate) mod brief;
 pub(crate) mod confirm;
 pub(crate) mod list;
 pub(crate) mod note;
+pub(crate) mod occasions;
 pub(crate) mod retention;
 pub(crate) mod review;
 pub(crate) mod setup;
@@ -16,6 +17,7 @@ pub(crate) mod ingest;
 #[cfg(test)]
 mod tests;
 
+pub(crate) mod path;
 
 
 pub(crate) mod synthesize;

@@ -186,4 +186,28 @@ fn transcribe_accepts_language_and_dry_run_flags_around_the_identity() {
     }
 }
 
+#[test]
+fn path_requires_one_identity_and_an_explicit_stage_with_global_options() {
+    for line in [
+        "path memo --stage transcript --json",
+        "--json path --stage transcript memo",
+    ] {
+        assert_eq!(
+            parsed(line).unwrap().verb,
+            Verb::Path {
+                id: "memo".into(),
+                stage: "transcript".into()
+            }
+        );
+    }
+    for line in [
+        "path memo",
+        "path --stage transcript",
+        "path memo --stage",
+        "path memo --stage transcript extra",
+    ] {
+        assert!(parsed(line).is_err(), "{line}");
+    }
+}
+
 mod review;
