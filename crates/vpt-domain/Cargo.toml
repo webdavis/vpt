@@ -5,3 +5,7 @@ edition = "2024"
 
 [features]
 fixtures = []
+
+[dependencies]
+caseless = "=0.2.2"
+unicode-normalization = "=0.1.25"
