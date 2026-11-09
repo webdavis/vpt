@@ -159,6 +159,10 @@ pub(crate) use retention_history_cases;
 
 macro_rules! history_cases {
     ($case:ident) => {
+        $case!(synthesis_eligibility_commits_state_and_history_without_completed_work);
+        $case!(synthesis_eligibility_refuses_stale_or_fabricated_changes);
+        $case!(expired_synthesis_cannot_be_reenabled_by_configuration);
+        $case!(synthesis_eligibility_rolls_back_when_later_history_is_invalid);
         $case!(start_and_steps_have_stable_order_and_pending_export);
         $case!(source_update_and_history_commit_together);
         $case!(publication_clear_commits_with_history);

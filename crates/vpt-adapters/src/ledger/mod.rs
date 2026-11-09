@@ -1,4 +1,5 @@
 mod retention_artifacts;
+mod eligibility;
 mod engine_output;
 mod flags;
 pub(crate) mod json;

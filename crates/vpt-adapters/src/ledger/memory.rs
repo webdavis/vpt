@@ -1,3 +1,4 @@
+mod eligibility;
 mod engine_outputs;
 mod expirations;
 mod flags;
