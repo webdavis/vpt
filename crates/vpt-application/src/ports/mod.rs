@@ -2,9 +2,15 @@ mod verification;
 pub use verification::{VerificationChange, VerifiedClaims};
 mod archive;
 mod clock;
+mod context;
+pub use context::{ContextConfigError, ContextError, ContextRequest, ContextSource, ContextWindow};
 mod engine;
 mod proposal;
+mod synthesis;
 pub use proposal::{AcceptedProposal, GroundingBasis, ProposalChange, ProposalLedger};
+pub use synthesis::{
+    AgentCommand, SynthesisFailure, SynthesisOutput, SynthesisRequest, SynthesisStateChange,
+};
 mod engine_artifact;
 mod history;
 mod ledger;
