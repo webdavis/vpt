@@ -1,3 +1,7 @@
+mod observation;
+pub use observation::{
+    ObservationLedger, ObservedFlag, RecordingObservation, TranscriptionMetadata,
+};
 mod verification;
 pub use verification::{VerificationChange, VerifiedClaims};
 mod archive;
