@@ -1,6 +1,6 @@
 import Foundation
 
-package struct Outcome: Equatable {
+package struct Outcome: Equatable, Sendable {
     package let stdout: String
     package let stderr: String
     package let exitCode: Int32
@@ -12,8 +12,15 @@ package struct Outcome: Equatable {
     }
 }
 
-func run(_ command: Command, trasher: some Trasher) -> Outcome {
+func run(
+    _ command: Command,
+    trasher: some Trasher,
+    transcriber: some Transcriber = AppleTranscriber(),
+    isolation _: isolated (any Actor)? = #isolation
+) async -> Outcome {
     switch command {
+    case let .transcribe(path, locale):
+        return await transcribeOutcome(path: path, locale: locale, transcriber: transcriber)
     case .version:
         return documentOutcome(VersionDocument())
     case let .trash(path):
@@ -30,10 +37,15 @@ func run(_ command: Command, trasher: some Trasher) -> Outcome {
     }
 }
 
-package func execute(arguments: [String], trasher: some Trasher) -> Outcome {
+package func execute(
+    arguments: [String],
+    trasher: some Trasher,
+    transcriber: some Transcriber = AppleTranscriber(),
+    isolation: isolated (any Actor)? = #isolation
+) async -> Outcome {
     switch parse(arguments) {
     case let .success(command):
-        run(command, trasher: trasher)
+        await run(command, trasher: trasher, transcriber: transcriber, isolation: isolation)
     case let .failure(error):
         Outcome(
             stdout: "",

@@ -1,7 +1,7 @@
 import Foundation
 import VptMacos
 
-let outcome = execute(
+let outcome = await execute(
     arguments: Array(CommandLine.arguments.dropFirst()),
     trasher: FileManagerTrasher()
 )

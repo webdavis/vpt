@@ -15,7 +15,7 @@ final class ArgumentsTests: XCTestCase {
         )
         XCTAssertEqual(
             parse(["transcribe", "x"]),
-            .failure(UsageError(message: "unknown subcommand"))
+            .failure(UsageError(message: "transcribe requires one audio path and --locale <tag>"))
         )
         XCTAssertEqual(
             parse(["--version", "extra"]),
