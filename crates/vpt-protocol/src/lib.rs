@@ -6,6 +6,7 @@ mod event;
 mod helper;
 mod limits;
 pub mod result;
+pub mod whisply;
 
 pub use event::{EventEncodeError, encode_history, encode_hook};
 pub use helper::{HELPER_SCHEMA, HelperVersion, Trashed};
