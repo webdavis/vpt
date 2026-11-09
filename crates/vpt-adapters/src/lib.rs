@@ -23,6 +23,7 @@ mod spawn;
 mod stores;
 mod symlink;
 mod transcript_document;
+pub mod transcription;
 pub mod verification;
 mod voice_memos;
 pub use git_tree::enclosing_git_tree;
