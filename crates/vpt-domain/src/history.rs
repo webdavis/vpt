@@ -1,6 +1,9 @@
+mod detail;
+mod retention_counts;
 use crate::identity::RecordingId;
-use crate::sweep::DeferralReason;
 use crate::time::UtcInstant;
+pub use detail::EventDetail;
+pub use retention_counts::RetentionCounts;
 use std::path::PathBuf;
 
 mod id;
@@ -58,23 +61,18 @@ pub enum SafeFailureClass {
     ConfigurationRefused,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum EventDetail {
-    None,
-    Review { spans: u32, agreed_unverified: u32 },
-    Failure(SafeFailureClass),
-    Deferred { reason: DeferralReason, count: u32 },
-    Retention { completed: u32, failed: u32 },
-}
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct EventCounts {
+    pub retention: Option<RetentionCounts>,
     pub numeric: u32,
     pub proper_noun: u32,
     pub low_confidence: u32,
     pub formatting: u32,
     pub other: u32,
     pub unsupported: u32,
+    pub unsourced: u32,
+    pub bad_reference: u32,
+    pub built_on_flagged_text: u32,
     pub agreed_unverified: u32,
     pub diagnostics: u32,
 }
@@ -111,31 +109,11 @@ pub struct Event {
     pub kind: EventKind,
     pub state: EventState,
     pub recording: Option<RecordingId>,
+    pub occasion: Option<crate::occasion::OccasionId>,
     pub detail: EventDetail,
     pub counts: EventCounts,
     pub paths: Vec<EventPath>,
     pub occurred_at: UtcInstant,
-}
-
-impl Event {
-    pub fn detail_text(&self) -> String {
-        match self.detail {
-            EventDetail::None => String::new(),
-            EventDetail::Review {
-                spans,
-                agreed_unverified,
-            } => {
-                format!("{spans} spans to review, {agreed_unverified} agreed spans unverified")
-            }
-            EventDetail::Failure(class) => class.as_str().to_owned(),
-            EventDetail::Deferred { reason, count } => {
-                format!("deferred {count} times: {}", reason.as_str())
-            }
-            EventDetail::Retention { completed, failed } => {
-                format!("{completed} retention items completed, {failed} failed")
-            }
-        }
-    }
 }
 
 impl SafeFailureClass {
@@ -152,50 +130,4 @@ impl SafeFailureClass {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::sweep::DeferralReason;
-
-    #[test]
-    fn detail_is_derived_from_typed_safe_counts() {
-        let event = Event {
-            kind: EventKind::ReviewNeeded,
-            state: EventState::NeedsAttention,
-            recording: None,
-            detail: EventDetail::Review {
-                spans: 6,
-                agreed_unverified: 11,
-            },
-            counts: EventCounts::default(),
-            paths: vec![],
-            occurred_at: UtcInstant { secs: 0 },
-        };
-        assert_eq!(
-            event.detail_text(),
-            "6 spans to review, 11 agreed spans unverified"
-        );
-    }
-
-    #[test]
-    fn deferred_detail_uses_typed_reason_and_count() {
-        let event = Event {
-            kind: EventKind::Deferred,
-            state: EventState::NeedsAttention,
-            recording: None,
-            detail: EventDetail::Deferred {
-                reason: DeferralReason::Dataless,
-                count: 4,
-            },
-            counts: EventCounts::default(),
-            paths: vec![],
-            occurred_at: UtcInstant { secs: 0 },
-        };
-        assert_eq!(event.detail_text(), "deferred 4 times: dataless");
-    }
-
-    #[test]
-    fn source_event_path_key_has_exact_wire_name() {
-        let name = std::panic::catch_unwind(|| EventPathKey::Source.as_str());
-        assert_eq!(name.ok(), Some("source"));
-    }
-}
+mod tests;
