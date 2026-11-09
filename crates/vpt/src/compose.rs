@@ -1,3 +1,7 @@
+pub(crate) mod publication;
+pub(crate) mod releases;
+pub(crate) mod run_outcome;
+pub(crate) mod startup;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use vpt_adapters::config::{ConfigError, default_state_dir, from_table, load_file};
@@ -5,7 +9,10 @@ use vpt_application::Settings;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
 pub(crate) mod errors;
+pub(crate) mod events;
+pub(crate) mod history;
 mod ledger;
+pub(crate) mod mutation;
 mod observations;
 pub(crate) use ledger::RuntimeLedger;
 pub(crate) use observations::{ledger_from, storage_from};
@@ -110,3 +117,5 @@ pub(crate) fn config_error(error: ConfigError) -> Box<ErrorDocument> {
 }
 
 
+#[cfg(test)]
+mod history_tests;

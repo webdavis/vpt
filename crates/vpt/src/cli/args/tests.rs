@@ -38,6 +38,11 @@ fn every_stage_one_verb_decodes_its_arguments() {
             },
         ),
         ("storage", Verb::Storage),
+        ("retention run", Verb::RetentionRun { dry_run: false }),
+        (
+            "retention run --dry-run",
+            Verb::RetentionRun { dry_run: true },
+        ),
         ("symlink deploy", Verb::SymlinkDeploy),
         ("symlink verify", Verb::SymlinkVerify),
     ] {
@@ -58,6 +63,8 @@ fn missing_positionals_subcommands_and_flag_values_are_refused() {
     for (line, message) in [
         ("show", "<id> is required"),
         ("show --force", "<id> is required"),
+        ("retention", "run is required"),
+        ("retention erase", "unknown retention subcommand erase"),
         ("symlink", "deploy|verify is required"),
         ("symlink erase", "unknown symlink subcommand erase"),
         ("--config --json doctor", "--config needs a value"),

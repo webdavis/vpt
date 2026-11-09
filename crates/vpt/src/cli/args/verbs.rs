@@ -18,6 +18,12 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
             stage: take_value(words, "--stage")?,
         }),
         "storage" => Ok(Verb::Storage),
+        "retention" => match take_positional(words, "run")?.as_str() {
+            "run" => Ok(Verb::RetentionRun {
+                dry_run: take_flag(words, "--dry-run"),
+            }),
+            other => Err(UsageError(format!("unknown retention subcommand {other}"))),
+        },
         "symlink" => match take_positional(words, "deploy|verify")?.as_str() {
             "deploy" => Ok(Verb::SymlinkDeploy),
             "verify" => Ok(Verb::SymlinkVerify),
