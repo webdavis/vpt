@@ -7,6 +7,20 @@ fn parsed(line: &str) -> Result<Invocation, UsageError> {
 }
 
 #[test]
+fn json_and_config_are_global_flags_in_any_position() {
+    let invocation = parsed("ingest --json --config /tmp/c.toml --dry-run").expect("parsed");
+    assert!(invocation.json);
+    assert_eq!(invocation.config, Some(PathBuf::from("/tmp/c.toml")));
+    assert_eq!(
+        invocation.verb,
+        Verb::Ingest {
+            dry_run: true,
+            once: None
+        }
+    );
+}
+
+#[test]
 fn an_unknown_verb_is_a_usage_error_naming_it() {
     assert_eq!(
         parsed("transcode"),
@@ -23,12 +37,34 @@ fn a_trailing_unknown_argument_is_refused() {
 }
 
 #[test]
+fn a_value_flag_without_a_value_is_refused() {
+    assert_eq!(
+        parsed("ingest --once"),
+        Err(UsageError("--once needs a value".into()))
+    );
+}
+
+#[test]
 fn every_stage_one_verb_decodes_its_arguments() {
     for (line, verb) in [
         ("--version", Verb::Version),
         ("setup", Verb::Setup { force: false }),
         ("setup --force", Verb::Setup { force: true }),
         ("doctor", Verb::Doctor),
+        (
+            "ingest",
+            Verb::Ingest {
+                dry_run: false,
+                once: None,
+            },
+        ),
+        (
+            "ingest --once memo.m4a",
+            Verb::Ingest {
+                dry_run: false,
+                once: Some("memo.m4a".into()),
+            },
+        ),
         ("show memo", Verb::Show { id: "memo".into() }),
         ("list", Verb::List { stage: None }),
         (
@@ -77,11 +113,30 @@ fn missing_positionals_subcommands_and_flag_values_are_refused() {
 #[test]
 fn global_flags_cannot_fill_missing_value_slots() {
     for (line, flag) in [
+        ("ingest --once --json memo.m4a", "--once"),
         ("list --stage --json extract", "--stage"),
+        ("ingest --once --config c.toml memo.m4a", "--once"),
     ] {
         assert_eq!(
             parsed(line),
             Err(UsageError(format!("{flag} needs a value")))
+        );
+    }
+}
+
+#[test]
+fn non_utf8_paths_are_refused_without_substitution() {
+    use std::os::unix::ffi::OsStringExt;
+    for flag in ["--config", "--once"] {
+        let args = [
+            "vpt".into(),
+            "ingest".into(),
+            flag.into(),
+            OsString::from_vec(vec![b'a', 0xff]),
+        ];
+        assert_eq!(
+            parse(args),
+            Err(UsageError("arguments must be valid UTF-8".into()))
         );
     }
 }

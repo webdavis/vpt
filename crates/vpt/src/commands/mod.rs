@@ -6,6 +6,7 @@ pub(crate) mod storage;
 pub(crate) mod symlink;
 pub(crate) mod version;
 
+pub(crate) mod ingest;
 #[cfg(test)]
 mod tests;
 

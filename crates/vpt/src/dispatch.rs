@@ -55,6 +55,14 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             Ok((paths, stores)) => commands::storage::run(&paths, &stores),
             Err(error) => Outcome::Failure(*error),
         },
+        Verb::Ingest { dry_run, once } => commands::ingest::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            &vpt_application::Mode {
+                dry_run: *dry_run,
+                once: once.clone(),
+            },
+        ),
     };
     emit(outcome, invocation.json)
 }
