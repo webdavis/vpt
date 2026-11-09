@@ -21,6 +21,15 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
             dry_run: take_flag(words, "--dry-run"),
             once: take_value(words, "--once")?.map(PathBuf::from),
         }),
+        "transcribe" => {
+            let language = take_value(words, "--language")?;
+            let dry_run = take_flag(words, "--dry-run");
+            Ok(Verb::Transcribe {
+                id: take_positional(words, "<id>")?,
+                language,
+                dry_run,
+            })
+        }
         "show" => Ok(Verb::Show {
             id: take_positional(words, "<id>")?,
         }),

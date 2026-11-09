@@ -53,6 +53,17 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             invocation.config.as_deref(),
             *dry_run,
         ),
+        Verb::Transcribe {
+            id,
+            language,
+            dry_run,
+        } => commands::transcribe::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            id,
+            language.as_deref(),
+            *dry_run,
+        ),
         Verb::Storage => match compose::storage_from(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

@@ -8,6 +8,7 @@ use verbs::parse_verb;
 
 pub const USAGE: &str = "usage: vpt [--json] [--config <file>] <verb>\n\
 verbs: setup [--force] | doctor | ingest [--dry-run] [--once <path>] | show <id> |\n\
+       transcribe <id> [--language <tag>] [--dry-run] |\n\
        note write <id> | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
        symlink deploy | symlink verify | --version\n";
 
@@ -20,6 +21,11 @@ pub enum Verb {
     Doctor,
     NoteWrite {
         id: String,
+    },
+    Transcribe {
+        id: String,
+        language: Option<String>,
+        dry_run: bool,
     },
     Ingest {
         dry_run: bool,
@@ -65,6 +71,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
                 | "--config"
                 | "--once"
                 | "--stage"
+                | "--language"
         ) && words
             .get(index + 1)
             .is_none_or(|value| value.starts_with("--"))
