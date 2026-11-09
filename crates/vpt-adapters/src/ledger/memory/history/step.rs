@@ -31,7 +31,15 @@ pub(super) fn apply(
             return Err(conflict());
         }
     }
+    super::super::verification::apply(state, delta, facts)?;
+    super::super::proposals::apply(state, delta, facts)?;
+    super::super::engine_outputs::check(state, delta)?;
+    super::super::vocabulary::apply(state, delta, facts)?;
+    super::super::notes::apply(state, delta, facts)?;
+    super::super::tags::apply(state, delta, facts)?;
+    super::super::relations::apply(state, delta, facts)?;
     apply_commit(state, &delta.commit)?;
+    super::super::engine_outputs::apply(state, delta);
     for (id, path) in &delta.source_updates {
         let recording = state
             .recordings
@@ -42,6 +50,7 @@ pub(super) fn apply(
     }
     for target in &delta.publication_clears {
         state.vocabulary.retain(|row| &row.entry.target != target);
+        super::super::notes::published(state, target)?;
         state
             .publications
             .retain(|publication| publication.target != *target);
@@ -54,7 +63,13 @@ pub(super) fn apply(
             .ok_or_else(conflict)?;
         recording.audio_trashed_at = Some(*at);
     }
+    if let Some(change) = &delta.transcription {
+        crate::ledger::transcript::check_history(change, facts)?;
+        super::super::transcript::apply(state, change)?;
+    }
     super::super::expirations::regenerated(state, delta);
+    super::super::flags::resolve::apply(state, delta, facts)?;
+    super::super::verification::state::refresh(state, delta)?;
     let records = facts
         .iter()
         .map(|(at, fact)| state.history.append(run, *at, fact.clone()))

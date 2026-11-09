@@ -5,15 +5,22 @@ pub mod config;
 mod contained;
 mod database;
 mod events;
+mod flag_identity;
+pub use flag_identity::{diagnostic_flag_id, lexical_flag_id, verification_flag_id};
 mod git_tree;
 mod helper;
+pub mod known_tags;
+pub mod known_terms;
 mod ledger;
 mod lock;
 pub mod note_document;
 mod prompt;
+pub mod proposal;
 mod spawn;
 mod stores;
 mod symlink;
+mod transcript_document;
+pub mod verification;
 mod voice_memos;
 pub use git_tree::enclosing_git_tree;
 pub use helper::{BUILT_AGAINST_MAJOR, CALL_DEADLINE, HelperClient, HelperError};
@@ -31,7 +38,7 @@ pub use contained::{
 };
 pub use events::LoggedEvents;
 pub use ledger::{
-    MemoryLedger, OpenError, SCHEMA_VERSION, SqliteLedger,
+    MemoryLedger, OpenError, SCHEMA_VERSION, SqliteLedger, grounding_basis_for,
 };
 pub use lock::{LockError, WriteLock};
 pub use stores::{BUFFER, FilesystemStores, digest_open};

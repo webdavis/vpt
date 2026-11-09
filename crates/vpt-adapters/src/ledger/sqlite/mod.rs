@@ -1,13 +1,22 @@
 mod connection;
+mod engine_outputs;
 mod error;
 mod expirations;
+mod flags;
 mod history;
 mod journal;
 mod migrations;
+mod notes;
+mod proposals;
 mod recordings;
+mod relations;
 mod retention;
 mod retention_artifacts;
 mod snapshot;
+mod tags;
+mod transcript;
+mod verification;
+mod vocabulary;
 mod wal_lifetime;
 
 use crate::database::AccessPolicy;

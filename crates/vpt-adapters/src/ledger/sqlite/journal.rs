@@ -21,6 +21,17 @@ pub(super) fn upsert_publication(
     connection: &Connection,
     entry: &DirtyPublication,
 ) -> Result<(), LedgerError> {
+    if super::migrations::current(connection)? >= 5
+        && connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM known_term_publications WHERE target=?1)",
+                [entry.target.to_string_lossy()],
+                |row| row.get::<_, bool>(0),
+            )
+            .map_err(map)?
+    {
+        return Err(crate::ledger::vocabulary::conflict());
+    }
     connection
         .execute(
             "INSERT INTO dirty_publications (target, expected_previous, intended, recorded_at) VALUES (?1, ?2, ?3, ?4) \
