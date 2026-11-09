@@ -9,6 +9,19 @@ use vpt_domain::run::{
 use vpt_domain::sweep::DeferralReason;
 
 #[test]
+fn synthesis_state_history_names_the_recording_and_both_states() {
+    assert_fact(
+        HistoryFact::SynthesisStateChanged {
+            recording: recording(),
+            from: vpt_domain::stage::StageState::Disabled,
+            to: vpt_domain::stage::StageState::Pending,
+        },
+        json!({"tag":"synthesis_state_changed", "recording":recording().as_str(),
+        "from":"disabled", "to":"pending"}),
+    );
+}
+
+#[test]
 fn deferred_work_has_distinct_outgoing_history_outcome() {
     let result = std::panic::catch_unwind(|| {
         assert_fact(
@@ -173,6 +186,8 @@ fn history_document_pins_every_closed_fact_variant() {
         (RunKind::Recover, "recover"),
         (RunKind::Publish, "publish"),
         (RunKind::Retain, "retain"),
+        (RunKind::Transcribe, "transcribe"),
+        (RunKind::Note, "note"),
     ] {
         assert_fact(
             HistoryFact::RunStarted(kind),
@@ -334,5 +349,61 @@ fn history_document_pins_every_closed_fact_variant() {
             }),
         },
         json!({"tag":"recovery_summary","evidence":wire,"window":{"after":null,"through":failure.render()}}),
+    );
+}
+
+#[test]
+fn note_move_history_names_the_recording_and_both_paths() {
+    let id = vpt_domain::identity::RecordingId::parse("2026-08-24T144736-4f3ab19c02de").unwrap();
+    assert_fact(
+        HistoryFact::NoteMoved {
+            recording: id.clone(),
+            from: "/notes/old.md".into(),
+            to: "/notes/new.md".into(),
+        },
+        json!({"tag":"note_moved", "recording":id.as_str(), "from":"/notes/old.md", "to":"/notes/new.md"}),
+    );
+}
+
+#[test]
+fn flag_resolution_history_contains_only_identity_and_kind() {
+    let id = vpt_domain::identity::RecordingId::parse("2026-08-24T144736-4f3ab19c02de").unwrap();
+    let flag = vpt_domain::digest::Sha256Digest([3; 32]);
+    for kind in [
+        vpt_domain::review::ResolutionKind::Confirmed,
+        vpt_domain::review::ResolutionKind::Corrected,
+        vpt_domain::review::ResolutionKind::Dismissed,
+    ] {
+        assert_fact(
+            HistoryFact::FlagResolved {
+                recording: id.clone(),
+                flag,
+                resolution: kind,
+            },
+            json!({"tag":"flag_resolved", "recording":id.as_str(), "flag":flag.hex(), "resolution":kind.as_str()}),
+        );
+    }
+}
+
+#[test]
+fn occasion_history_has_its_own_identity_without_private_provider_fields() {
+    let id = vpt_domain::occasion::OccasionId::parse("2026-09-30T230000-abcdefabcdef").unwrap();
+    assert_fact(
+        HistoryFact::OccasionSaved {
+            occasion: id.clone(),
+        },
+        json!({"tag":"occasion_saved", "occasion":id.as_str()}),
+    );
+    assert_fact(
+        HistoryFact::RunStarted(RunKind::Brief),
+        json!({"tag":"run_started", "kind":"brief"}),
+    );
+}
+
+#[test]
+fn redaction_runs_have_a_typed_public_history_name() {
+    assert_fact(
+        HistoryFact::RunStarted(RunKind::Redact),
+        json!({"tag":"run_started", "kind":"redact"}),
     );
 }

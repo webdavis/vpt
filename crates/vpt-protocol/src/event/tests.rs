@@ -14,6 +14,7 @@ fn event(kind: EventKind, state: EventState) -> Event {
     Event {
         kind,
         state,
+        occasion: None,
         recording: None,
         detail: EventDetail::None,
         counts: EventCounts::default(),
@@ -37,3 +38,5 @@ fn record(fact: HistoryFact) -> HistoryRecord {
         export_position: None,
     }
 }
+
+mod review;

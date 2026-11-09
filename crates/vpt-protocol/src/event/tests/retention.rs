@@ -50,3 +50,23 @@ fn retention_without_a_move_detail_does_not_invent_an_audio_count() {
     .unwrap();
     assert!(hook["counts"].get("audio").is_none());
 }
+
+#[test]
+fn store_counts_override_legacy_total_in_both_hook_and_history() {
+    use vpt_domain::{history::RetentionCounts, layout::StoreKey};
+    let mut counts = RetentionCounts::default();
+    for (index, store) in StoreKey::all().into_iter().enumerate() {
+        counts.set(store, index as u32);
+    }
+    let mut event = retention(21, 0);
+    event.counts.retention = Some(counts);
+    let hook: Value = serde_json::from_slice(&encode_hook(&event).unwrap()).unwrap();
+    let logged: Value = serde_json::from_str(
+        &encode_history(&record(HistoryFact::Event(event)), UtcInstant { secs: 20 }).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(hook["counts"], logged["fact"]["event"]["counts"]);
+    for (index, store) in StoreKey::all().into_iter().enumerate() {
+        assert_eq!(hook["counts"][store.key_name()], index);
+    }
+}
