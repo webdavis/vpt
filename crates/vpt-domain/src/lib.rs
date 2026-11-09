@@ -4,11 +4,13 @@ pub mod digest;
 pub mod duration;
 #[cfg(any(test, feature = "fixtures"))]
 pub mod fixtures;
+pub mod grounding;
 pub mod history;
 pub mod identity;
 pub mod layout;
 pub mod normalize;
 pub mod note;
+pub mod proposal;
 pub mod readability;
 pub mod redaction;
 pub mod relations;

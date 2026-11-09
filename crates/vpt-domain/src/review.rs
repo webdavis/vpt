@@ -1,3 +1,5 @@
+mod verification;
+pub use verification::VerificationFlag;
 mod resolution;
 use crate::{
     digest::Sha256Digest,
@@ -10,6 +12,7 @@ pub use resolution::{ResolutionKind, ResolveError, ReviewAction, valid_correctio
 pub enum FlagContent {
     Lexical(LexicalFlag),
     Diagnostic(Diagnostic),
+    Verification(VerificationFlag),
 }
 
 #[derive(Clone, PartialEq, Eq)]
