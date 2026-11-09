@@ -9,6 +9,7 @@ pub mod identity;
 pub mod layout;
 pub mod normalize;
 pub mod retention;
+pub mod review;
 pub mod run;
 pub mod sweep;
 pub mod time;
