@@ -1,4 +1,5 @@
 pub(crate) mod list;
+pub(crate) mod note;
 pub(crate) mod retention;
 pub(crate) mod setup;
 pub(crate) mod show;
