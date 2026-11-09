@@ -21,6 +21,24 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             flag,
             action,
         ),
+        Verb::ConfirmTag { id, tag, action } => commands::confirm::run_tag(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            id,
+            tag.as_str(),
+            *action,
+        ),
+        Verb::ConfirmTerm { term } => commands::confirm::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            term.as_str(),
+        ),
+        Verb::ConfirmRelation { id, relation } => commands::confirm::run_relation(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            id,
+            relation.as_str(),
+        ),
         Verb::NoteWrite { id } => commands::note::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

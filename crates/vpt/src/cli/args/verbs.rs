@@ -8,6 +8,18 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
     if text.correction.is_some() && first != "review" {
         return Err(UsageError("--correct requires review".into()));
     }
+    if first == "confirm" {
+        return confirm::parse(words, text);
+    }
+    if text.term.is_some() {
+        return Err(UsageError("--term requires confirm".into()));
+    }
+    if text.relation.is_some() {
+        return Err(UsageError("--relation requires confirm".into()));
+    }
+    if !text.tags.is_empty() || text.reject_tag.is_some() {
+        return Err(UsageError("--tag and --reject-tag require confirm".into()));
+    }
     match first.as_str() {
         "synthesize" => {
             let dry_run = take_flag(words, "--dry-run");

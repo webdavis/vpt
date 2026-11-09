@@ -6,11 +6,15 @@ mod fixture;
 mod mentions;
 #[path = "note/output.rs"]
 mod output;
+#[path = "note/relation_confirm.rs"]
+mod relation_confirm;
 #[path = "note/relations.rs"]
 mod relations;
 #[path = "note/rename.rs"]
 mod rename;
 mod support;
+#[path = "note/tag_confirm.rs"]
+mod tag_confirm;
 #[path = "note/tags.rs"]
 mod tags;
 use support::{Sandbox, stderr, stdout};

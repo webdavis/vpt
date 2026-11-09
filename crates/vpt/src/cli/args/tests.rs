@@ -1,6 +1,8 @@
 use super::*;
 use std::ffi::OsString;
 use std::path::PathBuf;
+mod confirm;
+mod relation;
 mod synthesize;
 
 fn parsed(line: &str) -> Result<Invocation, UsageError> {

@@ -1,3 +1,4 @@
+mod confirm;
 mod options;
 mod review;
 mod text;
@@ -9,7 +10,7 @@ use verbs::parse_verb;
 
 pub const USAGE: &str = "usage: vpt [--json] [--config <file>] <verb>\n\
 verbs: setup [--force] | doctor | ingest [--dry-run] [--once <path>] | show <id> |\n\
-       transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] |\n\
+       transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
        synthesize <id> [--dry-run] | note write <id> | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
        symlink deploy | symlink verify | --version\n";
 
@@ -23,6 +24,18 @@ pub enum Verb {
         id: String,
         flag: String,
         action: vpt_domain::review::ReviewAction,
+    },
+    ConfirmTerm {
+        term: text::PrivateText,
+    },
+    ConfirmRelation {
+        id: String,
+        relation: text::PrivateText,
+    },
+    ConfirmTag {
+        id: String,
+        tag: text::PrivateText,
+        action: vpt_domain::tags::Action,
     },
     Version,
     Setup {
