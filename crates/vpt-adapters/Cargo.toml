@@ -9,6 +9,7 @@ vpt-domain = { path = "../vpt-domain" }
 vpt-protocol = { path = "../vpt-protocol" }
 libc = "0.2.189"
 jiff = "=0.2.37"
+ureq = { version = "=3.4.2", default-features = false, features = ["rustls"] }
 rusqlite = { version = "=0.39.0", default-features = false, features = ["bundled"] }
 serde = "1.0.229"
 serde_json = { version = "1.0.151", features = ["preserve_order"] }
