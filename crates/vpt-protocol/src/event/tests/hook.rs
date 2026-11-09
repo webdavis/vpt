@@ -9,6 +9,19 @@ fn hook(event: &Event) -> Value {
 }
 
 #[test]
+fn finding_class_counts_are_additive_hook_fields_when_nonzero() {
+    let mut value = event(EventKind::ReviewNeeded, EventState::NeedsAttention);
+    assert!(hook(&value)["counts"].get("unsourced").is_none());
+    value.counts.unsourced = 2;
+    value.counts.bad_reference = 3;
+    value.counts.built_on_flagged_text = 4;
+    let counts = &hook(&value)["counts"];
+    assert_eq!(counts["unsourced"], 2);
+    assert_eq!(counts["bad_reference"], 3);
+    assert_eq!(counts["built_on_flagged_text"], 4);
+}
+
+#[test]
 fn hook_document_preserves_typed_event_metadata() {
     let mut value = event(EventKind::ReviewNeeded, EventState::NeedsAttention);
     value.recording = Some(recording());
@@ -25,6 +38,7 @@ fn hook_document_preserves_typed_event_metadata() {
         unsupported: 1,
         agreed_unverified: 11,
         diagnostics: 7,
+        ..Default::default()
     };
     value.paths = vec![
         EventPath {

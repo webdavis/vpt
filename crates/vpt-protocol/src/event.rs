@@ -54,10 +54,48 @@ fn event_value(event: &Event) -> Result<Value, EventEncodeError> {
         "paths": paths,
         "occurred_at": timestamp(event.occurred_at)?,
     });
+    if let Some(occasion) = &event.occasion {
+        value["occasion"] = json!(occasion.as_str());
+    }
+    if let vpt_domain::history::EventDetail::Brief {
+        notes,
+        spans,
+        tasks,
+        unresolved,
+    } = event.detail
+    {
+        for (key, count) in [
+            ("notes", notes),
+            ("spans", spans),
+            ("tasks", tasks),
+            ("unresolved", unresolved),
+        ] {
+            value["counts"][key] = json!(count);
+        }
+    }
+    for (key, count) in [
+        ("unsourced", event.counts.unsourced),
+        ("bad_reference", event.counts.bad_reference),
+        ("built_on_flagged_text", event.counts.built_on_flagged_text),
+    ] {
+        if count != 0 {
+            value["counts"][key] = json!(count);
+        }
+    }
+    if let vpt_domain::history::EventDetail::ReviewAggregate { recordings } = event.detail {
+        value["counts"]["recordings"] = json!(recordings);
+    }
     if event.kind == vpt_domain::history::EventKind::Retention
         && let vpt_domain::history::EventDetail::Retention { completed, .. } = event.detail
     {
-        value["counts"]["audio"] = json!(completed);
+        if let Some(counts) = event.counts.retention {
+            for store in vpt_domain::layout::StoreKey::all() {
+                value["counts"][store.key_name()] = json!(counts.get(store));
+            }
+        } else {
+            // Historical audio-only events did not persist separate store counts.
+            value["counts"]["audio"] = json!(completed);
+        }
     }
     Ok(value)
 }
