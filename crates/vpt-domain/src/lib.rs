@@ -8,6 +8,7 @@ pub mod history;
 pub mod identity;
 pub mod layout;
 pub mod normalize;
+pub mod note;
 pub mod readability;
 pub mod redaction;
 pub mod relations;
