@@ -35,7 +35,7 @@ impl Registration {
             return Err(sqlite_error(code));
         }
         let number = NEXT_NAME
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
                 value.checked_add(1)
             })
             .map_err(|_| invalid("registration names exhausted"))?;
