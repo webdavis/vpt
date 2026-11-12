@@ -37,6 +37,12 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             id,
             *dry_run,
         ),
+        Verb::SynthesizeBatch { scope, dry_run } => commands::synthesize::batch::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            scope,
+            *dry_run,
+        ),
         Verb::VerifyNote { path, recording } => commands::verify::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

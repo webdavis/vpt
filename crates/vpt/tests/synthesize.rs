@@ -1,5 +1,9 @@
 #![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared CLI fixtures")]
+#[path = "synthesize/batch.rs"]
+mod batch;
+#[path = "synthesize/batch_input.rs"]
+mod batch_input;
 #[path = "synthesize/events.rs"]
 mod events;
 #[path = "synthesize/filenames.rs"]
