@@ -5,6 +5,7 @@ mod evidence;
 mod facts;
 mod proposal;
 mod sources;
+pub(crate) use sources::seconds as timecode_seconds;
 mod uncertainty;
 
 const MAX_ITEMS: usize = 65_536;

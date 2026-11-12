@@ -29,6 +29,12 @@ impl NoteLedger for RuntimeLedger {
     fn note_at(&self, target: &Path) -> Result<Option<NoteArtifact>, LedgerError> {
         self.notes().note_at(target)
     }
+    fn visit_notes(
+        &self,
+        visitor: &mut dyn FnMut(NoteArtifact) -> std::ops::ControlFlow<()>,
+    ) -> Result<(), LedgerError> {
+        self.notes().visit_notes(visitor)
+    }
 }
 
 impl vpt_application::ports::NoteInputsLedger for RuntimeLedger {

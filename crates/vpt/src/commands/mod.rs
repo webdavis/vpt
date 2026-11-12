@@ -5,6 +5,7 @@ pub(crate) mod note;
 pub(crate) mod occasions;
 pub(crate) mod retention;
 pub(crate) mod review;
+pub(crate) mod search;
 pub(crate) mod setup;
 pub(crate) mod show;
 pub(crate) mod storage;

@@ -92,6 +92,7 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
             id: take_positional(words, "<id>")?,
         }),
         "review" => review::parse(words, text.correction),
+        "search" => search::parse(words),
         "list" => Ok(Verb::List {
             stage: take_value(words, "--stage")?,
         }),
