@@ -17,7 +17,11 @@ fn text_fields(result: &serde_json::Value, stage: &str) {
     assert!(result["generated_at"].is_string());
 }
 
-fn synthesize(sandbox: &Sandbox, id: &vpt_domain::identity::RecordingId, proposal: &str) {
+pub(super) fn synthesize(
+    sandbox: &Sandbox,
+    id: &vpt_domain::identity::RecordingId,
+    proposal: &str,
+) {
     let script = sandbox.path().join("agent.sh");
     let path = sandbox.path().join("proposal.json");
     fs::write(&script, "#!/bin/sh\n/bin/cat >/dev/null\n/bin/cat \"$1\"\n").unwrap();

@@ -13,27 +13,41 @@ pub(crate) struct Artifact<'a> {
     pub digest: Sha256Digest,
     pub body: &'a str,
     pub provenance: Provenance<'a>,
+    pub withhold_path: bool,
 }
 pub(crate) fn value(roots: &Roots, artifact: Artifact<'_>) -> Result<Value, Box<ErrorDocument>> {
     let path = artifact
         .path
         .strip_prefix(&roots.home)
         .unwrap_or(artifact.path);
+    let id = artifact.identity.as_str().to_owned();
+    let (note, stem) = match artifact.withhold_path {
+        true => (id.as_str(), id.as_str()),
+        false => (
+            path.to_str().ok_or_else(errors::changed)?,
+            artifact
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .ok_or_else(errors::changed)?,
+        ),
+    };
     let document = Document {
         kind: artifact.kind,
         identity: artifact.identity,
-        note: path.to_str().ok_or_else(errors::changed)?,
+        note,
         digest: artifact.digest,
-        stem: artifact
-            .path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .ok_or_else(errors::changed)?,
+        stem,
         body: artifact.body,
         provenance: artifact.provenance,
         generated_at: SystemClock.now(),
     };
-    vpt_protocol::handoff::value(&document).map_err(errors::document)
+    let mut value = vpt_protocol::handoff::value(&document).map_err(errors::document)?;
+    if artifact.withhold_path {
+        value["identity"]["note"] = Value::Null;
+        value["provenance"]["redacted"] = true.into();
+    }
+    Ok(value)
 }
 pub(super) fn outcome(value: Value) -> Result<Outcome, Box<ErrorDocument>> {
     let human = value["content"]

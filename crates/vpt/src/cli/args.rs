@@ -17,7 +17,7 @@ use verbs::parse_verb;
 
 pub const USAGE: &str = "usage: vpt [--json|--toon|--yaml] [--progress] [--config <file>] <verb>\n\
 verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <path>] |\n\
-       import <file> [--title <text>] [--captured-at <RFC3339>] | show <id> [--stage released|transcript|analysis|brief] |\n\
+       import <file> [--title <text>] [--captured-at <RFC3339>] | show <id> [--stage released|transcript|analysis|brief] [--redact] |\n\
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
        tag rename <old> <new> [--dry-run] |\n\
        synthesize <id> [--dry-run] | path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | search <word>... [--limit <n>] | storage | retention run [--dry-run] |\n\
@@ -92,6 +92,7 @@ pub enum Verb {
     Show {
         id: String,
         stage: Option<vpt_domain::handoff::Kind>,
+        redact: bool,
     },
     Search(search::Options),
     Review {

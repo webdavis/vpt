@@ -3,7 +3,7 @@ use vpt_adapters::{ContainedError, FilesystemStores, Roots, redaction::document:
 use vpt_application::ports::*;
 use vpt_domain::{identity::RecordingId, note::NoteStage};
 use vpt_protocol::error::ErrorDocument;
-pub(super) struct Source {
+pub(crate) struct Source {
     pub input: NoteInputs,
     pub path: std::path::PathBuf,
     pub note: StoredNote,

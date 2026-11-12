@@ -1,4 +1,5 @@
 mod proposal;
+mod redacted;
 mod segments;
 pub(crate) mod stage;
 use crate::cli::output::Outcome;

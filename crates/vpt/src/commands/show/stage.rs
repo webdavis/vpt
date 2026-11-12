@@ -10,13 +10,17 @@ use vpt_protocol::{
     result::document,
 };
 
+pub(crate) const BRIEF_REDACT: &str =
+    "--redact does not apply to --stage brief, which is not a redaction source";
+
 pub(crate) fn run(
     environment: &Environment,
     config: Option<&Path>,
     id: &str,
     stage: Kind,
+    redact: bool,
 ) -> Outcome {
-    execute(environment, config, id, stage).unwrap_or_else(|error| Outcome::Failure(*error))
+    execute(environment, config, id, stage, redact).unwrap_or_else(|error| Outcome::Failure(*error))
 }
 
 fn execute(
@@ -24,15 +28,23 @@ fn execute(
     config: Option<&Path>,
     id: &str,
     stage: Kind,
+    redact: bool,
 ) -> Result<Outcome, Box<ErrorDocument>> {
     let target = target(id, stage)?;
-    let (_, roots, ledger) = handoff::open(environment, config)?;
+    let (settings, roots, ledger) = handoff::open(environment, config)?;
     let mut body = json!({"stage": stage.as_str()});
-    flatten(
-        handoff::artifact(&ledger, &roots, &target, stage)?,
-        &mut body,
-    );
+    let copy = match (&target, redact) {
+        (Target::Recording(id), true) => {
+            super::redacted::copy(&settings, &roots, &ledger, id, stage)?
+        }
+        (Target::Occasion(_), true) => {
+            return Err(Box::new(ErrorDocument::new(ErrorKind::Usage, BRIEF_REDACT)));
+        }
+        (_, false) => handoff::artifact(&ledger, &roots, &target, stage)?,
+    };
+    flatten(copy, &mut body);
     if let Target::Recording(id) = &target
+        && !redact
         && matches!(stage, Kind::Transcript | Kind::Analysis)
     {
         let input = ledger

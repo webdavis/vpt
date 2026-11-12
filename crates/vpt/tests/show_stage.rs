@@ -18,6 +18,11 @@ fn json(output: &std::process::Output) -> serde_json::Value {
     assert!(output.stderr.is_empty());
     serde_json::from_slice(&output.stdout).unwrap()
 }
+fn ledger(sandbox: &Sandbox) -> SqliteLedger {
+    SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
+        .unwrap()
+        .unwrap()
+}
 fn configured(name: &str) -> (Sandbox, vpt_domain::identity::RecordingId) {
     let sandbox = fixture::configured(name);
     let id = recording::seed_flags(&sandbox, true);
@@ -136,5 +141,7 @@ fn analysis_without_an_accepted_proposal_is_an_input_error() {
     assert!(missing.stdout.is_empty());
 }
 
+#[path = "show_stage/redact.rs"]
+mod redact;
 #[path = "show_stage/text.rs"]
 mod text;
