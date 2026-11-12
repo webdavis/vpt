@@ -1,4 +1,5 @@
 mod detail;
+mod done;
 mod retention_counts;
 use crate::identity::RecordingId;
 use crate::time::UtcInstant;
@@ -18,6 +19,8 @@ pub enum EventKind {
     BriefWritten,
     Retention,
     ConfigRefused,
+    Transcribed,
+    Synthesized,
 }
 
 impl EventKind {
@@ -30,7 +33,16 @@ impl EventKind {
             Self::BriefWritten => "brief_written",
             Self::Retention => "retention",
             Self::ConfigRefused => "config_refused",
+            Self::Transcribed => "transcribed",
+            Self::Synthesized => "synthesized",
         }
+    }
+
+    pub fn is_report(self) -> bool {
+        matches!(
+            self,
+            Self::BriefWritten | Self::Retention | Self::Transcribed | Self::Synthesized
+        )
     }
 }
 

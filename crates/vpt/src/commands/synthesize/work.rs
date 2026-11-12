@@ -133,6 +133,7 @@ impl<E: EventSink> Writer<'_, E> {
                 self.sink,
                 self.warnings,
             )?;
+            super::notification::synthesized(self.ledger, self.sink, self.warnings, run, &id)?;
             output::success(self.ledger, &id, &diagnostics)
         })();
         if attempted {

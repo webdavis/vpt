@@ -15,10 +15,10 @@ pub fn encode_hook(event: &Event) -> Result<Vec<u8>, EventEncodeError> {
     let mut value = event_value(event)?;
     let fields = value.as_object_mut().expect("event object");
     fields.insert("schema".into(), json!("vpt.event/1"));
-    let channel = match event.kind {
-        vpt_domain::history::EventKind::BriefWritten
-        | vpt_domain::history::EventKind::Retention => "report",
-        _ => "alert",
+    let channel = if event.kind.is_report() {
+        "report"
+    } else {
+        "alert"
     };
     fields.insert("channel".into(), json!(channel));
     Ok(value.to_string().into_bytes())

@@ -1,5 +1,7 @@
 #![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared CLI fixtures")]
+#[path = "synthesize/events.rs"]
+mod events;
 #[path = "synthesize/filenames.rs"]
 mod filenames;
 #[path = "show_list_storage/fixture.rs"]
@@ -28,6 +30,7 @@ mod protocol;
 mod recovery;
 #[path = "synthesize/related.rs"]
 mod related;
+mod report_hook;
 mod support;
 #[path = "synthesize/tag_defaults.rs"]
 mod tag_defaults;
