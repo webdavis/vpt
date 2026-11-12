@@ -445,9 +445,11 @@ no later than the recording's length. Every capitalized word and every number in
 in the cited text, otherwise the claim is marked `unsupported`. A claim that starts with "They" or
 "An" is marked for that reason.
 
-Both examples below ran end to end against a synthetic recording, four times each, with Claude Code
-2.1.322 and codex-cli 0.167.0. Claude took 20 to 40 seconds a call and Codex about 11, and each
-produced an analysis note with no findings. The prompt is the same in both.
+Both examples below ran against a synthetic transcript, four times each, with Claude Code 2.1.322
+and codex-cli 0.167.0. Claude took 17 to 24 seconds a call and Codex 9 to 12. Every call exited 0 with
+one document, named the owner of each of three actions correctly, and turned "by Thursday" into the
+right date from `{captured_at}`. The first document from each was run through vpt, which accepted it.
+The prompt is the same in both.
 
 `claude -p` with structured output prints only the document. `--safe-mode` skips the user's hooks,
 plugins and `CLAUDE.md`, and `--tools ""` removes every tool. `--json-schema` takes the schema as a
