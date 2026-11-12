@@ -52,7 +52,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
     let ledger = seed(root);
     assert_eq!(ledger.database_path(), root.path().join("vpt.db"));
     assert_eq!(ledger.schema_version().unwrap(), SCHEMA_VERSION);
-    assert_eq!(SCHEMA_VERSION, 16);
+    assert_eq!(SCHEMA_VERSION, 17);
     match scenario {
         "ledger_schema_create" | "ledger_schema_reopen" => {
             if scenario == "ledger_schema_reopen" {
@@ -85,6 +85,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                             "history_records",
                             "history_runs",
                             "known_term_publications",
+                            "learned_tags",
                             "mention_ambiguities",
                             "occasions",
                             "owned_briefs",

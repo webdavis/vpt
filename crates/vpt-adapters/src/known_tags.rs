@@ -1,7 +1,7 @@
 mod batch;
 mod rename;
 use crate::known_terms::{self, TermsError, Update};
-pub use batch::prepare_many;
+pub use batch::{Edit, prepare_many};
 pub use rename::prepare_renamed;
 use std::path::Path;
 use vpt_domain::tags::{NewTags, Options, TagError, Vocabulary};

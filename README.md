@@ -375,11 +375,14 @@ repairs saved output without rerunning the agent when its source and grounding i
 This also covers a vocabulary acknowledgement failure after both notes finished publishing.
 
 Proposed tags use the indexed vocabulary and `tags.new_tags = hold|write`; automatic additions to
-`known-tags.txt` are journaled with the notes. Rejections log their proposal index and rule without
+`known-tags.txt` are journaled with the notes. VPT remembers which lines it appended. When a later
+synthesis drops such a tag and no recording and no other indexed note carries it, the same journaled
+write removes the line. Only tags VPT learned after this version are ever removed from `known-tags.txt`;
+lines the owner typed, tags confirmed by hand, and renamed lines stay. Rejections log their proposal index and rule without
 private tag text. A proposed tag that `vpt tag rename` renamed away, by key, becomes its new name,
 following chains, and logs `tag_renamed` with its proposal index; confirming the old name by hand on
-any recording ends that rename's effect. Related suggestions use indexed names/aliases or recording
-identities, preserve provenance, and respect the configured cap. Manual tag and relation decisions survive later proposals.
+any recording ends that rename's effect. Related suggestions use indexed names/aliases or recording identities, preserve
+provenance, and respect the configured cap. Manual tag and relation decisions survive later proposals.
 Dry runs render an input plan without starting an agent or creating notes, logs, or directories.
 Transcript, lexical, or claim changes invalidate saved findings and remove them from active review counts.
 Note rewrites check claim freshness before rendering counts, including when readability settings change.

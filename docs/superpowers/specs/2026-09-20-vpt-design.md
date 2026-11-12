@@ -881,7 +881,10 @@ Indexing grants no write authority: vpt still writes into no note it did not cre
 `[tags] new_tags` is the auto-create switch:
 
 - `write` (fully automatic): a new tag is written to `tags` as `confirmed` and appended to
-  `known-tags.txt`; nothing is ever held and nothing asks.
+  `known-tags.txt`; nothing is ever held and nothing asks. The ledger records each tag it appended.
+  When a later synthesis drops one of those tags and no recording's tag state and no other indexed
+  note carries it, the line leaves `known-tags.txt` in the same journaled publication. Any other line
+  stays.
 - `hold` (shipped default): a new tag is written to `vptSuggestedTags` as `suggested` until
   `vpt confirm <id> --tag <t>` promotes it or `--reject-tag` drops it.
 

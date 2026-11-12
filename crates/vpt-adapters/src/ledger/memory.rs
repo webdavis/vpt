@@ -43,6 +43,7 @@ struct State {
     relations: Vec<(RecordingId, Vec<vpt_domain::relations::Relation>)>,
     tags: Vec<(RecordingId, Vec<vpt_domain::tags::Tag>)>,
     tag_renames: Vec<vpt_application::ports::TagRename>,
+    learned_tags: std::collections::BTreeSet<String>,
     vocabulary: Vec<vpt_application::ports::VocabularyPublication>,
     notes: Vec<vpt_application::ports::NoteArtifact>,
     flags: Vec<(RecordingId, vpt_domain::review::ReviewFlag)>,

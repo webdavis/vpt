@@ -20,6 +20,7 @@ pub struct WorkDelta {
     pub relations: Option<super::RelationChange>,
     pub tags: Option<super::TagChange>,
     pub tag_rename: Option<super::TagRename>,
+    pub learned_tags: Option<super::LearnedTagChange>,
     pub vocabulary: Option<super::VocabularyPublication>,
     pub resolution: Option<super::FlagResolutionChange>,
     pub notes: Vec<super::NoteChange>,

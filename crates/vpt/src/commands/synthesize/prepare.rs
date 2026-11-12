@@ -120,6 +120,7 @@ pub(super) fn delta(
         });
     delta.tags = tags.tags;
     delta.vocabulary = tags.vocabulary;
+    delta.learned_tags = tags.learned;
     accepted.vocabulary_publication = delta.vocabulary.as_ref().map(|value| value.entry.clone());
     delta.proposal = Some(ProposalChange::Accept(Box::new(accepted)));
     Ok(Prepared {

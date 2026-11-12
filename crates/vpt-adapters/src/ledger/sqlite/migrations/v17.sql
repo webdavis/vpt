@@ -1,0 +1,3 @@
+CREATE TABLE learned_tags (
+    key TEXT PRIMARY KEY NOT NULL CHECK(length(CAST(key AS BLOB)) BETWEEN 1 AND 262144)
+);

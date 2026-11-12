@@ -1,4 +1,5 @@
 use super::{errors, prepare::Context};
+mod prune;
 mod renames;
 mod vocabulary;
 use vpt_application::ports::*;
@@ -11,6 +12,7 @@ use vpt_protocol::error::ErrorDocument;
 pub(super) struct Changes {
     pub tags: Option<TagChange>,
     pub vocabulary: Option<VocabularyPublication>,
+    pub learned: Option<LearnedTagChange>,
     pub rejections: Vec<tags::Rejected>,
     pub renamed: Vec<usize>,
 }
@@ -128,6 +130,7 @@ pub(super) fn apply(
             });
         }
     }
+    let drop = prune::candidates(expected.as_deref(), &tags, input, context)?;
     let change = (expected.as_ref() != Some(&tags)).then(|| TagChange {
         recording: input.record.id.clone(),
         expected,
@@ -139,11 +142,17 @@ pub(super) fn apply(
         index: indices[rejected.index],
         reason: rejected.reason,
     }));
-    let vocabulary =
-        vocabulary::prepare(&context.settings.tags.known_tags_path, &selection.learn, at)?;
+    let (vocabulary, learned) = vocabulary::prepare(
+        &context.settings.tags.known_tags_path,
+        &selection.learn,
+        &drop,
+        context.ledger,
+        at,
+    )?;
     Ok(Changes {
         tags: change,
         vocabulary,
+        learned,
         rejections,
         renamed,
     })

@@ -49,7 +49,7 @@ pub(super) fn run(root: &crate::RootDir) {
     })
     .unwrap();
     let upgraded = SqliteLedger::open(root).unwrap();
-    assert_eq!(upgraded.schema_version().unwrap(), 16);
+    assert_eq!(upgraded.schema_version().unwrap(), 17);
     assert_eq!(upgraded.note_at(&note.target).unwrap(), Some(note));
     assert_eq!(upgraded.pending_exports().unwrap(), history);
     assert_eq!(upgraded.pending_publications().unwrap(), publications);

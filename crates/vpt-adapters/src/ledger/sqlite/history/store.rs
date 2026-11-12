@@ -81,6 +81,7 @@ pub(super) fn step(
         crate::ledger::sqlite::notes::apply(transaction, delta, facts)?;
         crate::ledger::sqlite::tags::apply(transaction, delta, facts)?;
         crate::ledger::sqlite::tags::apply_rename(transaction, delta)?;
+        crate::ledger::sqlite::tags::apply_learned(transaction, delta)?;
         crate::ledger::sqlite::relations::apply(transaction, delta, facts)?;
         recordings::apply_commit(transaction, &delta.commit)?;
         crate::ledger::sqlite::engine_outputs::apply(transaction, delta)?;

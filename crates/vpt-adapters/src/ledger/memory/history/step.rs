@@ -41,6 +41,7 @@ pub(super) fn apply(
     super::super::notes::apply(state, delta, facts)?;
     super::super::tags::apply(state, delta, facts)?;
     super::super::tags::apply_rename(state, delta)?;
+    super::super::tags::apply_learned(state, delta)?;
     super::super::relations::apply(state, delta, facts)?;
     apply_commit(state, &delta.commit)?;
     super::super::engine_outputs::apply(state, delta);
