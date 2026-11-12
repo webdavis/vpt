@@ -1,5 +1,5 @@
 use super::*;
-use vpt_domain::proposal::Owner;
+use vpt_domain::proposal::{CheckedAction, CheckedClaim, Owner};
 use vpt_protocol::proposal::{self as protocol, Claim, ProposalDocument, Relation, Tag};
 
 pub(super) fn encode(proposal: &CheckedProposal) -> Result<String, LedgerError> {
@@ -19,6 +19,17 @@ pub(super) fn encode(proposal: &CheckedProposal) -> Result<String, LedgerError> 
     for action in &proposal.actions {
         if let Some(Owner::Other(Some(name))) = &action.owner {
             text(name)?;
+        }
+        if let Some(checked) = &action.due {
+            let due = &checked.due;
+            text(&due.date)?;
+            text(due.time.as_deref().unwrap_or_default())?;
+            if due.source_references.len() > 256 {
+                return Err(invalid());
+            }
+            for source in &due.source_references {
+                text(source)?;
+            }
         }
     }
     for checked in proposal.claims() {
@@ -81,6 +92,11 @@ fn action(action: &CheckedAction) -> protocol::Action {
         owner: action.owner.as_ref().map(|owner| match owner {
             Owner::Me => protocol::Owner::Me,
             Owner::Other(name) => protocol::Owner::Other(name.clone()),
+        }),
+        due: action.due.as_ref().map(|checked| protocol::Due {
+            date: checked.due.date.clone(),
+            time: checked.due.time.clone(),
+            sources: checked.due.source_references.clone(),
         }),
     }
 }

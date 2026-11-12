@@ -151,3 +151,39 @@ fn an_action_owner_round_trips_and_a_blank_name_is_refused() {
         assert!(decoded(&value).is_err());
     }
 }
+
+#[test]
+fn a_due_date_must_be_a_calendar_date_with_an_optional_clock_time() {
+    let mut value = document();
+    for due in [
+        json!({"date": "2024-02-29", "sources": ["00:00-00:02"]}),
+        json!({"date": "2026-11-19", "time": "23:59", "sources": []}),
+    ] {
+        value["actions"][0]["due"] = due;
+        let result = decoded(&value).unwrap();
+        assert_eq!(serde_json::to_value(&result.document).unwrap(), value);
+    }
+    value["actions"][0]["due"] = json!({"date": "2026-11-19", "time": null, "future": 1});
+    assert_eq!(
+        decoded(&value).unwrap().diagnostics,
+        ["unknown additive proposal field: actions.due.future"]
+    );
+    for (date, time) in [
+        ("2026-02-29", None),
+        ("2026-13-01", None),
+        ("26-11-19", None),
+        ("2026-11-19T15:00", None),
+        ("2026/11/19", None),
+        ("２０２６-11-19", None),
+        ("2026-11-19", Some("24:00")),
+        ("2026-11-19", Some("15:00:00")),
+        ("2026-11-19", Some("3pm")),
+    ] {
+        value["actions"][0]["due"] = json!({"date": date, "time": time, "sources": []});
+        assert_eq!(
+            decoded(&value),
+            Err(ProposalDecodeError::Invalid("due date")),
+            "{date} {time:?}"
+        );
+    }
+}

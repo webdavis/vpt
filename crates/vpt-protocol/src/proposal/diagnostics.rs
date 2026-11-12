@@ -12,7 +12,7 @@ pub(super) fn unknown_fields(value: &Value) -> Vec<String> {
     );
     for (key, known) in [
         ("summary", &["text", "sources"][..]),
-        ("actions", &["text", "sources", "owner"][..]),
+        ("actions", &["text", "sources", "owner", "due"][..]),
         ("tags", &["tag", "reason"][..]),
         ("relations", &["kind", "target", "reason"][..]),
     ] {
@@ -20,6 +20,16 @@ pub(super) fn unknown_fields(value: &Value) -> Vec<String> {
             for item in items {
                 collect(item, &format!("{key}."), known, &mut fields);
             }
+        }
+    }
+    if let Some(actions) = value["actions"].as_array() {
+        for action in actions {
+            collect(
+                &action["due"],
+                "actions.due.",
+                &["date", "time", "sources"],
+                &mut fields,
+            );
         }
     }
     fields

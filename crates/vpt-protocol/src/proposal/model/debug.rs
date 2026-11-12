@@ -23,6 +23,7 @@ impl fmt::Debug for Action {
         f.debug_struct("Action")
             .field("sources", &self.sources.len())
             .field("owner", &self.owner.is_some())
+            .field("due", &self.due.as_ref().map(|due| due.sources.len()))
             .finish()
     }
 }

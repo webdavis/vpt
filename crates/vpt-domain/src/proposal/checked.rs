@@ -1,5 +1,5 @@
-use super::{Claim, Owner, Related, Tag};
-use crate::grounding::GroundedClaim;
+use super::{Claim, Due, Owner, Related, Tag};
+use crate::grounding::{Finding, GroundedClaim};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct CheckedProposal {
@@ -20,6 +20,22 @@ pub struct CheckedClaim {
 pub struct CheckedAction {
     pub claim: CheckedClaim,
     pub owner: Option<Owner>,
+    pub due: Option<CheckedDue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CheckedDue {
+    pub due: Due,
+    pub grounding: GroundedClaim,
+}
+
+impl CheckedDue {
+    pub fn withheld(&self) -> bool {
+        matches!(
+            self.grounding.finding,
+            Some(Finding::Unsourced | Finding::BadReference)
+        )
+    }
 }
 
 impl CheckedProposal {
