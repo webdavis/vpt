@@ -60,20 +60,20 @@ fn both_note_profiles_include_audio_and_complete_provenance_with_either_link_sty
                     .check_owner(&record.id, artifact.stage.as_str())
                     .unwrap();
                 for field in [
-                    "vptSchema: 1\n".into(),
-                    format!("vptRecording: \"{}\"\n", record.id),
-                    format!("vptStage: \"{}\"\n", artifact.stage.as_str()),
+                    "vpt-schema: 1\n".into(),
+                    format!("vpt-recording: \"{}\"\n", record.id),
+                    format!("vpt-stage: \"{}\"\n", artifact.stage.as_str()),
                     format!(
-                        "vptCapturedAt: \"{}\"\n",
+                        "vpt-captured-at: \"{}\"\n",
                         record.captured_at.rfc3339_with(record.captured_offset)
                     ),
-                    format!("vptDurationSecs: {}\n", record.duration_secs),
-                    "vptLanguage: \"en-US\"\n".into(),
-                    "vptEngines:\n  - \"fixture:test\"\n  - \"comparison:second\"\n".into(),
-                    "vptOpenFlags: 1\n".into(),
-                    "vptDiagnostics: 0\n".into(),
-                    "vptReadability: false\n".into(),
-                    "vptSuggestedTags: []\n".into(),
+                    format!("vpt-duration-secs: {}\n", record.duration_secs),
+                    "vpt-language: \"en-US\"\n".into(),
+                    "vpt-engines:\n  - \"fixture:test\"\n  - \"comparison:second\"\n".into(),
+                    "vpt-open-flags: 1\n".into(),
+                    "vpt-diagnostics: 0\n".into(),
+                    "vpt-readability: false\n".into(),
+                    "vpt-suggested-tags: []\n".into(),
                 ] {
                     assert!(
                         artifact.text.contains(&field),
@@ -81,8 +81,8 @@ fn both_note_profiles_include_audio_and_complete_provenance_with_either_link_sty
                         artifact.text
                     );
                 }
-                assert!(!artifact.text.contains("createdDate:"));
-                assert!(!artifact.text.contains("createdTime:"));
+                assert!(!artifact.text.contains("created-date:"));
+                assert!(!artifact.text.contains("created-time:"));
                 if profile == "obsidian" {
                     let hub = if artifact.stage == NoteStage::Transcript {
                         "transcripts"
@@ -96,7 +96,7 @@ fn both_note_profiles_include_audio_and_complete_provenance_with_either_link_sty
                     };
                     let date = artifact.first_written.rfc3339_with(artifact.write_offset);
                     let prefix = format!(
-                        "---\naliases:\n  - \"title-7\"\nreference: \"{audio}\"\nhub: \"{hub}\"\ntags: []\nstatus: \"active\"\ndescription: \"Voice memo recorded 2026-08-24\"\nstartDate: \"{}\"\n",
+                        "---\naliases:\n  - \"title-7\"\nreference: \"{audio}\"\nhub: \"{hub}\"\ntags: []\nstatus: \"active\"\ndescription: \"Voice memo recorded 2026-08-24\"\nstart-date: \"{}\"\n",
                         date.split('T').next().unwrap()
                     );
                     assert!(artifact.text.starts_with(&prefix), "{}", artifact.text);

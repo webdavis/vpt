@@ -76,7 +76,7 @@ fn analysis_pin_is_read_without_publishing_pending_bytes() {
     note.target = sandbox.path().join("home/.vpt/analysis/pinned-analysis.md");
     note.text = note
         .text
-        .replace("vptStage: \"transcript\"", "vptStage: \"analysis\"");
+        .replace("vpt-stage: \"transcript\"", "vpt-stage: \"analysis\"");
     let stores = vpt_adapters::FilesystemStores::open(&[]).unwrap();
     note.digest = stores.digest_bytes(note.text.as_bytes());
     let ledger =

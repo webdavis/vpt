@@ -128,7 +128,7 @@ fn analyze_publishes_first_analysis_and_saves_findings_with_exact_input() {
     assert!(ledger.pending_publications().unwrap().is_empty());
     for note in [transcript, analysis] {
         assert_eq!(fs::read_to_string(note.target).unwrap(), note.text);
-        assert!(note.text.contains("vptOpenFlags: 1"));
+        assert!(note.text.contains("vpt-open-flags: 1"));
     }
     assert!(!stdout(&output).contains("private words"));
     assert!(!stdout(&output).contains("private agent"));

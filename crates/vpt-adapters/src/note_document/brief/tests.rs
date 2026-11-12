@@ -50,7 +50,7 @@ fn document(title: &str, tags: &[&str]) -> (OccasionId, String) {
 #[test]
 fn rewriting_a_brief_preserves_operator_text_properties_and_tags() {
     let (id, source) = document("Private old title", &["planning"]);
-    let source = source.replacen("---\n","---\nstatus: archived\nstartDate: '2025-01-02'\ndescription: |\n  Private description\ncustom: 'Private property' # keep\nvptOld: stale\n",1)
+    let source = source.replacen("---\n","---\nstatus: archived\nstart-date: '2025-01-02'\ndescription: |\n  Private description\ncustom: 'Private property' # keep\nvpt-old: stale\n",1)
         .replace("  - \"planning\"\n","  - \"planning\"\n  - \"personal\"\n")
         .replace(markdown::START,&format!("Private prose above\n{}",markdown::START));
     let source = format!("{source}Private prose below\n");
@@ -60,7 +60,7 @@ fn rewriting_a_brief_preserves_operator_text_properties_and_tags() {
     let updated = parsed.rewrite(&replacement, &["planning".into()]).unwrap();
     for preserved in [
         "status: archived\n",
-        "startDate: '2025-01-02'\n",
+        "start-date: '2025-01-02'\n",
         "description: |\n  Private description\n",
         "custom: 'Private property' # keep\n",
         "Private prose above\n",
@@ -68,7 +68,7 @@ fn rewriting_a_brief_preserves_operator_text_properties_and_tags() {
     ] {
         assert!(updated.contains(preserved), "{preserved}");
     }
-    assert!(!updated.contains("vptOld"));
+    assert!(!updated.contains("vpt-old"));
     assert!(!updated.contains("Private old title"));
     assert!(updated.contains("Private new title"));
     assert!(updated.contains("personal"));
@@ -91,7 +91,7 @@ fn brief_rewrites_refuse_foreign_identity_schema_and_broken_markers() {
         parsed.rewrite(&source.replace(id.as_str(), foreign.as_str()), &[]),
         Err(NoteError::Identity)
     );
-    let newer = source.replace("vptSchema: 1", "vptSchema: 2");
+    let newer = source.replace("vpt-schema: 1", "vpt-schema: 2");
     let newer = Document::parse(&newer).unwrap();
     assert_eq!(newer.check_owner(&id), Err(NoteError::UnsupportedSchema(2)));
     assert_eq!(
@@ -104,7 +104,7 @@ fn brief_rewrites_refuse_foreign_identity_schema_and_broken_markers() {
             markdown::START,
             &format!("{}\n{}", markdown::START, markdown::START),
         ),
-        source.replace("vptKind: \"brief\"", "vptKind: \"analysis\""),
+        source.replace("vpt-kind: \"brief\"", "vpt-kind: \"analysis\""),
     ] {
         assert!(Document::parse(&source).is_err());
     }
@@ -115,7 +115,7 @@ fn flow_frontmatter_and_duplicate_identity_keys_follow_the_same_ownership_rules(
     let (id, source) = document("Private old title", &[]);
     let body = source.splitn(3, "---\n").nth(2).unwrap();
     let source = format!(
-        "---\n{{vptSchema: 1, vptKind: brief, vptOccasion: '{}', tags: [personal], custom: 'Private property'}}\n---\n{body}",
+        "---\n{{vpt-schema: 1, vpt-kind: brief, vpt-occasion: '{}', tags: [personal], custom: 'Private property'}}\n---\n{body}",
         id.as_str()
     );
     let (_, replacement) = document("Private new title", &["planning"]);
@@ -128,8 +128,8 @@ fn flow_frontmatter_and_duplicate_identity_keys_follow_the_same_ownership_rules(
     assert!(updated.contains("Private new title"));
     Document::parse(&updated).unwrap().check_owner(&id).unwrap();
     let duplicate = source.replace(
-        "vptOccasion:",
-        &format!("vptOccasion: '{}', vptOccasion:", id.as_str()),
+        "vpt-occasion:",
+        &format!("vpt-occasion: '{}', vpt-occasion:", id.as_str()),
     );
     assert!(matches!(
         Document::parse(&duplicate),

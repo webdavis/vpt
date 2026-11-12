@@ -12,7 +12,7 @@ pub(in crate::note_document) fn update(
     let header = if let Some(field) = document
         .fields
         .iter()
-        .find(|field| field.key == "vptOpenFlags")
+        .find(|field| field.key == "vpt-open-flags")
     {
         let node = &document.tree.nodes[field.value_node];
         let mut changes: Vec<_> = properties::tags(
@@ -40,7 +40,7 @@ pub(in crate::note_document) fn update(
             .as_bytes()
             .get(document.tree.nodes[document.tree.root].span.start)
             == Some(&b'{');
-        additions::append(&mut header, &[format!("vptOpenFlags: {count}")], flow)?;
+        additions::append(&mut header, &[format!("vpt-open-flags: {count}")], flow)?;
         header
     };
     let size = document.source.len() - source.len() + header.len();

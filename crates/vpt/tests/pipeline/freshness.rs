@@ -51,8 +51,8 @@ fn changed_rendered_input_rechecks_transcript_before_analysis_and_then_skips_bot
         .note(&row.id, NoteStage::Analysis)
         .unwrap()
         .unwrap();
-    assert!(transcript.text.contains("vptOpenFlags: 1"));
-    assert!(analysis.text.contains("vptOpenFlags: 1"));
+    assert!(transcript.text.contains("vpt-open-flags: 1"));
+    assert!(analysis.text.contains("vpt-open-flags: 1"));
     assert_eq!(analysis::calls(&sandbox, "agent.calls"), 2);
     let next = json(&invoke(&sandbox, &[]));
     assert_eq!(next["analyzed"], serde_json::json!([]));

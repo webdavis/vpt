@@ -15,7 +15,7 @@ pub(crate) fn invalid_note_documents_refuse_without_state_or_history(
                 note.digest = hash(note.text.as_bytes());
             }
             3 => {
-                note.text = note.text.replace("vptSchema: 1", "vptSchema: 2");
+                note.text = note.text.replace("vpt-schema: 1", "vpt-schema: 2");
                 note.digest = hash(note.text.as_bytes());
             }
             4 => note.managed_tags = vec!["managed".into(); 257],

@@ -8,7 +8,7 @@ const ID: &str = "2026-08-24T144736-4f3ab19c02de";
 const BODY: &str = "# Filename\n\n<!-- vpt:links start -->\n<!-- vpt:links end -->\n\n<!-- vpt:content start -->\n## Transcript\n\n[00:00] hello\n<!-- vpt:content end -->\n";
 
 fn document(extra: &str) -> String {
-    format!("---\nvptSchema: 1\nvptRecording: {ID}\nvptStage: transcript\n{extra}---\n{BODY}")
+    format!("---\nvpt-schema: 1\nvpt-recording: {ID}\nvpt-stage: transcript\n{extra}---\n{BODY}")
 }
 
 #[test]
@@ -16,7 +16,7 @@ fn reads_block_and_flow_metadata_with_unicode_quoted_keys_and_tags() {
     for source in [
         document("aliases: [café, 世界]\n\"tags\": [invoice, 'operator/tag']\n"),
         format!(
-            "---\n{{vptSchema: 1, vptRecording: '{ID}', vptStage: transcript, tags: [invoice, 'operator/tag']}}\n---\n{BODY}"
+            "---\n{{vpt-schema: 1, vpt-recording: '{ID}', vpt-stage: transcript, tags: [invoice, 'operator/tag']}}\n---\n{BODY}"
         ),
     ] {
         let parsed = Document::parse(&source).unwrap();
@@ -36,7 +36,7 @@ fn reads_block_and_flow_metadata_with_unicode_quoted_keys_and_tags() {
 
 #[test]
 fn future_schema_is_readable_but_never_rewritable() {
-    let source = document("").replace("vptSchema: 1", "vptSchema: 2");
+    let source = document("").replace("vpt-schema: 1", "vpt-schema: 2");
     let parsed = Document::parse(&source).unwrap();
     assert_eq!(parsed.schema, 2);
     assert_eq!(
@@ -63,13 +63,13 @@ fn foreign_identity_stage_missing_and_duplicate_keys_are_refused() {
         Err(NoteError::Stage)
     );
     for source in [
-        document("vptSchema: 1\n"),
-        document("'vptSchema': 1\n"),
-        valid.replace("vptSchema: 1\n", ""),
-        valid.replace("vptSchema: 1", "vptSchema: '1'"),
-        valid.replace("vptStage: transcript", "vptStage: unknown"),
-        valid.replace("vptSchema: 1", "vptSchema: true"),
-        valid.replace("vptSchema: 1", "vptSchema: 0"),
+        document("vpt-schema: 1\n"),
+        document("'vpt-schema': 1\n"),
+        valid.replace("vpt-schema: 1\n", ""),
+        valid.replace("vpt-schema: 1", "vpt-schema: '1'"),
+        valid.replace("vpt-stage: transcript", "vpt-stage: unknown"),
+        valid.replace("vpt-schema: 1", "vpt-schema: true"),
+        valid.replace("vpt-schema: 1", "vpt-schema: 0"),
         valid.replace(ID, "private invalid identity"),
         document("tags: [one, [nested]]\n"),
         document("status: one\nstatus: two\n"),
@@ -81,7 +81,7 @@ fn foreign_identity_stage_missing_and_duplicate_keys_are_refused() {
 #[test]
 fn aliases_can_supply_metadata_without_unbounded_expansion() {
     let source = format!(
-        "---\nversion: &version 1\nidentity: &identity {ID}\nvptSchema: *version\nvptRecording: *identity\nvptStage: transcript\nmytags: &tags [invoice, personal]\ntags: *tags\n---\n{BODY}"
+        "---\nversion: &version 1\nidentity: &identity {ID}\nvpt-schema: *version\nvpt-recording: *identity\nvpt-stage: transcript\nmytags: &tags [invoice, personal]\ntags: *tags\n---\n{BODY}"
     );
     let parsed = Document::parse(&source).unwrap();
     assert_eq!(parsed.tags, ["invoice", "personal"]);

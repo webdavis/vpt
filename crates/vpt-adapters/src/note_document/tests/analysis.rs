@@ -102,10 +102,10 @@ fn generated_analysis_rewrites_keep_operator_fields_tags_and_prose_in_both_profi
         assert!(rendered.ends_with("Operator ending\r\n"));
         assert!(rendered.contains(input.links));
         assert_eq!(rendered.matches("<!-- vpt:content end -->").count(), 1);
-        assert!(rendered.contains("vptOpenFlags: 2\r\n"));
+        assert!(rendered.contains("vpt-open-flags: 2\r\n"));
         if obsidian {
             assert!(rendered.contains("status: 'reviewed' # keep\r\n"));
-            assert!(rendered.contains("startDate: \"1969-12-31\"\r\n"));
+            assert!(rendered.contains("start-date: \"1969-12-31\"\r\n"));
             assert!(rendered.contains("hub: \"[[analysis]]\"\r\n"));
         }
         assert_eq!(parsed.rewrite(&replacement, &next_tags).unwrap(), rendered);

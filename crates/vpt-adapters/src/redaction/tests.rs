@@ -55,7 +55,7 @@ fn links_images_wikilinks_and_reference_definitions_keep_only_visible_labels() {
 }
 #[test]
 fn raw_html_comments_and_metadata_are_discarded_with_hidden_element_content() {
-    let source = "---\nvptRecording: PRIVATE\ntitle: PRIVATE\n---\n\nPublic <span style='display:none'>PRIVATE <b>hidden</b></span> visible <!-- PRIVATE comment -->.\n\n<script>PRIVATE script</script>\n\nAfter <br> line.\n";
+    let source = "---\nvpt-recording: PRIVATE\ntitle: PRIVATE\n---\n\nPublic <span style='display:none'>PRIVATE <b>hidden</b></span> visible <!-- PRIVATE comment -->.\n\n<script>PRIVATE script</script>\n\nAfter <br> line.\n";
     let output = run(source, ContentOptions::default());
     assert!(!output.text.contains("PRIVATE"));
     assert!(!output.text.contains("hidden"));

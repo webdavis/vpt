@@ -43,8 +43,8 @@ fn first_analysis_prepares_both_notes_and_findings_without_publishing() {
             let transcript_path = settings.stores.transcripts.join("source.md");
             input.notes[0].target = transcript_path.clone();
             input.notes[0].text = input.notes[0].text.replace(
-                "vptStage: transcript\n",
-                "vptStage: transcript\nvptOpenFlags: 1\n",
+                "vpt-stage: transcript\n",
+                "vpt-stage: transcript\nvpt-open-flags: 1\n",
             );
             input.notes[0].text.push_str("\nOperator ending\n");
             input.notes[0].digest = stores.digest_bytes(input.notes[0].text.as_bytes());
@@ -102,7 +102,7 @@ fn first_analysis_prepares_both_notes_and_findings_without_publishing() {
             assert!(transcript.artifact.text.contains("- Analysis:"));
             assert!(transcript.artifact.text.ends_with("\nOperator ending\n"));
             for note in &delta.notes {
-                assert!(note.artifact.text.contains("vptOpenFlags: 3"));
+                assert!(note.artifact.text.contains("vpt-open-flags: 3"));
                 assert_eq!(
                     note.artifact.digest,
                     stores.digest_bytes(note.artifact.text.as_bytes())
@@ -116,7 +116,12 @@ fn first_analysis_prepares_both_notes_and_findings_without_publishing() {
                 0
             );
             if profile == "obsidian" {
-                assert!(analysis.artifact.text.contains("startDate: \"1969-12-31\""));
+                assert!(
+                    analysis
+                        .artifact
+                        .text
+                        .contains("start-date: \"1969-12-31\"")
+                );
             }
         }
     }

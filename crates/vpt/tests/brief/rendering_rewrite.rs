@@ -13,12 +13,12 @@ fn brief_rewrites_preserve_operator_fields_tags_prose_and_creation_metadata() {
             let saved = ledger(&sandbox).brief(&id).unwrap().unwrap();
             let mut edited = saved
                 .text
-                .replace("vptSchema:", "operator: keep\nvptSchema:")
-                .replace("tags:\n", "tags:\n  - \"operator-tag\"\n");
+                .replace("vpt-schema:", "operator: keep\nvpt-schema:")
+                .replace("\ntags:\n", "\ntags:\n  - \"operator-tag\"\n");
             if profile == "obsidian" {
                 let start = edited
                     .lines()
-                    .find(|line| line.starts_with("startDate:"))
+                    .find(|line| line.starts_with("start-date:"))
                     .unwrap()
                     .to_owned();
                 let description = edited
@@ -27,7 +27,7 @@ fn brief_rewrites_preserve_operator_fields_tags_prose_and_creation_metadata() {
                     .unwrap()
                     .to_owned();
                 edited = edited
-                    .replace(&start, "startDate: \"1999-12-31\"")
+                    .replace(&start, "start-date: \"1999-12-31\"")
                     .replace(&description, "description: \"Operator description\"")
                     .replace("status: \"active\"", "status: \"paused\"");
             }
@@ -54,7 +54,7 @@ fn brief_rewrites_preserve_operator_fields_tags_prose_and_creation_metadata() {
             assert_eq!(after.text.matches("<!-- vpt:brief end -->").count(), 1);
             if profile == "obsidian" {
                 for field in [
-                    "startDate: \"1999-12-31\"",
+                    "start-date: \"1999-12-31\"",
                     "status: \"paused\"",
                     "description: \"Operator description\"",
                 ] {
@@ -86,7 +86,7 @@ fn empty_brief_persists_every_empty_section_and_provenance_field() {
     assert!(saved.snapshot.pack.sources.is_empty());
     assert!(saved.snapshot.pack.items.is_empty());
     assert!(saved.snapshot.tasks.is_empty());
-    assert!(saved.text.contains("vptNotes: []"));
+    assert!(saved.text.contains("vpt-notes: []"));
     for section in [
         "Unresolved",
         "From your notes",

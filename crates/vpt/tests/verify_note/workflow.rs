@@ -29,7 +29,7 @@ fn unchanged_claim_keeps_its_correction_and_changed_claim_starts_open() {
     success(&invoke(&sandbox, &artifact.target, record.id.as_str()));
     let corrected = note::saved(&sandbox, &record);
     assert!(corrected.text.contains("[corrected: Private correction]"));
-    assert!(corrected.text.contains("vptOpenFlags: 0\n"));
+    assert!(corrected.text.contains("vpt-open-flags: 0\n"));
     success(&invoke(&sandbox, &artifact.target, record.id.as_str()));
     assert_eq!(note::saved(&sandbox, &record).text, corrected.text);
     let edited = corrected

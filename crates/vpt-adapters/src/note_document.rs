@@ -87,13 +87,13 @@ impl<'a> Document<'a> {
                 .map(|field| field.value_node)
                 .ok_or(NoteError::Frontmatter)
         };
-        let schema = tree.integer(get("vptSchema")?)?;
+        let schema = tree.integer(get("vpt-schema")?)?;
         if schema == 0 {
             return Err(NoteError::Frontmatter);
         }
-        let recording = RecordingId::parse(tree.string(get("vptRecording")?)?)
+        let recording = RecordingId::parse(tree.string(get("vpt-recording")?)?)
             .map_err(|_| NoteError::Identity)?;
-        let stage = tree.string(get("vptStage")?)?.to_owned();
+        let stage = tree.string(get("vpt-stage")?)?.to_owned();
         if !matches!(stage.as_str(), "transcript" | "analysis") {
             return Err(NoteError::Stage);
         }

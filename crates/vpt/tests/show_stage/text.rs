@@ -6,7 +6,7 @@ pub(super) fn text_fields(result: &serde_json::Value, stage: &str) {
         content.starts_with(&format!("# vpt {stage} copy, ")),
         "{content}"
     );
-    assert!(!content.contains("vptStage"), "{content}");
+    assert!(!content.contains("vpt-stage"), "{content}");
     let stem = result["note"].as_str().unwrap().rsplit('/').next().unwrap();
     assert_eq!(
         result["title"],

@@ -2,16 +2,16 @@ use super::*;
 
 #[test]
 fn unicode_spacing_inside_a_plain_owned_value_is_replaced_with_that_value() {
-    let source = document("vptLanguage: en-US\u{a0}\n");
+    let source = document("vpt-language: en-US\u{a0}\n");
     let rewritten = Document::parse(&source)
         .unwrap()
-        .rewrite(&document("vptLanguage: en-GB\n"), &[])
+        .rewrite(&document("vpt-language: en-GB\n"), &[])
         .unwrap();
     let parsed = Document::parse(&rewritten).unwrap();
     let field = parsed
         .fields
         .iter()
-        .find(|field| field.key == "vptLanguage")
+        .find(|field| field.key == "vpt-language")
         .unwrap();
     assert_eq!(parsed.tree.string(field.value_node).unwrap(), "en-GB");
 }
@@ -19,21 +19,21 @@ fn unicode_spacing_inside_a_plain_owned_value_is_replaced_with_that_value() {
 #[test]
 fn removing_a_flow_field_keeps_comments_between_it_and_the_next_field() {
     let source = format!(
-        "---\n{{vptSchema: 1, vptObsolete: old\n# keep this comment,\n, vptRecording: '{ID}', vptStage: transcript}}\n---\n{BODY}"
+        "---\n{{vpt-schema: 1, vpt-obsolete: old\n# keep this comment,\n, vpt-recording: '{ID}', vpt-stage: transcript}}\n---\n{BODY}"
     );
     let rewritten = Document::parse(&source)
         .unwrap()
         .rewrite(&document(""), &[])
         .unwrap();
     assert!(rewritten.contains("\n# keep this comment,\n"));
-    assert!(!rewritten.contains("vptObsolete"));
+    assert!(!rewritten.contains("vpt-obsolete"));
     assert!(Document::parse(&rewritten).is_ok());
 }
 
 #[test]
 fn vpt_values_take_the_new_type_even_when_the_old_value_has_an_explicit_yaml_tag() {
-    let source = document("vptOpenFlags: &count !!str 'six'\ncustomCount: *count\n");
-    let replacement = document("vptOpenFlags: 3\n");
+    let source = document("vpt-open-flags: &count !!str 'six'\ncustomCount: *count\n");
+    let replacement = document("vpt-open-flags: 3\n");
     let rewritten = Document::parse(&source)
         .unwrap()
         .rewrite(&replacement, &[])
@@ -42,7 +42,7 @@ fn vpt_values_take_the_new_type_even_when_the_old_value_has_an_explicit_yaml_tag
     let field = parsed
         .fields
         .iter()
-        .find(|field| field.key == "vptOpenFlags")
+        .find(|field| field.key == "vpt-open-flags")
         .unwrap();
     assert_eq!(parsed.tree.integer(field.value_node).unwrap(), 3);
     assert!(rewritten.contains("customCount: *count"));
@@ -51,7 +51,7 @@ fn vpt_values_take_the_new_type_even_when_the_old_value_has_an_explicit_yaml_tag
 #[test]
 fn encoded_yaml_tag_names_remain_tags_when_their_values_are_rewritten() {
     let source = document("");
-    let replacement = document("vptExtra: !<tag:example%3E> payload\n");
+    let replacement = document("vpt-extra: !<tag:example%3E> payload\n");
     let rewritten = Document::parse(&source)
         .unwrap()
         .rewrite(&replacement, &[])
@@ -64,18 +64,18 @@ fn encoded_yaml_tag_names_remain_tags_when_their_values_are_rewritten() {
 fn flow_comment_commas_are_preserved_and_never_mistaken_for_separators() {
     for tail in [" # a comment,\n", ", # trailing separator,\n"] {
         let source = format!(
-            "---\n{{vptSchema: 1, vptRecording: '{ID}', vptStage: transcript{tail}}}\n---\n{BODY}"
+            "---\n{{vpt-schema: 1, vpt-recording: '{ID}', vpt-stage: transcript{tail}}}\n---\n{BODY}"
         );
         let rewritten = Document::parse(&source)
             .unwrap()
-            .rewrite(&document("vptOpenFlags: 3\n"), &[])
+            .rewrite(&document("vpt-open-flags: 3\n"), &[])
             .unwrap();
         assert!(rewritten.contains(tail), "{tail:?}: {rewritten:?}");
         let parsed = Document::parse(&rewritten).unwrap();
         let field = parsed
             .fields
             .iter()
-            .find(|field| field.key == "vptOpenFlags")
+            .find(|field| field.key == "vpt-open-flags")
             .unwrap();
         assert_eq!(parsed.tree.integer(field.value_node).unwrap(), 3);
     }
@@ -84,7 +84,7 @@ fn flow_comment_commas_are_preserved_and_never_mistaken_for_separators() {
 #[test]
 fn indented_frontmatter_crlf_and_anchored_operator_values_survive() {
     let source = document(
-        "custom: &mine [café, 世界]\naliases: *mine\nvptOpenFlags: &count 1\ncountAlias: *count\n",
+        "custom: &mine [café, 世界]\naliases: *mine\nvpt-open-flags: &count 1\ncountAlias: *count\n",
     )
     .lines()
     .map(|line| {
@@ -103,19 +103,19 @@ fn indented_frontmatter_crlf_and_anchored_operator_values_survive() {
     .join("\r\n");
     let rewritten = Document::parse(&source)
         .unwrap()
-        .rewrite(&document("vptOpenFlags: 2\nvptLanguage: en-US\n"), &[])
+        .rewrite(&document("vpt-open-flags: 2\nvpt-language: en-US\n"), &[])
         .unwrap();
     assert!(rewritten.contains("  custom: &mine [café, 世界]\r\n  aliases: *mine\r\n"));
-    assert!(rewritten.contains("vptOpenFlags: &count 2"));
+    assert!(rewritten.contains("vpt-open-flags: &count 2"));
     assert!(rewritten.contains("  countAlias: *count\r\n"));
     assert!(Document::parse(&rewritten).is_ok());
 }
 
 #[test]
 fn rewrite_preserves_operator_fields_comments_and_all_prose_outside_regions() {
-    let source = document("status: complete # mine\ndescription: |\n  café\n  second line\nstartDate: 2020-01-01\ncustom: {nested: [one, two]}\n# keep this comment\nvptObsolete: remove-me\ntags: [old-auto, manual]\n")
+    let source = document("status: complete # mine\ndescription: |\n  café\n  second line\nstart-date: 2020-01-01\ncustom: {nested: [one, two]}\n# keep this comment\nvpt-obsolete: remove-me\ntags: [old-auto, manual]\n")
         .replace("# Filename", "# Renamed heading\nMy preface") + "\nMy ending\n";
-    let replacement = document("status: active\ndescription: new\nstartDate: 2026-09-29\nvptOpenFlags: 3\ntags: [new-auto]\n").replace("[00:00] hello", "[00:00] changed");
+    let replacement = document("status: active\ndescription: new\nstart-date: 2026-09-29\nvpt-open-flags: 3\ntags: [new-auto]\n").replace("[00:00] hello", "[00:00] changed");
     let rewritten = Document::parse(&source)
         .unwrap()
         .rewrite(&replacement, &["old-auto".into()])
@@ -123,7 +123,7 @@ fn rewrite_preserves_operator_fields_comments_and_all_prose_outside_regions() {
     for retained in [
         "status: complete # mine\n",
         "description: |\n  café\n  second line\n",
-        "startDate: 2020-01-01\n",
+        "start-date: 2020-01-01\n",
         "custom: {nested: [one, two]}\n",
         "# keep this comment\n",
         "# Renamed heading\nMy preface",
@@ -131,7 +131,7 @@ fn rewrite_preserves_operator_fields_comments_and_all_prose_outside_regions() {
     ] {
         assert!(rewritten.contains(retained), "{retained}");
     }
-    assert!(!rewritten.contains("vptObsolete"));
+    assert!(!rewritten.contains("vpt-obsolete"));
     assert!(!rewritten.contains("old-auto"));
     let parsed = Document::parse(&rewritten).unwrap();
     assert_eq!(parsed.tags, ["manual", "new-auto"]);
@@ -144,15 +144,15 @@ fn rewrite_preserves_operator_fields_comments_and_all_prose_outside_regions() {
 #[test]
 fn flow_frontmatter_preserves_operator_values_and_remains_valid_after_key_removal() {
     let source = format!(
-        "---\n{{vptSchema: 1, custom: 'café, 世界', vptObsolete: [old], vptRecording: '{ID}', tags: [manual], vptStage: transcript}}\n---\n{BODY}"
+        "---\n{{vpt-schema: 1, custom: 'café, 世界', vpt-obsolete: [old], vpt-recording: '{ID}', tags: [manual], vpt-stage: transcript}}\n---\n{BODY}"
     );
-    let replacement = document("vptOpenFlags: 2\ntags: [invoice]\n");
+    let replacement = document("vpt-open-flags: 2\ntags: [invoice]\n");
     let rewritten = Document::parse(&source)
         .unwrap()
         .rewrite(&replacement, &[])
         .unwrap();
     assert!(rewritten.contains("custom: 'café, 世界'"));
-    assert!(!rewritten.contains("vptObsolete"));
+    assert!(!rewritten.contains("vpt-obsolete"));
     assert_eq!(
         Document::parse(&rewritten).unwrap().tags,
         ["manual", "invoice"]
@@ -178,7 +178,7 @@ fn rewrite_refuses_a_foreign_or_malformed_replacement_without_changing_the_sourc
 
 #[test]
 fn unchanged_managed_values_preserve_the_existing_yaml_layout() {
-    let source = document("vptEngines:\n  - \"custom:test\"\nvptOpenFlags: 0\ntags: []\n");
+    let source = document("vpt-engines:\n  - \"custom:test\"\nvpt-open-flags: 0\ntags: []\n");
     let rewritten = Document::parse(&source)
         .unwrap()
         .rewrite(&source, &[])
@@ -190,14 +190,14 @@ fn unchanged_managed_values_preserve_the_existing_yaml_layout() {
 fn managed_alias_values_are_still_replaced_when_the_resolved_value_is_unchanged() {
     for value in ["*names", "[*model]"] {
         let source = document(&format!(
-            "custom: &model custom:test\nengines: &names [custom:test]\nvptEngines: {value}\n"
+            "custom: &model custom:test\nengines: &names [custom:test]\nvpt-engines: {value}\n"
         ));
-        let replacement = document("vptEngines: [custom:test]\n");
+        let replacement = document("vpt-engines: [custom:test]\n");
         let rewritten = Document::parse(&source)
             .unwrap()
             .rewrite(&replacement, &[])
             .unwrap();
-        assert!(rewritten.contains("vptEngines: [\"custom:test\"]"));
+        assert!(rewritten.contains("vpt-engines: [\"custom:test\"]"));
         assert!(rewritten.contains("custom: &model custom:test"));
     }
 }

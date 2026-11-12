@@ -12,7 +12,7 @@ pub(super) fn recording(source: &str) -> Result<Option<RecordingId>, NoteError> 
     let fields = header::fields(&tree)?;
     fields
         .iter()
-        .find(|field| field.key == "vptRecording")
+        .find(|field| field.key == "vpt-recording")
         .map(|field| {
             RecordingId::parse(tree.string(field.value_node)?).map_err(|_| NoteError::Identity)
         })

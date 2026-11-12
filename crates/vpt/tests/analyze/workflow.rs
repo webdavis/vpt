@@ -155,7 +155,7 @@ fn analysis_preserves_operator_edits_and_review_resolutions_on_repeated_claims()
         .unwrap();
     fs::write(
         &initial.target,
-        initial.text.replace("tags: []", "tags: [operator]") + "\nOperator ending\n",
+        initial.text.replace("\ntags: []", "\ntags: [operator]") + "\nOperator ending\n",
     )
     .unwrap();
     let flag = ledger(&sandbox)
@@ -187,7 +187,7 @@ fn analysis_preserves_operator_edits_and_review_resolutions_on_repeated_claims()
     assert!(next.text.ends_with("\nOperator ending\n"));
     assert!(next.text.contains("operator"));
     assert!(next.text.contains("[corrected: Operator correction]"));
-    assert!(next.text.contains("vptOpenFlags: 0"));
+    assert!(next.text.contains("vpt-open-flags: 0"));
     assert_eq!(
         ledger(&sandbox)
             .review_snapshot(&record.id)

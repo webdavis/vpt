@@ -75,7 +75,7 @@ fn correction_publishes_note_and_known_term_without_changing_accepted_words() {
     );
     let note = &after.notes[0];
     assert!(note.text.contains("[corrected: Private correction]"));
-    assert!(note.text.contains("vptOpenFlags: 2"));
+    assert!(note.text.contains("vpt-open-flags: 2"));
     assert_eq!(std::fs::read_to_string(&note.target).unwrap(), note.text);
     assert_eq!(
         std::fs::read_to_string(&terms).unwrap(),
@@ -122,7 +122,7 @@ fn dismissal_and_diagnostic_confirmation_close_flags_without_learning_terms() {
     assert!(
         inputs(&sandbox, &id).notes[0]
             .text
-            .contains("vptDiagnostics: 0")
+            .contains("vpt-diagnostics: 0")
     );
 }
 

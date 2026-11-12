@@ -21,11 +21,11 @@ fn artifact(kind: ArtifactKind, path: &Path) -> RetentionArtifact {
 fn note(kind: ArtifactKind) -> String {
     if kind == ArtifactKind::Brief {
         format!(
-            "---\nvptSchema: 1\nvptKind: brief\nvptOccasion: {ID}\n---\nOperator prose\n<!-- vpt:brief start -->\nSaved pack\n<!-- vpt:brief end -->\n"
+            "---\nvpt-schema: 1\nvpt-kind: brief\nvpt-occasion: {ID}\n---\nOperator prose\n<!-- vpt:brief start -->\nSaved pack\n<!-- vpt:brief end -->\n"
         )
     } else {
         format!(
-            "---\nvptSchema: 1\nvptStage: {}\nvptRecording: {ID}\n---\nOperator prose\n<!-- vpt:links start -->\n<!-- vpt:links end -->\n<!-- vpt:content start -->\nSaved content\n<!-- vpt:content end -->\n",
+            "---\nvpt-schema: 1\nvpt-stage: {}\nvpt-recording: {ID}\n---\nOperator prose\n<!-- vpt:links start -->\n<!-- vpt:links end -->\n<!-- vpt:content start -->\nSaved content\n<!-- vpt:content end -->\n",
             kind.as_str()
         )
     }
@@ -75,7 +75,7 @@ fn notes_require_matching_identity_stage_schema_and_complete_markers() {
         for text in [
             original.replace(ID, "2026-10-01T090000-ffffffffffff"),
             original.replace(kind.as_str(), "foreign"),
-            original.replace("vptSchema: 1", "vptSchema: 2"),
+            original.replace("vpt-schema: 1", "vpt-schema: 2"),
             original.replace(" end -->", " lost -->"),
             original.replace(" start -->", " lost -->"),
         ] {

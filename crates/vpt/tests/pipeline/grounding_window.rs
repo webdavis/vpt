@@ -132,7 +132,7 @@ fn changed_grounding_window_rechecks_analysis_without_agent_and_keeps_review_dec
                     .unwrap()
                     .unwrap()
                     .text
-                    .contains(&format!("vptOpenFlags: {count}"))
+                    .contains(&format!("vpt-open-flags: {count}"))
             );
         }
         assert!(

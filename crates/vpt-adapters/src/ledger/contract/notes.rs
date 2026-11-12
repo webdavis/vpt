@@ -18,7 +18,7 @@ use vpt_domain::{
 pub(crate) fn artifact() -> NoteArtifact {
     let recording = record(81).id;
     let text = format!(
-        "---\nvptSchema: 1\nvptRecording: {recording}\nvptStage: transcript\ntags: [managed, manual]\n---\n# Pinned\n<!-- vpt:links start -->\n<!-- vpt:links end -->\n<!-- vpt:content start -->\nPrivate café transcript\n<!-- vpt:content end -->\nOperator prose\n"
+        "---\nvpt-schema: 1\nvpt-recording: {recording}\nvpt-stage: transcript\ntags: [managed, manual]\n---\n# Pinned\n<!-- vpt:links start -->\n<!-- vpt:links end -->\n<!-- vpt:content start -->\nPrivate café transcript\n<!-- vpt:content end -->\nOperator prose\n"
     );
     let content = crate::note_document::Document::parse(&text)
         .unwrap()
@@ -221,7 +221,7 @@ pub(crate) fn transcript_and_analysis_commit_with_one_recording_receipt(
     analysis.target = "/analysis/pinned.md".into();
     analysis.text = analysis
         .text
-        .replace("vptStage: transcript", "vptStage: analysis");
+        .replace("vpt-stage: transcript", "vpt-stage: analysis");
     analysis.digest = hash(analysis.text.as_bytes());
     both.commit.publications.push(DirtyPublication {
         target: analysis.target.clone(),

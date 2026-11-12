@@ -20,7 +20,7 @@ fn correcting_a_renamed_note_preserves_operator_edits_and_invalidates_analysis()
         original
             .text
             .clone()
-            .replace("tags: []", "tags: [manual]\ncustom: 'keep'")
+            .replace("\ntags: []", "\ntags: [manual]\ncustom: 'keep'")
             + "\nOperator prose\n",
     )
     .unwrap();

@@ -29,7 +29,7 @@ fn default_tag_limits_keep_proposal_order_and_operator_tags_in_both_profiles() {
                 let operator = format!("operator-{}", artifact.stage.as_str());
                 let edited = artifact
                     .text
-                    .replace("tags: []", &format!("tags: [{operator}]"))
+                    .replace("\ntags: []", &format!("\ntags: [{operator}]"))
                     + "\nOperator ending\n";
                 fs::write(&artifact.target, edited).unwrap();
             }
@@ -104,7 +104,7 @@ fn default_tag_limits_keep_proposal_order_and_operator_tags_in_both_profiles() {
                 let suggested_value = artifact
                     .text
                     .lines()
-                    .find_map(|line| line.strip_prefix("vptSuggestedTags: "))
+                    .find_map(|line| line.strip_prefix("vpt-suggested-tags: "))
                     .unwrap();
                 let actual: Vec<String> = serde_json::from_str(suggested_value).unwrap();
                 assert_eq!(actual, suggested);

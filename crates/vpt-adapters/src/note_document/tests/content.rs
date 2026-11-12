@@ -3,16 +3,16 @@ use super::*;
 #[test]
 fn updating_flag_count_preserves_other_yaml_values_comments_and_source_lines() {
     for source in [
-        document("vptOpenFlags: 9 # keep comment\ncustom: 'operator'\n"),
+        document("vpt-open-flags: 9 # keep comment\ncustom: 'operator'\n"),
         format!(
-            "---\n{{vptSchema: 1, vptRecording: '{ID}', vptStage: transcript, vptOpenFlags: 9, custom: 'operator'}}\n---\n{BODY}"
+            "---\n{{vpt-schema: 1, vpt-recording: '{ID}', vpt-stage: transcript, vpt-open-flags: 9, custom: 'operator'}}\n---\n{BODY}"
         ),
     ] {
         let source = source.replace('\n', "\r\n");
         let parsed = Document::parse(&source).unwrap();
         assert_eq!(
             parsed.with_open_flags(2).unwrap(),
-            source.replace("vptOpenFlags: 9", "vptOpenFlags: 2")
+            source.replace("vpt-open-flags: 9", "vpt-open-flags: 2")
         );
         let first = source
             .lines()
@@ -27,7 +27,7 @@ fn updating_flag_count_preserves_other_yaml_values_comments_and_source_lines() {
             .unwrap()
             .with_open_flags(0)
             .unwrap()
-            .contains("vptOpenFlags: 0\n")
+            .contains("vpt-open-flags: 0\n")
     );
 }
 
@@ -38,7 +38,7 @@ fn annotation_update_preserves_every_byte_outside_the_content_region() {
             "{}\nOperator ending\n",
             document("# Private comment\ntags: [operator/tag]\nstatus: 'reviewed'\n")
         )
-        .replace("vptStage: transcript", &format!("vptStage: {stage}"))
+        .replace("vpt-stage: transcript", &format!("vpt-stage: {stage}"))
         .replace(
             "<!-- vpt:links end -->",
             "- [Link](private.md)\n<!-- vpt:links end -->",
@@ -64,7 +64,7 @@ fn annotation_update_preserves_every_byte_outside_the_content_region() {
 
 #[test]
 fn content_only_updates_refuse_future_schema_and_marker_injection() {
-    let future = document("").replace("vptSchema: 1", "vptSchema: 2");
+    let future = document("").replace("vpt-schema: 1", "vpt-schema: 2");
     assert_eq!(
         Document::parse(&future)
             .unwrap()

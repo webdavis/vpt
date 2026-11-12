@@ -83,7 +83,7 @@ fn brief_resolves_occasion_sources_and_keeps_operator_prose() {
     assert_eq!(brief["provenance"]["engines"], json!(["apple:fixture"]));
     let content = brief["content"].as_str().unwrap();
     assert!(content.ends_with("Operator brief text.\n"));
-    assert!(!content.contains("vptOccasion:"));
+    assert!(!content.contains("vpt-occasion:"));
     assert_eq!(fixture::snapshot(&sandbox), before);
 }
 

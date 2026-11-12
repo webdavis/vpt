@@ -70,7 +70,9 @@ fn transcript_copy_keeps_operator_prose_and_drops_frontmatter() {
         .note(&id, NoteStage::Transcript)
         .unwrap()
         .unwrap();
-    let edited = note.text.replace("tags:", "privateHeader: secret\ntags:")
+    let edited = note
+        .text
+        .replace("\ntags:", "\nprivateHeader: secret\ntags:")
         + "\nOperator prose must survive.\n";
     fs::write(&note.target, &edited).unwrap();
     let before = fixture::snapshot(&sandbox);
@@ -177,7 +179,7 @@ fn analysis_copy_uses_the_current_owned_body_and_refuses_a_changed_owner() {
         &saved.target,
         saved
             .text
-            .replace("vptStage: \"analysis\"", "vptStage: \"transcript\""),
+            .replace("vpt-stage: \"analysis\"", "vpt-stage: \"transcript\""),
     )
     .unwrap();
     let changed = show(&sandbox, id.as_str(), "analysis");
