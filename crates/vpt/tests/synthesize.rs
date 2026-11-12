@@ -28,6 +28,8 @@ mod progress;
 mod protocol;
 #[path = "synthesize/recovery.rs"]
 mod recovery;
+#[path = "synthesize/redo.rs"]
+mod redo;
 #[path = "synthesize/related.rs"]
 mod related;
 mod report_hook;
