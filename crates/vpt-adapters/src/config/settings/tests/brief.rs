@@ -64,6 +64,13 @@ fn context_provider_scopes_and_credentials_reach_settings_without_private_debug_
 }
 
 #[test]
+fn dam_max_age_defaults_to_none_and_reaches_settings() {
+    assert!(settings("").unwrap().context.dam_max_age.is_empty());
+    let settings = settings("[context.dam]\nmax_age=['gcal=15m']").unwrap();
+    assert_eq!(settings.context.dam_max_age, ["gcal=15m"]);
+}
+
+#[test]
 fn context_scopes_and_provider_names_are_bounded_and_validated() {
     for config in [
         "[context]\ntype='Private invalid'".to_owned(),

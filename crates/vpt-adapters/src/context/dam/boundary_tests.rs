@@ -42,6 +42,7 @@ fn agenda_shows_and_task_queries_share_one_deadline_and_keep_a_completed_half() 
     }
     let snapshot = collect::run(
         &["dam".into()],
+        &[],
         &request(&["calendar/".into()], &["one/".into(), "two/".into()]),
         |argv, budget| {
             budgets.push(budget.as_secs());
@@ -72,6 +73,7 @@ fn pretty_printed_error_stderr_and_provider_scope_escape_fail_the_half() {
     ] {
         let snapshot = collect::run(
             &["dam".into()],
+            &[],
             &ContextRequest {
                 window: None,
                 tasks: true,
@@ -97,6 +99,7 @@ fn overlapping_scopes_deduplicate_equal_rows_and_refuse_conflicting_versions() {
         let mut calls = 0;
         let snapshot = collect::run(
             &["dam".into()],
+            &[],
             &ContextRequest {
                 window: None,
                 tasks: true,
@@ -140,6 +143,7 @@ fn calendar_results_use_exact_inclusive_start_and_exclusive_end() {
     request.tasks = false;
     let snapshot = collect::run(
         &["dam".into()],
+        &[],
         &request,
         |argv, _| {
             if argv[1] == "show" {
@@ -166,6 +170,7 @@ fn aggregate_overflow_still_returns_a_valid_bounded_context_document() {
         let events = [event.clone()];
         collect::run(
             &["dam".into()],
+            &[],
             &request,
             |argv, _| Ok(answer(argv, &events)),
             Instant::now,
@@ -198,6 +203,7 @@ fn interruption_aborts_collection_instead_of_becoming_publishable_absence() {
         let clock = Cell::new(Instant::now());
         let result = collect::run(
             &["dam".into()],
+            &[],
             &request(&["calendar/".into()], &["work/".into()]),
             |_, _| {
                 clock.set(clock.get() + elapsed);
@@ -222,6 +228,7 @@ fn an_empty_window_fails_the_calendar_without_spawning() {
     let mut calls = 0;
     let snapshot = collect::run(
         &["dam".into()],
+        &[],
         &request,
         |_, _| {
             calls += 1;

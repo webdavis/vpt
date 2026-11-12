@@ -17,6 +17,7 @@ pub(super) fn from_table(table: &Table) -> Result<ContextSettings, ConfigError> 
         calendars: scopes(table, "context.calendars")?,
         projects: scopes(table, "context.projects")?,
         dam_command: strings(table, "context.dam.command")?,
+        dam_max_age: strings(table, "context.dam.max_age")?,
         google: GoogleCredentials {
             client_id: text(table, "context.google.client_id")?.into(),
             client_secret: text(table, "context.google.client_secret")?.into(),

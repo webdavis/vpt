@@ -1184,8 +1184,11 @@ selection is in the request, never a filter afterwards.
   become participants by email, its `organizer` supplies a name when present, `subject` is the title,
   `oid` the identity, `labels` the tags, and `start` and `end` give `at` and `duration_secs`; an
   all-day date starts at midnight in the system zone. Cancelled events are dropped. `--no-pull` is
-  always passed so a brief never triggers a remote pull. A non-zero exit or an error document on
-  stderr is a collector failure.
+  always passed so a brief never triggers a remote pull. Each `[context.dam] max_age` value
+  (`<remote>=<duration>`) is passed to `agenda` as `--max-age`; dam's exit 4 with rule `stale_remote`
+  fails the calendar half with the fixed detail `calendar data is stale: dam refused it under
+  context.dam.max_age`, which `--upcoming` reports in its error. Any other non-zero exit or an error
+  document on stderr is a collector failure.
 - `google`: a native reader over the Google Calendar events list endpoint with `singleEvents=true` and
   `timeMin` and `timeMax` bracketing the window, per configured calendar id, following `nextPageToken`
   until exhausted within the same scope; because `timeMin` filters on end time, vpt applies the trigger
@@ -1635,6 +1638,7 @@ canary-secret test.
 | `context.calendars`                  | string list    | `[]`                                                                      | dam path prefixes or Google calendar ids; empty refuses                                                      |
 | `context.projects`                   | string list    | `[]`                                                                      | dam task path prefixes; empty refuses                                                                        |
 | `context.dam.command`                | string list    | `["dam"]`                                                                 | how dam is invoked                                                                                           |
+| `context.dam.max_age`                | string list    | `[]`                                                                      | `<remote>=<duration>` bounds passed to `dam agenda --max-age`; empty passes none                             |
 | `context.google.client_id`           | string, secret | `""`                                                                      | OAuth client id                                                                                              |
 | `context.google.client_secret`       | string, secret | `""`                                                                      | OAuth client secret                                                                                          |
 | `context.google.refresh_token`       | string, secret | `""`                                                                      | a refresh token bearing only the read-only events scope                                                      |

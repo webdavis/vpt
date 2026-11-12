@@ -56,6 +56,12 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "how dam is invoked",
     ),
     key(
+        "context.dam.max_age",
+        Kind::TextList,
+        "[]",
+        "<remote>=<duration> freshness bounds passed to dam agenda as --max-age",
+    ),
+    key(
         "context.google.client_id",
         Kind::Secret,
         "\"\"",

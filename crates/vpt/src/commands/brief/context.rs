@@ -30,6 +30,7 @@ pub(super) fn validate(settings: &Settings) -> Result<(), Box<ErrorDocument>> {
         ContextSource::None => Ok(()),
         ContextSource::Dam => DamContext {
             command: &settings.context.dam_command,
+            max_age: &settings.context.dam_max_age,
         }
         .validate(&request)
         .map_err(config_error),
@@ -64,6 +65,7 @@ pub(super) fn collect_window(
         ContextSource::None => Ok(ContextSnapshot::default()),
         ContextSource::Dam => DamContext {
             command: &settings.context.dam_command,
+            max_age: &settings.context.dam_max_age,
         }
         .collect(&request)
         .map_err(collection_error),

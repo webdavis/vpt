@@ -8,6 +8,7 @@ pub(super) fn output(result: Result<Outcome, SpawnError>) -> Result<Vec<u8>, Fai
     })?;
     match outcome.status {
         Status::Exited(0) => (),
+        Status::Exited(4) if refused_as_stale(&outcome.stderr) => return Err(Failure::Stale),
         Status::DeadlineExceeded => return Err(Failure::Deadline),
         Status::Interrupted => return Err(Failure::Interrupted),
         _ => return Err(Failure::Exit),
@@ -28,6 +29,12 @@ pub(super) fn output(result: Result<Outcome, SpawnError>) -> Result<Vec<u8>, Fai
         }
     }
     Ok(outcome.stdout)
+}
+
+fn refused_as_stale(stderr: &[u8]) -> bool {
+    stderr.len() <= 65_536
+        && vpt_protocol::read_bounded(stderr, &vpt_protocol::Limits::incoming())
+            .is_ok_and(|v| v["error"]["rule"] == "stale_remote")
 }
 
 pub(super) fn merge(target: &mut ContextSnapshot, input: ContextSnapshot) -> Result<(), Failure> {

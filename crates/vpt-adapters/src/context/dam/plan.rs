@@ -21,6 +21,7 @@ pub(super) struct Plan {
 
 pub(super) fn make(
     command: &[String],
+    max_age: &[String],
     request: &ContextRequest<'_>,
 ) -> Result<Plan, ContextConfigError> {
     if (request.window.is_some() || request.tasks) && !crate::arguments::valid(command, 65_536) {
@@ -34,6 +35,11 @@ pub(super) fn make(
         "context.calendars",
     )?;
     let projects = scopes(request.projects, request.tasks, "context.projects")?;
+    if !max_age.iter().all(|bound| fresh_bound(bound)) {
+        return Err(ContextConfigError {
+            key: "context.dam.max_age",
+        });
+    }
     let calendar = request.window.map(|window| {
         if window.end <= window.start {
             return Err(Failure::Invalid);
@@ -53,8 +59,12 @@ pub(super) fn make(
             "--to",
             &window.end.rfc3339(),
         ];
+        let mut args = args.map(String::from).to_vec();
+        for bound in max_age {
+            args.extend(["--max-age".into(), bound.clone()]);
+        }
         Ok(Agenda {
-            args: args.map(String::from).to_vec(),
+            args,
             scopes: calendars,
         })
     });
@@ -109,4 +119,13 @@ fn scopes(
         }
     }
     Ok(result)
+}
+
+fn fresh_bound(bound: &str) -> bool {
+    bound.len() <= 256
+        && !bound.starts_with('-')
+        && !bound.chars().any(|c| c.is_whitespace() || c.is_control())
+        && bound
+            .split_once('=')
+            .is_some_and(|(remote, age)| !remote.is_empty() && !age.is_empty())
 }

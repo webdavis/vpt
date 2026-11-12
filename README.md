@@ -336,6 +336,12 @@ read-only queries. Zoned and all-day dam events preserve their local date and da
 an all-day event uses the system zone, as dam does. Exact start and end bounds select the returned
 occasions, and cancelled events are left out.
 
+Set `context.dam.max_age` to bound how old dam's calendar data may be, such as
+`max_age = ["gcal=15m"]` under `[context.dam]`. Each value is passed to `dam agenda` as `--max-age`;
+the default, an empty list, passes none. When dam refuses with `stale_remote`, the calendar half
+fails with the detail `calendar data is stale: dam refused it under context.dam.max_age`, and
+`--upcoming` exits with that detail instead of writing nothing.
+
 `context.type = google` reads the configured calendar IDs through native HTTPS with rustls. Set
 `context.google.client_id`, `client_secret`, and `refresh_token`; the access-token response must grant
 only `calendar.events.readonly`. Recurring events are expanded within the requested window, with at

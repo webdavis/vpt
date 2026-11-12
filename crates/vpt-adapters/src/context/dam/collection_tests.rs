@@ -46,12 +46,15 @@ fn collector_reads_the_selected_agenda_window_then_shows_only_selected_events() 
         "*) printf '%s' '{\"objects\":[]}';;\n",
         "esac",
     ));
-    let snapshot = DamContext { command: &command }
-        .collect(&request(
-            &["calendar/work/".into(), "calendar/home/".into()],
-            &["work/team/".into()],
-        ))
-        .unwrap();
+    let snapshot = DamContext {
+        command: &command,
+        max_age: &[],
+    }
+    .collect(&request(
+        &["calendar/work/".into(), "calendar/home/".into()],
+        &["work/team/".into()],
+    ))
+    .unwrap();
     assert_eq!(snapshot.status.calendar, ContextStatus::Present);
     assert_eq!(snapshot.status.tasks, ContextStatus::Present);
     assert_eq!(snapshot.occasions.len(), 1);
@@ -86,7 +89,11 @@ fn missing_and_query_injected_selections_refuse_before_spawning() {
         ),
     ] {
         assert_eq!(
-            DamContext { command: &command }.collect(&request(&calendars, &projects)),
+            DamContext {
+                command: &command,
+                max_age: &[]
+            }
+            .collect(&request(&calendars, &projects)),
             Err(ContextConfigError { key }.into())
         );
     }
@@ -98,9 +105,12 @@ fn failed_calendar_does_not_discard_successful_tasks_or_expose_provider_stderr()
     let (_dir, command) = fixture(
         "case \"$2\" in agenda) echo '{\"error\":\"PRIVATE token\"}' >&2; printf '%s' '{\"events\":[]}';; *) printf '%s' '{\"objects\":[]}' ;; esac",
     );
-    let snapshot = DamContext { command: &command }
-        .collect(&request(&["calendar/".into()], &["work/".into()]))
-        .unwrap();
+    let snapshot = DamContext {
+        command: &command,
+        max_age: &[],
+    }
+    .collect(&request(&["calendar/".into()], &["work/".into()]))
+    .unwrap();
     assert!(matches!(
         snapshot.status.calendar,
         ContextStatus::Failed { .. }
@@ -112,14 +122,69 @@ fn failed_calendar_does_not_discard_successful_tasks_or_expose_provider_stderr()
 #[test]
 fn unrequested_halves_need_no_selection_and_do_not_spawn() {
     let (dir, command) = fixture("echo invoked > \"$1\"");
-    let snapshot = DamContext { command: &command }
-        .collect(&ContextRequest {
-            window: None,
-            tasks: false,
-            calendars: &[],
-            projects: &[],
-        })
-        .unwrap();
+    let snapshot = DamContext {
+        command: &command,
+        max_age: &[],
+    }
+    .collect(&ContextRequest {
+        window: None,
+        tasks: false,
+        calendars: &[],
+        projects: &[],
+    })
+    .unwrap();
     assert_eq!(snapshot, ContextSnapshot::default());
+    assert!(!dir.path().join("calls").exists());
+}
+
+#[test]
+fn max_age_is_passed_to_agenda_and_a_stale_refusal_fails_only_the_calendar() {
+    let (dir, command) = fixture(concat!(
+        "log=$1; shift\nprintf '%s\\n' \"$@\" >> \"$log\"\n",
+        "case \"$1\" in\n",
+        "agenda) printf '%s' '{\"error\":{\"kind\":\"refused\",\"rule\":\"stale_remote\",\"message\":\"PRIVATE\",\"oids\":[]}}' >&2; exit 4;;\n",
+        "*) printf '%s' '{\"objects\":[]}';;\n",
+        "esac",
+    ));
+    let max_age = ["gcal=15m".into(), "work=1h".into()];
+    let snapshot = DamContext {
+        command: &command,
+        max_age: &max_age,
+    }
+    .collect(&request(&["calendar/".into()], &["work/".into()]))
+    .unwrap();
+    assert_eq!(
+        snapshot.status.calendar,
+        ContextStatus::Failed {
+            detail: Failure::Stale.detail().into()
+        }
+    );
+    assert!(Failure::Stale.detail().contains("stale"));
+    assert_eq!(snapshot.status.tasks, ContextStatus::Present);
+    assert!(!format!("{snapshot:?}").contains("PRIVATE"));
+    let calls = fs::read_to_string(dir.path().join("calls")).unwrap();
+    assert!(
+        calls.starts_with("agenda\npath:calendar/\n--json\n--no-pull\n--from\n2026-10-01T23:00:00Z\n--to\n2026-10-02T01:00:00Z\n--max-age\ngcal=15m\n--max-age\nwork=1h\nls\n"),
+        "{calls}"
+    );
+}
+
+#[test]
+fn malformed_max_age_refuses_before_spawning() {
+    let (dir, command) = fixture("echo invoked > \"$1\"");
+    for value in ["gcal", "=15m", "gcal=", "-x=1h", "gcal=15 m"] {
+        let max_age = [value.into()];
+        assert_eq!(
+            DamContext {
+                command: &command,
+                max_age: &max_age,
+            }
+            .collect(&request(&["calendar/".into()], &["work/".into()])),
+            Err(ContextConfigError {
+                key: "context.dam.max_age"
+            }
+            .into())
+        );
+    }
     assert!(!dir.path().join("calls").exists());
 }
