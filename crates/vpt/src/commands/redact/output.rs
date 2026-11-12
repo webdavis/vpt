@@ -22,6 +22,11 @@ impl Summary {
         }
     }
 }
+pub(crate) fn candidates(list: &[Candidate], shift: usize) -> serde_json::Value {
+    list.iter()
+        .map(|c| serde_json::json!({"token":c.token, "line":c.line + shift}))
+        .collect()
+}
 pub(crate) struct Written {
     pub release: ReleaseRecord,
     pub(super) summary: Summary,
@@ -31,12 +36,7 @@ impl Written {
     pub fn fields(&self) -> serde_json::Value {
         let release = &self.release;
         let summary = &self.summary;
-        let candidates: Vec<_> = self
-            .summary
-            .candidates
-            .iter()
-            .map(|c| serde_json::json!({"token":c.token, "line":c.line}))
-            .collect();
+        let candidates = candidates(&summary.candidates, 0);
         serde_json::json!({
             "id":release.recording.as_str(), "stage":release.stage.as_str(),
             "written":release.destination, "report":release.report_path, "masks":summary.masks,

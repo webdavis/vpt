@@ -582,8 +582,8 @@ Masking covers only what vpt was told about: the configured pattern classes, the
 `known-terms.txt`, and the names and aliases of indexed notes. A person or company named in a recording
 that is on none of those lists stays readable, in a released copy and under `vpt show --redact` alike.
 A redacted copy has its known items removed; it is not anonymous. Read it before sharing it, or confirm
-the names as terms first with `vpt confirm --term`. `vpt redact` lists the capitalized words that
-survived as `candidates` to help with that.
+the names as terms first with `vpt confirm --term`. `vpt redact` and `vpt show --redact` list the
+capitalized words that survived as `candidates`, each with its line, to help with that.
 
 Copies go to `[stores] released`, or the directory supplied with `--to`. Destinations inside private
 stores, state, configuration, or Voice Memos are refused. Existing copies are never overwritten;

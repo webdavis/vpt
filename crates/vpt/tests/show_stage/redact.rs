@@ -207,3 +207,45 @@ fn a_pending_note_publication_stops_both_views() {
     }
     assert_eq!(fixture::snapshot(&sandbox), before);
 }
+
+fn survivors(result: &serde_json::Value) -> Vec<String> {
+    let lines: Vec<_> = content(result).lines().collect();
+    let candidates = result["candidates"].as_array().unwrap();
+    candidates
+        .iter()
+        .map(|candidate| {
+            let token = candidate["token"].as_str().unwrap();
+            let line = candidate["line"].as_u64().unwrap() as usize;
+            assert!(lines[line - 1].contains(token), "{candidate}: {lines:?}");
+            token.to_owned()
+        })
+        .collect()
+}
+
+#[test]
+fn redacted_text_lists_the_capitalized_words_that_survived_at_their_emitted_line() {
+    let (sandbox, id) = configured("show-redact-candidates");
+    private(&sandbox);
+    super::text::analyze(
+        &sandbox,
+        &id,
+        r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[],"actions":[{"text":"Ask Alice to call Zelda","sources":[]}],"tags":[],"relations":[]}"#,
+    );
+    let labelled = survivors(&redacted(&sandbox, id.as_str(), "analysis"));
+    assert!(labelled.contains(&"Zelda".to_owned()), "{labelled:?}");
+    let mut config = fs::read_to_string(sandbox.config_path()).unwrap();
+    config.push_str("\n[share]\nsource_line = \"\"\n");
+    fs::write(sandbox.config_path(), config).unwrap();
+    let unlabelled = survivors(&json(&invoke(
+        &sandbox,
+        &[
+            "show",
+            id.as_str(),
+            "--stage",
+            "analysis",
+            "--redact",
+            "--json",
+        ],
+    )));
+    assert_eq!(unlabelled, labelled);
+}
