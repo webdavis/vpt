@@ -43,6 +43,7 @@ pub(super) fn run(
                     open_flags: p.open_flags,
                     reviewed: p.reviewed,
                 },
+                withhold_path: false,
             },
         );
     }

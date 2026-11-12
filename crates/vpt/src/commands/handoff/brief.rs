@@ -9,7 +9,7 @@ use vpt_domain::{
     occasion::OccasionId,
 };
 use vpt_protocol::error::ErrorDocument;
-pub(super) fn run(
+pub(crate) fn run(
     ledger: &SqliteLedger,
     roots: &Roots,
     id: &OccasionId,
@@ -88,6 +88,7 @@ pub(super) fn run(
                 open_flags: flags,
                 reviewed,
             },
+            withhold_path: false,
         },
     )
 }

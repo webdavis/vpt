@@ -123,13 +123,17 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
         Verb::Show {
             id,
             stage: Some(stage),
+            redact,
         } => commands::show::stage::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
             id,
             *stage,
+            *redact,
         ),
-        Verb::Show { id, stage: None } => match compose::ledger_from(
+        Verb::Show {
+            id, stage: None, ..
+        } => match compose::ledger_from(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
         ) {

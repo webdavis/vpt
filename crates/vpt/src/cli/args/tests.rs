@@ -91,6 +91,7 @@ fn every_stage_one_verb_decodes_its_arguments() {
             Verb::Show {
                 id: "memo".into(),
                 stage: None,
+                redact: false,
             },
         ),
         ("list", Verb::List { stage: None }),

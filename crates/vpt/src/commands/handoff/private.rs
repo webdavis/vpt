@@ -64,10 +64,11 @@ pub(super) fn run(
                 open_flags: flags,
                 reviewed: reviewed && note.digest == saved.digest,
             },
+            withhold_path: false,
         },
     )
 }
-pub(super) fn provenance(input: &NoteInputs, stage: NoteStage) -> (Vec<String>, u32, bool) {
+pub(crate) fn provenance(input: &NoteInputs, stage: NoteStage) -> (Vec<String>, u32, bool) {
     let mut flags = 0u32;
     let mut diagnostic = false;
     for flag in input

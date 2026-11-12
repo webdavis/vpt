@@ -2,8 +2,8 @@ mod errors;
 mod mutation;
 pub(crate) mod output;
 pub(crate) mod plan;
-mod prepare;
-mod source;
+pub(crate) mod prepare;
+pub(crate) mod source;
 mod unchanged;
 pub(crate) mod write;
 use crate::{

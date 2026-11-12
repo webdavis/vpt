@@ -214,6 +214,20 @@ including operator prose outside managed regions. Released selects the newest fi
 still exists and takes provenance from that release's saved snapshot; a changed copy is refused (3) and
 a release still pending is an operational error (1). A missing stage names the stages that exist.
 
+`--redact` with `--stage transcript|analysis` returns the stage's text with private details masked at
+call time by the same pipeline and `[share]` settings `vpt redact` uses: confirmed terms, indexed note
+names and aliases, the configured pattern classes, denied sections, and open flagged spans omitted or
+marked as `share.redact.flagged_spans` says. The text starts with the configured `share.source_line`, and
+`provenance.redacted` is true. The redacted document carries only that text: `segments`, `summary` and
+`actions` are absent, so nothing leaves outside the one masked text. For timecoded lines, set
+`share.keep_timecodes = true` and read the `[mm:ss]` lines in `content`. `note` is null and `title` names
+the recording ID, since a note's name can hold private words. `content_sha256` is the digest of the
+redacted `content` returned, so a caller can check what it received. A pending note publication stops it
+(1), as it does without `--redact`. Nothing is saved: no released copy, report, ledger row or event. Only
+the managed content region is masked, as with `vpt redact`. `--redact` without `--stage`, with `--stage
+released` (already redacted) or with `--stage brief` (not a redaction source; its quotes have no map to
+their recordings' flags) is a usage error (2).
+
 `vpt show <id> --stage transcript` also returns the accepted transcript's segments from saved state, each with
 `start` and `end` seconds, a `mm:ss` `timecode` and its `text` with review corrections applied.
 `vpt show <id> --stage analysis` also returns the accepted proposal's `summary` and `actions` lines in

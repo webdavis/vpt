@@ -1,7 +1,7 @@
-mod brief;
+pub(crate) mod brief;
 pub(crate) mod errors;
 mod file;
-mod output;
+pub(crate) mod output;
 pub(crate) mod private;
 mod released;
 use crate::{
