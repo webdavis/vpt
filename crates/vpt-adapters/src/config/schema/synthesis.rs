@@ -5,7 +5,7 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "synthesis.command",
         Kind::Argv,
         "[]",
-        "the agent command receives the full transcript and, through {known_tags} and {refused_tags}, tag names; empty disables synthesis only",
+        "the agent command receives the full transcript, the capture time through {captured_at} and, through {known_tags} and {refused_tags}, tag names; empty disables synthesis only",
     ),
     key(
         "synthesis.timeout_secs",

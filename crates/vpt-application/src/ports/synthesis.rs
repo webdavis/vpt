@@ -1,12 +1,18 @@
 use crate::{SynthesisSettings, tag_hints::TagHints};
 use std::path::Path;
-use vpt_domain::{digest::Sha256Digest, identity::RecordingId, proposal::Proposal};
+use vpt_domain::{
+    digest::Sha256Digest,
+    identity::RecordingId,
+    proposal::Proposal,
+    time::{UtcInstant, UtcOffset},
+};
 
 pub struct SynthesisRequest<'a> {
     pub settings: &'a SynthesisSettings,
     pub transcript: &'a Path,
     pub recording: &'a RecordingId,
     pub language: &'a str,
+    pub captured: (UtcInstant, UtcOffset),
     pub content: &'a str,
     pub tags: &'a TagHints,
 }

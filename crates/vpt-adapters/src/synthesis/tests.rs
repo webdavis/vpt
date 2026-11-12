@@ -31,6 +31,12 @@ fn request<'a>(
         recording,
         transcript: Path::new("/private/with spaces {language} $(Private).md"),
         language: "fr-CA",
+        captured: (
+            vpt_domain::time::UtcInstant {
+                secs: 1_787_000_000,
+            },
+            vpt_domain::time::UtcOffset { secs: -21_600 },
+        ),
         content: "  Private exact content\r\n[00:01] punctuation!\n",
         tags: &NO_TAGS,
     }

@@ -352,9 +352,13 @@ Requested briefs emit no automatic notification.
 
 `vpt synthesize <id> [--dry-run] [--json|--toon|--yaml]` uses the configured `[synthesis] command` argument list.
 An empty command disables synthesis and explicit invocation returns a configuration error. No model
-vendor is built in. The command receives `{transcript}`, `{id}`, `{language}`, `{known_tags}`, and
-`{refused_tags}` substitutions and exact rendered transcript content on stdin; the default deadline is
-600 seconds.
+vendor is built in. The command receives `{transcript}`, `{id}`, `{language}`, `{captured_at}`,
+`{known_tags}`, and `{refused_tags}` substitutions and exact rendered transcript content on stdin; the
+default deadline is 600 seconds.
+
+`{captured_at}` expands to the recording's capture time in its local offset, as in
+`2026-08-24T14:47:36-06:00`, so that the command can turn "by Thursday" into a date. It reaches only
+the arguments, never stdin, so it does not change the recorded input digest.
 
 `{known_tags}` expands to the indexed tags and `known-tags.txt` entries, most used first, each with
 the number of indexed notes that carry it, as in `invoice (14), garden-club (6)`. It lists at most 300

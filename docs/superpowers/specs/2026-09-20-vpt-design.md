@@ -955,7 +955,8 @@ directory commit them. Consequences vpt states rather than hides:
 `[synthesis] command` is an argv list, empty by default, which means synthesis is off: `vpt run` skips it
 and `vpt synthesize` refuses with exit 2. Automatic redaction is not part of that switch; it follows
 `[share] automatic` alone (section 8.5). When set, `vpt synthesize <id>` runs the command with
-`{transcript}` (the note path), `{id}`, `{language}`, `{known_tags}` and `{refused_tags}` substituted,
+`{transcript}` (the note path), `{id}`, `{language}`, `{captured_at}` (the capture time as RFC 3339 in
+its local offset), `{known_tags}` and `{refused_tags}` substituted,
 writes the transcript note's content region on the command's stdin, records the digest of exactly those bytes as the proposal's input digest
 (section 3.3), and reads one `vpt.proposal/1` document from its stdout within `[synthesis] timeout_secs`
 (default 600):
