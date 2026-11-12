@@ -84,6 +84,20 @@ fn check(key: &str, kind: Kind, value: &Value) -> Result<(), ConfigError> {
             Some(items) if items.iter().all(Value::is_str) => Ok(()),
             _ => Err(wrong()),
         },
+        Kind::ExitCodes => match value.as_array() {
+            Some(items) if items.iter().all(|item| item.as_integer().is_some()) => {
+                if items
+                    .iter()
+                    .filter_map(Value::as_integer)
+                    .all(|code| (1..=255).contains(&code))
+                {
+                    Ok(())
+                } else {
+                    Err(range("exit codes from 1 to 255"))
+                }
+            }
+            _ => Err(wrong()),
+        },
     }
 }
 

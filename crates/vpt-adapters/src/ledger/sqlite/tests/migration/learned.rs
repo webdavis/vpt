@@ -6,10 +6,10 @@ fn version_sixteen_upgrade_adds_an_empty_learned_tag_table() {
     let connection = Connection::open_in_memory().unwrap();
     migrations::migrate(&connection, || Ok(())).unwrap();
     connection
-        .execute_batch("DROP TABLE learned_tags; PRAGMA user_version=16;")
+        .execute_batch("DROP TABLE action_sends; DROP TABLE learned_tags; PRAGMA user_version=16;")
         .unwrap();
     migrations::migrate(&connection, || Ok(())).unwrap();
-    assert_eq!(migrations::current(&connection).unwrap(), 17);
+    assert_eq!(migrations::current(&connection).unwrap(), 18);
     assert_eq!(
         connection
             .query_row("SELECT count(*) FROM learned_tags", [], |row| row

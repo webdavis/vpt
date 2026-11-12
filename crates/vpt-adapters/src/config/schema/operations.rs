@@ -20,6 +20,18 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "recordings needing review in one run before one aggregate event",
     ),
     key(
+        "actions.command",
+        Kind::Argv,
+        "[]",
+        "runs once for each new or changed analysis action; see the README for its placeholders; empty sends nothing",
+    ),
+    key(
+        "actions.final_exit_codes",
+        Kind::ExitCodes,
+        "[]",
+        "exit codes of the actions command that mean the action is refused and is never sent again",
+    ),
+    key(
         "import.extract_command",
         Kind::Argv,
         "[\"ffmpeg\"]",

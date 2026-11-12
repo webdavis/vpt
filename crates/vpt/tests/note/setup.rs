@@ -14,6 +14,10 @@ pub(super) fn configured() -> (Sandbox, RecordingRecord) {
 }
 
 pub(super) fn configured_with(seeds: &[u8]) -> (Sandbox, Vec<RecordingRecord>) {
+    configured_saying(seeds, "um private words")
+}
+
+pub(super) fn configured_saying(seeds: &[u8], words: &str) -> (Sandbox, Vec<RecordingRecord>) {
     let sandbox = fixture::configured("note-write");
     let rows: Vec<_> = seeds
         .iter()
@@ -23,12 +27,12 @@ pub(super) fn configured_with(seeds: &[u8]) -> (Sandbox, Vec<RecordingRecord>) {
     let ledger =
         SqliteLedger::open(&RootDir::open(&sandbox.path().join("state/vpt")).unwrap()).unwrap();
     for row in &rows {
-        accept(&ledger, row);
+        accept(&ledger, row, words);
     }
     (sandbox, rows)
 }
 
-fn accept(ledger: &SqliteLedger, row: &RecordingRecord) {
+fn accept(ledger: &SqliteLedger, row: &RecordingRecord, words: &str) {
     let at = UtcInstant { secs: 50 };
     let accepted = AcceptedTranscript {
         checker_engine: Some(EngineMetadata {
@@ -60,9 +64,9 @@ fn accept(ledger: &SqliteLedger, row: &RecordingRecord) {
                 speaker: None,
                 start: 0.0,
                 end: 1.0,
-                text: "um private words".into(),
+                text: words.into(),
                 words: vec![Word {
-                    text: "um private words".into(),
+                    text: words.into(),
                     start: 0.0,
                     end: 1.0,
                     confidence: None,

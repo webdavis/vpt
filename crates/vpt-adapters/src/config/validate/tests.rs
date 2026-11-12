@@ -312,3 +312,22 @@ fn report_and_alert_hooks_reject_invalid_argv_without_leaking_values() {
         }
     }
 }
+
+#[test]
+fn final_exit_codes_accept_only_codes_a_command_can_exit_with() {
+    let key = "actions.final_exit_codes";
+    for value in ["[]", "[1]", "[2, 4, 255]"] {
+        assert_eq!(load(key, value), Ok(()), "{value}");
+    }
+    for value in ["[0]", "[256]", "[-1]"] {
+        assert_eq!(
+            load(key, value),
+            Err(out_of_range(key, "exit codes from 1 to 255")),
+            "{value}"
+        );
+    }
+    assert!(matches!(
+        load(key, "['2']"),
+        Err(ConfigError::WrongType { .. })
+    ));
+}

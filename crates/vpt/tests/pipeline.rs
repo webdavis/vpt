@@ -1,5 +1,7 @@
 #![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared command fixtures")]
+#[path = "pipeline/actions.rs"]
+mod actions;
 #[path = "pipeline/alerts.rs"]
 mod alerts;
 #[path = "pipeline/analysis.rs"]

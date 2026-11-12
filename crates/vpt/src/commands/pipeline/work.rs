@@ -70,7 +70,17 @@ pub(super) fn run<E: EventSink>(
     let stores = FilesystemStores::open(&paths)
         .map_err(|error| Box::new(contained_error(error)))?
         .with_private_roots(std::slice::from_ref(&context.roots.stores.engine_outputs));
-    stages::run(context, &stores, run, report, notices)?;
+    let staged = stages::run(context, &stores, run, report, notices);
+    let sent = crate::compose::actions::Delivery {
+        ledger: context.ledger,
+        settings: context.settings,
+        sink: context.sink,
+        warnings: context.warnings,
+        run,
+    }
+    .send(None)?;
+    report.actions = (!context.settings.actions_command.is_empty()).then_some(sent);
+    staged?;
     super::retention::run(context, &stores, run, report)
 }
 

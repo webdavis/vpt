@@ -1042,6 +1042,24 @@ withholds the date, which is saved with its finding but shown nowhere, and the a
 from its own sources, never the due date's. Tags and relations
 go through the stage 3 gates.
 
+An action reaches the configured `[actions] command`, an argument list run with no shell and with empty
+standard input, once per new or changed action. Placeholders: `{text}`, `{owner}` (`me`, `other` or
+`unknown`), `{owner_name}`, `{due}` (`<date>` or `<date>T<time>`), `{due_date}`, `{due_time}`, `{id}`,
+`{moment}` (the action's moment, or the bare recording id without a source), `{recording}`, `{note}`
+(the analysis note's path) and `{link}` (`obsidian://open?path=` or `file://` and the encoded note
+path). The due placeholders and `{owner_name}` are optional. An argument that is exactly an absent
+optional placeholder is dropped, together with the argument before it when that one starts with `-`,
+is not `--` and holds no placeholder; `-flag={optional}` with an absent value is dropped whole. The
+id is `<recording id>@<mm:ss>` from the first source, with `#2`, `#3`, ... for later actions starting
+in the same second, or `<recording id>#<n>` by order among actions without a source; it is
+wording-free. Accepting a proposal records each id with a SHA-256 over the text, owner and kept due
+date in `action_sends` in the same transaction: a new id or a changed digest is pending, an unchanged
+digest keeps its state. After publication `analyze` sends that recording's pending actions and `run`
+sends every recording's. Exit 0 marks the action sent and an exit code in `[actions]
+final_exit_codes` marks it refused, each with a work step; any other outcome leaves it pending and
+adds a warning. A dropped action is neither sent nor withdrawn. An empty command records and sends
+nothing.
+
 ### 8.2 verify-note
 
 `vpt verify-note <path> --recording <id>` checks a Markdown note against the transcript and the flags. It
@@ -1667,6 +1685,8 @@ canary-secret test.
 | `import.extract_command`             | string list    | `["ffmpeg"]`                                                              | audio extractor for `vpt import` of files other than `.m4a`; vpt appends its own arguments   |
 | `alert.command`                      | string list    | `[]`                                                                      | optional failure or review-needed command; receives `vpt.event/1` JSON on stdin; empty means logs only |
 | `alert.aggregate_after`              | int            | `3`                                                                       | recordings needing review in one run before one aggregate alert                                              |
+| `actions.command`                    | string list    | `[]`                                                                      | run once per new or changed analysis action with its placeholders; empty sends nothing |
+| `actions.final_exit_codes`         | int list       | `[]`                                                                      | exit codes meaning the action is refused for good; other failures are retried |
 | `retention.enabled`                  | bool           | `false`                                                                   | the opt-in retention run                                                                                     |
 | `retention.include_audio`            | bool           | `false`                                                                   | let the audio store expire                                                                                   |
 | `retention.hold.<store>`             | duration       | `0` for every store                                                       | files older than this move to the Trash; `0` never                                                           |

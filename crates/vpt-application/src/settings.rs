@@ -33,6 +33,8 @@ pub struct Settings {
     pub source: SourceSettings,
     pub report_command: Vec<String>,
     pub alert_command: Vec<String>,
+    pub actions_command: Vec<String>,
+    pub actions_final_exit_codes: Vec<i32>,
     pub import_extract_command: Vec<String>,
     pub alert_aggregate_after: u32,
     pub retention: RetentionSettings,

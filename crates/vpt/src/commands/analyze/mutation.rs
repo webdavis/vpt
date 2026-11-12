@@ -78,7 +78,18 @@ pub(super) fn locked(
             sink: &mut sink,
             warnings: &mut warnings,
         }
-        .run(input, run, &mut committed);
+        .run(input, run, &mut committed)
+        .and_then(|outcome| {
+            crate::compose::actions::Delivery {
+                ledger: &ledger,
+                settings,
+                sink: &mut sink,
+                warnings: &mut warnings,
+                run,
+            }
+            .send(Some(id))
+            .map(|counts| with_counts(outcome, settings, counts))
+        });
         let finished = (|| {
             let at = SystemClock.now();
             let mut facts = Vec::new();
@@ -116,4 +127,17 @@ pub(super) fn locked(
         result
     })();
     note::output::finish(result, warnings, id, committed, retention)
+}
+
+fn with_counts(
+    mut outcome: Outcome,
+    settings: &Settings,
+    counts: crate::compose::actions::Counts,
+) -> Outcome {
+    if let Outcome::Success { document, .. } = &mut outcome
+        && !settings.actions_command.is_empty()
+    {
+        document["actions"] = counts.json();
+    }
+    outcome
 }

@@ -21,6 +21,7 @@ pub struct WorkDelta {
     pub tags: Option<super::TagChange>,
     pub tag_rename: Option<super::TagRename>,
     pub learned_tags: Option<super::LearnedTagChange>,
+    pub actions: Option<super::ActionChange>,
     pub vocabulary: Option<super::VocabularyPublication>,
     pub resolution: Option<super::FlagResolutionChange>,
     pub notes: Vec<super::NoteChange>,
@@ -86,6 +87,8 @@ pub enum SinkWarning {
     ExportFailureEvidenceUnconfirmed,
     ExportBookkeepingPostCommitFailure,
     HookFailed,
+    ActionFailed,
+    ActionRefused,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

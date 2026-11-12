@@ -33,6 +33,8 @@ pub(crate) fn warning_text(warning: SinkWarning) -> &'static str {
             "event log bookkeeping failed after commit"
         }
         SinkWarning::HookFailed => "configured notification command failed",
+        SinkWarning::ActionFailed => "configured action command failed",
+        SinkWarning::ActionRefused => "configured action command refused an action",
     }
 }
 

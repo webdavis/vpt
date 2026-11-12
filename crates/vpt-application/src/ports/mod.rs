@@ -4,6 +4,8 @@ pub use observation::{
 };
 mod verification;
 pub use verification::{VerificationChange, VerifiedClaims};
+mod actions;
+pub use actions::{ActionChange, ActionLedger, QueuedAction};
 mod archive;
 mod clock;
 mod context;

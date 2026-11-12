@@ -125,7 +125,7 @@ fn migration(root: &crate::RootDir, ledger: SqliteLedger, row: &OccasionRecord) 
     .unwrap();
     drop(db);
     let upgraded = SqliteLedger::open(root).unwrap();
-    assert_eq!(upgraded.schema_version().unwrap(), 17);
+    assert_eq!(upgraded.schema_version().unwrap(), 18);
     assert!(upgraded.brief(&row.id).unwrap().is_none());
     upgraded
         .read(|c| {
