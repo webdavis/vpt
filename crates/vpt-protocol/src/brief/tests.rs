@@ -31,6 +31,7 @@ fn row() -> Candidate {
                 language_source: LanguageSource::Reported,
                 local: true,
                 segments: vec![Segment {
+                    speaker: None,
                     start: 0.25,
                     end: 1.0,
                     text: "Private exact quote".into(),

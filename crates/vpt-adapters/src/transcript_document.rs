@@ -27,6 +27,7 @@ pub(crate) fn from_document(
                         confidence: word.confidence,
                     })
                     .collect(),
+                speaker: segment.speaker,
             })
             .collect(),
     }
@@ -55,6 +56,7 @@ pub(crate) fn to_document(transcript: &domain::Transcript) -> wire::EngineDocume
                         confidence: word.confidence,
                     })
                     .collect(),
+                speaker: segment.speaker.clone(),
             })
             .collect(),
     }

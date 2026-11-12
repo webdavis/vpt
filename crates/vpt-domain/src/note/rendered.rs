@@ -49,6 +49,10 @@ pub fn transcript_with_spans(
         output.literal("\n")?;
         let seconds = segment.start as u64;
         output.literal(&format!("[{:02}:{:02}] ", seconds / 60, seconds % 60))?;
+        if let Some(speaker) = &segment.speaker {
+            output.text(speaker)?;
+            output.literal(": ")?;
+        }
         open_spans.extend(annotations::render(&mut output, text, &spans, readability)?);
         output.literal("\n")?;
     }

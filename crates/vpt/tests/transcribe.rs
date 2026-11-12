@@ -4,6 +4,8 @@
 mod events;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
+#[path = "transcribe/labels.rs"]
+mod labels;
 #[path = "transcribe/lexical.rs"]
 mod lexical;
 #[path = "transcribe/output.rs"]

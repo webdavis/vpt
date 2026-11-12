@@ -63,6 +63,7 @@ pub(super) fn prepared(profile: &str, style: &str) -> (Sandbox, RecordingId) {
 
 fn segment(text: &str, start: f64, words: &[&str]) -> Segment {
     Segment {
+        speaker: None,
         text: text.into(),
         start,
         end: start + 1.0,

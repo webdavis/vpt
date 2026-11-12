@@ -21,7 +21,7 @@ pub(super) fn unknown_fields(value: &Value) -> Vec<String> {
             collect(
                 segment,
                 "segments.",
-                &["start", "end", "text", "words"],
+                &["start", "end", "text", "words", "speaker"],
                 &mut fields,
             );
             if let Some(words) = segment["words"].as_array() {

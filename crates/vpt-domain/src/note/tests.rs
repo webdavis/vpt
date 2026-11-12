@@ -25,6 +25,7 @@ pub(super) fn transcript(parts: &[(&str, &[&str])]) -> Transcript {
             .iter()
             .enumerate()
             .map(|(i, (text, words))| Segment {
+                speaker: None,
                 start: i as f64 * 7.0,
                 end: i as f64 * 7.0 + 6.0,
                 text: (*text).into(),

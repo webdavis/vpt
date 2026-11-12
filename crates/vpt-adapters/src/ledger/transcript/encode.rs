@@ -28,6 +28,9 @@ pub(super) fn check_shape(transcript: &Transcript) -> Result<(), LedgerError> {
     let mut words = 0usize;
     for segment in &transcript.segments {
         text(&segment.text)?;
+        if let Some(speaker) = &segment.speaker {
+            text(speaker)?;
+        }
         if segment.words.len() > 65_536 {
             return Err(corrupt());
         }

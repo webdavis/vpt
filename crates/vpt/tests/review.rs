@@ -71,6 +71,7 @@ fn configured() -> (Sandbox, vpt_domain::identity::RecordingId) {
             language_source: LanguageSource::Reported,
             local: true,
             segments: vec![Segment {
+                speaker: None,
                 start: 0.0,
                 end: 9.0,
                 text: words

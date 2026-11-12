@@ -113,13 +113,13 @@ fn additive_fields_are_accepted_with_named_diagnostics() {
     let mut value = document();
     value["future"] = json!(true);
     value["engine"]["revision"] = json!("canary");
-    value["segments"][0]["speaker"] = json!("canary");
+    value["segments"][0]["voice"] = json!("canary");
     value["segments"][0]["words"][0]["score_kind"] = json!("canary");
     let result = decoded(&value).unwrap();
     for name in [
         "future",
         "engine.revision",
-        "segments.speaker",
+        "segments.voice",
         "segments.words.score_kind",
     ] {
         assert!(
@@ -158,4 +158,15 @@ fn zero_length_ranges_and_confidence_endpoints_are_valid() {
         word["confidence"] = json!(index);
     }
     assert!(decode(&serde_json::to_vec(&value).unwrap(), &expected(), 0.0).is_ok());
+}
+
+#[test]
+fn a_speaker_label_is_kept_and_a_blank_one_is_refused() {
+    let mut value = document();
+    value["segments"][0]["speaker"] = json!("Ana");
+    let result = decoded(&value).unwrap();
+    assert_eq!(result.document.segments[0].speaker.as_deref(), Some("Ana"));
+    assert!(result.diagnostics.is_empty());
+    value["segments"][0]["speaker"] = json!(" ");
+    assert_eq!(decoded(&value), Err(EngineDecodeError::Invalid("speaker")));
 }
