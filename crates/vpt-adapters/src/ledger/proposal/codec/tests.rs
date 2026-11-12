@@ -1,6 +1,9 @@
 use super::*;
 use crate::ledger::{MemoryLedger, contract::proposals::fixture};
-use vpt_domain::grounding::{Finding, GroundedClaim, SourceRange};
+use vpt_domain::{
+    grounding::{Finding, GroundedClaim, SourceRange},
+    proposal::{CheckedAction, CheckedClaim},
+};
 mod publication;
 
 fn accepted() -> AcceptedProposal {
@@ -40,6 +43,7 @@ fn versioned_saved_proposals_preserve_every_finding_shape_and_private_metadata()
     ] {
         accepted.proposal.actions.push(CheckedAction {
             owner: None,
+            due: None,
             claim: CheckedClaim {
                 claim: vpt_domain::proposal::Claim {
                     text: "private claim".into(),
@@ -123,4 +127,50 @@ fn expanded_finding_text_is_refused_before_constructing_the_saved_document() {
     accepted.proposal.summary[0].grounding.finding = Some(Finding::Unsupported("a".repeat(65_536)));
     accepted.proposal.summary = vec![accepted.proposal.summary[0].clone(); 257];
     assert_eq!(grounding::check(&accepted.proposal), Err(invalid()));
+}
+
+#[test]
+fn action_owner_and_due_round_trip_and_their_saved_grounding_must_match() {
+    use vpt_domain::proposal::{CheckedDue, Due, Owner};
+    let mut accepted = accepted();
+    accepted.proposal.actions[0].owner = Some(Owner::Other(Some("Private Dana".into())));
+    accepted.proposal.actions[0].due = Some(CheckedDue {
+        due: Due {
+            date: "2026-11-19".into(),
+            time: Some("15:00".into()),
+            source_references: vec![],
+        },
+        grounding: GroundedClaim {
+            sources: vec![],
+            finding: Some(Finding::Unsourced),
+            inherited_flags: vec![],
+        },
+    });
+    let body = encode(&accepted).unwrap();
+    let restored = decode(
+        accepted.recording.clone(),
+        &accepted.input_digest.hex(),
+        &body,
+        accepted.accepted_at,
+    );
+    assert_eq!(restored.unwrap(), accepted);
+    let value: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let due = value["actions"][0]["due"].clone();
+    for variant in 0..3 {
+        let mut changed = value.clone();
+        match variant {
+            0 => {
+                changed["actions"][0].as_object_mut().unwrap().remove("due");
+            }
+            1 => changed["summary"][0]["due"] = due.clone(),
+            _ => changed["actions"][0]["due"]["finding"] = serde_json::Value::Null,
+        }
+        let result = decode(
+            accepted.recording.clone(),
+            &accepted.input_digest.hex(),
+            &changed.to_string(),
+            accepted.accepted_at,
+        );
+        assert_eq!(result, Err(invalid()), "variant {variant}");
+    }
 }

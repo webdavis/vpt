@@ -1,6 +1,6 @@
 mod checked;
 mod debug;
-pub use checked::{CheckedAction, CheckedClaim, CheckedProposal};
+pub use checked::{CheckedAction, CheckedClaim, CheckedDue, CheckedProposal};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Proposal {
@@ -21,6 +21,7 @@ pub struct Claim {
 pub struct Action {
     pub claim: Claim,
     pub owner: Option<Owner>,
+    pub due: Option<Due>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -29,9 +30,20 @@ pub enum Owner {
     Other(Option<String>),
 }
 
+#[derive(Clone, PartialEq, Eq)]
+pub struct Due {
+    pub date: String,
+    pub time: Option<String>,
+    pub source_references: Vec<String>,
+}
+
 impl From<Claim> for Action {
     fn from(claim: Claim) -> Self {
-        Self { claim, owner: None }
+        Self {
+            claim,
+            owner: None,
+            due: None,
+        }
     }
 }
 

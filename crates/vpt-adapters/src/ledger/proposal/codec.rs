@@ -1,14 +1,12 @@
 mod grounding;
 mod publication;
 mod raw;
+mod restore;
 use super::invalid;
 use serde::{Deserialize, Serialize};
 use vpt_application::ports::{AcceptedProposal, GroundingBasis, LedgerError};
 use vpt_domain::{
-    digest::Sha256Digest,
-    identity::RecordingId,
-    proposal::{CheckedAction, CheckedClaim, CheckedProposal},
-    time::UtcInstant,
+    digest::Sha256Digest, identity::RecordingId, proposal::CheckedProposal, time::UtcInstant,
 };
 
 pub(in crate::ledger) const MAX_BODY: usize = 16 * 1024 * 1024;
@@ -51,7 +49,7 @@ pub(in crate::ledger) fn encode(accepted: &AcceptedProposal) -> Result<String, L
             .proposal
             .actions
             .iter()
-            .map(|action| grounding::save(&action.claim.grounding))
+            .map(grounding::save_action)
             .collect(),
     };
     super::super::json::encode(&saved, MAX_BODY).map_err(|_| invalid())
@@ -82,20 +80,16 @@ pub(in crate::ledger) fn decode(
     let raw = crate::proposal::decode(saved.document.as_bytes())
         .map_err(|_| invalid())?
         .proposal;
-    let summary = restore(raw.summary, saved.summary)?;
+    let summary = restore::claims(raw.summary, saved.summary)?;
     if raw.actions.len() != saved.actions.len() {
         return Err(invalid());
     }
-    let (claims, owners): (Vec<_>, Vec<_>) = raw
+    let actions = raw
         .actions
         .into_iter()
-        .map(|action| (action.claim, action.owner))
-        .unzip();
-    let actions = restore(claims, saved.actions)?
-        .into_iter()
-        .zip(owners)
-        .map(|(claim, owner)| CheckedAction { claim, owner })
-        .collect();
+        .zip(saved.actions)
+        .map(|(action, saved)| restore::action(action, saved))
+        .collect::<Result<_, _>>()?;
     let accepted = AcceptedProposal {
         vocabulary_publication: saved
             .vocabulary_publication
@@ -119,25 +113,6 @@ pub(in crate::ledger) fn decode(
     };
     grounding::check(&accepted.proposal)?;
     Ok(accepted)
-}
-
-fn restore(
-    claims: Vec<vpt_domain::proposal::Claim>,
-    saved: Vec<grounding::SavedGrounding>,
-) -> Result<Vec<CheckedClaim>, LedgerError> {
-    if claims.len() != saved.len() {
-        return Err(invalid());
-    }
-    claims
-        .into_iter()
-        .zip(saved)
-        .map(|(claim, saved)| {
-            Ok(CheckedClaim {
-                claim,
-                grounding: grounding::restore(saved)?,
-            })
-        })
-        .collect()
 }
 
 fn digest(value: &str) -> Result<Sha256Digest, LedgerError> {

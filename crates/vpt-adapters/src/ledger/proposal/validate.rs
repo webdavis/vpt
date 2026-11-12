@@ -92,6 +92,16 @@ pub(in crate::ledger) fn check(
             return Err(invalid());
         }
     }
+    for due in accepted
+        .proposal
+        .actions
+        .iter()
+        .filter_map(|a| a.due.as_ref())
+    {
+        if checker.due(&due.due).map_err(|_| invalid())? != due.grounding {
+            return Err(invalid());
+        }
+    }
     let mut notes = delta.notes.iter().filter(|change| {
         change.artifact.recording == accepted.recording
             && change.artifact.stage == NoteStage::Analysis

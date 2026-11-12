@@ -1,4 +1,9 @@
-use crate::{digest::Sha256Digest, proposal::Claim, review::ReviewFlag, transcript::Word};
+use crate::{
+    digest::Sha256Digest,
+    proposal::{Claim, Due},
+    review::ReviewFlag,
+    transcript::Word,
+};
 mod context;
 mod corrections;
 mod evidence;
@@ -77,29 +82,45 @@ impl<'a> Grounder<'a> {
             return Err(GroundingError::CapacityExceeded);
         }
         spend(&mut self.remaining, claim.text.len() + 1)?;
-        if claim.source_references.is_empty() {
+        let mut grounded = self.sources(&claim.source_references)?;
+        if grounded.sources.is_empty() {
+            return Ok(grounded);
+        }
+        let evidence = evidence::collect(
+            &self.evidence,
+            &grounded.sources,
+            self.window_secs,
+            &mut self.remaining,
+        )?;
+        if let Some(fact) = facts::extract(&claim.text, &mut self.remaining)?
+            .into_iter()
+            .find(|fact| fact.required && !evidence.contains(&fact.key))
+        {
+            grounded.finding = Some(Finding::Unsupported(fact.text));
+        }
+        Ok(grounded)
+    }
+
+    pub fn due(&mut self, due: &Due) -> Result<GroundedClaim, GroundingError> {
+        if due.source_references.len() > 256 {
+            return Err(GroundingError::CapacityExceeded);
+        }
+        spend(&mut self.remaining, due.date.len() + 1)?;
+        self.sources(&due.source_references)
+    }
+
+    fn sources(&mut self, references: &[String]) -> Result<GroundedClaim, GroundingError> {
+        if references.is_empty() {
             return Ok(GroundedClaim::unresolved(Finding::Unsourced));
         }
-        let Some(sources) = sources::resolve(&claim.source_references, self.duration) else {
+        let Some(sources) = sources::resolve(references, self.duration) else {
             return Ok(GroundedClaim::unresolved(Finding::BadReference));
         };
         let inherited_flags =
             uncertainty::inherit(&self.words, self.flags, &sources, &mut self.remaining)?;
-        let evidence = evidence::collect(
-            &self.evidence,
-            &sources,
-            self.window_secs,
-            &mut self.remaining,
-        )?;
-        let unsupported = facts::extract(&claim.text, &mut self.remaining)?
-            .into_iter()
-            .find(|fact| fact.required && !evidence.contains(&fact.key));
-        let finding = unsupported
-            .map(|fact| Finding::Unsupported(fact.text))
-            .or_else(|| (!inherited_flags.is_empty()).then_some(Finding::BuiltOnFlaggedText));
         Ok(GroundedClaim {
             sources,
-            finding,
+            finding: (!inherited_flags.is_empty()).then_some(Finding::BuiltOnFlaggedText),
             inherited_flags,
         })
     }

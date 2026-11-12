@@ -16,6 +16,19 @@ pub(super) fn input(proposal: &CheckedProposal) -> Result<(), RenderError> {
                 return Err(RenderError::InvalidProposal);
             }
         }
+        if let Some(due) = &action.due {
+            let calendar = |text: &str| {
+                text.len() <= 10
+                    && text
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || matches!(b, b'-' | b':'))
+            };
+            if !calendar(&due.due.date)
+                || due.due.time.as_deref().is_some_and(|time| !calendar(time))
+            {
+                return Err(RenderError::InvalidProposal);
+            }
+        }
     }
     for checked in proposal.claims() {
         let claim = &checked.claim;

@@ -1,5 +1,7 @@
 use super::{Grounder, GroundingError, MAX_ITEMS};
-use crate::proposal::{Action, CheckedAction, CheckedClaim, CheckedProposal, Claim, Proposal};
+use crate::proposal::{
+    Action, CheckedAction, CheckedClaim, CheckedDue, CheckedProposal, Claim, Proposal,
+};
 
 impl Grounder<'_> {
     pub fn proposal(&mut self, proposal: Proposal) -> Result<CheckedProposal, GroundingError> {
@@ -35,9 +37,18 @@ impl Grounder<'_> {
     }
 
     fn action(&mut self, action: Action) -> Result<CheckedAction, GroundingError> {
+        let claim = self.claim(action.claim)?;
+        let due = match action.due {
+            Some(due) => Some(CheckedDue {
+                grounding: self.due(&due)?,
+                due,
+            }),
+            None => None,
+        };
         Ok(CheckedAction {
-            claim: self.claim(action.claim)?,
+            claim,
             owner: action.owner,
+            due,
         })
     }
 }

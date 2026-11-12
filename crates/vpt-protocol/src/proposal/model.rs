@@ -23,6 +23,8 @@ pub struct Action {
     pub sources: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner: Option<Owner>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due: Option<Due>,
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -30,6 +32,15 @@ pub struct Action {
 pub enum Owner {
     Me,
     Other(Option<String>),
+}
+
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct Due {
+    pub date: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time: Option<String>,
+    #[serde(default)]
+    pub sources: Vec<String>,
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]

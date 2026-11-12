@@ -1,4 +1,4 @@
-use vpt_domain::proposal::{Action, Claim, Owner, Proposal, Related, Tag};
+use vpt_domain::proposal::{Action, Claim, Due, Owner, Proposal, Related, Tag};
 use vpt_protocol::proposal as protocol;
 pub use vpt_protocol::proposal::ProposalDecodeError;
 
@@ -46,6 +46,11 @@ fn action(action: protocol::Action) -> Action {
         owner: action.owner.map(|owner| match owner {
             protocol::Owner::Me => Owner::Me,
             protocol::Owner::Other(name) => Owner::Other(name),
+        }),
+        due: action.due.map(|due| Due {
+            date: due.date,
+            time: due.time,
+            source_references: due.sources,
         }),
     }
 }

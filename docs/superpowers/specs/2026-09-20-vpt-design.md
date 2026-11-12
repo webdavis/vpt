@@ -981,6 +981,12 @@ writes the transcript note's content region on the command's stdin, records the 
       ],
       "owner": {
         "other": "Dana"
+      },
+      "due": {
+        "date": "2026-11-19",
+        "sources": [
+          "02:07-02:11"
+        ]
       }
     }
   ],
@@ -1016,7 +1022,13 @@ source reference and any verify-note annotation, and no headings of the agent's 
 `owner`: `"me"` for the speaker's own task, `{"other": "<name>"}` for another person's, `{"other": null}`
 when no name was said; absent or null means unknown. Its bullet then shows `[owner:: me]`,
 `[owner:: <name>]` or `[owner:: someone else]` after the sources, with the name escaped under section 7.2;
-claim extraction skips that field, so it never changes a claim's text or grounding. Tags and relations
+claim extraction skips that field, so it never changes a claim's text or grounding. An action may carry
+`due`: a `date` (`YYYY-MM-DD`, a real calendar date), an optional `time` (`HH:MM`) and `sources`; a
+malformed date or time makes the document invalid. The due date's sources are resolved and checked for
+flagged text as a claim's are, with no fact check; `unsourced` or `bad-reference` withholds the date, which
+is saved with its finding but shown nowhere, and the action stays. A kept date follows the owner as
+`[due:: <date>]` or `[due:: <date> <time>]`, a field claim extraction also skips. The action's moment comes
+from its own sources, never the due date's. Tags and relations
 go through the stage 3 gates.
 
 ### 8.2 verify-note
@@ -1479,7 +1491,7 @@ under `--json`.
 | `vpt show <id>` / `vpt list [--stage <s>]`                                                    | nothing                                                                                                                               | the record / `{"recordings": [..]}`                                                                                   | 0, 2                                  |
 | `vpt search <word>... [--limit <n>]`                                                          | nothing                                                                                                                               | `{"words", "limit", "truncated", "hits":[{"moment", "recording", "title", "stage", "seconds", "timecode", "quote"}]}` | 0, 2                                  |
 | `vpt show <id> --stage transcript`                                                            | nothing                                                                                                                               | `{"recording", "stage", text, "segments": [{"start", "end", "timecode", "text"}]}`                                    | 0, 2, 3 changed                       |
-| `vpt show <id> --stage analysis`                                                              | nothing                                                                                                                               | `{"recording", "stage", text, "summary": [line], "actions": [line + "owner"]}`, line `{"moment", "text", "sources", "finding"}` | 0, 2, 3 changed                       |
+| `vpt show <id> --stage analysis`                                                              | nothing                                                                                                                               | `{"recording", "stage", text, "summary": [line], "actions": [line + "owner", "due"]}`, line `{"moment", "text", "sources", "finding"}` | 0, 2, 3 changed                       |
 | `vpt show <id> --stage released`                                                              | nothing                                                                                                                               | `{"recording", "stage", text}`, the newest surviving release                                                          | 0, 1 pending, 2, 3 changed            |
 | `vpt show <occasion> --stage brief`                                                           | nothing                                                                                                                               | `{"occasion", "recordings", "stage", text}`; `text` = `{"title", "content", "note", "content_sha256", "provenance", "generated_at"}` | 0, 1 pending, 2, 3 changed            |
 | `vpt show <id> --stage <s> --redact`                                                          | nothing                                                                                                                               | `{"recording", "stage", text}` with `content` masked by `[share]`, no structured fields                               | 0, 2, 3 changed or residue            |

@@ -6,8 +6,18 @@ pub(in crate::ledger::proposal::codec) fn check(
 ) -> Result<(), LedgerError> {
     let mut items = 0usize;
     let mut token_bytes = 0usize;
-    for checked in proposal.claims() {
-        let grounded = &checked.grounding;
+    let claims = proposal
+        .claims()
+        .map(|checked| (&checked.claim.source_references, &checked.grounding, false));
+    let dues = proposal
+        .actions
+        .iter()
+        .filter_map(|action| action.due.as_ref())
+        .map(|due| (&due.due.source_references, &due.grounding, true));
+    for (references, grounded, due) in claims.chain(dues) {
+        if due && matches!(grounded.finding, Some(Finding::Unsupported(_))) {
+            return Err(invalid());
+        }
         if let Some(Finding::Unsupported(token)) = &grounded.finding {
             token_bytes = token_bytes.checked_add(token.len()).ok_or_else(invalid)?;
             if token_bytes > MAX_BODY {
@@ -38,21 +48,21 @@ pub(in crate::ledger::proposal::codec) fn check(
             if !grounded.sources.is_empty() || !grounded.inherited_flags.is_empty() {
                 return Err(invalid());
             }
-        } else if grounded.sources.len() != checked.claim.source_references.len()
+        } else if grounded.sources.len() != references.len()
             || grounded.sources.is_empty()
             || grounded
                 .sources
                 .iter()
-                .zip(&checked.claim.source_references)
+                .zip(references)
                 .any(|(source, reference)| SourceRange::parse(reference) != Some(*source))
         {
             return Err(invalid());
         }
         match &grounded.finding {
-            Some(Finding::Unsourced) if !checked.claim.source_references.is_empty() => {
+            Some(Finding::Unsourced) if !references.is_empty() => {
                 return Err(invalid());
             }
-            Some(Finding::BadReference) if checked.claim.source_references.is_empty() => {
+            Some(Finding::BadReference) if references.is_empty() => {
                 return Err(invalid());
             }
             Some(Finding::BuiltOnFlaggedText) if grounded.inherited_flags.is_empty() => {

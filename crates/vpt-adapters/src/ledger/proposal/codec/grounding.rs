@@ -1,5 +1,8 @@
 use super::*;
-use vpt_domain::grounding::{Finding, GroundedClaim, SourceRange};
+use vpt_domain::{
+    grounding::{Finding, GroundedClaim, SourceRange},
+    proposal::CheckedAction,
+};
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -7,6 +10,8 @@ pub(super) struct SavedGrounding {
     sources: Vec<[u64; 2]>,
     finding: Option<SavedFinding>,
     inherited_flags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) due: Option<Box<SavedGrounding>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,10 +46,24 @@ pub(super) fn save(grounding: &GroundedClaim) -> SavedGrounding {
             .iter()
             .map(Sha256Digest::hex)
             .collect(),
+        due: None,
+    }
+}
+
+pub(super) fn save_action(action: &CheckedAction) -> SavedGrounding {
+    SavedGrounding {
+        due: action
+            .due
+            .as_ref()
+            .map(|due| Box::new(save(&due.grounding))),
+        ..save(&action.claim.grounding)
     }
 }
 
 pub(super) fn restore(saved: SavedGrounding) -> Result<GroundedClaim, LedgerError> {
+    if saved.due.is_some() {
+        return Err(invalid());
+    }
     Ok(GroundedClaim {
         sources: saved
             .sources

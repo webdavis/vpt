@@ -23,6 +23,14 @@ impl fmt::Debug for Action {
         f.debug_struct("Action")
             .field("claim", &self.claim)
             .field("owner", &self.owner)
+            .field("due", &self.due)
+            .finish()
+    }
+}
+impl fmt::Debug for Due {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Due")
+            .field("sources", &self.source_references.len())
             .finish()
     }
 }
