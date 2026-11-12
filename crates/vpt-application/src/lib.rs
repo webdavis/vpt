@@ -26,6 +26,6 @@ pub use retention::{
 };
 pub use settings::{
     AnalysisSettings, BriefSettings, ContextSettings, ContextSource, GoogleCredentials, LinkStyle,
-    NoteProfile, NoteSettings, ObsidianSettings, ReconcileSettings, RetentionSettings, Settings,
-    ShareSettings, SourceSettings, StorePaths, TagSettings,
+    NoteProfile, NoteSettings, ObsidianSettings, ReconcileSettings, RetentionSettings, SecretEnv,
+    Settings, ShareSettings, SourceSettings, StorePaths, TagSettings,
 };

@@ -115,6 +115,7 @@ impl<E: EventSink> Delivery<'_, E> {
             let outcome = send_action(
                 &self.settings.actions_command,
                 &self.settings.actions_final_exit_codes,
+                &self.settings.actions_env.0,
                 &send,
             );
             let refused = match outcome {

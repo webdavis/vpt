@@ -604,6 +604,19 @@ With `"todo-tool", "add", "--", "{text}", "--due", "{due}"`, an action due at a 
 `todo-tool add -- 'Call the bank' --due 2026-11-19T15:00`, and one without a kept due date runs
 `todo-tool add -- 'Call the bank'`.
 
+`[actions.env]` adds environment variables to the command's own environment, for a tool that wants a
+credential. The command otherwise inherits vpt's environment as it is; an empty table, the default,
+adds nothing. Each name must match `[A-Za-z_][A-Za-z0-9_]*` and each value must be a non-empty string
+without NUL, or vpt refuses the configuration with exit 2, naming the key and never the value.
+Placeholders are not expanded in values. vpt treats the values as secrets: they never reach the
+arguments, vpt's output, errors, events or the ledger, and the configuration file's `0600` rule
+covers their storage.
+
+```toml
+[actions.env]
+TODO_TOOL_TOKEN = "<your token>"
+```
+
 The text reaches the command verbatim and may start with `-`, so it could look like an option to the
 command. Put `{text}` after `--` or inside one argument such as `--title={text}`. The expanded command
 must stay within 1 MiB.

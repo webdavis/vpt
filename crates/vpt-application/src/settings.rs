@@ -35,6 +35,7 @@ pub struct Settings {
     pub alert_command: Vec<String>,
     pub actions_command: Vec<String>,
     pub actions_final_exit_codes: Vec<i32>,
+    pub actions_env: SecretEnv,
     pub import_extract_command: Vec<String>,
     pub alert_aggregate_after: u32,
     pub retention: RetentionSettings,
@@ -111,5 +112,18 @@ impl RetentionSettings {
             .iter()
             .find(|(store, _)| *store == key)
             .map_or(Hold::never(), |(_, hold)| *hold)
+    }
+}
+
+/// Environment variables whose values are secrets, so only their count is ever shown.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct SecretEnv(pub Vec<(String, String)>);
+
+impl std::fmt::Debug for SecretEnv {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SecretEnv")
+            .field("variables", &self.0.len())
+            .finish()
     }
 }

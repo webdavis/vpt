@@ -13,6 +13,7 @@ pub enum Kind {
     TextList,
     Argv,
     ExitCodes,
+    EnvSecret,
 }
 
 impl Kind {
@@ -22,7 +23,7 @@ impl Kind {
             Kind::PositiveInt | Kind::NonNegativeInt | Kind::PositiveInt64 => "integer",
             Kind::Ratio | Kind::RatioAboveZero => "number",
             Kind::Duration => "duration",
-            Kind::Enum(_) | Kind::Text | Kind::Secret => "string",
+            Kind::Enum(_) | Kind::Text | Kind::Secret | Kind::EnvSecret => "string",
             Kind::TextList | Kind::Argv => "list of strings",
             Kind::ExitCodes => "list of integers",
         }

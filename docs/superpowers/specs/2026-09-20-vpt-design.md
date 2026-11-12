@@ -1058,7 +1058,10 @@ date in `action_sends` in the same transaction: a new id or a changed digest is 
 digest keeps its state. After publication `analyze` sends that recording's pending actions and `run`
 sends every recording's. Exit 0 marks the action sent and an exit code in `[actions]
 final_exit_codes` marks it refused, each with a work step; any other outcome leaves it pending and
-adds a warning. A dropped action is neither sent nor withdrawn. An empty command records and sends
+adds a warning. `[actions.env]` maps environment variable names (`[A-Za-z_][A-Za-z0-9_]*`) to
+non-empty secret values without NUL that are added to the command's inherited environment, unexpanded
+and never shown; a bad entry refuses with exit 2 naming only the key. A dropped action is neither sent
+nor withdrawn. An empty command records and sends
 nothing.
 
 ### 8.2 verify-note
@@ -1690,6 +1693,7 @@ canary-secret test.
 | `alert.aggregate_after`              | int            | `3`                                                                       | recordings needing review in one run before one aggregate alert                                              |
 | `actions.command`                    | string list    | `[]`                                                                      | run once per new or changed analysis action with its placeholders; empty sends nothing |
 | `actions.final_exit_codes`         | int list       | `[]`                                                                      | exit codes meaning the action is refused for good; other failures are retried |
+| `actions.env.<NAME>`                 | string, secret | none                                                                      | added to the action command's environment; never shown |
 | `retention.enabled`                  | bool           | `false`                                                                   | the opt-in retention run                                                                                     |
 | `retention.include_audio`            | bool           | `false`                                                                   | let the audio store expire                                                                                   |
 | `retention.hold.<store>`             | duration       | `0` for every store                                                       | files older than this move to the Trash; `0` never                                                           |
