@@ -1,3 +1,4 @@
+mod report;
 use super::{errors::ledger_error, history::commit};
 use std::collections::BTreeSet;
 use vpt_adapters::{
@@ -150,6 +151,7 @@ impl<E: EventSink> Delivery<'_, E> {
                 self.warnings,
             )?;
         }
+        report::commit(self, recording, note, counts)?;
         Ok(counts)
     }
 }

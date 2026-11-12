@@ -21,6 +21,7 @@ pub enum EventKind {
     ConfigRefused,
     Transcribed,
     Analyzed,
+    ActionsSent,
 }
 
 impl EventKind {
@@ -35,13 +36,18 @@ impl EventKind {
             Self::ConfigRefused => "config_refused",
             Self::Transcribed => "transcribed",
             Self::Analyzed => "analyzed",
+            Self::ActionsSent => "actions_sent",
         }
     }
 
     pub fn is_report(self) -> bool {
         matches!(
             self,
-            Self::BriefWritten | Self::Retention | Self::Transcribed | Self::Analyzed
+            Self::BriefWritten
+                | Self::Retention
+                | Self::Transcribed
+                | Self::Analyzed
+                | Self::ActionsSent
         )
     }
 }
