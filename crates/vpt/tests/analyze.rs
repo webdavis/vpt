@@ -34,6 +34,8 @@ mod progress;
 mod protocol;
 #[path = "analyze/prune.rs"]
 mod prune;
+#[path = "analyze/prune_vault.rs"]
+mod prune_vault;
 #[path = "analyze/recovery.rs"]
 mod recovery;
 #[path = "analyze/redo.rs"]
