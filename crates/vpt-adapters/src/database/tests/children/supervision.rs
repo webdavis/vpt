@@ -1,4 +1,4 @@
-use super::child_for_root;
+use super::{CLEANUP_BOUND, WATCHDOG, child_for_root};
 use crate::database::tests::support::root;
 use std::io;
 use std::time::{Duration, Instant};
@@ -29,7 +29,7 @@ fn a_second_milestone_cannot_reuse_the_first_ready_message() {
 fn a_later_peer_keeps_the_original_scenario_budget() {
     let (temp, _root) = root();
     let observed = Instant::now();
-    let started = observed - Duration::from_millis(400);
+    let started = observed - WATCHDOG.saturating_sub(Duration::from_millis(100));
     let mut first = child_for_root(
         "supervision_ready",
         temp.path(),
@@ -82,14 +82,17 @@ fn a_direct_participant_stalled_before_sql_is_terminated_and_reaped() {
     assert_reaped(pid);
     assert_eq!(error.kind(), io::ErrorKind::TimedOut);
     assert!(error.to_string().contains("phase=pre-sql-stall"));
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < CLEANUP_BOUND);
     let elapsed_ms = error
         .to_string()
         .split_ascii_whitespace()
         .find_map(|part| part.strip_prefix("parent_elapsed_ms="))
         .and_then(|value| value.parse::<u128>().ok())
         .expect("timeout reports numeric parent elapsed milliseconds");
-    assert!(elapsed_ms >= 500, "timeout preceded the operation deadline");
+    assert!(
+        elapsed_ms >= WATCHDOG.as_millis(),
+        "timeout preceded the operation deadline"
+    );
 }
 
 pub(super) fn assert_reaped(pid: u32) {

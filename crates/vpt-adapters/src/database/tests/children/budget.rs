@@ -1,6 +1,6 @@
 use super::identity::terminal;
 use super::supervision::assert_reaped;
-use super::{ChildGuard, operation_budget, process, spawn_with_signal};
+use super::{CLEANUP_BOUND, ChildGuard, WATCHDOG, process, spawn_with_signal};
 use crate::database::tests::support::root;
 use std::io::{self, Write};
 use std::path::Path;
@@ -32,13 +32,14 @@ fn participant(
     directory: &Path,
     started: Instant,
 ) -> (ChildGuard, Receiver<SignalRecord>) {
-    let remaining = Duration::from_millis(850).saturating_sub(started.elapsed());
+    let fallback = CLEANUP_BOUND.saturating_sub(Duration::from_millis(50));
+    let remaining = fallback.saturating_sub(started.elapsed());
     std::fs::write(
         directory.join("budget-fallback"),
         (monotonic() + remaining).as_nanos().to_string(),
     )
     .unwrap();
-    let cleanup = started + Duration::from_millis(900);
+    let cleanup = started + CLEANUP_BOUND;
     let (send, receive) = mpsc::channel();
     let signal = move |pid, signal| {
         process::signal_group(pid, signal);
@@ -61,33 +62,6 @@ fn participant(
 }
 
 #[test]
-fn only_history_contracts_select_seven_hundred_milliseconds() {
-    assert_eq!(operation_budget(HISTORY_STALL), Duration::from_millis(700));
-    for scenario in [
-        "ledger_contract_history_",
-        "ledger_contract_history_recovery_summaries_advance_saved_failure_window",
-    ] {
-        assert_eq!(operation_budget(scenario), Duration::from_millis(700));
-    }
-}
-
-#[test]
-fn other_scenarios_keep_five_hundred_milliseconds() {
-    for scenario in [
-        "ledger_contract_history",
-        "ledger_contract_historyx_stall",
-        "other_ledger_contract_history_stall",
-        "ledger_contract_schema_trace",
-        "ledger_schema_foreign_keys",
-        "identity_exit",
-        "supervision_stall",
-        "",
-    ] {
-        assert_eq!(operation_budget(scenario), Duration::from_millis(500));
-    }
-}
-
-#[test]
 fn history_child_preserves_original_operation_and_cleanup_anchors() {
     let (directory, _root) = root();
     let started = Instant::now() - Duration::from_millis(200);
@@ -97,8 +71,8 @@ fn history_child_preserves_original_operation_and_cleanup_anchors() {
     let cleanup = child.group.cleanup_deadline();
     drop(child);
     assert_reaped(pid);
-    assert_eq!(operation, started + Duration::from_millis(700));
-    assert_eq!(cleanup, started + Duration::from_millis(900));
+    assert_eq!(operation, started + WATCHDOG);
+    assert_eq!(cleanup, started + CLEANUP_BOUND);
 }
 
 #[test]
@@ -111,8 +85,8 @@ fn ordinary_child_preserves_original_operation_and_cleanup_anchors() {
     let cleanup = child.group.cleanup_deadline();
     drop(child);
     assert_reaped(pid);
-    assert_eq!(operation, started + Duration::from_millis(500));
-    assert_eq!(cleanup, started + Duration::from_millis(900));
+    assert_eq!(operation, started + WATCHDOG);
+    assert_eq!(cleanup, started + CLEANUP_BOUND);
 }
 
 #[test]
@@ -123,7 +97,7 @@ fn finite_history_participant_reports_success() {
     let pid = child.group.id();
     let output = child.finish();
     assert_reaped(pid);
-    assert!(started.elapsed() < Duration::from_millis(900));
+    assert!(started.elapsed() < CLEANUP_BOUND);
     assert!(output.unwrap().status.success());
 }
 
@@ -137,10 +111,7 @@ fn stalled_history_participant_is_force_killed_and_reaped_within_cleanup_bound()
     let output = child.finish();
     let elapsed = started.elapsed();
     assert_reaped(pid);
-    assert!(
-        elapsed < Duration::from_millis(900),
-        "cleanup took {elapsed:?}"
-    );
+    assert!(elapsed < CLEANUP_BOUND, "cleanup took {elapsed:?}");
     ready.expect("stall participant installed TERM refusal");
     let error = output.expect_err("a stalled participant must time out");
     assert_eq!(error.kind(), io::ErrorKind::TimedOut);
@@ -160,8 +131,10 @@ fn stalled_history_participant_is_force_killed_and_reaped_within_cleanup_bound()
         .unwrap()
         .parse::<u128>()
         .unwrap();
-    assert!(elapsed_ms >= 700, "history timed out early: {reported}");
-    assert!(elapsed < Duration::from_secs(1));
+    assert!(
+        elapsed_ms >= WATCHDOG.as_millis(),
+        "history timed out early: {reported}"
+    );
 }
 
 pub(super) fn finite_child(scenario: &str, directory: &Path) -> ! {

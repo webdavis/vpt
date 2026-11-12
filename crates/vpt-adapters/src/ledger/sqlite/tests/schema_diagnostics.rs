@@ -21,7 +21,7 @@ fn assert_repository_trace(scenario: &str) {
     let started = Instant::now();
     let child = super::child_for_root(scenario, temp.path(), std::process::id(), started).unwrap();
     let output = child.finish().expect("bounded ledger trace child");
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < crate::database::CLEANUP_BOUND);
     assert!(
         output.status.success(),
         "owned trace child failed: {}",
