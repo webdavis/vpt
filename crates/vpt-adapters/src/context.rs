@@ -12,6 +12,7 @@ pub enum Failure {
     Interrupted,
     Capacity,
     Stale,
+    UnknownRemote,
     Invalid,
     Network,
     Scope,
@@ -28,6 +29,9 @@ impl Failure {
             Self::Deadline => "context collection deadline exceeded",
             Self::Interrupted => "context collection interrupted",
             Self::Capacity => "context collection exceeds capacity",
+            Self::UnknownRemote => {
+                "context.dam.max_age names a remote that dam does not know; use a name from dam remote list"
+            }
             Self::Stale => "calendar data is stale: dam refused it under context.dam.max_age",
             Self::Invalid => "invalid context document",
             Self::Network => "context network request failed",
