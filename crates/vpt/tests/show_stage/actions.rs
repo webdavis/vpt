@@ -2,7 +2,7 @@ use super::*;
 use serde_json::Value;
 use vpt_domain::identity::RecordingId;
 
-fn synthesize(name: &str, actions: Value) -> (Sandbox, RecordingId, std::process::Output) {
+fn analyze(name: &str, actions: Value) -> (Sandbox, RecordingId, std::process::Output) {
     let sandbox = fixture::configured(name);
     let id = recording::seed_flags(&sandbox, false);
     let script = sandbox.path().join("agent.sh");
@@ -12,14 +12,14 @@ fn synthesize(name: &str, actions: Value) -> (Sandbox, RecordingId, std::process
     fs::write(&proposal, document.to_string()).unwrap();
     fixture::write_config(
         &sandbox,
-        &format!("[synthesis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
+        &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
     );
-    let output = invoke(&sandbox, &["synthesize", id.as_str(), "--json"]);
+    let output = invoke(&sandbox, &["analyze", id.as_str(), "--json"]);
     (sandbox, id, output)
 }
 
-fn synthesized(name: &str, actions: Value) -> (Sandbox, RecordingId, Value, String) {
-    let (sandbox, id, output) = synthesize(name, actions);
+fn analyzed(name: &str, actions: Value) -> (Sandbox, RecordingId, Value, String) {
+    let (sandbox, id, output) = analyze(name, actions);
     json(&output);
     let shown = json(&show(&sandbox, id.as_str(), "analysis"));
     let note = analysis_note(&sandbox, &id).text;
@@ -55,7 +55,7 @@ fn action(text: &str, extra: Value) -> Value {
 
 #[test]
 fn each_action_carries_whose_it_is_to_show_and_the_note() {
-    let (_sandbox, id, shown, section) = synthesized(
+    let (_sandbox, id, shown, section) = analyzed(
         "show-action-owner",
         json!([
             action("email Bob", json!({"owner": "me"})),
@@ -92,7 +92,7 @@ fn each_action_carries_whose_it_is_to_show_and_the_note() {
 
 #[test]
 fn actions_without_owner_or_due_render_exactly_as_before() {
-    let (_sandbox, _id, shown, section) = synthesized(
+    let (_sandbox, _id, shown, section) = analyzed(
         "show-action-plain",
         json!([action("send notes", json!({})), {"text": "call Alice", "sources": []}]),
     );
@@ -107,7 +107,7 @@ fn actions_without_owner_or_due_render_exactly_as_before() {
 #[test]
 fn an_owner_name_cannot_inject_markdown_or_frontmatter() {
     let name = "Dana] [due:: 2030-01-01] *x*\n---\ntitle: y #tag";
-    let (_sandbox, _id, shown, section) = synthesized(
+    let (_sandbox, _id, shown, section) = analyzed(
         "show-action-owner-escaped",
         json!([action("send notes", json!({"owner": {"other": name}}))]),
     );
@@ -121,7 +121,7 @@ fn an_owner_name_cannot_inject_markdown_or_frontmatter() {
 
 #[test]
 fn a_spoken_due_date_reaches_show_and_the_note_and_survives_a_rewrite() {
-    let (sandbox, id, shown, section) = synthesized(
+    let (sandbox, id, shown, section) = analyzed(
         "show-action-due",
         json!([
             action(
@@ -170,7 +170,7 @@ fn a_spoken_due_date_reaches_show_and_the_note_and_survives_a_rewrite() {
 
 #[test]
 fn a_due_date_without_a_valid_source_is_withheld_and_flagged_while_the_action_stays() {
-    let (_sandbox, _id, shown, section) = synthesized(
+    let (_sandbox, _id, shown, section) = analyzed(
         "show-action-due-withheld",
         json!([
             action(
@@ -207,13 +207,13 @@ fn a_due_date_without_a_valid_source_is_withheld_and_flagged_while_the_action_st
 fn a_malformed_due_date_refuses_the_proposal() {
     for date in ["2026-02-30", "19 November", "2026-11-19T15:00"] {
         let due = json!({"due": {"date": date, "sources": ["00:00-00:01"]}});
-        let (_sandbox, _id, output) = synthesize(
+        let (_sandbox, _id, output) = analyze(
             "show-action-due-malformed",
             json!([action("send notes", due)]),
         );
         assert_ne!(output.status.code(), Some(0), "{date}");
         assert!(
-            stderr(&output).contains("synthesis output document is invalid"),
+            stderr(&output).contains("analysis output document is invalid"),
             "{date}"
         );
     }

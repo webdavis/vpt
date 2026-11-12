@@ -8,7 +8,7 @@ const VERBS: [&str; 6] = [
     "ingest",
     "run",
     "transcribe",
-    "synthesize",
+    "analyze",
     "retention",
     "brief",
 ];
@@ -16,7 +16,7 @@ const VERBS: [&str; 6] = [
 fn enable_commands(sandbox: &Sandbox) {
     let marker = sandbox.path().join("forbidden-command-called");
     let config = fs::read_to_string(sandbox.config_path()).unwrap();
-    fs::write(sandbox.config_path(), format!("{config}\n[synthesis]\ncommand = ['/usr/bin/touch', {marker:?}]\n[report]\ncommand = ['/usr/bin/touch', {marker:?}]\n[alert]\ncommand = ['/usr/bin/touch', {marker:?}]\n[retention]\nenabled = true\ninclude_audio = true\n[retention.hold]\naudio = '1d'\n")).unwrap();
+    fs::write(sandbox.config_path(), format!("{config}\n[analysis]\ncommand = ['/usr/bin/touch', {marker:?}]\n[report]\ncommand = ['/usr/bin/touch', {marker:?}]\n[alert]\ncommand = ['/usr/bin/touch', {marker:?}]\n[retention]\nenabled = true\ninclude_audio = true\n[retention.hold]\naudio = '1d'\n")).unwrap();
     let helper = sandbox.path().join("bin/vpt-macos");
     fs::write(
         &helper,
@@ -30,7 +30,7 @@ fn preview(sandbox: &Sandbox, verb: &str, id: &str, json: bool) -> std::process:
     let mut command = sandbox.vpt();
     command.arg(verb);
     match verb {
-        "transcribe" | "synthesize" => {
+        "transcribe" | "analyze" => {
             command.arg(id);
         }
         "retention" => {
@@ -109,7 +109,7 @@ fn every_dry_run_preserves_absent_state_and_absent_stores() {
     enable_commands(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
     for verb in VERBS {
-        let code = if matches!(verb, "transcribe" | "synthesize") {
+        let code = if matches!(verb, "transcribe" | "analyze") {
             2
         } else {
             0

@@ -6,7 +6,7 @@ const PROPOSAL: &str = "unknown additive proposal field: future_proposal";
 
 fn prepared() -> Sandbox {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
     for (file, field) in [
         ("engine.json", "future_engine"),
@@ -110,7 +110,7 @@ fn pipeline_preserves_engine_and_proposal_diagnostics_in_human_and_json_success(
 }
 
 #[test]
-fn later_synthesis_failure_preserves_diagnostics_from_completed_transcription() {
+fn later_analysis_failure_preserves_diagnostics_from_completed_transcription() {
     let sandbox = prepared();
     fs::write(
         sandbox.path().join("agent.proposal"),
@@ -140,7 +140,7 @@ fn stdout_failure_preserves_diagnostics_and_completed_pipeline_work() {
 }
 
 #[test]
-fn synthesis_run_finish_failure_preserves_proposal_diagnostics_and_completed_work() {
+fn analysis_run_finish_failure_preserves_proposal_diagnostics_and_completed_work() {
     for structured in [false, true] {
         let sandbox = prepared();
         json(&invoke(&sandbox, &[]));
@@ -148,10 +148,10 @@ fn synthesis_run_finish_failure_preserves_proposal_diagnostics_and_completed_wor
         let id = ledger.recordings().unwrap().remove(0).id;
         sql(
             &sandbox,
-            "CREATE TRIGGER refuse_synthesis_finish BEFORE INSERT ON history_records WHEN NEW.fact LIKE '%run_finished%' AND (SELECT kind FROM history_runs WHERE sequence=NEW.run_sequence)='synthesize' BEGIN SELECT RAISE(ABORT,'Private finish failure'); END",
+            "CREATE TRIGGER refuse_analysis_finish BEFORE INSERT ON history_records WHEN NEW.fact LIKE '%run_finished%' AND (SELECT kind FROM history_runs WHERE sequence=NEW.run_sequence)='analyze' BEGIN SELECT RAISE(ABORT,'Private finish failure'); END",
         );
         let mut command = sandbox.vpt();
-        command.args(["synthesize", id.as_str()]);
+        command.args(["analyze", id.as_str()]);
         if structured {
             command.arg("--json");
         }

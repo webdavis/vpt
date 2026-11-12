@@ -27,9 +27,7 @@ fn set_content(delta: &mut WorkDelta, content: &str) {
     delta.commit.publications[0].intended = delta.notes[0].artifact.digest;
 }
 
-pub(crate) fn synthesis_preserves_reviewed_claims_and_other_artifact_findings(
-    ledger: &impl Ledger,
-) {
+pub(crate) fn analysis_preserves_reviewed_claims_and_other_artifact_findings(ledger: &impl Ledger) {
     let run = seed(ledger);
     let initial = delta(accepted(ledger));
     committed(ledger.commit_step(run, &initial, &[fact(70, WorkOutcome::Completed)]));
@@ -131,7 +129,7 @@ pub(crate) fn synthesis_preserves_reviewed_claims_and_other_artifact_findings(
     assert!(saved.iter().all(|flag| flag.resolution == Resolution::Open));
 }
 
-pub(crate) fn synthesis_findings_roll_back_on_late_failure(ledger: &impl Ledger) {
+pub(crate) fn analysis_findings_roll_back_on_late_failure(ledger: &impl Ledger) {
     let run = seed(ledger);
     let initial = delta(accepted(ledger));
     committed(ledger.commit_step(run, &initial, &[fact(70, WorkOutcome::Completed)]));
@@ -172,7 +170,7 @@ pub(crate) fn synthesis_findings_roll_back_on_late_failure(ledger: &impl Ledger)
     assert_eq!(flags(ledger).len(), before.len() - 1);
 }
 
-pub(crate) fn synthesis_refuses_competing_verification_in_the_same_transaction(
+pub(crate) fn analysis_refuses_competing_verification_in_the_same_transaction(
     ledger: &impl Ledger,
 ) {
     let run = seed(ledger);
@@ -191,7 +189,7 @@ pub(crate) fn synthesis_refuses_competing_verification_in_the_same_transaction(
     assert!(ledger.accepted_proposal(&record(81).id).unwrap().is_none());
 }
 
-pub(crate) fn synthesis_findings_follow_rendered_markdown_and_recheck_idempotently(
+pub(crate) fn analysis_findings_follow_rendered_markdown_and_recheck_idempotently(
     ledger: &impl Ledger,
 ) {
     use vpt_domain::grounding::Finding;

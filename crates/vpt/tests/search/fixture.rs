@@ -97,16 +97,16 @@ fn accept(sandbox: &Sandbox, id: &RecordingId, segments: &[(f64, &str)]) {
     ));
 }
 
-pub(super) fn synthesized(sandbox: &Sandbox, id: &RecordingId, proposal: &str) {
+pub(super) fn analyzed(sandbox: &Sandbox, id: &RecordingId, proposal: &str) {
     let script = sandbox.path().join("agent.sh");
     let document = sandbox.path().join("proposal.json");
     std::fs::write(&script, "#!/bin/sh\n/bin/cat >/dev/null\n/bin/cat \"$1\"\n").unwrap();
     std::fs::write(&document, proposal).unwrap();
     record::write_config(
         sandbox,
-        &format!("[synthesis]\ncommand=['/bin/sh', {script:?}, {document:?}]\n"),
+        &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {document:?}]\n"),
     );
-    json(&invoke(sandbox, &["synthesize", id.as_str(), "--json"]));
+    json(&invoke(sandbox, &["analyze", id.as_str(), "--json"]));
     std::fs::remove_file(script).unwrap();
     std::fs::remove_file(document).unwrap();
 }

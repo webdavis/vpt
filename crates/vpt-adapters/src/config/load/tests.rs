@@ -339,7 +339,7 @@ fn table_values_report_the_declared_leaf_kind() {
         ("home.path", "string"),
         ("context.google.client_secret", "string"),
         ("context.calendars", "list of strings"),
-        ("synthesis.command", "list of strings"),
+        ("analysis.command", "list of strings"),
     ] {
         let error = load_text(&format!("config_version = 1\n{key} = {{}}"))
             .map(drop)

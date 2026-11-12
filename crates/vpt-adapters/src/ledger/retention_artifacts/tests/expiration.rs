@@ -118,7 +118,7 @@ pub(super) fn lifecycle(
     assert_eq!(ledger.release_payload(release_sequence).unwrap(), release);
     let record = ledger.by_id(&contract::record(81).id).unwrap().unwrap();
     assert_eq!(record.stages.note, StageState::Expired);
-    assert_eq!(record.stages.synthesis, StageState::Expired);
+    assert_eq!(record.stages.analysis, StageState::Expired);
 }
 
 #[test]

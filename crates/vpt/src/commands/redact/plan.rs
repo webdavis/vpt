@@ -21,7 +21,7 @@ pub(crate) fn next(
         .map_err(crate::compose::releases::errors::document)?;
     for (stage, state) in [
         (NoteStage::Transcript, record.stages.note),
-        (NoteStage::Analysis, record.stages.synthesis),
+        (NoteStage::Analysis, record.stages.analysis),
     ] {
         if state == StageState::Expired || !input.notes.iter().any(|n| n.stage == stage) {
             continue;

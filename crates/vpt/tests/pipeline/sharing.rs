@@ -1,11 +1,11 @@
 use super::*;
 
 fn enable(sandbox: &Sandbox) {
-    synthesis::append(sandbox, "\n[share]\nautomatic = true\n");
+    analysis::append(sandbox, "\n[share]\nautomatic = true\n");
 }
 
 #[test]
-fn automatic_sharing_without_synthesis_releases_once_and_dry_run_is_observational() {
+fn automatic_sharing_without_analysis_releases_once_and_dry_run_is_observational() {
     let sandbox = configured();
     enable(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
@@ -30,13 +30,13 @@ fn automatic_sharing_without_synthesis_releases_once_and_dry_run_is_observationa
         serde_json::json!([])
     );
     assert_eq!(ledger(&sandbox).releases(&row.id).unwrap(), sequences);
-    assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "calls"), 1);
 }
 
 #[test]
 fn automatic_sharing_releases_each_source_stage_and_reports_candidates_in_human_output() {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     enable(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
     fs::write(sandbox.path().join("agent.proposal"), r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[{"text":"Private words with Candidate","sources":["00:00-00:01"]}],"actions":[],"tags":[],"relations":[]}"#).unwrap();
@@ -56,13 +56,13 @@ fn automatic_sharing_releases_each_source_stage_and_reports_candidates_in_human_
         json(&invoke(&sandbox, &[]))["redacted"],
         serde_json::json!([])
     );
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
 }
 
 #[test]
-fn transcript_release_survives_later_synthesis_failure_and_retry_adds_only_analysis() {
+fn transcript_release_survives_later_analysis_failure_and_retry_adds_only_analysis() {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     enable(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
     let path = sandbox.path().join("agent.proposal");
@@ -116,7 +116,7 @@ fn sharing_is_off_by_default_and_enabling_it_processes_existing_notes() {
 #[test]
 fn sharing_plan_is_observational_and_human_run_lists_surviving_candidates() {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     fs::write(sandbox.path().join("agent.proposal"), r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[{"text":"Private words with Candidate","sources":["00:00-00:01"]}],"actions":[],"tags":[],"relations":[]}"#).unwrap();
     add(&sandbox, "one.m4a", 1_787_604_456);
     json(&invoke(&sandbox, &[]));

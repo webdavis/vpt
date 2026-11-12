@@ -18,7 +18,7 @@ for it.
 
 vpt collects the voice memos a person records on an iPhone and that iCloud syncs to their Mac, keeps a
 byte-identical copy of each original, transcribes it with one or two engines, writes a transcript note in
-Markdown, and optionally hands the transcript to an agent command for a synthesis note. Around that
+Markdown, and optionally hands the transcript to an agent command for an analysis note. Around that
 pipeline it offers per-occasion briefs assembled from those notes, redacted copies for sharing, each
 stage's text for another program to read, and a small amount of housekeeping.
 
@@ -38,7 +38,7 @@ vpt is not:
   never configures Voice Memos, and never touches the dictation path (FluidVoice stays exactly as it is).
   `vpt import` accepts one audio or video file that already exists on disk; whatever produced it, such as
   a workflow engine that downloaded a link, stays outside vpt.
-- a language model. Where a model is useful (synthesis, tag proposals) vpt runs a command the operator
+- a language model. Where a model is useful (analysis, tag proposals) vpt runs a command the operator
   configured, disabled by default, and names no vendor.
 
 vpt is a product other people install with `cargo install --git https://github.com/webdavis/vpt vpt`.
@@ -59,7 +59,7 @@ it says; it never records the option that lost.
 | T3  | 2026-07-21 | Third-party recorder applications are rejected as a capture route.                        |
 | T4  | 2026-07-21 | Just Press Record is rejected as a capture route.                                         |
 | T5  | 2026-07-21 | The purpose of extracting memos is a transcription pipeline.                              |
-| T6  | 2026-07-21 | Four stages (extract, transcribe, vault note, agent synthesis), one spec, a staged build. |
+| T6  | 2026-07-21 | Four stages (extract, transcribe, vault note, agent analysis), one spec, a staged build.  |
 | T7  | 2026-07-21 | Auto-create over review gates wherever a gate is not separately ruled.                    |
 | T8  | 2026-07-21 | `minutes` adds a layer of complexity (the doubt that decision D1 confirmed).              |
 | T9  | 2026-07-28 | FluidVoice is a must and stays in daily use; vpt never touches the dictation path.        |
@@ -153,13 +153,13 @@ permitted domain primitive, and one normalization policy serves alignment, terms
 Unicode version pinned by the lockfile.
 
 `vpt-application` holds one concrete use case per verb (`Setup`, `Run`, `Ingest`, `Transcribe`,
-`WriteNote`, `Path`, `Synthesize`, `Review`, `Confirm`, `Brief`, `Redact`, `Handoff`, `Storage`,
+`WriteNote`, `Path`, `Analyze`, `Review`, `Confirm`, `Brief`, `Redact`, `Handoff`, `Storage`,
 `Retention`, `Doctor`, `Symlink`) and the ports below. A use case is a concrete type; no use case gets a
 trait.
 
 `vpt-protocol` holds the documents that cross a process boundary, each carrying a `schema` string with a
 major version: `vpt.engine/1` (an engine's transcript), `vpt.event/1` (a report or alert), `vpt.proposal/1`
-(an agent's synthesis), `vpt.context/1` (calendar and task context), `vpt.brief/1`, and
+(an agent's analysis), `vpt.context/1` (calendar and task context), `vpt.brief/1`, and
 the `--json` output and error documents. It is plain serde over JSON. An unknown major version is refused
 with the version named; an unknown additive field is accepted and named in diagnostics; byte, depth,
 array-length and text-length limits are enforced while a document is read, before it is fully allocated:
@@ -187,7 +187,7 @@ not depend on `vpt-protocol`.
 | `Trash`                   | move a path to the system Trash                                                           | `macos_helper` (`vpt-macos trash`)                                                                 |
 | `EventSink`               | log an `Event` and invoke its configured report or alert hook                              | logging with optional command execution                                                           |
 | `ContextSource`           | a `ContextSnapshot` (occasions and tasks) for a window and a selection                    | `dam` (spawns `dam ls --json --no-pull`), `google` (native HTTPS, read-only scope), `none`         |
-| `AgentCommand`            | run the configured synthesis command over a transcript and read a `Proposal` back         | `command`                                                                                          |
+| `AgentCommand`            | run the configured analysis command over a transcript and read a `Proposal` back          | `command`                                                                                          |
 | `KnownTerms`, `KnownTags` | read and append the two confirmation lists                                                | `filesystem`                                                                                       |
 
 Every port is a trait because each is an external capability with a fake in tests. Nothing else in the
@@ -200,20 +200,20 @@ workspace is a trait. `dyn Trait` appears only at the composition root in `vpt`.
 | 1 Extract              | identity, wholeness gate, sweep decision         | `Ingest`                                   | `RecorderStore`, `Archive`, `Ledger`, `EventSink`          |
 | 2 Transcribe           | normalize, align, classify, rank, readability    | `Transcribe`, `Review`, `Confirm`          | `Engine` x2, `Ledger`, `Stores`, `KnownTerms`, `EventSink` |
 | 3 Vault note           | render, managed block, tag gate, relations, slug | `WriteNote`, `Path`                        | `Stores`, `Ledger`, `KnownTags`                           |
-| 4 Synthesis and extras | verify-note grounding, brief selector, redaction | `Synthesize`, `Brief`, `Redact`, `Handoff` | `AgentCommand`, `ContextSource`, `Stores`, `Ledger`       |
+| 4 Analysis and extras  | verify-note grounding, brief selector, redaction | `Analyze`, `Brief`, `Redact`, `Handoff`    | `AgentCommand`, `ContextSource`, `Stores`, `Ledger`       |
 
 `vpt run` composes the use cases in stage order. Each stage of a recording is `pending`, `succeeded`,
 `failed`, `disabled` or `expired`; success is recorded only after the stage's artifacts commit. Stage
 eligibility is evaluated from the current configuration on every run: a stage that is off in config is
 marked `disabled` and skipped, and an incomplete stage marked `disabled` on an earlier run becomes
-`pending` when its configuration enables it, so a recording processed before synthesis was configured is
-synthesized once it is. Disabling a stage discards nothing: an earlier `succeeded` or `expired` state
-stays. Every derived stage records the digest of the exact input it consumed: synthesis records the
+`pending` when its configuration enables it, so a recording processed before analysis was configured is
+analyzed once it is. Disabling a stage discards nothing: an earlier `succeeded` or `expired` state
+stays. Every derived stage records the digest of the exact input it consumed: analysis records the
 digest of the content-region bytes it wrote to the command's stdin, and a verification finding records
 the claim, the transcript and the lexical-flag state it was computed against. Before selecting work on
-every run, vpt renders the current synthesis input (a review correction and the readability pass both
+every run, vpt renders the current analysis input (a review correction and the readability pass both
 change it without touching the transcript of record) and compares its digest with the recorded one; a
-mismatch makes enabled synthesis `pending` again unless retention expired its output. A verification
+mismatch makes enabled analysis `pending` again unless retention expired its output. A verification
 finding and the inherited uncertainty persisted with a proposal are current only while the transcript and
 the lexical-flag state they recorded are the current ones; a change to either invalidates the prior
 result and the next run recomputes it. A run selects every recording with an enabled stage that is
@@ -221,9 +221,9 @@ result and the next run recomputes it. A run selects every recording with an ena
 next run; an `expired` stage (retention moved its artifact) is never retried by `run`, and a released
 copy is immutable whatever changes upstream.
 
-Configuration and input-driven synthesis state changes commit with a `synthesis_state_changed`
+Configuration and input-driven analysis state changes commit with an `analysis_state_changed`
 history fact naming the recording and its previous/next states. Scheduling work is not completed
-synthesis. If an engine or agent is interrupted, its child run and parent pipeline finish as
+analysis. If an engine or agent is interrupted, its child run and parent pipeline finish as
 `interrupted`; known committed work remains in the command result.
 
 ### 3.4 The macOS helper
@@ -272,7 +272,7 @@ The home is one directory, default `~/.vpt`, under which every store lands by de
 | ---------------- | --------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `audio`          | `audio/`                    | the archive clone of each recording, `<id>.m4a`, mode 0600                                     | the recording itself                      |
 | `transcripts`    | `transcripts/`              | the transcript note per recording                                                              | searchable text of the recording          |
-| `analysis`       | `analysis/`                 | the synthesis note per recording                                                               | derived text                              |
+| `analysis`       | `analysis/`                 | the analysis note per recording                                                                | derived text                              |
 | `briefs`         | `briefs/`                   | one brief per occasion                                                                         | names the people in a room                |
 | `engine_outputs` | `engine-outputs/`           | each engine's raw `vpt.engine/1` document, `<id>.<engine>.json`, mode 0600                     | full transcripts with timings             |
 | `drafts`         | `drafts/`                   | each redacted copy's private report, `<id>.<stage>.<creation-sequence>.report.json`, mode 0600 | the map from every mask to its real value |
@@ -373,10 +373,10 @@ and `vpt note write` reads nothing else. `vpt show <id> --json` prints a recordi
 `vpt list --json` prints the recordings table.
 
 An accepted proposal also retains the exact vocabulary publication created by its transaction, when
-automatic tag learning adds entries. A synthesis retry recognizes this dependency even after both
+automatic tag learning adds entries. An analysis retry recognizes this dependency even after both
 notes have finished publishing. Once recovery completes, unchanged source and grounding inputs allow
 returning the saved result without rerunning the agent. Unrelated pending vocabulary work does not
-suppress an explicit synthesis request.
+suppress an explicit analysis request.
 
 Every mutating command takes one advisory lock on `<state_dir>/write.lock` (`flock`, close on exec),
 waiting at most five seconds and exiting 1 when it cannot; a read-only verb takes none. A mutation
@@ -731,7 +731,7 @@ flag, marks it `corrected`, and appends the corrected text to `known-terms.txt` 
 correction improves every future transcript and redaction; the transcript of record is never rewritten
 and the note's inline marker is re-rendered as `[corrected: <text>]`. `--dismiss` closes the flag. A
 resolved flag stays resolved across re-runs. Every resolution re-renders the note, so a correction
-changes the synthesis input and makes a succeeded synthesis `pending` again (section 3.3). The inline
+changes the analysis input and makes a succeeded analysis `pending` again (section 3.3). The inline
 marker in the note is the exact word wrapped as `[unverified: <record text> | <alternative>]` for a
 disagreement and `[unverified: <text>]` for the other classes; the note's frontmatter carries
 `vptOpenFlags`.
@@ -837,7 +837,7 @@ timecode is the source reference every consumer uses. Transcript uncertainty app
 places, the inline markers and `vpt review <id>`: there is no summary block and no separate document.
 
 A note has two managed regions, `vpt:links` and `vpt:content`, each between a start and an end marker.
-Generated content (the transcript or the synthesis, with its inline markers and annotations) lives in
+Generated content (the transcript or the analysis, with its inline markers and annotations) lives in
 `vpt:content`; links live in `vpt:links`. A rewrite replaces the two regions and the frontmatter keys vpt
 owns (every `vpt` key, and `tags` merged so a tag the operator added by hand is kept) and preserves every
 other byte, so prose a person adds above, between or below the regions survives. A note whose required
@@ -882,7 +882,7 @@ Indexing grants no write authority: vpt still writes into no note it did not cre
 
 - `write` (fully automatic): a new tag is written to `tags` as `confirmed` and appended to
   `known-tags.txt`; nothing is ever held and nothing asks. The ledger records each tag it appended.
-  When a later synthesis drops one of those tags and no recording's tag state and no other indexed
+  When a later analysis drops one of those tags and no recording's tag state and no other indexed
   note carries it, the line leaves `known-tags.txt` in the same journaled publication. Any other line
   stays.
 - `hold` (shipped default): a new tag is written to `vptSuggestedTags` as `suggested` until
@@ -948,17 +948,17 @@ directory commit them. Consequences vpt states rather than hides:
   inside a vault, the operator either accepts that those JSON files are committed or points the two
   stores elsewhere; `doctor` names the two as sensitive when they sit in a git tree.
 
-## 8. Stage 4: Synthesis and extras
+## 8. Stage 4: Analysis and extras
 
 ### 8.1 The agent command
 
-`[synthesis] command` is an argv list, empty by default, which means synthesis is off: `vpt run` skips it
-and `vpt synthesize` refuses with exit 2. Automatic redaction is not part of that switch; it follows
-`[share] automatic` alone (section 8.5). When set, `vpt synthesize <id>` runs the command with
+`[analysis] command` is an argv list, empty by default, which means analysis is off: `vpt run` skips it
+and `vpt analyze` refuses with exit 2. Automatic redaction is not part of that switch; it follows
+`[share] automatic` alone (section 8.5). When set, `vpt analyze <id>` runs the command with
 `{transcript}` (the note path), `{id}`, `{language}`, `{captured_at}` (the capture time as RFC 3339 in
 its local offset), `{known_tags}` and `{refused_tags}` substituted,
 writes the transcript note's content region on the command's stdin, records the digest of exactly those bytes as the proposal's input digest
-(section 3.3), and reads one `vpt.proposal/1` document from its stdout within `[synthesis] timeout_secs`
+(section 3.3), and reads one `vpt.proposal/1` document from its stdout within `[analysis] timeout_secs`
 (default 600):
 
 ```json
@@ -1047,7 +1047,7 @@ sentence in a paragraph is a claim line. Four classes, in order:
 1. `unsourced`: no `[mm:ss-mm:ss]` range on the line.
 1. `bad-reference`: a range that is empty, inverted, or outside the transcript's bounds.
 1. `unsupported`: the claim's digit runs, money amounts, dates and capitalized tokens do not appear in
-   the cited span or within `[synthesis] grounding_window_secs` (default 15) of it. Paraphrase is not
+   the cited span or within `[analysis] grounding_window_secs` (default 15) of it. Paraphrase is not
    checked; that needs a model, and a model checking a model's summary reintroduces the error class this
    exists to catch.
 1. `built-on-flagged-text`: an open surfaced lexical flag of any class (`numeric`, `proper-noun`,
@@ -1070,11 +1070,11 @@ index, annotation-stripped claim, and saved correction match. Unrecognized unmar
 claim text. Newly marked finding corrections are excluded even after their claim is edited, so they
 cannot become evidence or acquire a resolution on the edited claim.
 Each saved check records its grounding window, including checks with no findings. Automatic runs
-recheck live artifacts when that window differs from the configured value, even with synthesis
+recheck live artifacts when that window differs from the configured value, even with analysis
 disabled. Rechecking retains unchanged claim resolutions and updates both owned notes' counts.
 Legacy checks without a recorded window require rechecking rather than assuming the default;
 expired artifacts remain expired.
-Findings alone exit 0; a read or write failure exits 1. `vpt synthesize` runs
+Findings alone exit 0; a read or write failure exits 1. `vpt analyze` runs
 `verify-note` on the analysis note it just wrote before it notifies.
 
 ### 8.3 Briefs
@@ -1208,7 +1208,7 @@ vpt redact <id> [--stage transcript|analysis] [--to <dir>] [--title <t>] [--json
 ```
 
 Two ways to produce a copy: `[share] automatic = true` makes `vpt run` redact every recording's
-transcript note as soon as it is written, with synthesis configured or not, and its analysis note as soon
+transcript note as soon as it is written, with analysis configured or not, and its analysis note as soon
 as that artifact exists; `vpt redact` does it on demand for one recording. Both write into
 `[stores] released`, and `--to <dir>` names a different destination for that run. The destination may not
 resolve inside a private store (`audio`, `transcripts`, `analysis`, `briefs`, `engine_outputs`,
@@ -1234,7 +1234,7 @@ them, and vpt claims nothing else. A span with an open lexical flag is omitted a
 pass may not strip. In an analysis copy the unit is the claim: `flagged_spans` applies to every claim
 carrying `built-on-flagged-text` (section 8.2), `omit` removing and counting the whole claim and `mark`
 keeping it with its `[unverified]` annotation, and a transcript word offset is never applied to
-synthesized text.
+analyzed text.
 
 The pass runs over parsed Markdown: character references are decoded first; HTML, comments, reference
 definitions and every link destination are discarded; retained text is re-escaped on render. Candidate
@@ -1383,10 +1383,10 @@ Verification alerts also include nonzero `unsourced`, `bad_reference`, and
 class. Per-recording and aggregate events count all four classes without including claim text.
 
 Event names are `review_needed`, `transcribe_failed`, `ingest_failed`, `deferred`, `brief_written`,
-`retention`, `config_refused`, `transcribed` and `synthesized`. `state` is `needs_attention`, `failed` or
-`done`. Completed briefs, retention summaries, finished transcriptions and finished syntheses are
+`retention`, `config_refused`, `transcribed` and `analyzed`. `state` is `needs_attention`, `failed` or
+`done`. Completed briefs, retention summaries, finished transcriptions and finished analyses are
 reports; the other events are alerts. `transcribed` commits with the run's end after the transcript note
-is published, and `synthesized` commits after the analysis note is published; each carries the
+is published, and `analyzed` commits after the analysis note is published; each carries the
 `recording` and `paths.note`, with zero counts. `counts` carries one entry per lexical
 class plus `diagnostics`. Logs and hook input contain identities, counts, classes and paths, never a
 transcript span, an alternative, a title, a tag, a mask value or a brief line.
@@ -1461,9 +1461,9 @@ and the error carries a `completed` field listing the work already committed (fo
 a sweep ingested before it aborted). A result with no schema of its own carries `schema: "vpt.result/1"`
 and `command: "<verb>"`; an error carries `schema: "vpt.error/1"`. Without `--json`, success prints human
 lines and failure prints `vpt: <message>`. `--progress` is the one exception to holding output back: it
-adds compact `vpt.progress/1` JSON lines (`recording`, `step` `transcribe` or `synthesize`, `state`
-`started`, `done` or `failed`, `audio_secs`, `at`) on stderr as each engine run and synthesis command in
-`run`, `transcribe` or `synthesize` starts and ends. Stdout is unchanged; a failure's error document follows
+adds compact `vpt.progress/1` JSON lines (`recording`, `step` `transcribe` or `analyze`, `state`
+`started`, `done` or `failed`, `audio_secs`, `at`) on stderr as each engine run and analysis command in
+`run`, `transcribe` or `analyze` starts and ends. Stdout is unchanged; a failure's error document follows
 the progress lines, so under `--json` stderr stays one JSON object per line. Without the flag stderr
 carries only the error document. `--config <file>` overrides the config path; `VPT_CONFIG` does
 the same. An unknown argument or subcommand prints usage to stderr and exits 2, as an error document
@@ -1473,7 +1473,7 @@ under `--json`.
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | `vpt setup [--force]`                                                                         | `config.toml` (the main engine prompted for, every other key at its default), the home, the state directory, the default store leaves | `{"written": "<path>", "main_engine": "<name>"}`                                                                      | 0, 2 exists or no terminal            |
 | `vpt doctor`                                                                                  | nothing                                                                                                                               | `{"checks": [{"name", "ok", "detail"}]}` when all pass; `vpt.error/1` with the same array in `error.checks` otherwise | 0 all ok, 3 any failed                |
-| `vpt run [--dry-run]`                                                                         | everything a stage writes, for new work                                                                                               | `{"ingested": [..], "transcribed": [..], "notes": [..], "synthesized": [..], "redacted": [..], "retention": {..}}`    | 0, 1 any stage failed                 |
+| `vpt run [--dry-run]`                                                                         | everything a stage writes, for new work                                                                                               | `{"ingested": [..], "transcribed": [..], "notes": [..], "analyzed": [..], "redacted": [..], "retention": {..}}`       | 0, 1 any stage failed                 |
 | `vpt ingest [--dry-run] [--once <path>]`                                                      | clones, ledger rows                                                                                                                   | `{"ingested": [record...], "deferred": [{"path", "reason"}], "skipped": n}`                                           | 0, 1 aborted                          |
 | `vpt import <file> [--title <t>] [--captured-at <RFC3339>]`                                   | clones, ledger rows                                                                                                                   | the `ingest` shape                                                                                                    | 0, 1 aborted, 2 no file, 3 refused    |
 | `vpt transcribe <id> [--language <tag>] [--dry-run]`                                          | engine outputs, flags, transcript note                                                                                                | the record plus `{"flags": {"<class>": n}}`                                                                           | 0, 1 engines failed, 3 refused        |
@@ -1482,8 +1482,8 @@ under `--json`.
 | `vpt tag rename <old> <new> [--dry-run]`                                                      | tag state, owned note rewrite, `known-tags.txt`, the rename record                                                                    | `{"dry_run", "changed", "recordings": [{"id", "notes"}], "known_tags_changed", "untouched_briefs", "untouched_notes"}` | 0, 1 or 3 some recordings failed, 2   |
 | `vpt note write <id>`                                                                         | re-renders managed regions of both notes                                                                                              | the record                                                                                                            | 0, 3 markers                          |
 | `vpt path <id> --stage <stage>` / `vpt path --occasion <id> --stage brief`                    | nothing                                                                                                                               | `{"path": "<abs>"}`                                                                                                   | 0, 2                                  |
-| `vpt synthesize <id> [--dry-run]`                                                             | analysis note, tags, relations                                                                                                        | the record plus `{"verify": {"<class>": n}}`                                                                          | 0, 1 command failed, 2 not configured |
-| `vpt synthesize --all [--since <RFC3339>] [--dry-run]` / `vpt synthesize --stdin [--dry-run]` | the same, per recording, under one write lock                                                                                         | `{"dry_run", "recordings": [{"id", "status", "summary_changed", "tags_added", "tags_removed"}]}`                      | 0, 1 any recording failed, 2 usage    |
+| `vpt analyze <id> [--dry-run]`                                                                | analysis note, tags, relations                                                                                                        | the record plus `{"verify": {"<class>": n}}`                                                                          | 0, 1 command failed, 2 not configured |
+| `vpt analyze --all [--since <RFC3339>] [--dry-run]` / `vpt analyze --stdin [--dry-run]`       | the same, per recording, under one write lock                                                                                         | `{"dry_run", "recordings": [{"id", "status", "summary_changed", "tags_added", "tags_removed"}]}`                      | 0, 1 any recording failed, 2 usage    |
 | `vpt verify-note <path> --recording <id>`                                                     | the owned artifact's annotations                                                                                                      | `{"flags": [{"class", "line", "range"}]}`                                                                             | 0, 1, 3                               |
 | `vpt brief <occasion> [--explain] [--dry-run]` / `--title --at ...` / `--upcoming`            | brief note, occasion row, events                                                                                                      | `vpt.brief/1`, or `{"written": [..]}` for `--upcoming`                                                                | 0, 2, 3                               |
 | `vpt occasions`                                                                               | nothing                                                                                                                               | `{"occasions": [..]}`                                                                                                 | 0                                     |
@@ -1532,7 +1532,7 @@ nothing else does.
 
 `--dry-run`, wherever a verb offers it, opens existing state read-only and performs no migration,
 directory creation, ledger write, artifact write, notification or Trash move. `run`, `transcribe` and
-`synthesize` spawn no engine and no agent command under it and report the operations they would perform;
+`analyze` spawn no engine and no agent command under it and report the operations they would perform;
 `brief --dry-run` may collect configured read-only context and prints the pack it would write;
 `ingest --dry-run` neither creates nor refreshes the title copy and creates no durable state.
 
@@ -1571,7 +1571,7 @@ canary-secret test.
 | `helper.path`                        | string         | `vpt-macos`                                                               | the macOS helper, resolved on `PATH` when relative                                                           |
 | `stores.audio`                       | string         | `<home>/audio`                                                            | archive clones                                                                                               |
 | `stores.transcripts`                 | string         | `<home>/transcripts`                                                      | transcript notes                                                                                             |
-| `stores.analysis`                    | string         | `<home>/analysis`                                                         | synthesis notes                                                                                              |
+| `stores.analysis`                    | string         | `<home>/analysis`                                                         | analysis notes                                                                                               |
 | `stores.briefs`                      | string         | `<home>/briefs`                                                           | briefs                                                                                                       |
 | `stores.engine_outputs`              | string         | `<home>/engine-outputs`                                                   | raw engine documents                                                                                         |
 | `stores.drafts`                      | string         | `<home>/drafts`                                                           | private redaction reports                                                                                    |
@@ -1615,9 +1615,9 @@ canary-secret test.
 | `tags.max_suggested`                 | int            | `10`                                                                      | held tags per note                                                                                           |
 | `relations.session_gap_minutes`      | int            | `60`                                                                      | `continues` window                                                                                           |
 | `relations.max_suggested`            | int            | `5`                                                                       | agent-proposed `related` links kept per note                                                                 |
-| `synthesis.command`                  | string list    | `[]`                                                                      | the agent command; empty disables synthesis only (automatic redaction is `share.automatic`)                  |
-| `synthesis.timeout_secs`             | int            | `600`                                                                     | the command's deadline                                                                                       |
-| `synthesis.grounding_window_secs`    | int            | `15`                                                                      | verify-note's tolerance around a cited span                                                                  |
+| `analysis.command`                   | string list    | `[]`                                                                      | the agent command; empty disables analysis only (automatic redaction is `share.automatic`)                   |
+| `analysis.timeout_secs`              | int            | `600`                                                                     | the command's deadline                                                                                       |
+| `analysis.grounding_window_secs`     | int            | `15`                                                                      | verify-note's tolerance around a cited span                                                                  |
 | `brief.lookback_days`                | int            | `180`                                                                     | how far back selection reaches                                                                               |
 | `brief.max_notes`                    | int            | `12`                                                                      | selection cap                                                                                                |
 | `brief.max_spans_per_note`           | int            | `5`                                                                       | quoted spans per selected note                                                                               |
@@ -1741,7 +1741,7 @@ Refused at startup, before any work, exit 2 or 3 as marked:
 - the `obsidian` profile with `note.obsidian.vault_root` empty, relative or not an existing directory
   (2).
 - the helper present with a different major version (3, `helper_version`).
-- `brief --upcoming` with the trigger disabled (2); `synthesize` with no command (2); `show --redact`
+- `brief --upcoming` with the trigger disabled (2); `analyze` with no command (2); `show --redact`
   without `--stage` or with `--stage released` (2).
 
 `vpt doctor` never refuses at startup: it runs every check, prints the whole result and exits 3 when any
@@ -1898,13 +1898,13 @@ tag gate with `new_tags`, `known-tags.txt`, `vpt confirm --tag|--reject-tag|--re
 relations, the output-tree index, rename recovery, the vault-related `doctor` checks, and `vpt run`
 composing stages 1 to 3. Depends on stage 2.
 
-### Stage 4: Synthesis and extras
+### Stage 4: Analysis and extras
 
-Ships `[synthesis]`, `vpt.proposal/1`, `vpt synthesize`, `vpt verify-note` and the analysis note;
+Ships `[analysis]`, `vpt.proposal/1`, `vpt analyze`, `vpt verify-note` and the analysis note;
 occasions, `vpt brief` in all three forms, `vpt occasions`, `vpt.brief/1`, `vpt.context/1`, the `dam`,
 `google` and `none` context sources, the calendar trigger and `brief_written`; `vpt redact`, `[share]`,
 the release rows and the draft reports; `vpt show --stage` with its text and `--redact`; and `vpt run` extended with
-synthesis and automatic redaction. Depends on stage 3.
+analysis and automatic redaction. Depends on stage 3.
 
 ### Deferred until the external notebook is deployed
 

@@ -85,7 +85,7 @@ fn stage_case(stage: &str) -> (String, serde_json::Value) {
         StageStates {
             transcribe: StageState::Succeeded,
             note: StageState::Pending,
-            synthesis: StageState::Disabled,
+            analysis: StageState::Disabled,
         },
     );
     let second = record(
@@ -94,7 +94,7 @@ fn stage_case(stage: &str) -> (String, serde_json::Value) {
         StageStates {
             transcribe: StageState::Failed,
             note: StageState::Succeeded,
-            synthesis: StageState::Pending,
+            analysis: StageState::Pending,
         },
     );
     let done = record(
@@ -103,7 +103,7 @@ fn stage_case(stage: &str) -> (String, serde_json::Value) {
         StageStates {
             transcribe: StageState::Succeeded,
             note: StageState::Succeeded,
-            synthesis: StageState::Succeeded,
+            analysis: StageState::Succeeded,
         },
     );
     seed(&sandbox, vec![done, first, second]);
@@ -129,8 +129,8 @@ fn list_note_includes_pending_but_not_succeeded() {
 }
 
 #[test]
-fn list_synthesis_includes_disabled_and_pending() {
-    let (_, result) = stage_case("synthesis");
+fn list_analysis_includes_disabled_and_pending() {
+    let (_, result) = stage_case("analysis");
     assert_eq!(result["recordings"].as_array().unwrap().len(), 2);
     assert_eq!(result["recordings"][0]["title"], "title-1");
     assert_eq!(result["recordings"][1]["title"], "title-2");

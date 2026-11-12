@@ -32,7 +32,7 @@ fn commands(sandbox: &Sandbox) -> Vec<Vec<String>> {
         vec!["confirm", &id, "--reject-tag", "planning"],
         vec!["confirm", &id, "--relation", &format!("related:{id}")],
         vec!["note", "write", &id],
-        vec!["synthesize", &id],
+        vec!["analyze", &id],
         vec!["verify-note", note.to_str().unwrap(), "--recording", &id],
         vec!["occasions"],
         vec!["path", &id, "--stage", "transcript"],

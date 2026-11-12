@@ -72,6 +72,6 @@ pub(crate) fn note_stage_completion_commits_with_publication_history(
     assert!(ledger.pending_publications().unwrap().is_empty());
     let stages = ledger.by_id(&artifact().recording).unwrap().unwrap().stages;
     assert_eq!(stages.note, StageState::Succeeded);
-    assert_eq!(stages.synthesis, StageState::Pending);
+    assert_eq!(stages.analysis, StageState::Pending);
     assert_eq!(ledger.pending_exports().unwrap().len(), 4);
 }

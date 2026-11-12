@@ -19,7 +19,7 @@ pub(super) fn run<E: EventSink>(
         .ok_or_else(crate::commands::note::errors::not_found)?;
     let state = match stage {
         NoteStage::Transcript => input.record.stages.note,
-        NoteStage::Analysis => input.record.stages.synthesis,
+        NoteStage::Analysis => input.record.stages.analysis,
     };
     if state == StageState::Expired || !input.notes.iter().any(|n| n.stage == stage) {
         return Ok(());

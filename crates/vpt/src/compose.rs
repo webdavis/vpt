@@ -1,9 +1,9 @@
+pub(crate) mod analysis_state;
 pub(crate) mod publication;
 pub(crate) mod releases;
 pub(crate) mod review_notice;
 pub(crate) mod run_outcome;
 pub(crate) mod startup;
-pub(crate) mod synthesis_state;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use vpt_adapters::config::{ConfigError, default_state_dir, from_table, load_file};

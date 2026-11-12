@@ -11,7 +11,7 @@ pub(super) fn apply(
     if let Some(change) = eligibility::check(delta, facts)? {
         let changed = connection
             .execute(
-                "UPDATE recordings SET stage_synthesis=?1 WHERE id=?2 AND stage_synthesis=?3",
+                "UPDATE recordings SET stage_analysis=?1 WHERE id=?2 AND stage_analysis=?3",
                 params![
                     change.next.as_str(),
                     change.recording.as_str(),

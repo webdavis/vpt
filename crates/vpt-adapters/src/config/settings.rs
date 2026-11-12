@@ -1,3 +1,4 @@
+mod analysis;
 mod brief;
 mod context;
 mod engines;
@@ -5,7 +6,6 @@ mod note;
 mod reconcile;
 mod retention;
 mod share;
-mod synthesis;
 mod tags;
 use super::{ConfigError, get};
 use std::path::{Path, PathBuf};
@@ -46,7 +46,7 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         readability_enabled: boolean(table, "readability.enabled")?,
         note: note::from_table(table, home_dir)?,
         tags: tags::from_table(table, home_dir)?,
-        synthesis: synthesis::from_table(table)?,
+        analysis: analysis::from_table(table)?,
         brief: brief::from_table(table)?,
         context: context::from_table(table)?,
         share: share::from_table(table)?,

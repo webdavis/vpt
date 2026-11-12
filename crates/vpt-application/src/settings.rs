@@ -6,11 +6,11 @@ mod context;
 pub use context::{ContextSettings, ContextSource, GoogleCredentials};
 mod note;
 pub use brief::BriefSettings;
+mod analysis;
 mod share;
-mod synthesis;
+pub use analysis::AnalysisSettings;
 pub use note::{LinkStyle, NoteProfile, NoteSettings, ObsidianSettings};
 pub use share::ShareSettings;
-pub use synthesis::SynthesisSettings;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Settings {
@@ -21,7 +21,7 @@ pub struct Settings {
     pub note: NoteSettings,
     pub tags: TagSettings,
     pub relations: vpt_domain::relations::Options,
-    pub synthesis: SynthesisSettings,
+    pub analysis: AnalysisSettings,
     pub brief: BriefSettings,
     pub context: ContextSettings,
     pub share: ShareSettings,

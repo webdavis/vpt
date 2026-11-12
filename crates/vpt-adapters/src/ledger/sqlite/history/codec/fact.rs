@@ -29,7 +29,7 @@ pub(super) fn decode(value: &Value) -> Result<HistoryFact, LedgerError> {
             occasion: vpt_domain::occasion::OccasionId::parse(string(value, "occasion")?)
                 .map_err(|_| corrupt())?,
         }),
-        "synthesis_state_changed" => Ok(HistoryFact::SynthesisStateChanged {
+        "analysis_state_changed" => Ok(HistoryFact::AnalysisStateChanged {
             recording: recording(value, "recording")?.ok_or_else(corrupt)?,
             from: vpt_domain::stage::StageState::parse(string(value, "from")?)
                 .ok_or_else(corrupt)?,

@@ -49,7 +49,7 @@ fn observations_expose_later_metadata_and_expiration_without_writes() {
     let before = fixture::snapshot(&sandbox);
     let expired = show(&sandbox, row.id.as_str());
     assert_eq!(expired["stages"]["note"], "expired");
-    assert_eq!(expired["stages"]["synthesis"], "expired");
+    assert_eq!(expired["stages"]["analysis"], "expired");
     assert_eq!(expired["engines"], shown["engines"]);
     assert_eq!(expired["note_paths"], shown["note_paths"]);
     assert!(
@@ -59,7 +59,7 @@ fn observations_expose_later_metadata_and_expiration_without_writes() {
             .iter()
             .all(|a| a["status"] == "expired" && a["trashed_at"].is_string())
     );
-    for stage in ["note", "synthesis"] {
+    for stage in ["note", "analysis"] {
         let listed = json(&support::run(
             sandbox.vpt().args(["list", "--stage", stage, "--json"]),
         ));
@@ -83,7 +83,7 @@ fn observations_count_current_flags_and_hide_stale_verification() {
     json(&invoke(&sandbox, &[]));
     let row = ledger(&sandbox).recordings().unwrap().remove(0);
     lexical_freshness::flag_first_word(&sandbox, &row);
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     json(&invoke(&sandbox, &[]));
     let before = fixture::snapshot(&sandbox);
     let observed = show(&sandbox, row.id.as_str());
@@ -126,7 +126,7 @@ fn observations_count_current_flags_and_hide_stale_verification() {
             .unwrap()
             .contains(&serde_json::json!("analysis"))
     );
-    assert_eq!(observed["stages"]["synthesis"], "pending");
+    assert_eq!(observed["stages"]["analysis"], "pending");
     assert_eq!(fixture::snapshot(&sandbox), before);
 }
 

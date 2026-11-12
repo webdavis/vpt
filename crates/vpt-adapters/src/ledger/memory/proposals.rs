@@ -44,9 +44,7 @@ pub(super) fn apply(
         .position(|row| row.id == *change.recording())
         .ok_or_else(conflict)?;
     match change {
-        ProposalChange::Fail { .. } => {
-            state.recordings[index].stages.synthesis = StageState::Failed
-        }
+        ProposalChange::Fail { .. } => state.recordings[index].stages.analysis = StageState::Failed,
         ProposalChange::Accept(accepted) => {
             let transcript = state
                 .transcripts
@@ -100,7 +98,7 @@ pub(super) fn apply(
                 Some(row) => *row = accepted.as_ref().clone(),
                 None => state.proposals.push(accepted.as_ref().clone()),
             }
-            state.recordings[index].stages.synthesis = StageState::Pending;
+            state.recordings[index].stages.analysis = StageState::Pending;
         }
     }
     Ok(())

@@ -24,12 +24,12 @@ fn last_outcome(sandbox: &Sandbox, kind: &str) -> String {
 }
 
 #[test]
-fn interrupted_synthesis_marks_child_and_pipeline_runs_interrupted() {
+fn interrupted_analysis_marks_child_and_pipeline_runs_interrupted() {
     for pipeline in [false, true] {
         let sandbox = configured();
         add(&sandbox, "one.m4a", 1_787_604_456);
         json(&invoke(&sandbox, &[]));
-        synthesis::enable(&sandbox);
+        analysis::enable(&sandbox);
         let row = ledger(&sandbox).recordings().unwrap().remove(0);
         fs::write(
             sandbox.path().join("agent.sh"),
@@ -40,9 +40,7 @@ fn interrupted_synthesis_marks_child_and_pipeline_runs_interrupted() {
             invoke(&sandbox, &[])
         } else {
             support::run_with_budget(
-                sandbox
-                    .vpt()
-                    .args(["synthesize", row.id.as_str(), "--json"]),
+                sandbox.vpt().args(["analyze", row.id.as_str(), "--json"]),
                 std::time::Duration::from_secs(5),
             )
         };
@@ -55,10 +53,10 @@ fn interrupted_synthesis_marks_child_and_pipeline_runs_interrupted() {
                 .unwrap()
                 .unwrap()
                 .stages
-                .synthesis,
+                .analysis,
             StageState::Failed
         );
-        assert_eq!(last_outcome(&sandbox, "synthesize"), "interrupted");
+        assert_eq!(last_outcome(&sandbox, "analyze"), "interrupted");
         if pipeline {
             assert_eq!(last_outcome(&sandbox, "run"), "interrupted");
         }

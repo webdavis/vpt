@@ -9,14 +9,14 @@ use vpt_domain::run::{
 use vpt_domain::sweep::DeferralReason;
 
 #[test]
-fn synthesis_state_history_names_the_recording_and_both_states() {
+fn analysis_state_history_names_the_recording_and_both_states() {
     assert_fact(
-        HistoryFact::SynthesisStateChanged {
+        HistoryFact::AnalysisStateChanged {
             recording: recording(),
             from: vpt_domain::stage::StageState::Disabled,
             to: vpt_domain::stage::StageState::Pending,
         },
-        json!({"tag":"synthesis_state_changed", "recording":recording().as_str(),
+        json!({"tag":"analysis_state_changed", "recording":recording().as_str(),
         "from":"disabled", "to":"pending"}),
     );
 }

@@ -27,7 +27,7 @@ pub(crate) fn record_json(record: &RecordingRecord) -> Result<Value, ErrorDocume
         "stages": {
             "transcribe": record.stages.transcribe.as_str(),
             "note": record.stages.note.as_str(),
-            "synthesis": record.stages.synthesis.as_str(),
+            "analysis": record.stages.analysis.as_str(),
         },
         "audio_trashed_at": record.audio_trashed_at.map(|at| at.rfc3339()),
     }))
@@ -74,7 +74,7 @@ mod tests {
             stages: StageStates {
                 transcribe: StageState::Succeeded,
                 note: StageState::Failed,
-                synthesis: StageState::Disabled,
+                analysis: StageState::Disabled,
             },
             audio_trashed_at: Some(UtcInstant {
                 secs: 1_787_800_000,
@@ -98,7 +98,7 @@ mod tests {
         assert_eq!(value["audio_path"], "/owned/audio.m4a");
         assert_eq!(value["stages"]["transcribe"], "succeeded");
         assert_eq!(value["stages"]["note"], "failed");
-        assert_eq!(value["stages"]["synthesis"], "disabled");
+        assert_eq!(value["stages"]["analysis"], "disabled");
         assert_eq!(
             value["audio_trashed_at"],
             UtcInstant {

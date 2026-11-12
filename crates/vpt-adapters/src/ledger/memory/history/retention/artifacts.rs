@@ -52,7 +52,7 @@ pub(super) fn complete(
             .ok_or_else(conflict)?;
         match intent.kind {
             ArtifactKind::Transcript => recording.stages.note = StageState::Expired,
-            ArtifactKind::Analysis => recording.stages.synthesis = StageState::Expired,
+            ArtifactKind::Analysis => recording.stages.analysis = StageState::Expired,
             _ => unreachable!(),
         }
     }

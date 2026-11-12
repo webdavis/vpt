@@ -1,14 +1,14 @@
-use vpt_application::ports::{LedgerError, StageState, SynthesisStateChange, WorkDelta};
+use vpt_application::ports::{AnalysisStateChange, LedgerError, StageState, WorkDelta};
 use vpt_domain::{run::HistoryFact, time::UtcInstant};
 
 pub(super) fn check<'a>(
     delta: &'a WorkDelta,
     facts: &[(UtcInstant, HistoryFact)],
-) -> Result<Option<&'a SynthesisStateChange>, LedgerError> {
+) -> Result<Option<&'a AnalysisStateChange>, LedgerError> {
     let mut transitions = facts
         .iter()
-        .filter(|(_, fact)| matches!(fact, HistoryFact::SynthesisStateChanged { .. }));
-    let Some(change) = &delta.synthesis_state else {
+        .filter(|(_, fact)| matches!(fact, HistoryFact::AnalysisStateChanged { .. }));
+    let Some(change) = &delta.analysis_state else {
         return if transitions.next().is_none() {
             Ok(None)
         } else {
@@ -26,7 +26,7 @@ pub(super) fn check<'a>(
         )
     );
     let only_state = WorkDelta {
-        synthesis_state: Some(change.clone()),
+        analysis_state: Some(change.clone()),
         ..Default::default()
     };
     if !valid
@@ -40,5 +40,5 @@ pub(super) fn check<'a>(
 }
 
 pub(super) fn conflict() -> LedgerError {
-    LedgerError::Conflict("synthesis state transition is inconsistent".into())
+    LedgerError::Conflict("analysis state transition is inconsistent".into())
 }

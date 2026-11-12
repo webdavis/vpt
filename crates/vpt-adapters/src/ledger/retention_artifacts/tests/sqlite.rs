@@ -32,7 +32,7 @@ fn pending_note_publication_takes_precedence_over_an_expired_stage() {
         .transaction(|transaction| {
             transaction
                 .execute_batch(
-                    "UPDATE recordings SET stage_note='expired', stage_synthesis='expired'",
+                    "UPDATE recordings SET stage_note='expired', stage_analysis='expired'",
                 )
                 .unwrap();
             Ok(())

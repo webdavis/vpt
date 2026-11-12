@@ -1,9 +1,9 @@
 use super::*;
 
 #[test]
-fn later_synthesis_failure_keeps_final_findings_for_already_published_analysis() {
+fn later_analysis_failure_keeps_final_findings_for_already_published_analysis() {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     boundaries::alert_hook(&sandbox, 3);
     for index in 0..2 {
         add(&sandbox, &format!("{index}.m4a"), 1_787_604_456 + index);
@@ -23,9 +23,9 @@ fn later_synthesis_failure_keeps_final_findings_for_already_published_analysis()
 }
 
 #[test]
-fn synthesis_findings_join_the_final_review_alert_once_per_recording() {
+fn analysis_findings_join_the_final_review_alert_once_per_recording() {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     fs::write(sandbox.path().join("agent.proposal"), r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[],"actions":[{"text":"private action","sources":[]}],"tags":[],"relations":[]}"#).unwrap();
     boundaries::alert_hook(&sandbox, 3);
     for index in 0..4 {
@@ -43,18 +43,16 @@ fn synthesis_findings_join_the_final_review_alert_once_per_recording() {
 }
 
 #[test]
-fn standalone_synthesis_reports_findings_after_analysis_publication() {
+fn standalone_analysis_reports_findings_after_analysis_publication() {
     let sandbox = configured();
     add(&sandbox, "one.m4a", 1_787_604_456);
     json(&invoke(&sandbox, &[]));
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     fs::write(sandbox.path().join("agent.proposal"), r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[],"actions":[{"text":"private action","sources":[]}],"tags":[],"relations":[]}"#).unwrap();
     boundaries::alert_hook(&sandbox, 3);
     let row = ledger(&sandbox).recordings().unwrap().remove(0);
     json(&support::run_with_budget(
-        sandbox
-            .vpt()
-            .args(["synthesize", row.id.as_str(), "--json"]),
+        sandbox.vpt().args(["analyze", row.id.as_str(), "--json"]),
         std::time::Duration::from_secs(5),
     ));
     let analysis = ledger(&sandbox)

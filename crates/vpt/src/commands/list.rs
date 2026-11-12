@@ -10,7 +10,7 @@ pub(crate) fn run(ledger: &dyn ObservationLedger, stage: Option<&str>) -> Outcom
         None => |_| true,
         Some("transcribe") => |record| record.stages.transcribe != StageState::Succeeded,
         Some("note") => |record| record.stages.note != StageState::Succeeded,
-        Some("synthesis") => |record| record.stages.synthesis != StageState::Succeeded,
+        Some("analysis") => |record| record.stages.analysis != StageState::Succeeded,
         Some(_) => return Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, "invalid stage")),
     };
     let records = match ledger.observe_recordings(None) {
@@ -31,12 +31,12 @@ pub(crate) fn run(ledger: &dyn ObservationLedger, stage: Option<&str>) -> Outcom
             let record = &record.record;
             let title = record.title.as_deref().unwrap_or("(untitled)");
             format!(
-                "{}  {}  [transcribe: {}, note: {}, synthesis: {}]\n",
+                "{}  {}  [transcribe: {}, note: {}, analysis: {}]\n",
                 record.id,
                 title.escape_debug(),
                 record.stages.transcribe.as_str(),
                 record.stages.note.as_str(),
-                record.stages.synthesis.as_str()
+                record.stages.analysis.as_str()
             )
         })
         .collect();

@@ -1,7 +1,7 @@
 use super::*;
 
 fn enable_report(sandbox: &Sandbox) {
-    synthesis::append(
+    analysis::append(
         sandbox,
         &format!(
             "\n[report]\ncommand=[{:?}, 'command-sink']\n",
@@ -51,8 +51,8 @@ fn partial_recovery_refusal_reports_actual_moves_once_and_keeps_the_replacement(
     );
     assert_eq!(ledger(&sandbox).pending_intents().unwrap().len(), 1);
     assert!(!events[0].to_string().contains("PRIVATE"));
-    assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
 }
 
 #[test]

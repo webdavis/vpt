@@ -5,7 +5,7 @@ pub(crate) fn acceptance_invalidates_note_success(
 ) {
     let mut row = record(81);
     row.stages.note = StageState::Succeeded;
-    row.stages.synthesis = StageState::Succeeded;
+    row.stages.analysis = StageState::Succeeded;
     ledger
         .commit(&LedgerCommit {
             recordings: vec![row.clone()],
@@ -16,7 +16,7 @@ pub(crate) fn acceptance_invalidates_note_success(
     committed(ledger.commit_step(run, &delta(), &[fact(WorkOutcome::Completed)]));
     let after = ledger.by_id(&row.id).unwrap().unwrap();
     assert_eq!(after.stages.note, StageState::Pending);
-    assert_eq!(after.stages.synthesis, StageState::Succeeded);
+    assert_eq!(after.stages.analysis, StageState::Succeeded);
 }
 
 pub(crate) fn acceptance_preserves_expired_notes(
@@ -24,7 +24,7 @@ pub(crate) fn acceptance_preserves_expired_notes(
 ) {
     let mut row = record(81);
     row.stages.note = StageState::Expired;
-    row.stages.synthesis = StageState::Expired;
+    row.stages.analysis = StageState::Expired;
     ledger
         .commit(&LedgerCommit {
             recordings: vec![row.clone()],
@@ -35,7 +35,7 @@ pub(crate) fn acceptance_preserves_expired_notes(
     committed(ledger.commit_step(run, &delta(), &[fact(WorkOutcome::Completed)]));
     let after = ledger.by_id(&row.id).unwrap().unwrap();
     assert_eq!(after.stages.note, StageState::Expired);
-    assert_eq!(after.stages.synthesis, StageState::Expired);
+    assert_eq!(after.stages.analysis, StageState::Expired);
 }
 
 pub(crate) fn rejected_acceptance_preserves_note_success_and_prior_state(

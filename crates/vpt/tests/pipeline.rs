@@ -2,6 +2,8 @@
 #![allow(dead_code, reason = "shared command fixtures")]
 #[path = "pipeline/alerts.rs"]
 mod alerts;
+#[path = "pipeline/analysis.rs"]
+mod analysis;
 #[path = "pipeline/command_output.rs"]
 mod command_output;
 #[path = "pipeline/configuration.rs"]
@@ -37,8 +39,6 @@ mod output;
 #[path = "pipeline/state_paths.rs"]
 mod state_paths;
 mod support;
-#[path = "pipeline/synthesis.rs"]
-mod synthesis;
 use std::{fs, os::unix::fs::PermissionsExt};
 use support::{Sandbox, stderr, stdout};
 use vpt_adapters::SqliteLedger;

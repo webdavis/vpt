@@ -1,3 +1,4 @@
+pub(crate) mod analyze;
 pub(crate) mod brief;
 mod confirm;
 pub(crate) mod import;
@@ -6,7 +7,6 @@ pub(crate) mod redact;
 mod review;
 pub(crate) mod search;
 mod show;
-pub(crate) mod synthesize;
 mod text;
 mod verbs;
 use super::format::Format;
@@ -20,7 +20,7 @@ verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <
        import <file> [--title <text>] [--captured-at <RFC3339>] | show <id> [--stage released|transcript|analysis|brief] [--redact] |\n\
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
        tag rename <old> <new> [--dry-run] |\n\
-       synthesize <id> [--dry-run] | synthesize --all [--since <RFC3339>] [--dry-run] | synthesize --stdin [--dry-run] |\n\
+       analyze <id> [--dry-run] | analyze --all [--since <RFC3339>] [--dry-run] | analyze --stdin [--dry-run] |\n\
        path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | search <word>... [--limit <n>] | storage | retention run [--dry-run] |\n\
        brief <occasion-id> [--dry-run] [--explain] | brief --title <title> --at <RFC3339> [--duration-minutes <n>] [--participant <name>]... [--tag <tag>]... | brief --upcoming |\n\
        redact <id> [--stage transcript|analysis] [--to <dir>] [--title <title>] | symlink deploy | symlink verify | --version\n";
@@ -35,12 +35,12 @@ pub enum Verb {
         id: String,
         stage: String,
     },
-    Synthesize {
+    Analyze {
         id: String,
         dry_run: bool,
     },
-    SynthesizeBatch {
-        scope: synthesize::Scope,
+    AnalyzeBatch {
+        scope: analyze::Scope,
         dry_run: bool,
     },
     VerifyNote {

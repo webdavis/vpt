@@ -109,7 +109,7 @@ macro_rules! refusal_test {
 refusal_test!(pipeline, "run", Pipeline);
 refusal_test!(transcribe, "transcribe", Transcribe);
 refusal_test!(note, "note", Note);
-refusal_test!(synthesize, "synthesize", Synthesize);
+refusal_test!(analyze, "analyze", Analyze);
 refusal_test!(confirm, "confirm", Confirm);
 refusal_test!(review, "review", Review);
 refusal_test!(manual_brief, "brief", Brief);

@@ -17,20 +17,16 @@ pub(super) fn text_fields(result: &serde_json::Value, stage: &str) {
     assert!(result["generated_at"].is_string());
 }
 
-pub(super) fn synthesize(
-    sandbox: &Sandbox,
-    id: &vpt_domain::identity::RecordingId,
-    proposal: &str,
-) {
+pub(super) fn analyze(sandbox: &Sandbox, id: &vpt_domain::identity::RecordingId, proposal: &str) {
     let script = sandbox.path().join("agent.sh");
     let path = sandbox.path().join("proposal.json");
     fs::write(&script, "#!/bin/sh\n/bin/cat >/dev/null\n/bin/cat \"$1\"\n").unwrap();
     fs::write(&path, proposal).unwrap();
     fixture::write_config(
         sandbox,
-        &format!("[synthesis]\ncommand=['/bin/sh', {script:?}, {path:?}]\n"),
+        &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {path:?}]\n"),
     );
-    json(&invoke(sandbox, &["synthesize", id.as_str(), "--json"]));
+    json(&invoke(sandbox, &["analyze", id.as_str(), "--json"]));
 }
 
 #[test]
@@ -55,7 +51,7 @@ fn transcript_returns_the_text_and_its_provenance_beside_the_segments() {
 #[test]
 fn analysis_returns_the_text_beside_the_summary_and_actions() {
     let (sandbox, id) = configured("show-text-analysis");
-    synthesize(
+    analyze(
         &sandbox,
         &id,
         r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[{"text":"Alice meets Bob","sources":["00:00-00:01"]}],"actions":[],"tags":[],"relations":[]}"#,

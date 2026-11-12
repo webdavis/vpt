@@ -83,8 +83,8 @@ fn positive_integers_enforce_the_32_bit_endpoints() {
         "source.deferral_page_threshold",
         "engines.timeout_secs",
         "note.slug_max_chars",
-        "synthesis.timeout_secs",
-        "synthesis.grounding_window_secs",
+        "analysis.timeout_secs",
+        "analysis.grounding_window_secs",
         "alert.aggregate_after",
     ] {
         for value in ["1", "4294967295"] {

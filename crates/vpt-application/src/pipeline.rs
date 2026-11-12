@@ -4,7 +4,7 @@ use crate::ports::{StageState, StageStates};
 pub enum NextStage {
     Transcribe,
     Note,
-    Synthesize,
+    Analyze,
     Redact(crate::ports::NoteStage),
     Verify(crate::ports::NoteStage),
 }
@@ -13,7 +13,7 @@ impl NextStage {
         match self {
             Self::Transcribe => "transcribe",
             Self::Note => "note",
-            Self::Synthesize => "synthesize",
+            Self::Analyze => "analyze",
             Self::Redact(crate::ports::NoteStage::Transcript) => "redact_transcript",
             Self::Redact(crate::ports::NoteStage::Analysis) => "redact_analysis",
             Self::Verify(crate::ports::NoteStage::Transcript) => "verify_transcript",

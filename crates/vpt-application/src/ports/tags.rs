@@ -13,7 +13,7 @@ pub trait TagLedger {
     fn learned_tags(&self) -> Result<Vec<String>, LedgerError>;
 }
 
-/// Keys of the tags synthesis appended to the known-tags file, and of those that left it.
+/// Keys of the tags analysis appended to the known-tags file, and of those that left it.
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct LearnedTagChange {
     pub learned: Vec<String>,

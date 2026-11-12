@@ -1,9 +1,9 @@
 use super::*;
 
 #[test]
-fn changed_rendered_input_rechecks_transcript_before_synthesis_and_then_skips_both() {
+fn changed_rendered_input_rechecks_transcript_before_analysis_and_then_skips_both() {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
     json(&invoke(&sandbox, &[]));
     let row = ledger(&sandbox).recordings().unwrap().remove(0);
@@ -27,7 +27,7 @@ fn changed_rendered_input_rechecks_transcript_before_synthesis_and_then_skips_bo
             .iter()
             .any(|claims| claims.artifact == NoteStage::Transcript)
     );
-    synthesis::append(&sandbox, "\n[readability]\nenabled = true\n");
+    analysis::append(&sandbox, "\n[readability]\nenabled = true\n");
     let before = fixture::snapshot(&sandbox);
     assert_eq!(
         json(&invoke(&sandbox, &["--dry-run"]))["plan"][0]["stage"],
@@ -35,11 +35,11 @@ fn changed_rendered_input_rechecks_transcript_before_synthesis_and_then_skips_bo
     );
     assert_eq!(fixture::snapshot(&sandbox), before);
     let result = json(&invoke(&sandbox, &[]));
-    assert_eq!(result["synthesized"], serde_json::json!([row.id.as_str()]));
+    assert_eq!(result["analyzed"], serde_json::json!([row.id.as_str()]));
     let current = ledger(&sandbox).review_snapshot(&row.id).unwrap().unwrap();
     assert!(
         current.stale_artifacts.is_empty(),
-        "stale checks must run before synthesis"
+        "stale checks must run before analysis"
     );
     assert_ne!(old.verified_claims, current.verified_claims);
     let transcript = ledger(&sandbox)
@@ -53,16 +53,16 @@ fn changed_rendered_input_rechecks_transcript_before_synthesis_and_then_skips_bo
         .unwrap();
     assert!(transcript.text.contains("vptOpenFlags: 1"));
     assert!(analysis.text.contains("vptOpenFlags: 1"));
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 2);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 2);
     let next = json(&invoke(&sandbox, &[]));
-    assert_eq!(next["synthesized"], serde_json::json!([]));
+    assert_eq!(next["analyzed"], serde_json::json!([]));
     assert_eq!(next["notes"], serde_json::json!([]));
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 2);
-    assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 2);
+    assert_eq!(analysis::calls(&sandbox, "calls"), 1);
 }
 
 #[test]
-fn run_rechecks_stale_transcript_findings_with_synthesis_disabled() {
+fn run_rechecks_stale_transcript_findings_with_analysis_disabled() {
     let sandbox = configured();
     add(&sandbox, "one.m4a", 1_787_604_456);
     json(&invoke(&sandbox, &[]));
@@ -81,11 +81,11 @@ fn run_rechecks_stale_transcript_findings_with_synthesis_disabled() {
         ]),
         std::time::Duration::from_secs(5),
     ));
-    synthesis::append(&sandbox, "\n[readability]\nenabled = true\n");
+    analysis::append(&sandbox, "\n[readability]\nenabled = true\n");
     json(&invoke(&sandbox, &[]));
     let current = ledger(&sandbox).review_snapshot(&row.id).unwrap().unwrap();
     assert!(current.stale_artifacts.is_empty());
     assert_eq!(current.verified_claims.len(), 1);
     assert!(!sandbox.path().join("agent.calls").exists());
-    assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "calls"), 1);
 }

@@ -15,12 +15,12 @@ pub(in crate::ledger::sqlite::history::codec) fn encode(
         HistoryFact::OccasionSaved { occasion } => {
             json!({"tag":"occasion_saved", "occasion": occasion.as_str()})
         }
-        HistoryFact::SynthesisStateChanged {
+        HistoryFact::AnalysisStateChanged {
             recording,
             from,
             to,
         } => json!({
-            "tag":"synthesis_state_changed", "recording":recording.as_str(),
+            "tag":"analysis_state_changed", "recording":recording.as_str(),
             "from":from.as_str(), "to":to.as_str(),
         }),
         HistoryFact::TagRejected {

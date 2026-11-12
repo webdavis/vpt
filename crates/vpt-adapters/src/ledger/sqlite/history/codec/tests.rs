@@ -11,6 +11,7 @@ use vpt_domain::run::{
 use vpt_domain::sweep::DeferralReason;
 use vpt_domain::time::UtcInstant;
 
+mod analysis_state;
 mod brief_event;
 mod deferral;
 mod finding_counts;
@@ -18,7 +19,6 @@ mod missing_retention_history;
 mod recovery_baseline;
 mod recovery_counts;
 mod retention_counts;
-mod synthesis_state;
 mod vocabulary;
 
 #[test]
@@ -91,7 +91,7 @@ fn every_fact_variant_round_trips_with_typed_safe_event_fields() {
         HistoryFact::RunStarted(RunKind::Confirm),
         HistoryFact::RunStarted(RunKind::Review),
         HistoryFact::RunStarted(RunKind::VerifyNote),
-        HistoryFact::RunStarted(RunKind::Synthesize),
+        HistoryFact::RunStarted(RunKind::Analyze),
         HistoryFact::TagRejected {
             recording: crate::ledger::contract::record(2).id,
             index: 3,

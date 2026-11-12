@@ -52,25 +52,25 @@ pub(super) fn next(
     if verification(&inputs, settings, NoteStage::Transcript) {
         return Ok(Some(NextStage::Verify(NoteStage::Transcript)));
     }
-    if synthesis(&inputs, settings, roots)? {
-        return Ok(Some(NextStage::Synthesize));
+    if analysis(&inputs, settings, roots)? {
+        return Ok(Some(NextStage::Analyze));
     }
     Ok(verification(&inputs, settings, NoteStage::Analysis)
         .then_some(NextStage::Verify(NoteStage::Analysis)))
 }
 
-pub(super) fn synthesis(
+pub(super) fn analysis(
     input: &NoteInputs,
     settings: &Settings,
     roots: &Roots,
 ) -> Result<bool, Box<ErrorDocument>> {
-    if settings.synthesis.command.is_empty()
+    if settings.analysis.command.is_empty()
         || input.record.stages.note != StageState::Succeeded
-        || input.record.stages.synthesis == StageState::Expired
+        || input.record.stages.analysis == StageState::Expired
     {
         return Ok(false);
     }
-    Ok(!crate::commands::synthesize::resume::current(
+    Ok(!crate::commands::analyze::resume::current(
         input, settings, roots,
     )?)
 }
@@ -78,13 +78,13 @@ pub(super) fn synthesis(
 pub(super) fn verification(input: &NoteInputs, settings: &Settings, stage: NoteStage) -> bool {
     let state = match stage {
         NoteStage::Transcript => input.record.stages.note,
-        NoteStage::Analysis => input.record.stages.synthesis,
+        NoteStage::Analysis => input.record.stages.analysis,
     };
     state != StageState::Expired
         && (input.review.stale_artifacts.contains(&stage)
             || input.review.verified_claims.iter().any(|claims| {
                 claims.artifact == stage
-                    && claims.grounding_window_secs != settings.synthesis.grounding_window_secs
+                    && claims.grounding_window_secs != settings.analysis.grounding_window_secs
             }))
         && input.notes.iter().any(|note| note.stage == stage)
 }

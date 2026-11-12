@@ -1,10 +1,10 @@
+mod analysis;
 mod child;
 mod eligibility;
 mod initial;
 mod notices;
 mod sharing;
 mod stages;
-mod synthesis;
 mod verification;
 use super::Report;
 use crate::compose::{

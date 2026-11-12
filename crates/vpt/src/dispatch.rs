@@ -31,13 +31,13 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             },
             Err(error) => Outcome::Failure(*error),
         },
-        Verb::Synthesize { id, dry_run } => commands::synthesize::run(
+        Verb::Analyze { id, dry_run } => commands::analyze::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
             id,
             *dry_run,
         ),
-        Verb::SynthesizeBatch { scope, dry_run } => commands::synthesize::batch::run(
+        Verb::AnalyzeBatch { scope, dry_run } => commands::analyze::batch::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
             scope,

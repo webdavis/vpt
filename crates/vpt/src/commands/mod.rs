@@ -24,6 +24,6 @@ pub(crate) mod path;
 
 pub(crate) mod pipeline;
 
-pub(crate) mod synthesize;
+pub(crate) mod analyze;
 
 pub(crate) mod redact;

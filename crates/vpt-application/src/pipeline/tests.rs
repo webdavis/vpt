@@ -7,7 +7,7 @@ fn selection_uses_earliest_incomplete_stage_and_never_retries_success_or_expirat
             let states = StageStates {
                 transcribe,
                 note,
-                synthesis: Pending,
+                analysis: Pending,
             };
             let expected = match (transcribe, note) {
                 (Pending | Failed | Disabled, _) => Some(NextStage::Transcribe),

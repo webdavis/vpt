@@ -63,9 +63,9 @@ pub(in crate::ledger::memory) fn refresh(
             && let Some(record) = state
                 .recordings
                 .iter_mut()
-                .find(|row| row.id == *id && row.stages.synthesis == StageState::Succeeded)
+                .find(|row| row.id == *id && row.stages.analysis == StageState::Succeeded)
         {
-            record.stages.synthesis = StageState::Pending;
+            record.stages.analysis = StageState::Pending;
         }
     }
     Ok(())

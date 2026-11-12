@@ -151,7 +151,7 @@ fn missing_artifacts_name_only_stages_whose_files_exist() {
 #[test]
 fn analysis_copy_uses_the_current_owned_body_and_refuses_a_changed_owner() {
     let (sandbox, id) = configured("show-copy-analysis");
-    super::text::synthesize(
+    super::text::analyze(
         &sandbox,
         &id,
         r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[{"text":"Meet Alice with Bob via person@sample.test for 1234","sources":["00:00-00:01"]}],"actions":[],"tags":[],"relations":[]}"#,

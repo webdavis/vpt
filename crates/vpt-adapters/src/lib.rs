@@ -16,6 +16,7 @@ pub use engines::{
     inspect_archived_audio,
 };
 pub use flag_identity::{diagnostic_flag_id, lexical_flag_id, verification_flag_id};
+mod analysis;
 mod git_tree;
 mod helper;
 pub mod known_tags;
@@ -29,8 +30,7 @@ pub mod proposal;
 mod spawn;
 mod stores;
 mod symlink;
-mod synthesis;
-pub use synthesis::CommandAgent;
+pub use analysis::CommandAgent;
 mod transcript_document;
 pub mod transcription;
 pub mod verification;

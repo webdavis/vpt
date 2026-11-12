@@ -56,7 +56,7 @@ pub(in crate::ledger::sqlite::history) fn run_kind(kind: RunKind) -> &'static st
         RunKind::Confirm => "confirm",
         RunKind::Review => "review",
         RunKind::VerifyNote => "verify-note",
-        RunKind::Synthesize => "synthesize",
+        RunKind::Analyze => "analyze",
         RunKind::Pipeline => "run",
     }
 }
@@ -142,7 +142,7 @@ pub(super) fn parse_run_kind(value: &str) -> Result<RunKind, LedgerError> {
         "confirm" => Ok(RunKind::Confirm),
         "review" => Ok(RunKind::Review),
         "verify-note" => Ok(RunKind::VerifyNote),
-        "synthesize" => Ok(RunKind::Synthesize),
+        "analyze" => Ok(RunKind::Analyze),
         "run" => Ok(RunKind::Pipeline),
         _ => Err(corrupt()),
     }

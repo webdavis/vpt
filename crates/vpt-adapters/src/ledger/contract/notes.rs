@@ -1,10 +1,10 @@
 use super::{engine_outputs::committed, record};
 use sha2::{Digest, Sha256};
+mod analysis;
 mod publication;
 mod relocation;
-mod synthesis;
+pub(crate) use analysis::*;
 pub(crate) use relocation::*;
-pub(crate) use synthesis::*;
 mod refusals;
 pub(crate) use publication::note_stage_completion_commits_with_publication_history;
 pub(crate) use refusals::*;
@@ -194,9 +194,9 @@ pub(crate) fn rewrites_save_operator_bytes_and_only_content_changes_its_digest(
 
 macro_rules! cases {
     ($case:ident) => {
-        $case!(content_changes_leave_expired_synthesis_expired);
-        $case!(content_changes_leave_disabled_synthesis_disabled);
-        $case!(only_content_changes_make_succeeded_synthesis_pending);
+        $case!(content_changes_leave_expired_analysis_expired);
+        $case!(content_changes_leave_disabled_analysis_disabled);
+        $case!(only_content_changes_make_succeeded_analysis_pending);
         $case!(relocation_commits_pin_bytes_and_one_history_fact_atomically);
         $case!(relocation_refuses_missing_history_changed_pins_and_reservations);
         $case!(note_stage_completion_commits_with_publication_history);

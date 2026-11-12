@@ -22,7 +22,7 @@ pub(super) fn current(
         Some(stage),
         accepted,
         &previous,
-        settings.synthesis.grounding_window_secs,
+        settings.analysis.grounding_window_secs,
     )
     .map_err(|_| errors::source())?;
     let findings =

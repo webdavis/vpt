@@ -3,7 +3,7 @@ use std::time::Duration;
 
 pub(super) fn prepare() -> (Sandbox, Vec<Vec<String>>) {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
     add(&sandbox, "two.m4a", 1_787_604_476);
     json(&invoke(&sandbox, &[]));
@@ -37,13 +37,13 @@ pub(super) fn prepare() -> (Sandbox, Vec<Vec<String>>) {
     let occasion = ledger.occasions().unwrap().remove(0).id;
     add(&sandbox, "pending.m4a", 1_787_604_496);
     history_exports::upcoming(&sandbox);
-    synthesis::append(&sandbox, "\n[retention]\nenabled=true\n");
+    analysis::append(&sandbox, "\n[retention]\nenabled=true\n");
     let commands = vec![
         vec!["ingest"],
         vec!["run"],
         vec!["transcribe", id],
         vec!["note", "write", id],
-        vec!["synthesize", id],
+        vec!["analyze", id],
         vec![
             "verify-note",
             analysis.target.to_str().unwrap(),
@@ -121,8 +121,8 @@ fn assert_stopped(unsafe_state: bool) {
             assert_eq!(ledger.recovery_view().unwrap().records, history);
             assert_eq!(ledger.occasions().unwrap(), occasions);
             assert!(ledger.pending_publications().unwrap().is_empty());
-            assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 2);
-            assert_eq!(synthesis::calls(&sandbox, "calls"), 2);
+            assert_eq!(analysis::calls(&sandbox, "agent.calls"), 2);
+            assert_eq!(analysis::calls(&sandbox, "calls"), 2);
             assert!(!sandbox.path().join("context.calls").exists());
             assert!(
                 !sandbox

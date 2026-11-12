@@ -38,7 +38,7 @@ impl NoteInputs {
     pub fn has_renderable_notes(&self) -> bool {
         self.review.accepted.is_some()
             && (self.record.stages.note != super::StageState::Expired
-                || (self.record.stages.synthesis != super::StageState::Expired
+                || (self.record.stages.analysis != super::StageState::Expired
                     && self
                         .notes
                         .iter()

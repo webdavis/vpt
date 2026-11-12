@@ -111,9 +111,9 @@ fn analysis_lists_summary_and_actions_with_a_moment_per_line() {
     fs::write(&proposal, r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[{"text":"Alice meets Bob","sources":["00:00-00:01"]}],"actions":[{"text":"Email Bob","sources":["00:00-00:01"]},{"text":"Call Alice","sources":[]}],"tags":[],"relations":[]}"#).unwrap();
     fixture::write_config(
         &sandbox,
-        &format!("[synthesis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
+        &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
     );
-    json(&invoke(&sandbox, &["synthesize", id.as_str(), "--json"]));
+    json(&invoke(&sandbox, &["analyze", id.as_str(), "--json"]));
     let before = fixture::snapshot(&sandbox);
     let result = json(&show(&sandbox, id.as_str(), "analysis"));
     let moment = format!("{}@00:00", id.as_str());

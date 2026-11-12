@@ -20,7 +20,7 @@ pub enum EventKind {
     Retention,
     ConfigRefused,
     Transcribed,
-    Synthesized,
+    Analyzed,
 }
 
 impl EventKind {
@@ -34,14 +34,14 @@ impl EventKind {
             Self::Retention => "retention",
             Self::ConfigRefused => "config_refused",
             Self::Transcribed => "transcribed",
-            Self::Synthesized => "synthesized",
+            Self::Analyzed => "analyzed",
         }
     }
 
     pub fn is_report(self) -> bool {
         matches!(
             self,
-            Self::BriefWritten | Self::Retention | Self::Transcribed | Self::Synthesized
+            Self::BriefWritten | Self::Retention | Self::Transcribed | Self::Analyzed
         )
     }
 }

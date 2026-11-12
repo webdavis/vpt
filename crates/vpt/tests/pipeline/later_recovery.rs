@@ -5,7 +5,7 @@ fn pipeline_repairs_accepted_analysis_without_rerunning_agent_or_resending_hooks
     let sandbox = configured();
     add(&sandbox, "one.m4a", 1_787_604_456);
     json(&invoke(&sandbox, &[]));
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     boundaries::alert_hook(&sandbox, 3);
     sql(
         &sandbox,
@@ -29,7 +29,7 @@ fn pipeline_repairs_accepted_analysis_without_rerunning_agent_or_resending_hooks
     json(&invoke(&sandbox, &["--dry-run"]));
     assert_eq!(fixture::snapshot(&sandbox), before);
     json(&invoke(&sandbox, &[]));
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
     assert_eq!(
         ledger(&sandbox).accepted_proposal(&row.id).unwrap(),
         Some(accepted)
@@ -39,16 +39,16 @@ fn pipeline_repairs_accepted_analysis_without_rerunning_agent_or_resending_hooks
 }
 
 #[test]
-fn stale_analysis_is_rechecked_with_disabled_synthesis_and_an_expired_transcript() {
+fn stale_analysis_is_rechecked_with_disabled_analysis_and_an_expired_transcript() {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
     json(&invoke(&sandbox, &[]));
     let row = ledger(&sandbox).recordings().unwrap().remove(0);
     let config = fs::read_to_string(sandbox.config_path()).unwrap();
     fs::write(
         sandbox.config_path(),
-        config.split("[synthesis]").next().unwrap(),
+        config.split("[analysis]").next().unwrap(),
     )
     .unwrap();
     let engine = sandbox.path().join("engine.json");
@@ -87,7 +87,7 @@ fn stale_analysis_is_rechecked_with_disabled_synthesis_and_an_expired_transcript
             .contains(&NoteStage::Analysis)
     );
     assert!(!transcript.target.exists());
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
     let analysis = ledger(&sandbox)
         .note(&row.id, NoteStage::Analysis)
         .unwrap()

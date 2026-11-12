@@ -167,7 +167,7 @@ fn tags_update_both_notes_and_expired_analysis_requires_explicit_regeneration() 
         );
     }
     let old = analysis(&sandbox, &row);
-    sql(&sandbox, "UPDATE recordings SET stage_synthesis='expired'");
+    sql(&sandbox, "UPDATE recordings SET stage_analysis='expired'");
     fs::remove_file(&old.target).unwrap();
     success(&command(
         &sandbox,
@@ -181,7 +181,7 @@ fn tags_update_both_notes_and_expired_analysis_requires_explicit_regeneration() 
             .unwrap()
             .unwrap()
             .stages
-            .synthesis,
+            .analysis,
         StageState::Expired
     );
     success(&invoke(&sandbox, row.id.as_str()));
@@ -265,7 +265,7 @@ fn resolving_an_analysis_finding_updates_its_annotation_and_both_counts() {
 }
 
 #[test]
-fn changed_transcript_content_keeps_synthesis_pending_after_analysis_metadata_publication() {
+fn changed_transcript_content_keeps_analysis_pending_after_analysis_metadata_publication() {
     let (sandbox, row) = seeded("");
     fixture::write_config(&sandbox, "[readability]\nenabled = true\n");
     success(&invoke(&sandbox, row.id.as_str()));
@@ -274,7 +274,7 @@ fn changed_transcript_content_keeps_synthesis_pending_after_analysis_metadata_pu
         inputs.proposal.unwrap().input_digest,
         saved(&sandbox, &row).content_digest
     );
-    assert_eq!(inputs.record.stages.synthesis, StageState::Pending);
+    assert_eq!(inputs.record.stages.analysis, StageState::Pending);
 }
 
 #[test]
@@ -403,7 +403,7 @@ fn resolving_a_finding_with_both_notes_expired_keeps_them_expired() {
         .remove(0);
     sql(
         &sandbox,
-        "UPDATE recordings SET stage_note='expired', stage_synthesis='expired'",
+        "UPDATE recordings SET stage_note='expired', stage_analysis='expired'",
     );
     let before = [saved(&sandbox, &row), analysis(&sandbox, &row)];
     for note in &before {
@@ -426,7 +426,7 @@ fn resolving_a_finding_with_both_notes_expired_keeps_them_expired() {
     let inputs = reader(&sandbox).note_inputs(&row.id).unwrap().unwrap();
     assert_eq!(inputs.notes, before);
     assert_eq!(inputs.record.stages.note, StageState::Expired);
-    assert_eq!(inputs.record.stages.synthesis, StageState::Expired);
+    assert_eq!(inputs.record.stages.analysis, StageState::Expired);
     assert!(matches!(
         inputs.review.flags[0].resolution,
         vpt_domain::review::Resolution::Dismissed { .. }

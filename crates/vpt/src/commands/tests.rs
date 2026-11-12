@@ -104,7 +104,7 @@ fn list_directly_filters_only_succeeded_stages() {
         StageStates {
             transcribe: StageState::Succeeded,
             note: StageState::Pending,
-            synthesis: StageState::Disabled,
+            analysis: StageState::Disabled,
         },
     );
     let second = record(
@@ -112,7 +112,7 @@ fn list_directly_filters_only_succeeded_stages() {
         StageStates {
             transcribe: StageState::Failed,
             note: StageState::Succeeded,
-            synthesis: StageState::Pending,
+            analysis: StageState::Pending,
         },
     );
     let done = record(
@@ -120,7 +120,7 @@ fn list_directly_filters_only_succeeded_stages() {
         StageStates {
             transcribe: StageState::Succeeded,
             note: StageState::Succeeded,
-            synthesis: StageState::Succeeded,
+            analysis: StageState::Succeeded,
         },
     );
     ledger
@@ -133,7 +133,7 @@ fn list_directly_filters_only_succeeded_stages() {
         (None, 3),
         (Some("transcribe"), 1),
         (Some("note"), 1),
-        (Some("synthesis"), 2),
+        (Some("analysis"), 2),
     ] {
         match list::run(&ledger, stage) {
             Outcome::Success { document, .. } => {

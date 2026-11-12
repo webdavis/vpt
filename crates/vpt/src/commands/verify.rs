@@ -61,7 +61,7 @@ fn prepare(
         return Ok(output::success(
             &path,
             false,
-            &check::run(&source, &input, settings.synthesis.grounding_window_secs)?.report,
+            &check::run(&source, &input, settings.analysis.grounding_window_secs)?.report,
         ));
     }
     mutation::run(&path, &id, &settings, &roots)

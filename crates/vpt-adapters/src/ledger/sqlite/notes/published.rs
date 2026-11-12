@@ -18,7 +18,7 @@ pub(in crate::ledger) fn apply(connection: &Connection, target: &Path) -> Result
     )?;
     connection
         .execute(
-            "UPDATE recordings SET stage_synthesis=?1 WHERE id=?2 AND stage_synthesis NOT IN ('failed','disabled')",
+            "UPDATE recordings SET stage_analysis=?1 WHERE id=?2 AND stage_analysis NOT IN ('failed','disabled')",
             params![if current { "succeeded" } else { "pending" }, id.as_str()],
         )
         .map_err(super::super::map)?;

@@ -12,7 +12,7 @@ pub(super) fn success(report: &Report, dry_run: bool) -> Result<Outcome, Box<Err
         .collect::<Result<Vec<_>, _>>()
         .map_err(Box::new)?;
     let mut human = format!(
-        "{}: {} ingested, {} transcribed, {} notes, {} synthesized, {} released\n",
+        "{}: {} ingested, {} transcribed, {} notes, {} analyzed, {} released\n",
         if dry_run { "Run plan" } else { "Run complete" },
         if dry_run {
             report.ingestion.would_ingest.len()
@@ -21,7 +21,7 @@ pub(super) fn success(report: &Report, dry_run: bool) -> Result<Outcome, Box<Err
         },
         report.transcribed.len(),
         report.notes.len(),
-        report.synthesized.len(),
+        report.analyzed.len(),
         report.redacted.len()
     );
     for written in &report.redacted {
@@ -50,7 +50,7 @@ pub(super) fn success(report: &Report, dry_run: bool) -> Result<Outcome, Box<Err
                 "dry_run":dry_run, "ingested":ingested,
                 "transcribed":report.transcribed.iter().map(|id| id.as_str()).collect::<Vec<_>>(),
                 "notes":report.notes.iter().map(|(id,path)| serde_json::json!({"id":id.as_str(),"path":path})).collect::<Vec<_>>(),
-                "synthesized":report.synthesized.iter().map(|id| id.as_str()).collect::<Vec<_>>(), "redacted":report.redacted.iter().map(|written| written.fields()).collect::<Vec<_>>(),
+                "analyzed":report.analyzed.iter().map(|id| id.as_str()).collect::<Vec<_>>(), "redacted":report.redacted.iter().map(|written| written.fields()).collect::<Vec<_>>(),
                 "would_ingest":report.ingestion.would_ingest.iter().map(|row| serde_json::json!({"path":row.path,"title":row.title,"title_source":row.title_source.as_str()})).collect::<Vec<_>>(),
                 "plan":report.plan.iter().map(|(id,stage)| serde_json::json!({"id":id.as_str(),"stage":stage.as_str()})).collect::<Vec<_>>(),
                 "deferred":report.ingestion.deferred.iter().map(|row|serde_json::json!({"path":row.path,"reason":row.reason.as_str()})).collect::<Vec<_>>(),
