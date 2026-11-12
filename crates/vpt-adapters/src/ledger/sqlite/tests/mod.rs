@@ -10,7 +10,7 @@ mod wal_lifetime;
 
 use super::{SqliteLedger, error, map};
 use crate::RootDir;
-use crate::database::{AccessPolicy, ChildGuard, Database, child_for_root, root};
+use crate::database::{AccessPolicy, ChildGuard, Database, child_for_root, root, turn};
 use rusqlite::Connection;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -30,6 +30,7 @@ fn finish(child: ChildGuard) -> std::process::Output {
 
 pub(super) fn supervised(scenario: &str) {
     let (temp, _root) = root();
+    let _turn = turn();
     let started = Instant::now();
     let output =
         finish(child_for_root(scenario, temp.path(), std::process::id(), started).unwrap());
@@ -47,6 +48,7 @@ pub(super) fn supervised(scenario: &str) {
 pub(super) fn supervised_prepared(scenario: &str, prepare: impl FnOnce(&RootDir)) {
     let (temp, root) = root();
     prepare(&root);
+    let _turn = turn();
     let started = Instant::now();
     finish(child_for_root(scenario, temp.path(), std::process::id(), started).unwrap());
 }

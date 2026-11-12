@@ -97,4 +97,4 @@ mod tests;
 #[cfg(test)]
 pub(crate) use tests::support::{root, snapshot};
 #[cfg(test)]
-pub(crate) use tests::{ChildGuard, child_for_root, test_root};
+pub(crate) use tests::{ChildGuard, child_for_root, test_root, turn};

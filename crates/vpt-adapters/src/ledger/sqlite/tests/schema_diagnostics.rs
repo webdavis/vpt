@@ -17,6 +17,7 @@ fn verification_trace_identifies_database_work_without_private_content() {
 
 fn assert_repository_trace(scenario: &str) {
     let (temp, _root) = super::root();
+    let _turn = super::turn();
     let started = Instant::now();
     let child = super::child_for_root(scenario, temp.path(), std::process::id(), started).unwrap();
     let output = child.finish().expect("bounded ledger trace child");

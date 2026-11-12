@@ -190,7 +190,7 @@ fn watchdog_terminates_the_hanging_group_and_reaps_its_child() {
     ]);
     command.arg(sandbox.path().join("pids"));
     let started = Instant::now();
-    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&mut command)))
+    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_now(&mut command)))
         .expect_err("hanging command must fail");
     let message = failure
         .downcast_ref::<String>()
@@ -240,7 +240,9 @@ fn watchdog_kills_a_direct_child_that_ignores_term() {
         ])
         .arg(sandbox.path().join("pid"));
     let started = Instant::now();
-    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&mut command))).is_err());
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_now(&mut command))).is_err()
+    );
     let pid = std::fs::read_to_string(sandbox.path().join("pid"))
         .expect("ready pid")
         .parse::<i32>()
@@ -269,7 +271,7 @@ fn watchdog_parent_reaps_its_same_group_descendant() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let started = Instant::now();
-    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(&mut command)));
+    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_now(&mut command)));
     assert!(failure.is_err(), "retained child output must time out");
     let ready = std::fs::read_to_string(sandbox.path().join("ready")).expect("ready record");
     let mut pids = ready.split_whitespace();
@@ -297,4 +299,10 @@ fn watchdog_parent_reaps_its_same_group_descendant() {
         Some(libc::ESRCH)
     );
     assert!(started.elapsed() < Duration::from_secs(1));
+}
+
+fn run_now(command: &mut Command) -> std::process::Output {
+    let started = Instant::now();
+    let child = support::spawn(command);
+    support::collect(child, started, Some(Instant::now()))
 }
