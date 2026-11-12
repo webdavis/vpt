@@ -80,8 +80,8 @@ pub(in crate::ledger) fn check(
     }) {
         return Err(conflict());
     }
-    let mut checker = Grounder::new(
-        transcript.transcript.segments.iter().flat_map(|s| &s.words),
+    let mut checker = Grounder::for_transcript(
+        &transcript.transcript,
         flags,
         transcript.duration,
         accepted.grounding_window_secs,

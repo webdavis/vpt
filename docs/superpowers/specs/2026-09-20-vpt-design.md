@@ -1060,7 +1060,9 @@ sentence in a paragraph is a claim line. Four classes, in order:
 1. `unsupported`: the claim's digit runs, money amounts, dates and capitalized tokens do not appear in
    the cited span or within `[analysis] grounding_window_secs` (default 15) of it. Paraphrase is not
    checked; that needs a model, and a model checking a model's summary reintroduces the error class this
-   exists to catch.
+   exists to catch. A whole speaker label in the claim, such as `Speaker 2`, is removed before the check
+   when a segment the cited span overlaps, without the window, carries it; label words never enter the
+   evidence, and a due date's time-word check reads words only.
 1. `built-on-flagged-text`: an open surfaced lexical flag of any class (`numeric`, `proper-noun`,
    `low-confidence`, `agreed-unverified` or `other`) intersects a cited source range. The claim inherits
    that uncertainty, and its source ranges and inherited uncertainty are persisted with the accepted

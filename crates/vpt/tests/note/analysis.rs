@@ -26,30 +26,25 @@ fn seeded(extra: &str) -> (Sandbox, RecordingRecord) {
         SqliteLedger::open(&RootDir::open(&sandbox.path().join("state/vpt")).unwrap()).unwrap();
     let transcript = ledger.accepted_transcript(&row.id).unwrap().unwrap();
     let flags = ledger.transcript_flags(&row.id).unwrap();
-    let checked = Grounder::new(
-        transcript.transcript.segments.iter().flat_map(|s| &s.words),
-        &flags,
-        transcript.duration,
-        15,
-    )
-    .unwrap()
-    .proposal(Proposal {
-        by: "private agent".into(),
-        summary: vec![Claim {
-            text: "private words".into(),
-            source_references: vec!["00:00-00:01".into()],
-        }],
-        actions: vec![
-            Claim {
-                text: "another task".into(),
-                source_references: vec![],
-            }
-            .into(),
-        ],
-        tags: vec![],
-        relations: vec![],
-    })
-    .unwrap();
+    let checked = Grounder::for_transcript(&transcript.transcript, &flags, transcript.duration, 15)
+        .unwrap()
+        .proposal(Proposal {
+            by: "private agent".into(),
+            summary: vec![Claim {
+                text: "private words".into(),
+                source_references: vec!["00:00-00:01".into()],
+            }],
+            actions: vec![
+                Claim {
+                    text: "another task".into(),
+                    source_references: vec![],
+                }
+                .into(),
+            ],
+            tags: vec![],
+            relations: vec![],
+        })
+        .unwrap();
     let content = vpt_domain::note::analysis_content(&checked).unwrap();
     let mut note = source.clone();
     note.stage = NoteStage::Analysis;

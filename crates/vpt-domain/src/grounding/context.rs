@@ -48,6 +48,7 @@ impl<'a> Grounder<'a> {
         Ok(Self {
             words: accepted,
             evidence,
+            labels: Vec::new(),
             flags,
             duration,
             window_secs,

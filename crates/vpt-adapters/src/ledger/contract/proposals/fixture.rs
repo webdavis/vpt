@@ -60,15 +60,10 @@ pub(crate) fn accepted(ledger: &impl Ledger) -> AcceptedProposal {
             reason: "private relation".into(),
         }],
     };
-    let proposal = Grounder::new(
-        transcript.transcript.segments.iter().flat_map(|s| &s.words),
-        &flags,
-        transcript.duration,
-        0,
-    )
-    .unwrap()
-    .proposal(proposal)
-    .unwrap();
+    let proposal = Grounder::for_transcript(&transcript.transcript, &flags, transcript.duration, 0)
+        .unwrap()
+        .proposal(proposal)
+        .unwrap();
     AcceptedProposal {
         vocabulary_publication: None,
         recording: id.clone(),

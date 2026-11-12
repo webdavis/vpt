@@ -32,8 +32,8 @@ pub(super) fn delta(
     let transcript = input.review.accepted.as_ref().ok_or_else(errors::invalid)?;
     let basis = vpt_adapters::grounding_basis_for(transcript, &input.review.flags)
         .map_err(|error| Box::new(ledger_error(error)))?;
-    let proposal = Grounder::new(
-        transcript.transcript.segments.iter().flat_map(|s| &s.words),
+    let proposal = Grounder::for_transcript(
+        &transcript.transcript,
         &input.review.flags,
         transcript.duration,
         settings.analysis.grounding_window_secs,
