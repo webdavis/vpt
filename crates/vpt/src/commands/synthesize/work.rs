@@ -80,6 +80,7 @@ impl<E: EventSink> Writer<'_, E> {
             let digest = source.content_digest;
             source::check(&stores, source)?;
             attempted = true;
+            crate::cli::progress::report(&id, "synthesize", "started", None);
             let generated = CommandAgent
                 .synthesize(&SynthesisRequest {
                     settings: &self.settings.synthesis,
@@ -134,6 +135,10 @@ impl<E: EventSink> Writer<'_, E> {
             )?;
             output::success(self.ledger, &id, &diagnostics)
         })();
+        if attempted {
+            let state = if accepted { "done" } else { "failed" };
+            crate::cli::progress::report(&id, "synthesize", state, None);
+        }
         let result = if result.is_err() && !accepted {
             finish::failure(self, run, &id, attempted).and(result)
         } else {

@@ -23,6 +23,14 @@ read as something else. `--yaml` prints it as block YAML with every string doubl
 flag, commands print text for people. Passing two different format flags is a usage error, reported
 as text with exit code 2.
 
+`--progress`, in any position, adds progress lines on standard error while `run`, `transcribe` or
+`synthesize` works. Each engine run and each synthesis command writes one line of compact JSON when it
+starts and one when it ends: `{"schema": "vpt.progress/1", "recording", "step", "state", "audio_secs",
+"at"}`, where `step` is `transcribe` or `synthesize`, `state` is `started`, `done` or `failed`, and
+`audio_secs` is the recording's length for a transcription and null otherwise. Standard output is
+unchanged. On failure the error document follows the progress lines, so under `--json` standard error
+stays one JSON object per line. Other verbs and dry runs write no progress lines.
+
 ## Configuration permissions
 
 VPT requires the selected configuration file to have mode `0600` and its containing directory to

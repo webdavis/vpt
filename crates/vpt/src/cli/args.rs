@@ -14,7 +14,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use verbs::parse_verb;
 
-pub const USAGE: &str = "usage: vpt [--json|--toon|--yaml] [--config <file>] <verb>\n\
+pub const USAGE: &str = "usage: vpt [--json|--toon|--yaml] [--progress] [--config <file>] <verb>\n\
 verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <path>] |\n\
        import <file> [--title <text>] [--captured-at <RFC3339>] | show <id> [--stage transcript|analysis] |\n\
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
@@ -106,6 +106,7 @@ pub struct Invocation {
     pub verb: Verb,
     pub format: Option<Format>,
     pub config: Option<PathBuf>,
+    pub progress: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -125,6 +126,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
     let invocation = Invocation {
         config: take_value(&mut words, "--config")?.map(PathBuf::from),
         format: take_format(&mut words)?,
+        progress: take_flag(&mut words, "--progress"),
         verb: parse_verb(&mut words, text)?,
     };
     if let Some(extra) = words.first() {
