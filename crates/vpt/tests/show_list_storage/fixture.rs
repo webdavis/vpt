@@ -146,6 +146,24 @@ pub(super) fn writer_ready(state: &Path) -> bool {
     matches!(std::fs::read(state.join("writer-ready")), Ok(bytes) if bytes == b"ready")
 }
 
+/// Writes back the WAL index pages a test's own SQLite connection left dirty through its shared
+/// mapping. The kernel otherwise writes them back seconds later and changes the file's times
+/// after the snapshot was taken.
+fn settle(path: &Path) {
+    if !path.to_string_lossy().ends_with("-shm") {
+        return;
+    }
+    let file = std::fs::File::open(path).unwrap();
+    // SAFETY: fsync receives the descriptor this function owns.
+    let result = unsafe { libc::fsync(std::os::fd::AsRawFd::as_raw_fd(&file)) };
+    assert_eq!(
+        result,
+        0,
+        "snapshot fsync: {}",
+        std::io::Error::last_os_error()
+    );
+}
+
 pub(super) fn snapshot(sandbox: &Sandbox) -> Vec<SnapshotEntry> {
     fn visit(path: &Path, rows: &mut Vec<SnapshotEntry>) {
         let metadata = match path.symlink_metadata() {
@@ -153,10 +171,14 @@ pub(super) fn snapshot(sandbox: &Sandbox) -> Vec<SnapshotEntry> {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
             Err(error) => panic!("snapshot: {error}"),
         };
-        let bytes = if metadata.is_file() {
-            std::fs::read(path).unwrap()
+        let (metadata, bytes) = if metadata.is_file() {
+            settle(path);
+            (
+                path.symlink_metadata().unwrap(),
+                std::fs::read(path).unwrap(),
+            )
         } else {
-            Vec::new()
+            (metadata, Vec::new())
         };
         let link_target = if metadata.file_type().is_symlink() {
             Some(std::fs::read_link(path).unwrap())
