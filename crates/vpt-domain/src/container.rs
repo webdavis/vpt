@@ -2,6 +2,7 @@ mod movie;
 use crate::time::UtcInstant;
 
 const MPEG4_EPOCH_OFFSET: i64 = 2_082_844_800;
+const EARLIEST_RECORDED: i64 = 31_536_000;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ReadFailure;
@@ -15,8 +16,9 @@ pub struct Container {
 }
 
 impl Container {
+    /// A recorder that sets no creation time leaves the container epoch, so a time before 1971 counts as unset.
     pub fn recorded_creation_time(&self) -> Option<UtcInstant> {
-        (self.creation_time.secs != -MPEG4_EPOCH_OFFSET).then_some(self.creation_time)
+        (self.creation_time.secs >= EARLIEST_RECORDED).then_some(self.creation_time)
     }
 
     pub fn precise_duration_secs(&self) -> f64 {

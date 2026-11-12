@@ -70,7 +70,9 @@ that variable. Ordinary tests skip this host-dependent case.
 A sweep considers only immediate `.m4a` files; it excludes sidecars and nested folders. `--once`
 selects one recording inside that directory and applies the same eligibility checks. The defaults
 are a 2 GiB size limit and a 30-second quiet period. Dataless iCloud entries are deferred without
-opening them. A previously deferred file must also keep the same size across sweeps.
+opening them. A previously deferred file must also keep the same size across sweeps. The capture time
+is the container's creation time when it is set, else the file's modification time. A creation time
+before 1971 counts as unset.
 
 Deferrals retain their reason and consecutive count. The fourth deferral sends one alert if an alert
 command is configured; later retries do not repeat it. `source.deferral_page_threshold` changes that
@@ -100,7 +102,7 @@ or other file that points at a network address is not followed. A missing or fai
 refused with exit 3.
 
 The capture time is `--captured-at`, else the container's creation time when it is set, else the file's
-modification time. The title is `--title`, else the file name without its extension, recorded with
+modification time. A creation time before 1971 counts as unset. The title is `--title`, else the file name without its extension, recorded with
 title source `import`. The recording keeps the original file as its source path. The quiet period does
 not apply, and any deferral is refused with exit 3. Importing the same bytes again reports the existing
 recording under `already_ingested`. Output uses the `vpt ingest` shapes with `command: "import"`.

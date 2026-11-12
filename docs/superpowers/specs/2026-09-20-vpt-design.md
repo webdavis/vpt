@@ -319,7 +319,8 @@ When `symlink_target` is empty and the default path is a symlink, vpt follows it
 A recording's identity is `<local-capture-timestamp>-<hash12>`, for example
 `2026-08-24T144736-4f3ab19c02de`:
 
-- the capture timestamp is the MPEG-4 `mvhd` creation time read out of the audio file itself, converted
+- the capture timestamp is the MPEG-4 `mvhd` creation time read out of the audio file itself, or the
+  file's modification time when that creation time is before 1971 and so unset, converted
   to the machine's local zone, formatted `YYYY-MM-DDThhmmss` (no colons, because Obsidian forbids a colon
   in a filename);
 - `hash12` is the first twelve hexadecimal characters of the SHA-256 (secure hash algorithm 256-bit)
@@ -539,7 +540,7 @@ one file by path, gates included.
 disk through the same gates, except the quiet period. A `.m4a` file is archived as it is. Any other file
 has its first audio stream converted to AAC `.m4a` by `[import] extract_command` (default `["ffmpeg"]`)
 in a private temporary directory; a missing or failing extractor is refused with exit 3. The capture time
-is `--captured-at`, else a nonzero container creation time, else the file's modification time. The title
+is `--captured-at`, else a container creation time from 1971 on, else the file's modification time. The title
 is `--title`, else the file stem, with `title_source = "import"`. The record's source path is the original
 file, and a repeated import of the same bytes reports the existing recording. A deferral is refused with
 exit 3 and rule `import_deferred`.

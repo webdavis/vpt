@@ -60,7 +60,7 @@ where
                             known = self.ledger.by_digest(&digest).map_err(|error| {
                                 Self::error(&report, IngestFailure::Ledger(error), None)
                             })?;
-                            let captured = source.container.creation_time;
+                            let captured = mode.captured_at(&source.container, &candidate);
                             (known.is_none()
                                 && vpt_domain::identity::RecordingId::derive(
                                     captured,

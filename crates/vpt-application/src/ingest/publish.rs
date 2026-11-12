@@ -60,7 +60,7 @@ where
             self.discard_owned(&staged.path, report);
             return Ok(());
         }
-        let captured_at = mode.captured_at(&container);
+        let captured_at = mode.captured_at(&container, candidate);
         let offset = self.clock.offset_at(captured_at);
         let Ok(id) = RecordingId::derive(captured_at, offset, &staged.digest) else {
             return self.defer_staged(
