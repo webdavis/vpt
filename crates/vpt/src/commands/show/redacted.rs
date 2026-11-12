@@ -3,7 +3,7 @@ use super::{
     output::{self, Artifact},
     recording::provenance,
 };
-use crate::commands::redact::{prepare, source::Source};
+use crate::commands::redact::{output::candidates, prepare, source::Source};
 use serde_json::Value;
 use vpt_adapters::{Roots, SqliteLedger};
 use vpt_application::{Settings, ports::*};
@@ -58,8 +58,10 @@ pub(super) fn copy(
             withhold_path: true,
         },
     )?;
-    let emitted = value["content"].as_str().unwrap_or_default().as_bytes();
-    value["content_sha256"] = source.stores.digest_bytes(emitted).hex().into();
+    let emitted = value["content"].as_str().unwrap_or_default();
+    let shift = emitted.lines().count() - masked.content.text.lines().count();
+    value["content_sha256"] = source.stores.digest_bytes(emitted.as_bytes()).hex().into();
+    value["candidates"] = candidates(&masked.content.candidates, shift);
     Ok(value)
 }
 
