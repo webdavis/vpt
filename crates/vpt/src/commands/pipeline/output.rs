@@ -36,7 +36,7 @@ pub(super) fn success(report: &Report, dry_run: bool) -> Result<Outcome, Box<Err
     for diagnostic in &diagnostics {
         human.push_str(&format!("Warning: {diagnostic}\n"));
     }
-    let outcome = Outcome::Success {
+    let mut outcome = Outcome::Success {
         completed: if dry_run {
             Vec::new()
         } else {
@@ -58,6 +58,9 @@ pub(super) fn success(report: &Report, dry_run: bool) -> Result<Outcome, Box<Err
             }),
         ),
     };
+    if let (Some(counts), Outcome::Success { document, .. }) = (report.actions, &mut outcome) {
+        document["actions"] = counts.json();
+    }
     Ok(super::retention::output::attach(
         outcome,
         &report.retention,

@@ -12,6 +12,7 @@ pub enum Kind {
     Secret,
     TextList,
     Argv,
+    ExitCodes,
 }
 
 impl Kind {
@@ -23,6 +24,7 @@ impl Kind {
             Kind::Duration => "duration",
             Kind::Enum(_) | Kind::Text | Kind::Secret => "string",
             Kind::TextList | Kind::Argv => "list of strings",
+            Kind::ExitCodes => "list of integers",
         }
     }
 }

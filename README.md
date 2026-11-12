@@ -547,6 +547,86 @@ A bad setup fails without touching the earlier analysis:
   in under the `HOME` vpt runs with, or when `--json-schema` is given a path.
 - `analysis output document is invalid`: standard output held anything besides the document.
 
+## Sending actions to a task tool
+
+`[actions] command` is an argument list that vpt runs once for each new or changed action of a
+published analysis, from `vpt analyze` and `vpt run` alike. It is empty by default. With the default
+`command = []` nothing is recorded or sent, no warning appears and vpt's output is unchanged. vpt runs
+the command with no shell, holds no defaults for any tool, writes nothing on its standard input and
+fetches nothing itself.
+
+```toml
+[actions]
+command = [
+  "todo-tool", "add", "--id", "{id}", "--due", "{due}",
+  "--assignee", "{owner_name}", "--", "{text}",
+]
+final_exit_codes = []
+```
+
+These placeholders expand in any argument:
+
+- `{text}`: the action's text, exactly as the proposal gave it.
+- `{owner}`: `me`, `other` or `unknown`.
+- `{owner_name}`: the other person's name when the recording gave one.
+- `{due}`: the kept due date as `2026-11-19`, or `2026-11-19T15:00` when a time was kept.
+- `{due_date}` and `{due_time}`: the same date and time apart, as `2026-11-19` and `15:00`.
+- `{id}`: the action's id, described below.
+- `{moment}`: `<recording id>@<mm:ss>`, the action's `moment` from `vpt show --stage analysis`, or the
+  bare recording id when the action has no source.
+- `{recording}`: the recording id.
+- `{note}`: the analysis note's absolute path.
+- `{link}`: the analysis note as `obsidian://open?path=<encoded path>` under the Obsidian profile, or as
+  `file://<encoded path>` under the portable profile. It opens the note, not the second.
+
+`{owner_name}`, `{due}`, `{due_date}` and `{due_time}` are optional: each is absent when the action
+has no such value, and a withheld due date is always absent. An argument list cannot leave out a flag
+by itself, so vpt drops arguments by this rule:
+
+- An argument that is exactly one absent optional placeholder is dropped.
+- The argument just before it is dropped as well when it starts with `-`, is not exactly `--`, and
+  holds no placeholder; otherwise only the empty argument itself is removed. The program, `--` and
+  positional words are never dropped.
+- An argument that is a flag starting with `-`, then `=`, then exactly one absent optional
+  placeholder, as in `--due={due}`, is dropped whole.
+- An absent placeholder anywhere else expands to nothing.
+
+With `"todo-tool", "add", "--", "{text}", "--due", "{due}"`, an action due at a kept time runs
+`todo-tool add -- 'Call the bank' --due 2026-11-19T15:00`, and one without a kept due date runs
+`todo-tool add -- 'Call the bank'`.
+
+The text reaches the command verbatim and may start with `-`, so it could look like an option to the
+command. Put `{text}` after `--` or inside one argument such as `--title={text}`. The expanded command
+must stay within 1 MiB.
+
+An action id is `<recording id>@<mm:ss>` from the start of the action's first source. When several
+actions of one recording start in the same second, the first keeps that id and the later ones, in
+proposal order, add `#2`, `#3` and so on, so even two identical actions get distinct ids. An action
+without a source is `<recording id>#1`, `#2` and so on by its order among the actions without one. The
+id never depends on the action's wording, owner or due date, so a redo after a prompt change keeps it.
+A redo that moves an action to a different second gives it a new id, as does adding or removing an
+earlier action in the same second.
+
+Publishing an analysis records each action's id and a digest of its text, owner and kept due date in
+the ledger, with the analysis itself, then runs the command for each action that is new or whose
+digest changed. A redo that leaves an action unchanged sends nothing. A changed action is sent again
+under the same id, so the command must treat a repeated id as an update to the item it already holds.
+An action a redo drops is not sent and not withdrawn; vpt has no delete call.
+
+A command that exits with a code in `final_exit_codes` has refused the action for good. The action
+is recorded as refused, counted, and not sent again until a redo changes it, and the run adds the
+warning `configured action command refused an action`. Any other failure, including a code not in
+the list or a run past 30 seconds, leaves the analysis in place, adds the warning `configured action
+command failed`, and the action is tried again later: `vpt run` sends every recording's waiting actions
+and `vpt analyze <id>` sends that recording's. With the default empty list every failure is retried.
+A send counts once the command exits 0. If vpt stops between that exit and saving the result, the
+next run sends the action again, so the command must accept a repeat. Dry runs send nothing.
+
+When the command is set, the result of `vpt analyze <id>` and of `vpt run` carries `"actions": {"sent",
+"failed", "refused"}` counts. Only analyses published while the command is set are recorded, so setting it does not
+send earlier analyses' actions. The action text reaches only the command, never `events.jsonl` or
+vpt's output.
+
 ## Note verification
 
 `vpt verify-note <path> --recording <id> [--json|--toon|--yaml]` checks Markdown claims against the recording's

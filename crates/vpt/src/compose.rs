@@ -1,3 +1,4 @@
+pub(crate) mod actions;
 pub(crate) mod analysis_state;
 pub(crate) mod publication;
 pub(crate) mod releases;

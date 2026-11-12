@@ -8,7 +8,7 @@ fn expiration_migration_preserves_legacy_journal_and_rolls_back_on_failure() {
     migrations::migrate(&connection, || Ok(())).unwrap();
     connection
         .execute_batch(
-            "DROP TABLE learned_tags; DROP TABLE tag_renames; DROP TABLE artifact_expirations; PRAGMA user_version=14;
+            "DROP TABLE action_sends; DROP TABLE learned_tags; DROP TABLE tag_renames; DROP TABLE artifact_expirations; PRAGMA user_version=14;
         INSERT INTO retention_intents(artifact_kind,recording,path,expected,recorded_at)
         VALUES('brief','legacy occasion','/briefs/private.md','saved digest',123);",
         )
@@ -31,7 +31,7 @@ fn expiration_migration_preserves_legacy_journal_and_rolls_back_on_failure() {
             .unwrap()
     );
     migrations::migrate(&connection, || Ok(())).unwrap();
-    assert_eq!(migrations::current(&connection).unwrap(), 17);
+    assert_eq!(migrations::current(&connection).unwrap(), 18);
     assert_eq!(journal(&connection), before);
     assert_eq!(
         connection

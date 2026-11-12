@@ -121,6 +121,7 @@ pub(super) fn delta(
     delta.tags = tags.tags;
     delta.vocabulary = tags.vocabulary;
     delta.learned_tags = tags.learned;
+    delta.actions = crate::compose::actions::queue(settings, &input.record.id, &accepted.proposal);
     accepted.vocabulary_publication = delta.vocabulary.as_ref().map(|value| value.entry.clone());
     delta.proposal = Some(ProposalChange::Accept(Box::new(accepted)));
     Ok(Prepared {

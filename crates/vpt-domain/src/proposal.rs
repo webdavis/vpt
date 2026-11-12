@@ -1,4 +1,6 @@
+mod action_id;
 mod checked;
+pub use action_id::action_ids;
 mod debug;
 pub use checked::{CheckedAction, CheckedClaim, CheckedDue, CheckedProposal};
 

@@ -24,6 +24,7 @@ struct Report {
     retention: vpt_application::RetentionReport,
     retention_failed: bool,
     stage_diagnostics: Vec<String>,
+    actions: Option<crate::compose::actions::Counts>,
 }
 impl Report {
     fn record_diagnostics(&mut self, id: &RecordingId, outcome: Outcome) {

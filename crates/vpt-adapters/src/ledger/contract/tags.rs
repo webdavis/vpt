@@ -6,8 +6,10 @@ use vpt_domain::{
     time::UtcInstant,
 };
 
+mod actions;
 mod learned;
 mod renames;
+pub(crate) use actions::*;
 pub(crate) use learned::*;
 pub(crate) use renames::*;
 
@@ -246,6 +248,7 @@ macro_rules! cases {
         $case!(confirmed_rejected_and_empty_tag_sets_round_trip);
         $case!(tag_renames_are_remembered_and_the_latest_rename_of_a_name_wins);
         $case!(learned_tags_are_remembered_until_forgotten);
+        $case!(an_action_is_pending_until_settled_and_again_only_when_its_digest_changes);
     };
 }
 pub(crate) use cases;

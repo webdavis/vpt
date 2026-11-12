@@ -31,6 +31,8 @@ mod spawn;
 mod stores;
 mod symlink;
 pub use analysis::CommandAgent;
+mod action_command;
+pub use action_command::{ActionSend, SendOutcome, action_digest, note_link, send_action};
 mod transcript_document;
 pub mod transcription;
 pub mod verification;
