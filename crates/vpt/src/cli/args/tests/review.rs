@@ -28,7 +28,7 @@ fn review_resolution_keeps_literal_corrections_separate_from_options_and_debug()
             .map(OsString::from),
         )
         .unwrap();
-        assert!(invocation.json);
+        assert_eq!(invocation.format, Some(Format::Json));
         assert_eq!(invocation.config, Some("settings.toml".into()));
         assert!(!format!("{invocation:?}").contains(text));
         assert_eq!(

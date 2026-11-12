@@ -74,7 +74,7 @@ it says; it never records the option that lost.
 | D5  | Built: a winner rule, both-engines-fail handling, engine per language. Not built: a disagreement threshold, a cloud spend ceiling.            |
 | D6  | Events are logged by default; optional `[report] command` and `[alert] command` hooks receive JSON on stdin. |
 | D7  | vpt carries no copy of any notification engine's wire contract and no producer-wire crate.                                                    |
-| D8  | Every subcommand ships `--json` on its own output, in vpt's own shape.                                                                        |
+| D8  | Every subcommand ships `--json`, `--toon` and `--yaml` on its own output, in vpt's own shape.                                                 |
 | D9  | Hook failures are logged without changing the work's result or invoking another delivery route. |
 | D10 | Engines are named in config; two first-class adapters (Apple Speech, whisply) plus a generic command adapter with no uncertainty flagging.    |
 | D11 | Two ideas adopted from FluidVoice with credit: local by default with cloud opt-in, and post-processing as its own layer.                      |

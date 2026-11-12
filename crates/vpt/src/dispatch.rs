@@ -161,5 +161,5 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             },
         ),
     };
-    emit(outcome, invocation.json)
+    emit(outcome, invocation.format)
 }

@@ -13,7 +13,7 @@ fn parsed(line: &str) -> Result<Invocation, UsageError> {
 #[test]
 fn json_and_config_are_global_flags_in_any_position() {
     let invocation = parsed("ingest --json --config /tmp/c.toml --dry-run").expect("parsed");
-    assert!(invocation.json);
+    assert_eq!(invocation.format, Some(Format::Json));
     assert_eq!(invocation.config, Some(PathBuf::from("/tmp/c.toml")));
     assert_eq!(
         invocation.verb,
@@ -106,7 +106,7 @@ fn every_stage_one_verb_decodes_its_arguments() {
         assert_eq!(parsed(line).expect(line).verb, verb);
     }
     let invocation = parsed("--config c.toml --json doctor").expect("global flags first");
-    assert!(invocation.json);
+    assert_eq!(invocation.format, Some(Format::Json));
     assert_eq!(invocation.config, Some("c.toml".into()));
     assert_eq!(invocation.verb, Verb::Doctor);
 }

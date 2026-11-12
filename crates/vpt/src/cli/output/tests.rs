@@ -10,7 +10,7 @@ fn human_failure_includes_each_diagnostic() {
         .rule("same_family")
         .diagnostics(vec!["helper absent".into(), "notification disabled".into()]);
     assert_eq!(
-        failure_text(&error, false, false),
+        failure_text(&error, None, false),
         "vpt: same_family: engines share a family\nvpt: helper absent\nvpt: notification disabled\n"
     );
 }
@@ -18,7 +18,7 @@ fn human_failure_includes_each_diagnostic() {
 #[test]
 fn human_usage_error_contains_only_its_message() {
     let error = ErrorDocument::new(ErrorKind::Usage, "unknown id memo");
-    let text = failure_text(&error, false, false);
+    let text = failure_text(&error, None, false);
     assert_eq!(text, "vpt: unknown id memo\n");
 }
 
@@ -26,7 +26,7 @@ fn human_usage_error_contains_only_its_message() {
 fn json_failure_contains_diagnostics_in_one_document() {
     let error = ErrorDocument::new(ErrorKind::Store, "write failed")
         .diagnostics(vec!["helper absent".into()]);
-    let text = failure_text(&error, true, false);
+    let text = failure_text(&error, Some(Format::Json), false);
     let json: serde_json::Value = serde_json::from_str(&text).expect("one document");
     assert_eq!(json["schema"], "vpt.error/1");
     assert_eq!(
@@ -39,7 +39,7 @@ fn json_failure_contains_diagnostics_in_one_document() {
 fn assert_safe_ledger_fault(fault: LedgerError, message: &str) {
     let error = crate::compose::errors::ledger_error(fault);
     assert_eq!(error.exit_code(), 1);
-    let text = failure_text(&error, true, false);
+    let text = failure_text(&error, Some(Format::Json), false);
     assert_eq!(text.lines().count(), 1);
     let actual: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(

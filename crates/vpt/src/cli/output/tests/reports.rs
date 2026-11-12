@@ -38,7 +38,10 @@ fn report() -> Outcome {
 #[test]
 fn success_json_uses_only_stdout() {
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    assert_eq!(emit_to(success(), true, &mut out, &mut err), 0);
+    assert_eq!(
+        emit_to(success(), Some(Format::Json), &mut out, &mut err),
+        0
+    );
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(&out).unwrap(),
         json!({"schema":"vpt.result/1","command":"doctor","checks":[]})
@@ -49,7 +52,7 @@ fn success_json_uses_only_stdout() {
 #[test]
 fn success_human_uses_only_stdout() {
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    assert_eq!(emit_to(success(), false, &mut out, &mut err), 0);
+    assert_eq!(emit_to(success(), None, &mut out, &mut err), 0);
     assert_eq!(out, b"ok config\n");
     assert!(err.is_empty());
 }
@@ -57,7 +60,7 @@ fn success_human_uses_only_stdout() {
 #[test]
 fn failed_report_json_is_one_error_document() {
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    assert_eq!(emit_to(report(), true, &mut out, &mut err), 3);
+    assert_eq!(emit_to(report(), Some(Format::Json), &mut out, &mut err), 3);
     assert!(out.is_empty());
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(&err).unwrap(),
@@ -69,7 +72,7 @@ fn failed_report_json_is_one_error_document() {
 #[test]
 fn failed_report_human_lists_checks_before_verdict() {
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    assert_eq!(emit_to(report(), false, &mut out, &mut err), 3);
+    assert_eq!(emit_to(report(), None, &mut out, &mut err), 3);
     assert!(out.is_empty());
     assert_eq!(
         err,
@@ -81,15 +84,20 @@ fn failed_report_human_lists_checks_before_verdict() {
 fn stdout_failure_is_safe_in_both_modes() {
     let actual = [false, true].map(|json_mode| {
         let mut err = Vec::new();
-        let code = emit_to(success(), json_mode, &mut Broken, &mut err);
+        let code = emit_to(
+            success(),
+            json_mode.then_some(Format::Json),
+            &mut Broken,
+            &mut err,
+        );
         (code, String::from_utf8(err).unwrap())
     });
     let error = ErrorDocument::new(ErrorKind::Store, "standard output write failed");
     assert_eq!(
         actual,
         [
-            (1, failure_text(&error, false, false)),
-            (1, failure_text(&error, true, false))
+            (1, failure_text(&error, None, false)),
+            (1, failure_text(&error, Some(Format::Json), false))
         ]
     );
 }
@@ -104,10 +112,23 @@ fn broken_stderr_returns_one_for_every_failure_variant() {
             Outcome::ParseFailure(failure()),
         ] {
             let mut out = Vec::new();
-            actual.push((emit_to(outcome, json_mode, &mut out, &mut Broken), out));
+            actual.push((
+                emit_to(
+                    outcome,
+                    json_mode.then_some(Format::Json),
+                    &mut out,
+                    &mut Broken,
+                ),
+                out,
+            ));
         }
         actual.push((
-            emit_to(success(), json_mode, &mut Broken, &mut Broken),
+            emit_to(
+                success(),
+                json_mode.then_some(Format::Json),
+                &mut Broken,
+                &mut Broken,
+            ),
             Vec::new(),
         ));
     }
@@ -120,7 +141,7 @@ fn parse_failure_preserves_human_help_and_diagnostics() {
         .diagnostics(vec!["safe diagnostic".into()]);
     let (mut out, mut err) = (Vec::new(), Vec::new());
     assert_eq!(
-        emit_to(Outcome::ParseFailure(error), false, &mut out, &mut err),
+        emit_to(Outcome::ParseFailure(error), None, &mut out, &mut err),
         2
     );
     assert_eq!(
@@ -140,7 +161,12 @@ fn parse_failure_json_contains_no_help_text() {
     let expected = error.to_json();
     let (mut out, mut err) = (Vec::new(), Vec::new());
     assert_eq!(
-        emit_to(Outcome::ParseFailure(error), true, &mut out, &mut err),
+        emit_to(
+            Outcome::ParseFailure(error),
+            Some(Format::Json),
+            &mut out,
+            &mut err
+        ),
         2
     );
     assert_eq!(
