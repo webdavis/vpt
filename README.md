@@ -366,6 +366,18 @@ entry, without a marker, so that it stays within 64 KiB and the expanded command
 never reach stdin, so a tag change does not change the recorded input digest or make `run` redo a
 summary. A command without either placeholder runs exactly as before.
 
+`vpt synthesize --all [--since <RFC3339>] [--dry-run]` reruns synthesis for every recording with an
+accepted transcript, in capture order; `--since` keeps those captured at or after the time.
+`vpt synthesize --stdin [--dry-run]` reads one recording id per line instead, so `vpt list` or
+`vpt search` output can choose the set. Both rerun the command even when the saved analysis is current,
+so a changed prompt reaches old recordings, and both carry on past a recording that fails. The result
+lists each recording with `summary_changed`, `tags_added` and `tags_removed` counts; tag names stay out
+of it. When any recording fails, the error document names the failed ids in `ids`, the finished ones
+in `completed`, and each failure's kind and message in `diagnostics`. A redo drops tags and related
+links an earlier proposal added automatically when the new proposal omits them; hand-set tags and
+decisions stay. `--dry-run` lists the recordings
+without starting the command.
+
 VPT grounds the returned `vpt.proposal/1`, then saves its proposal, analysis findings, tags, relations,
 and note publications together. New analysis has Summary and Actions sections. Repeated synthesis
 keeps pinned paths, operator prose/tags, and review decisions for unchanged claims. Failed or invalid

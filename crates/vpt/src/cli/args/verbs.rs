@@ -45,13 +45,7 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
             other => Err(UsageError(format!("unknown tag subcommand {other}"))),
         },
         "occasions" => Ok(Verb::Occasions),
-        "synthesize" => {
-            let dry_run = take_flag(words, "--dry-run");
-            Ok(Verb::Synthesize {
-                id: take_positional(words, "<id>")?,
-                dry_run,
-            })
-        }
+        "synthesize" => synthesize::parse(words),
         "verify-note" => {
             let recording = take_value(words, "--recording")?
                 .ok_or_else(|| UsageError("--recording is required".into()))?;

@@ -22,7 +22,7 @@ impl ErrorKind {
         }
     }
 
-    fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::Refused => "refused",
             Self::Usage => "usage",

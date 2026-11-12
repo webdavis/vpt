@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use std::collections::BTreeSet;
-use vpt_adapters::{HelperClient, LoggedEvents, Roots, SqliteLedger, SystemClock};
+use vpt_adapters::{HelperClient, LoggedEvents, RootDir, Roots, SqliteLedger, SystemClock};
 use vpt_application::{Settings, ports::*};
 use vpt_domain::{
     identity::RecordingId,
@@ -23,9 +23,21 @@ pub(super) fn run(
 ) -> Result<Outcome, Box<ErrorDocument>> {
     let state = crate::compose::mutation::state(roots)?;
     let _lock = crate::compose::mutation::lock(&state)?;
-    let ledger = SqliteLedger::open(&state).map_err(|error| Box::new(open_error(error)))?;
+    Ok(locked(id, settings, roots, &state))
+}
+
+pub(super) fn locked(
+    id: &RecordingId,
+    settings: &Settings,
+    roots: &Roots,
+    state: &RootDir,
+) -> Outcome {
+    let ledger = match SqliteLedger::open(state) {
+        Ok(ledger) => ledger,
+        Err(error) => return Outcome::Failure(open_error(error)),
+    };
     let mut sink = LoggedEvents::new(
-        &state,
+        state,
         &ledger,
         &settings.report_command,
         &settings.alert_command,
@@ -103,7 +115,5 @@ pub(super) fn run(
         })?;
         result
     })();
-    Ok(note::output::finish(
-        result, warnings, id, committed, retention,
-    ))
+    note::output::finish(result, warnings, id, committed, retention)
 }

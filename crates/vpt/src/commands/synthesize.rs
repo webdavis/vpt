@@ -1,3 +1,4 @@
+pub(crate) mod batch;
 mod errors;
 mod history;
 mod mutation;
@@ -15,6 +16,8 @@ use crate::{
     compose::{Environment, settings_from},
 };
 use std::path::Path;
+use vpt_adapters::Roots;
+use vpt_application::Settings;
 use vpt_domain::identity::RecordingId;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
@@ -33,6 +36,19 @@ fn execute(
     dry: bool,
 ) -> Result<Outcome, Box<ErrorDocument>> {
     let id = RecordingId::parse(id).map_err(|_| errors::usage("invalid recording id"))?;
+    let (settings, roots) = configured(environment, config)?;
+    let ledger = crate::compose::RuntimeLedger::read_only(&roots.state_dir)?;
+    let input = observe::inputs(&ledger, &id)?;
+    if dry {
+        return observe::plan(input, &settings, &roots);
+    }
+    mutation::run(&id, &settings, &roots)
+}
+
+fn configured(
+    environment: &Environment,
+    config: Option<&Path>,
+) -> Result<(Settings, Roots), Box<ErrorDocument>> {
     let settings = settings_from(environment, config)?;
     if settings.synthesis.command.is_empty() {
         return Err(Box::new(ErrorDocument::new(
@@ -50,10 +66,5 @@ fn execute(
     )?;
     let roots = vpt_adapters::config::resolve(&settings, config.parent().unwrap_or(Path::new(".")))
         .map_err(|error| Box::new(crate::compose::errors::root_error(&error)))?;
-    let ledger = crate::compose::RuntimeLedger::read_only(&roots.state_dir)?;
-    let input = observe::inputs(&ledger, &id)?;
-    if dry {
-        return observe::plan(input, &settings, &roots);
-    }
-    mutation::run(&id, &settings, &roots)
+    Ok((settings, roots))
 }
