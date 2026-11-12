@@ -31,14 +31,18 @@ impl Mode {
             .map_or(&candidate.path, |import| &import.origin)
     }
 
-    pub(super) fn captured_at(&self, container: &Container) -> UtcInstant {
-        match &self.import {
-            None => container.creation_time,
-            Some(import) => import
-                .captured_at
-                .or_else(|| container.recorded_creation_time())
-                .unwrap_or(import.modified_at),
-        }
+    pub(super) fn captured_at(&self, container: &Container, candidate: &Candidate) -> UtcInstant {
+        let modified = self.import.as_ref().map_or(
+            UtcInstant {
+                secs: candidate.mtime.secs,
+            },
+            |import| import.modified_at,
+        );
+        self.import
+            .as_ref()
+            .and_then(|import| import.captured_at)
+            .or_else(|| container.recorded_creation_time())
+            .unwrap_or(modified)
     }
 }
 
