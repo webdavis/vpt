@@ -8,7 +8,7 @@ mod review;
 mod text;
 mod verbs;
 use super::format::Format;
-use options::{take_flag, take_format, take_positional, take_value};
+use options::{require_values, take_flag, take_format, take_positional, take_value};
 use std::ffi::OsString;
 use std::path::PathBuf;
 use verbs::parse_verb;
@@ -118,27 +118,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
         })
         .collect::<Result<_, _>>()?;
     let text = text::take(&mut words)?;
-    for (index, word) in words.iter().enumerate() {
-        if matches!(
-            word.as_str(),
-            "--occasion"
-                | "--config"
-                | "--once"
-                | "--to"
-                | "--stage"
-                | "--language"
-                | "--resolve"
-                | "--recording"
-                | "--at"
-                | "--duration-minutes"
-                | "--captured-at"
-        ) && words
-            .get(index + 1)
-            .is_none_or(|value| value.starts_with("--"))
-        {
-            return Err(UsageError(format!("{word} needs a value")));
-        }
-    }
+    require_values(&words)?;
     let invocation = Invocation {
         config: take_value(&mut words, "--config")?.map(PathBuf::from),
         format: take_format(&mut words)?,
