@@ -27,6 +27,7 @@ pub enum Error {
     InvalidMask,
     InvalidText,
     Residue { class: Class, number: Option<usize> },
+    Split { class: Class, between: Vec<String> },
 }
 #[derive(Clone, PartialEq, Eq)]
 pub struct Options {

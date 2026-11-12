@@ -144,5 +144,7 @@ fn redact_rejects_unsupported_options_and_private_values_stay_out_of_usage_error
 
 #[path = "redact/analysis.rs"]
 mod analysis;
+#[path = "redact/split.rs"]
+mod split;
 #[path = "redact/workflow.rs"]
 mod workflow;

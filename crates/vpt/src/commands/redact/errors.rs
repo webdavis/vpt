@@ -28,6 +28,19 @@ pub(super) fn redaction(error: vpt_domain::redaction::Error) -> Box<ErrorDocumen
             ErrorDocument::new(ErrorKind::Refused, format!("redaction residue for {label}"))
                 .rule("residue")
         }
+        Error::Split { class, between } => {
+            let place = match between.as_slice() {
+                [first, last] if first != last => vec![format!("between {first} and {last}")],
+                [first, ..] => vec![format!("at {first}")],
+                [] => vec![],
+            };
+            ErrorDocument::new(
+                ErrorKind::Refused,
+                format!("redaction residue for {}", class.as_str()),
+            )
+            .rule("residue")
+            .diagnostics(place)
+        }
         Error::Capacity => {
             ErrorDocument::new(ErrorKind::Refused, "redaction exceeds content capacity")
                 .rule("redact_capacity")
