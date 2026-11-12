@@ -9,7 +9,7 @@ use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub(super) struct Fixture {
     pub root: tempfile::TempDir,
@@ -218,7 +218,7 @@ fn pending_leader() {
         return;
     };
     let started = Instant::now();
-    let lifetime = Duration::from_millis(600);
+    let lifetime = super::watchdog::FALLBACK;
     // SAFETY: this post-exec fixture changes only its own TERM disposition.
     unsafe { libc::signal(libc::SIGTERM, libc::SIG_IGN) };
     publish_ready(std::path::Path::new(&root), b"ready").expect("owned readiness");

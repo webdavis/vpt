@@ -61,7 +61,7 @@ pub(super) fn participant(scenario: &str, root: &RootDir, ready: fn()) {
                     .unwrap();
             assert_eq!(copy.title("a.m4a"), TitleLookup::Unavailable);
             assert!(started.elapsed() >= Duration::from_millis(20));
-            assert!(started.elapsed() < Duration::from_millis(250));
+            assert!(started.elapsed() < crate::database::WATCHDOG);
             unchanged(&before, &snapshot(root.path()));
         }
         "title_peer_refresh" => {

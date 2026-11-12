@@ -122,7 +122,11 @@ impl ProcessGroup {
         let running = cleanup_observation(self.observe(), &mut observation_error)?;
         let pid = i32::try_from(self.child.id()).expect("child pid fits pid_t");
         (self.signal)(pid, libc::SIGTERM);
-        let grace = (Instant::now() + Duration::from_millis(50)).min(self.deadline);
+        let reap_from = self
+            .deadline
+            .checked_sub(super::GRACE)
+            .unwrap_or(self.deadline);
+        let grace = (Instant::now() + super::GRACE).min(reap_from);
         while running
             && cleanup_observation(self.observe(), &mut observation_error)?
             && Instant::now() < grace

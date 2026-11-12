@@ -16,7 +16,7 @@ fn finite_exit_returns_both_real_child_streams_and_reaps_the_leader() {
     let outcome = execute(
         command,
         b"",
-        Duration::from_millis(500),
+        crate::database::WATCHDOG,
         OUTPUT_LIMIT,
         Controls {
             interrupted: || false,
@@ -45,7 +45,7 @@ fn finite_signal_returns_the_child_signal_and_reaps_the_leader() {
     let outcome = execute(
         command,
         b"",
-        Duration::from_millis(500),
+        crate::database::WATCHDOG,
         OUTPUT_LIMIT,
         Controls {
             interrupted: || false,
@@ -172,7 +172,7 @@ fn registered_observer_error_cleans_up_without_exposing_private_details() {
     let result = execute(
         fixture.pending(),
         b"",
-        Duration::from_secs(1),
+        crate::database::WATCHDOG,
         OUTPUT_LIMIT,
         Controls {
             interrupted: || false,
@@ -204,7 +204,7 @@ fn observer_unwinding_keeps_registration_until_owned_cleanup() {
         execute(
             fixture.pending(),
             b"",
-            Duration::from_secs(1),
+            crate::database::WATCHDOG,
             OUTPUT_LIMIT,
             Controls {
                 interrupted: || false,

@@ -18,8 +18,10 @@ pub(crate) use turn::turn;
 /// Bounds every supervised child so that a hang fails its test. It does not measure performance:
 /// children finish far inside it, and the margin absorbs a CI runner stalling the whole machine.
 pub(crate) const WATCHDOG: Duration = Duration::from_secs(2);
+/// Gives a child time to exit on TERM, and then to be reaped after KILL, despite a runner stall.
+pub(crate) const GRACE: Duration = Duration::from_secs(1);
 /// Bounds the forced cleanup of a child that outlived the watchdog.
-pub(crate) const CLEANUP_BOUND: Duration = WATCHDOG.saturating_add(Duration::from_millis(400));
+pub(crate) const CLEANUP_BOUND: Duration = WATCHDOG.saturating_add(GRACE).saturating_add(GRACE);
 
 pub(crate) struct ChildGuard {
     group: ProcessGroup,

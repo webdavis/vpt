@@ -84,7 +84,7 @@ fn wait_until(deadline: Instant, mut ready: impl FnMut() -> bool) -> bool {
 fn participant(scenario: &str, directory: &Path) -> (ChildGuard, Receiver<SignalRecord>, i32) {
     let release = (scenario == "identity_grace").then(|| directory.join("identity-release"));
     let started = Instant::now();
-    let (record, receive) = recorder(release, started + Duration::from_millis(500));
+    let (record, receive) = recorder(release, started + super::WATCHDOG);
     let child = spawn_with_signal(
         scenario,
         directory,
@@ -206,7 +206,7 @@ fn grace_observation_retains_identity_before_the_last_signal() {
 pub(super) fn finite_child(scenario: &str, directory: &Path) -> ! {
     if scenario == "identity_grace" {
         std::fs::write(directory.join("identity-ready"), b"ready").unwrap();
-        let until = Instant::now() + Duration::from_millis(250);
+        let until = Instant::now() + super::WATCHDOG;
         while !directory.join("identity-release").exists() && Instant::now() < until {
             std::thread::sleep(Duration::from_millis(1));
         }

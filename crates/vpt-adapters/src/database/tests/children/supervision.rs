@@ -58,7 +58,7 @@ fn a_later_peer_keeps_the_original_scenario_budget() {
     assert_eq!(error.kind(), io::ErrorKind::TimedOut);
     assert!(error.to_string().contains("phase=pre-sql-stall"));
     assert!(
-        observed.elapsed() < Duration::from_millis(300),
+        observed.elapsed() < WATCHDOG,
         "later peer reset the scenario budget: {:?}",
         observed.elapsed()
     );

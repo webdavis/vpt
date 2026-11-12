@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::os::fd::{AsFd, AsRawFd};
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub(super) const PRESSURE_BYTES: usize = 1_048_576;
 pub(super) const OUT_MARKER: &[u8] = b"\nVPT-STDOUT\n";
@@ -159,7 +159,7 @@ fn transient(error: &io::Error) -> bool {
 }
 
 fn check_bound(root: &Path, started: Instant) {
-    if started.elapsed() >= crate::database::WATCHDOG.saturating_add(Duration::from_millis(100)) {
+    if started.elapsed() >= super::watchdog::FALLBACK {
         std::process::exit(
             if std::fs::write(root.join("fallback"), b"expired").is_ok() {
                 75
