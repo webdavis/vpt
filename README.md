@@ -75,6 +75,25 @@ that its file version and path still match. Synchronization checks the expected 
 after syncing the file and directory. Detected edits or replacements refuse recovery/source updates
 and preserve the changed file. Different content at an expected archive path is `archive_collision`.
 
+## Importing other files
+
+`vpt import <file> [--title <text>] [--captured-at <RFC 3339 time>] [--json|--toon|--yaml]` archives one audio or
+video file from anywhere on disk. vpt never downloads; the caller provides a local file. A `.m4a` file is
+archived as it is. Any other file has its first audio stream converted to `.m4a` by the command in
+`[import] extract_command`, default `["ffmpeg"]`. vpt appends `-nostdin -loglevel error
+-protocol_whitelist file -i <file> -vn -map 0:a:0 -map_metadata 0 -c:a aac <output>`, so a playlist
+or other file that points at a network address is not followed. A missing or failing extractor is
+refused with exit 3.
+
+The capture time is `--captured-at`, else the container's creation time when it is set, else the file's
+modification time. The title is `--title`, else the file name without its extension, recorded with
+title source `import`. The recording keeps the original file as its source path. The quiet period does
+not apply, and any deferral is refused with exit 3. Importing the same bytes again reports the existing
+recording under `already_ingested`. Output uses the `vpt ingest` shapes with `command: "import"`.
+
+Converted audio is identified by its bytes. A different ffmpeg version can encode the same file
+differently, so re-importing a converted file after an ffmpeg upgrade can create a second recording.
+
 ## Transcription command
 
 `vpt transcribe <id> [--language <tag>] [--dry-run] [--json|--toon|--yaml]` runs the configured main engine

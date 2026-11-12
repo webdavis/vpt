@@ -13,6 +13,7 @@ pub(crate) mod transcribe;
 pub(crate) mod verify;
 pub(crate) mod version;
 
+pub(crate) mod import;
 pub(crate) mod ingest;
 #[cfg(test)]
 mod tests;

@@ -87,6 +87,7 @@ fn dry_run_checks_candidates_without_side_effects() {
         .run(&Mode {
             dry_run: true,
             once: None,
+            import: None,
         })
         .unwrap();
     assert_eq!(report.would_ingest.len(), 1);

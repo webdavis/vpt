@@ -24,5 +24,5 @@ pub(super) fn run(
             runtime::execute(&recorder, &archive, ledger, helper, &mut sink, source, mode)
         }
     };
-    Ok(output::outcome(report, true))
+    Ok(output::outcome(report, mode))
 }

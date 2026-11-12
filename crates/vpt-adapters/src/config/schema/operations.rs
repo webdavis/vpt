@@ -20,6 +20,12 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "recordings needing review in one run before one aggregate event",
     ),
     key(
+        "import.extract_command",
+        Kind::Argv,
+        "[\"ffmpeg\"]",
+        "audio extractor argv for vpt import of files other than .m4a",
+    ),
+    key(
         "retention.enabled",
         Kind::Bool,
         "false",

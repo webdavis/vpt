@@ -40,14 +40,16 @@ where
             seen,
             reason,
         } = deferral;
+        let source = mode.source(candidate).to_path_buf();
         if mode.dry_run {
             report.deferred.push(Deferred {
-                path: candidate.path.clone(),
+                path: source,
                 reason,
             });
             return Ok(());
         }
         let mut row = seen.unwrap_or_else(|| fresh_seen(candidate, now));
+        row.path.clone_from(&source);
         let previous = row.deferral_count;
         row.size = candidate.size;
         row.mtime = candidate.mtime;
@@ -80,7 +82,7 @@ where
                     counts: EventCounts::default(),
                     paths: vec![EventPath {
                         key: EventPathKey::Source,
-                        path: candidate.path.clone(),
+                        path: source.clone(),
                     }],
                     occurred_at: now,
                 }),
@@ -96,7 +98,7 @@ where
         let receipt = Self::required(self.ledger.commit_step(run, &delta, &facts), report)?;
         self.export(&receipt, report)?;
         report.deferred.push(Deferred {
-            path: candidate.path.clone(),
+            path: source,
             reason,
         });
         Ok(())

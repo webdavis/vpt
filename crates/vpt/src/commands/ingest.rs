@@ -36,7 +36,8 @@ fn execute(
         vpt_adapters::config::resolve(&settings, config_path.parent().unwrap_or(Path::new(".")))
             .map_err(|error| Box::new(crate::compose::errors::root_error(&error)))?;
     let helper = HelperClient::new(settings.helper_path.clone());
-    let recorder = VoiceMemosStore::open(&roots.recordings_dir);
+    let recorder =
+        VoiceMemosStore::open(super::import::recordings_dir(mode, &roots.recordings_dir));
     if mode.dry_run {
         return observe::run(recorder, &roots, &helper, &settings.source, mode);
     }
@@ -96,7 +97,11 @@ fn execute(
         })?;
         let archive = ClonefileArchive::open(&roots.stores.audio)
             .map_err(|error| Box::new(crate::compose::errors::contained_error(error)))?;
-        let recorder = recorder.with_titles_root(&state, settings.source.read_titles);
+        let recorder = if mode.import.is_none() {
+            recorder.with_titles_root(&state, settings.source.read_titles)
+        } else {
+            recorder
+        };
         let mut report = runtime::execute(
             &recorder,
             &archive,
@@ -110,7 +115,7 @@ fn execute(
             Ok(report) => report.warnings.extend(warnings.iter().copied()),
             Err(error) => error.warnings.extend(warnings.iter().copied()),
         }
-        Ok(output::outcome(report, false))
+        Ok(output::outcome(report, mode))
     })();
     let outcome = work.unwrap_or_else(|mut error| {
         error.diagnostics.extend(

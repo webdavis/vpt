@@ -158,7 +158,13 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             &vpt_application::Mode {
                 dry_run: *dry_run,
                 once: once.clone(),
+                import: None,
             },
+        ),
+        Verb::Import(options) => commands::import::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            options,
         ),
     };
     emit(outcome, invocation.format)

@@ -21,6 +21,7 @@ pub(super) fn run(settings: &Settings, roots: &Roots) -> Result<Outcome, Box<Err
     let mode = Mode {
         dry_run: true,
         once: None,
+        import: None,
     };
     let ingestion = match &ledger {
         RuntimeLedger::Sqlite(ledger) => crate::commands::ingest::runtime::execute(

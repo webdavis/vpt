@@ -34,8 +34,10 @@ vpt is not:
   operator sends a file with their own tools.
 - a backup. vpt's copy of a recording is an archive copy on the same disk; a machine backup is its own
   project.
-- a second capture path. vpt reads Apple's Voice Memos store read-only and never writes into it, never
-  configures Voice Memos, and never touches the dictation path (FluidVoice stays exactly as it is).
+- a recorder or a downloader. vpt reads Apple's Voice Memos store read-only and never writes into it,
+  never configures Voice Memos, and never touches the dictation path (FluidVoice stays exactly as it is).
+  `vpt import` accepts one audio or video file that already exists on disk; whatever produced it, such as
+  a workflow engine that downloaded a link, stays outside vpt.
 - a language model. Where a model is useful (synthesis, tag proposals) vpt runs a command the operator
   configured, disabled by default, and names no vendor.
 
@@ -532,6 +534,15 @@ path and takes nothing.
 title copy; it reports the title from accepted ledger state when the recording is already known and
 `title_source = "unavailable"` otherwise, and no gate depends on a title. `--once <path>` ingests exactly
 one file by path, gates included.
+
+`vpt import <file> [--title <text>] [--captured-at <RFC 3339 time>]` ingests one file from anywhere on
+disk through the same gates, except the quiet period. A `.m4a` file is archived as it is. Any other file
+has its first audio stream converted to AAC `.m4a` by `[import] extract_command` (default `["ffmpeg"]`)
+in a private temporary directory; a missing or failing extractor is refused with exit 3. The capture time
+is `--captured-at`, else a nonzero container creation time, else the file's modification time. The title
+is `--title`, else the file stem, with `title_source = "import"`. The record's source path is the original
+file, and a repeated import of the same bytes reports the existing recording. A deferral is refused with
+exit 3 and rule `import_deferred`.
 
 ### 5.6 What stage 1 does not do
 
@@ -1394,6 +1405,7 @@ under `--json`.
 | `vpt doctor`                                                                                  | nothing                                                                                                                               | `{"checks": [{"name", "ok", "detail"}]}` when all pass; `vpt.error/1` with the same array in `error.checks` otherwise | 0 all ok, 3 any failed                |
 | `vpt run [--dry-run]`                                                                         | everything a stage writes, for new work                                                                                               | `{"ingested": [..], "transcribed": [..], "notes": [..], "synthesized": [..], "redacted": [..], "retention": {..}}`    | 0, 1 any stage failed                 |
 | `vpt ingest [--dry-run] [--once <path>]`                                                      | clones, ledger rows                                                                                                                   | `{"ingested": [record...], "deferred": [{"path", "reason"}], "skipped": n}`                                           | 0, 1 aborted                          |
+| `vpt import <file> [--title <t>] [--captured-at <RFC3339>]`                                   | clones, ledger rows                                                                                                                   | the `ingest` shape                                                                                                    | 0, 1 aborted, 2 no file, 3 refused    |
 | `vpt transcribe <id> [--language <tag>] [--dry-run]`                                          | engine outputs, flags, transcript note                                                                                                | the record plus `{"flags": {"<class>": n}}`                                                                           | 0, 1 engines failed, 3 refused        |
 | `vpt review <id> [--resolve <flag> --confirm\|--correct <t>\|--dismiss]`                      | flag state, note rewrite, known-terms                                                                                                 | `{"flags": [{"id", "class", "at", "record", "alternative", "state"}]}`                                                | 0, 2 no such flag                     |
 | `vpt confirm --term <t>` / `vpt confirm <id> --tag <t>\|--reject-tag <t>\|--relation <k>:<t>` | the two lists, ledger, note rewrite                                                                                                   | `{"confirmed": {...}}`                                                                                                | 0, 2                                  |
@@ -1551,6 +1563,7 @@ canary-secret test.
 | `share.redact.flagged_spans`         | enum           | `omit`                                                                    | `omit` or `mark`                                                                                             |
 | `handoff.allow_private`              | bool           | `false`                                                                   | let transcripts, analysis notes and briefs be handed off                                                     |
 | `report.command`                     | string list    | `[]`                                                                      | optional routine-report command; receives `vpt.event/1` JSON on stdin; empty means logs only |
+| `import.extract_command`             | string list    | `["ffmpeg"]`                                                              | audio extractor for `vpt import` of files other than `.m4a`; vpt appends its own arguments   |
 | `alert.command`                      | string list    | `[]`                                                                      | optional failure or review-needed command; receives `vpt.event/1` JSON on stdin; empty means logs only |
 | `alert.aggregate_after`              | int            | `3`                                                                       | recordings needing review in one run before one aggregate alert                                              |
 | `retention.enabled`                  | bool           | `false`                                                                   | the opt-in retention run                                                                                     |

@@ -28,9 +28,15 @@ where
         mode: &Mode,
         report: &mut IngestReport,
     ) -> Result<(), Box<IngestError>> {
-        let eligible =
-            super::gates::source(self.recorder, candidate, seen.as_ref(), now, self.settings)
-                .map_err(|failure| Self::error(report, failure, None))?;
+        let eligible = super::gates::source(
+            self.recorder,
+            candidate,
+            seen.as_ref(),
+            now,
+            self.settings,
+            mode,
+        )
+        .map_err(|failure| Self::error(report, failure, None))?;
         let eligible = match eligible {
             Ok(eligible) => eligible,
             Err(reason) => {
@@ -119,7 +125,7 @@ where
             );
         };
         self.publish_staged(
-            run, candidate, seen, now, staged, &archived, container, report,
+            run, candidate, seen, now, staged, &archived, container, mode, report,
         )
     }
 }

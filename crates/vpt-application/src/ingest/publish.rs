@@ -1,5 +1,5 @@
 use super::failure::archive_failure;
-use super::{Ingest, IngestError, IngestFailure, IngestReport, commit::Accepted};
+use super::{Ingest, IngestError, IngestFailure, IngestReport, Mode, commit::Accepted};
 use crate::ports::{
     Archive, ArchiveError, Candidate, Clock, EventSink, Published, RecorderStore, RecordingLedger,
     RecordingRecord, RunHistory, SeenRow, StageStates, Staged, TitleLookup, TitleOrigin, Trash,
@@ -31,6 +31,7 @@ where
         staged: Staged,
         archived: &A::Handle,
         container: Container,
+        mode: &Mode,
         report: &mut IngestReport,
     ) -> Result<(), Box<IngestError>> {
         let known = self.ledger.by_digest(&staged.digest).map_err(|error| {
@@ -52,14 +53,16 @@ where
                     record,
                     existing: true,
                     intent: None,
+                    source: mode.source(candidate).to_path_buf(),
                 },
                 report,
             )?;
             self.discard_owned(&staged.path, report);
             return Ok(());
         }
-        let offset = self.clock.offset_at(container.creation_time);
-        let Ok(id) = RecordingId::derive(container.creation_time, offset, &staged.digest) else {
+        let captured_at = mode.captured_at(&container);
+        let offset = self.clock.offset_at(captured_at);
+        let Ok(id) = RecordingId::derive(captured_at, offset, &staged.digest) else {
             return self.defer_staged(
                 run,
                 super::deferral::Deferral {
@@ -69,7 +72,7 @@ where
                 },
                 &staged.path,
                 now,
-                &super::Mode::default(),
+                mode,
                 report,
             );
         };
@@ -98,15 +101,17 @@ where
                 ));
             }
         };
-        let (title, title_source) = match self.recorder.title(&candidate.file_name) {
-            TitleLookup::Titled(title) => (Some(title), TitleOrigin::VoiceMemos),
-            TitleLookup::Unavailable => (None, TitleOrigin::Unavailable),
+        let (title, title_source) = match (&mode.import, self.recorder.title(&candidate.file_name))
+        {
+            (Some(import), _) => (Some(import.title.clone()), TitleOrigin::Import),
+            (None, TitleLookup::Titled(title)) => (Some(title), TitleOrigin::VoiceMemos),
+            (None, TitleLookup::Unavailable) => (None, TitleOrigin::Unavailable),
         };
         let record = RecordingRecord {
             id: id.clone(),
-            source_path: Some(candidate.path.clone()),
+            source_path: Some(mode.source(candidate).to_path_buf()),
             digest: staged.digest,
-            captured_at: container.creation_time,
+            captured_at,
             captured_offset: offset,
             duration_secs: container.duration_secs,
             title,
@@ -125,6 +130,7 @@ where
                 record,
                 existing: false,
                 intent: Some(intent_id),
+                source: mode.source(candidate).to_path_buf(),
             },
             report,
         )?;

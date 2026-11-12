@@ -78,10 +78,12 @@ fn once_and_dry_run_do_not_mark_other_sources_gone() {
         Mode {
             dry_run: true,
             once: None,
+            import: None,
         },
         Mode {
             dry_run: false,
             once: Some(remaining),
+            import: None,
         },
     ] {
         parts.ingest().run(&mode).unwrap();
@@ -105,6 +107,7 @@ fn empty_source_dry_run_refuses_without_saving_history() {
         .run(&Mode {
             dry_run: true,
             once: None,
+            import: None,
         })
         .unwrap_err();
     assert_eq!(error.failure, IngestFailure::EmptyStore);

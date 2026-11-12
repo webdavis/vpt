@@ -23,6 +23,7 @@ fn empty_and_invalid_once_sweeps_still_refresh_titles() {
         let mode = Mode {
             dry_run: false,
             once: missing.map(|name| fixture.recordings.join(name)),
+            import: None,
         };
 
         let outcome = parts.ingest().run(&mode);
@@ -86,6 +87,7 @@ fn once_selects_only_named_recording() {
         .run(&Mode {
             dry_run: false,
             once: Some(selected.clone()),
+            import: None,
         })
         .unwrap();
 

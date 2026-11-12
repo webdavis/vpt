@@ -11,6 +11,7 @@ fn dry_run() -> Mode {
     Mode {
         dry_run: true,
         once: None,
+        import: None,
     }
 }
 
@@ -91,6 +92,7 @@ fn observation_enforces_size_and_quiet_period_and_once_selection() {
     let mode = Mode {
         dry_run: true,
         once: Some(path),
+        import: None,
     };
     parts.settings.max_audio_bytes = 1;
     let report = parts.ingest().run(&mode).unwrap();
