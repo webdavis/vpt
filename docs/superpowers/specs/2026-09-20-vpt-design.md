@@ -722,6 +722,7 @@ vpt review <id> [--json]                     print open flags, ranked: record te
 vpt review <id> --resolve <flag-id> --confirm | --correct <text> | --dismiss
 vpt confirm --term <text>                      append to known-terms.txt (idempotent)
 vpt confirm <id> --tag <t> | --reject-tag <t> | --relation <kind>:<target>
+vpt tag rename <old> <new> [--dry-run]         rename one tag on every note and list vpt owns
 ```
 
 `--confirm` on a `proper-noun` or `agreed-unverified` flag appends the record's text to
@@ -881,6 +882,22 @@ Indexing grants no write authority: vpt still writes into no note it did not cre
   `vpt confirm <id> --tag <t>` promotes it or `--reject-tag` drops it.
 
 Relations and links are always written, in both settings. The switch governs tags only.
+
+`vpt tag rename <old> <new> [--dry-run]` fixes a tag list that `write` let grow messy. It renames `<old>`
+in the saved tag state of every recording, in the transcript and analysis notes vpt owns, and in
+`known-tags.txt`, and the ledger records the rename (old name, new name, time) for later summary runs.
+Names match by key, so case and separator variants of `<old>` are renamed too. `<new>` takes its
+vocabulary spelling when it already exists. A recording that carries both names keeps one entry: a
+hand-set state beats one a proposal set, and otherwise the entry already named `<new>` wins, so a
+hand rejection of `<old>` rejects `<new>` on that recording unless the owner set `<new>` by hand.
+`known-tags.txt` gains `<new>` only where it held `<old>`. Each recording commits its tag state and note
+bytes together, as `vpt confirm --tag` does; the rename record and `known-tags.txt` commit first. A
+recording whose step fails does not stop the others; the command exits non-zero with the failed
+recordings in `ids`, and running the same command again finishes the rename. Brief notes, expired
+notes and notes vpt did not create are never written; brief tags are the meeting's labels, which the
+next brief would restore. The result counts briefs that carry `<old>` (`untouched_briefs`) apart from
+the other indexed notes that do (`untouched_notes`). `--dry-run` lists the notes it would rewrite and changes
+nothing. Renaming a tag that nothing carries exits 0 and reports that nothing changed.
 
 ### 7.4 Relations and filing
 
@@ -1417,6 +1434,7 @@ under `--json`.
 | `vpt transcribe <id> [--language <tag>] [--dry-run]`                                          | engine outputs, flags, transcript note                                                                                                | the record plus `{"flags": {"<class>": n}}`                                                                           | 0, 1 engines failed, 3 refused        |
 | `vpt review <id> [--resolve <flag> --confirm\|--correct <t>\|--dismiss]`                      | flag state, note rewrite, known-terms                                                                                                 | `{"flags": [{"id", "class", "at", "record", "alternative", "state"}]}`                                                | 0, 2 no such flag                     |
 | `vpt confirm --term <t>` / `vpt confirm <id> --tag <t>\|--reject-tag <t>\|--relation <k>:<t>` | the two lists, ledger, note rewrite                                                                                                   | `{"confirmed": {...}}`                                                                                                | 0, 2                                  |
+| `vpt tag rename <old> <new> [--dry-run]`                                                      | tag state, owned note rewrite, `known-tags.txt`, the rename record                                                                    | `{"dry_run", "changed", "recordings": [{"id", "notes"}], "known_tags_changed", "untouched_briefs", "untouched_notes"}` | 0, 1 or 3 some recordings failed, 2   |
 | `vpt note write <id>`                                                                         | re-renders managed regions of both notes                                                                                              | the record                                                                                                            | 0, 3 markers                          |
 | `vpt path <id> --stage <stage>` / `vpt path --occasion <id> --stage brief`                    | nothing                                                                                                                               | `{"path": "<abs>"}`                                                                                                   | 0, 2                                  |
 | `vpt synthesize <id> [--dry-run]`                                                             | analysis note, tags, relations                                                                                                        | the record plus `{"verify": {"<class>": n}}`                                                                          | 0, 1 command failed, 2 not configured |

@@ -80,3 +80,24 @@ fn preparing_missing_tags_is_observational_and_preserves_later_edits() {
     assert_eq!(update.publish(), Err(TermsError::Changed));
     assert_eq!(fs::read_to_string(&path).unwrap(), "operator\n");
 }
+
+#[test]
+fn renaming_replaces_every_spelling_of_the_old_tag_once_and_keeps_other_lines() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("known-tags.txt");
+    let rename = vpt_domain::tags::Vocabulary::new(&[])
+        .unwrap()
+        .rename("old topic", "Fresh_Name")
+        .unwrap();
+    fs::write(&path, " Keep \n old_topic \r\nOther\nOLD-TOPIC").unwrap();
+    let update = prepare_renamed(&path, &rename).unwrap();
+    assert_eq!(update.content(), b" Keep \nfresh_name\nOther\n");
+    update.publish().unwrap();
+    assert_eq!(read(&path).unwrap(), ["Keep", "fresh_name", "Other"]);
+    assert!(!prepare_renamed(&path, &rename).unwrap().added());
+    fs::write(&path, "old-topic\nfresh-name\n").unwrap();
+    assert_eq!(
+        prepare_renamed(&path, &rename).unwrap().content(),
+        b"fresh-name\n"
+    );
+}

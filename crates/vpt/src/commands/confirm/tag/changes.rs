@@ -1,9 +1,9 @@
 use super::Request;
-use crate::{commands::note, compose::publication};
-use vpt_adapters::{FilesystemStores, Roots, SystemClock, known_tags};
+use crate::compose::publication;
+use vpt_adapters::{FilesystemStores, Roots, known_tags};
 use vpt_application::{Settings, ports::*};
 use vpt_domain::{
-    tags::{Action, ManualError, Provenance, State, Tag},
+    tags::{Action, ManualError},
     time::UtcInstant,
 };
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
@@ -19,20 +19,7 @@ pub(in crate::commands::confirm) fn prepare(
     let index = crate::compose::index::read(settings, roots)?;
     let (vocabulary, diagnostics) = crate::compose::tag_vocabulary::read(settings, &index)?;
     let expected = inputs.tags.clone();
-    let mut tags = expected.clone().unwrap_or_else(|| {
-        inputs
-            .notes
-            .iter()
-            .filter(|note| note.stage == NoteStage::Transcript)
-            .flat_map(|note| &note.managed_tags)
-            .map(|name| Tag {
-                name: name.clone(),
-                state: State::Confirmed,
-                provenance: Provenance::Manual,
-                updated_at: None,
-            })
-            .collect()
-    });
+    let mut tags = crate::compose::tag_notes::current(expected.as_deref(), &inputs.notes);
     let edit = vocabulary
         .edit(
             &tags,
@@ -55,22 +42,8 @@ pub(in crate::commands::confirm) fn prepare(
     });
     inputs.tags = Some(tags);
     let mut delta = if inputs.has_renderable_notes() {
-        crate::compose::mentions::Context::with_index(index, settings)?
-            .enrich(&mut inputs, None)?;
-        vpt_application::note::prepare(
-            &inputs,
-            settings,
-            vpt_application::note::WriteOptions {
-                analysis_content: None,
-                roots: &roots.stores,
-                regenerate_expired: false,
-            },
-            at,
-            SystemClock.offset_at(at),
-            stores,
-            &vpt_adapters::note_document::NoteFormatter,
-        )
-        .map_err(note::errors::document)?
+        let context = crate::compose::mentions::Context::with_index(index, settings)?;
+        crate::compose::tag_notes::render(&mut inputs, &context, settings, roots, stores, at)?
     } else {
         WorkDelta::default()
     };

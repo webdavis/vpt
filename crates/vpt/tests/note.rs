@@ -19,6 +19,8 @@ mod rename;
 mod support;
 #[path = "note/tag_confirm.rs"]
 mod tag_confirm;
+#[path = "note/tag_rename.rs"]
+mod tag_rename;
 #[path = "note/tags.rs"]
 mod tags;
 use support::{Sandbox, stderr, stdout};

@@ -472,6 +472,19 @@ retaining operator tags and the global vocabulary. Expired notes remain expired;
 can regenerate them. Tag state, note bytes, and pending vocabulary bytes commit together, and startup
 recovery completes interrupted publication while preserving operator edits.
 
+`vpt tag rename <old> <new> [--dry-run] [--json|--toon|--yaml]` renames one tag everywhere vpt owns
+it: the saved tag state of every recording, the transcript and analysis notes, and `known-tags.txt`.
+The ledger remembers the rename. Case and separator variants of `<old>` match. When a recording
+already carries `<new>`, the two merge into one entry; a hand-set state beats one a summary set, and
+otherwise the existing `<new>` entry wins. Each recording's tag state and note bytes commit together.
+A recording that fails is listed in the error's `ids`, the others still change, the command exits
+non-zero, and running the same command again finishes the rename. Brief notes are not renamed,
+because a brief's tags are its meeting's labels and the next brief would restore them; the result
+counts briefs that carry `<old>` as `untouched_briefs`. Expired notes and notes vpt did not create stay
+untouched, and `untouched_notes` counts the other indexed notes that still carry `<old>`. `--dry-run` lists the notes it would rewrite and changes nothing. A tag nothing carries
+exits 0 with nothing changed; a malformed name, a missing name, or two names that normalize to the
+same tag exit 2.
+
 Vocabulary comes from the configured Obsidian vault, or the portable transcript/analysis/brief
 stores, plus `known-tags.txt`. Indexed external notes remain unchanged.
 

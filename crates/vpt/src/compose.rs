@@ -124,6 +124,7 @@ pub(crate) fn config_error(error: ConfigError) -> Box<ErrorDocument> {
 }
 
 pub(crate) mod relation_target;
+pub(crate) mod tag_notes;
 pub(crate) mod tag_vocabulary;
 
 #[cfg(test)]
