@@ -91,9 +91,10 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
         }
         "show" => {
             let stage = take_value(words, "--stage")?
-                .map(|stage| match NoteStage::parse(&stage) {
-                    Some(NoteStage::Transcript) => Ok(NoteStage::Transcript),
-                    _ => Err(UsageError("show --stage must be transcript".into())),
+                .map(|stage| {
+                    NoteStage::parse(&stage).ok_or_else(|| {
+                        UsageError("show --stage must be transcript or analysis".into())
+                    })
                 })
                 .transpose()?;
             Ok(Verb::Show {

@@ -5,6 +5,7 @@ mod fixture;
 mod recording;
 mod support;
 use serde_json::json;
+use std::fs;
 use support::{Sandbox, stderr};
 use vpt_adapters::SqliteLedger;
 use vpt_application::ports::*;
@@ -88,4 +89,43 @@ fn a_stage_without_saved_state_is_an_input_error() {
         &["show", id.as_str(), "--stage", "audio", "--json"],
     );
     assert_eq!(wrong.status.code(), Some(2), "{}", stderr(&wrong));
+}
+
+#[test]
+fn analysis_lists_summary_and_actions_with_a_moment_per_line() {
+    let (sandbox, id) = configured("show-analysis");
+    let script = sandbox.path().join("agent.sh");
+    let proposal = sandbox.path().join("proposal.json");
+    fs::write(&script, "#!/bin/sh\n/bin/cat >/dev/null\n/bin/cat \"$1\"\n").unwrap();
+    fs::write(&proposal, r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[{"text":"Alice meets Bob","sources":["00:00-00:01"]}],"actions":[{"text":"Email Bob","sources":["00:00-00:01"]},{"text":"Call Alice","sources":[]}],"tags":[],"relations":[]}"#).unwrap();
+    fixture::write_config(
+        &sandbox,
+        &format!("[synthesis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
+    );
+    json(&invoke(&sandbox, &["synthesize", id.as_str(), "--json"]));
+    let before = fixture::snapshot(&sandbox);
+    let result = json(&show(&sandbox, id.as_str(), "analysis"));
+    let moment = format!("{}@00:00", id.as_str());
+    let source = json!([{"start": 0, "end": 1, "range": "00:00-00:01"}]);
+    assert_eq!(result["recording"], id.as_str());
+    assert_eq!(result["stage"], "analysis");
+    assert_eq!(result["summary"][0]["moment"], moment.as_str());
+    assert_eq!(result["summary"][0]["text"], "Alice meets Bob");
+    assert_eq!(result["summary"][0]["sources"], source);
+    assert_eq!(result["actions"][0]["moment"], moment.as_str());
+    assert_eq!(result["actions"][0]["text"], "Email Bob");
+    assert_eq!(result["actions"][0]["sources"], source);
+    assert_eq!(result["actions"][1]["moment"], json!(null));
+    assert_eq!(result["actions"][1]["finding"], "unsourced");
+    assert_eq!(result["actions"].as_array().unwrap().len(), 2);
+    assert_eq!(fixture::snapshot(&sandbox), before);
+    assert_eq!(json(&show(&sandbox, id.as_str(), "analysis")), result);
+}
+
+#[test]
+fn analysis_without_an_accepted_proposal_is_an_input_error() {
+    let (sandbox, id) = configured("show-analysis-missing");
+    let missing = show(&sandbox, id.as_str(), "analysis");
+    assert_eq!(missing.status.code(), Some(2), "{}", stderr(&missing));
+    assert!(missing.stdout.is_empty());
 }

@@ -190,14 +190,19 @@ stage states, accepted engine metadata, requested/reported language, open flag a
 note paths, and artifact metadata. Artifacts distinguish published, pending publication, and expired
 files; expiration retains their recorded paths and digests. Stale verification findings are excluded
 from current counts and their artifact stages are listed separately. Each command reads one ledger
-snapshot without recovering publications or running engines. Results contain metadata, with no
-transcript or proposal bodies. `list --stage` selects stages whose state is not `succeeded`, including
+snapshot without recovering publications or running engines. Without `--stage`, results contain
+metadata, with no transcript or proposal bodies. `list --stage` selects stages whose state is not `succeeded`, including
 `disabled` and `expired`. Observation results are bounded to 65,536 recordings and 16 MiB of retained
 metadata.
 
 `vpt show <id> --stage transcript` prints the accepted transcript's segments from saved state, each with
-`start` and `end` seconds, a `mm:ss` `timecode` and its `text` with review corrections applied. It
-needs no opt-in. A recording with no accepted transcript is an input error (2).
+`start` and `end` seconds, a `mm:ss` `timecode` and its `text` with review corrections applied.
+`vpt show <id> --stage analysis` prints the accepted proposal's `summary` and `actions` lines in
+proposal order. Each line has its `text`, its `sources` (`start` and `end` seconds and a `mm:ss-mm:ss`
+`range`), its verification `finding` or null, and a `moment` of the form `<recording id>@<mm:ss>` taken
+from the start of its first source, or null for an unsourced line. Two lines from the same second share
+a moment. The proposal has no owner or due date, so neither does this output. Neither stage needs an
+opt-in. A recording with no accepted transcript or proposal is an input error (2).
 
 `vpt storage [--json|--toon|--yaml]` reports current file counts, bytes, and oldest/newest timestamps for all seven
 stores. It works independently of the recording source and ledger.
