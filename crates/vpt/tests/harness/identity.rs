@@ -131,7 +131,7 @@ fn assert_identity(receive: Receiver<SignalRecord>, pid: i32, expected: (i32, i3
 fn collection_retains_exited_identity_through_the_last_signal() {
     let sandbox = Sandbox::new("identity-exit");
     let started = Instant::now();
-    let (record, receive) = recorder(None, started + Duration::from_millis(500));
+    let (record, receive) = recorder(None, started + support::WATCHDOG);
     let child = support::spawn_with_signal(&mut command(&sandbox, "exit"), started, record);
     let pid = i32::try_from(child.id()).expect("owned child pid");
     let output = support::collect_with(child, started, None, || {});
@@ -146,7 +146,7 @@ fn collection_retains_exited_identity_through_the_last_signal() {
 fn collection_preserves_signal_status_while_retaining_identity() {
     let sandbox = Sandbox::new("identity-signal");
     let started = Instant::now();
-    let (record, receive) = recorder(None, started + Duration::from_millis(500));
+    let (record, receive) = recorder(None, started + support::WATCHDOG);
     let child = support::spawn_with_signal(&mut command(&sandbox, "signal"), started, record);
     let pid = i32::try_from(child.id()).expect("owned child pid");
     let output = support::collect_with(child, started, None, || {});
@@ -162,11 +162,11 @@ fn grace_observation_retains_identity_before_the_last_signal() {
     let started = Instant::now();
     let (record, receive) = recorder(
         Some(sandbox.path().join("identity-release")),
-        started + Duration::from_millis(500),
+        started + support::WATCHDOG,
     );
     let group = support::spawn_with_signal(&mut command(&sandbox, "grace"), started, record);
     let pid = i32::try_from(group.id()).expect("owned child pid");
-    let ready = wait_until(started + Duration::from_millis(500), || {
+    let ready = wait_until(started + support::WATCHDOG, || {
         sandbox.path().join("identity-ready").is_file()
     });
     drop(group);
@@ -199,14 +199,14 @@ fn driver_failure_reaps_the_finite_child_before_unwinding() {
     let started = Instant::now();
     let (record, receive) = recorder(
         Some(sandbox.path().join("identity-release")),
-        started + Duration::from_millis(500),
+        started + support::WATCHDOG,
     );
     let child = support::spawn_with_signal(&mut command(&sandbox, "grace"), started, record);
     let pid = i32::try_from(child.id()).expect("owned child pid");
     let mut ready = false;
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         support::collect_with(child, started, None, || {
-            ready = wait_until(started + Duration::from_millis(500), || {
+            ready = wait_until(started + support::WATCHDOG, || {
                 sandbox.path().join("identity-ready").is_file()
             });
             panic!("identity driver failure");
@@ -245,7 +245,7 @@ fn finite_child() {
     if scenario == "grace" {
         let root = PathBuf::from(std::env::var_os("VPT_IDENTITY_ROOT").expect("fixture root"));
         std::fs::write(root.join("identity-ready"), b"ready").unwrap();
-        let until = Instant::now() + Duration::from_millis(250);
+        let until = Instant::now() + support::WATCHDOG;
         while !root.join("identity-release").exists() && Instant::now() < until {
             std::thread::sleep(Duration::from_millis(1));
         }

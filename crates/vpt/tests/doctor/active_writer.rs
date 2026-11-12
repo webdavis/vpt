@@ -30,7 +30,7 @@ fn writer_child() {
     let started = Instant::now();
     while !state.join("writer-release").exists() {
         assert!(
-            started.elapsed() < Duration::from_millis(450),
+            started.elapsed() < support::WATCHDOG,
             "writer release timed out"
         );
         std::thread::sleep(Duration::from_millis(1));
@@ -65,7 +65,7 @@ fn doctor_reads_committed_seen_rows_during_native_write() {
     let mut child = support::spawn(&mut command);
     while !crate::observations_fixture::writer_ready(&state) {
         assert!(
-            started.elapsed() < Duration::from_millis(250),
+            started.elapsed() < support::WATCHDOG,
             "writer readiness timed out"
         );
         assert!(

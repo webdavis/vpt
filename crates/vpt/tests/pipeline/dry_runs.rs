@@ -47,7 +47,7 @@ fn preview(sandbox: &Sandbox, verb: &str, id: &str, json: bool) -> std::process:
     }
     let budget = match verb {
         "ingest" => Duration::from_secs(3),
-        "retention" => Duration::from_millis(500),
+        "retention" => support::WATCHDOG,
         "run" => Duration::from_secs(8),
         _ => Duration::from_secs(5),
     };
