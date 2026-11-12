@@ -1,9 +1,14 @@
 use super::LedgerError;
-use vpt_domain::{identity::RecordingId, tags::Tag, time::UtcInstant};
+use vpt_domain::{
+    identity::RecordingId,
+    tags::{State, Tag},
+    time::UtcInstant,
+};
 
 pub trait TagLedger {
     fn tags(&self, recording: &RecordingId) -> Result<Option<Vec<Tag>>, LedgerError>;
     fn tag_renames(&self) -> Result<Vec<TagRename>, LedgerError>;
+    fn tag_states(&self) -> Result<Vec<(String, State)>, LedgerError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
