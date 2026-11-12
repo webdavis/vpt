@@ -31,13 +31,6 @@ pub(super) fn output(result: Result<Outcome, SpawnError>) -> Result<Vec<u8>, Fai
 }
 
 pub(super) fn merge(target: &mut ContextSnapshot, input: ContextSnapshot) -> Result<(), Failure> {
-    for row in input.occasions {
-        match target.occasions.iter().find(|other| other.id == row.id) {
-            Some(other) if other != &row => return Err(Failure::Invalid),
-            Some(_) => (),
-            None => target.occasions.push(row),
-        }
-    }
     for row in input.tasks {
         match target.tasks.iter().find(|other| other.id == row.id) {
             Some(other) if other != &row => return Err(Failure::Invalid),

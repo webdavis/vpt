@@ -1,4 +1,6 @@
 pub(crate) mod capture;
+#[allow(dead_code, reason = "used only by tests that read context from dam")]
+pub mod dam;
 mod diagnostic;
 pub(crate) mod process;
 mod turn;

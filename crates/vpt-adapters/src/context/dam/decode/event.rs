@@ -4,22 +4,46 @@ use vpt_domain::{
     occasion::{OccasionDetails, Participant},
 };
 
-pub(super) fn convert(row: model::Object) -> Result<Option<ContextOccasion>, Failure> {
-    let event = row.event.ok_or(Failure::Invalid)?;
-    match event.status.as_str() {
+#[derive(Debug)]
+pub(in crate::context::dam) struct Event {
+    pub occasion: ContextOccasion,
+    pub attended: bool,
+}
+
+pub(super) fn convert(row: model::Row) -> Result<Option<Event>, Failure> {
+    match row.status.as_str() {
         "cancelled" => return Ok(None),
         "confirmed" | "tentative" => (),
         _ => return Err(Failure::Invalid),
     }
-    let (at, start) = time::parse(&event.start, event.timezone.as_deref())?;
-    let (_, end) = time::parse(&event.end, event.timezone.as_deref())?;
+    let (at, start) = time::parse(&row.start, row.timezone.as_deref())?;
+    let (_, end) = time::parse(&row.end, row.timezone.as_deref())?;
     let nanos = end.as_nanosecond() - start.as_nanosecond();
     let duration_secs = u64::try_from(nanos / 1_000_000_000).map_err(|_| Failure::Invalid)?;
     if nanos < 0 {
         return Err(Failure::Invalid);
     }
+    let attended = row.people.attendees.is_some();
+    Ok(Some(Event {
+        occasion: ContextOccasion {
+            source: OccasionSource::Dam,
+            id: row.oid,
+            calendar: None,
+            details: OccasionDetails {
+                at,
+                title: row.subject,
+                duration_secs: Some(duration_secs),
+                participants: participants(row.people)?,
+                tags: row.labels,
+            },
+        },
+        attended,
+    }))
+}
+
+pub(super) fn participants(people: model::People) -> Result<Vec<Participant>, Failure> {
     let mut participants = Vec::<Participant>::new();
-    for attendee in event.attendees {
+    for attendee in people.attendees.unwrap_or_default() {
         if attendee.email.trim().is_empty() {
             return Err(Failure::Invalid);
         }
@@ -33,7 +57,7 @@ pub(super) fn convert(row: model::Object) -> Result<Option<ContextOccasion>, Fai
             });
         }
     }
-    if let Some(person) = event.organizer {
+    if let Some(person) = people.organizer {
         let name = person.name.unwrap_or_default();
         if let Some(existing) = participants
             .iter_mut()
@@ -47,16 +71,5 @@ pub(super) fn convert(row: model::Object) -> Result<Option<ContextOccasion>, Fai
             });
         }
     }
-    Ok(Some(ContextOccasion {
-        source: OccasionSource::Dam,
-        id: row.oid,
-        calendar: None,
-        details: OccasionDetails {
-            at,
-            title: row.subject,
-            duration_secs: Some(duration_secs),
-            participants,
-            tags: row.labels,
-        },
-    }))
+    Ok(participants)
 }

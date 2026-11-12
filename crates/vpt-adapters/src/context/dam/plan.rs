@@ -1,13 +1,21 @@
 use super::*;
 use std::collections::BTreeSet;
-use vpt_domain::time::UtcInstant;
 
 pub(super) struct Query {
     pub scope: String,
     pub text: String,
 }
+impl Query {
+    pub fn args(&self) -> [String; 4] {
+        ["ls", &self.text, "--json", "--no-pull"].map(String::from)
+    }
+}
+pub(super) struct Agenda {
+    pub scopes: Vec<String>,
+    pub args: Vec<String>,
+}
 pub(super) struct Plan {
-    pub calendar: Option<Result<Vec<Query>, Failure>>,
+    pub calendar: Option<Result<Agenda, Failure>>,
     pub tasks: Option<Vec<Query>>,
 }
 
@@ -30,48 +38,25 @@ pub(super) fn make(
         if window.end <= window.start {
             return Err(Failure::Invalid);
         }
-        // dam dates are local to each event, so include the adjacent UTC days at both boundaries.
-        let first = window
-            .start
-            .secs
-            .div_euclid(86_400)
-            .checked_sub(1)
-            .ok_or(Failure::Capacity)?;
-        let last = window
-            .end
-            .secs
-            .checked_sub(1)
-            .ok_or(Failure::Capacity)?
-            .div_euclid(86_400)
-            .checked_add(1)
-            .ok_or(Failure::Capacity)?;
-        let days = last
-            .checked_sub(first)
-            .and_then(|n| n.checked_add(1))
-            .ok_or(Failure::Capacity)?;
-        if days > 4096 || days as usize * calendars.len() > 4096 {
-            return Err(Failure::Capacity);
-        }
-        let mut queries = Vec::new();
-        let mut remaining = 1_048_576usize;
-        for scope in &calendars {
-            for day in first..=last {
-                remaining = remaining
-                    .checked_sub(scope.len() * 2 + 64)
-                    .ok_or(Failure::Capacity)?;
-                let secs = day.checked_mul(86_400).ok_or(Failure::Capacity)?;
-                let date = UtcInstant { secs }.rfc3339();
-                let date = date
-                    .get(..10)
-                    .filter(|s| s.as_bytes()[4] == b'-' && s.as_bytes()[7] == b'-')
-                    .ok_or(Failure::Invalid)?;
-                queries.push(Query {
-                    scope: scope.clone(),
-                    text: format!("kind:event & path:{scope} & start:{date}"),
-                });
-            }
-        }
-        Ok(queries)
+        let query = calendars
+            .iter()
+            .map(|scope| format!("path:{scope}"))
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let args = [
+            "agenda",
+            &query,
+            "--json",
+            "--no-pull",
+            "--from",
+            &window.start.rfc3339(),
+            "--to",
+            &window.end.rfc3339(),
+        ];
+        Ok(Agenda {
+            args: args.map(String::from).to_vec(),
+            scopes: calendars,
+        })
     });
     let tasks = request.tasks.then(|| {
         projects

@@ -14,27 +14,46 @@ fn output(stdout: Vec<u8>, stderr: Vec<u8>) -> Outcome {
         group: 0,
     }
 }
+fn answer(argv: &[String], events: &[serde_json::Value]) -> Outcome {
+    match argv[1].as_str() {
+        "agenda" => output(tests::agenda(events.to_vec()), vec![]),
+        "show" => output(serde_json::to_vec(&tests::shown(&argv[2])).unwrap(), vec![]),
+        _ => output(tests::bytes(vec![tests::task()]), vec![]),
+    }
+}
 fn request<'a>(calendars: &'a [String], projects: &'a [String]) -> ContextRequest<'a> {
     collection_tests::request(calendars, projects)
 }
 
 #[test]
-fn all_queries_share_one_deadline_and_keep_a_completed_half() {
+fn agenda_shows_and_task_queries_share_one_deadline_and_keep_a_completed_half() {
     let clock = Cell::new(Instant::now());
     let mut budgets = Vec::new();
+    let mut events = Vec::new();
+    for (id, at) in [
+        ("one", "2026-10-01T23:00:00Z"),
+        ("two", "2026-10-02T00:00:00Z"),
+    ] {
+        let mut row = tests::event();
+        row["oid"] = serde_json::json!(id);
+        row["start"] = serde_json::json!(at);
+        row["end"] = serde_json::json!("2026-10-02T01:00:00Z");
+        events.push(row);
+    }
     let snapshot = collect::run(
         &["dam".into()],
         &request(&["calendar/".into()], &["one/".into(), "two/".into()]),
-        |_, budget| {
+        |argv, budget| {
             budgets.push(budget.as_secs());
-            clock.set(clock.get() + Duration::from_secs(5));
-            Ok(output(b"{\"objects\":[]}".to_vec(), vec![]))
+            clock.set(clock.get() + Duration::from_secs(9));
+            Ok(answer(argv, &events))
         },
         || clock.get(),
     )
     .unwrap();
-    assert_eq!(budgets, vec![30, 25, 20, 15, 10, 5]);
+    assert_eq!(budgets, vec![30, 21, 12, 3]);
     assert_eq!(snapshot.status.calendar, ContextStatus::Present);
+    assert_eq!(snapshot.occasions.len(), 2);
     assert!(
         matches!(snapshot.status.tasks,ContextStatus::Failed {ref detail} if detail == Failure::Deadline.detail())
     );
@@ -104,16 +123,17 @@ fn overlapping_scopes_deduplicate_equal_rows_and_refuse_conflicting_versions() {
 fn calendar_results_use_exact_inclusive_start_and_exclusive_end() {
     let mut rows = Vec::new();
     for (id, at) in [
-        ("early", "2026-10-01T22:59:59.999Z"),
-        ("start", "2026-10-01T23:00:00Z"),
-        ("end", "2026-10-02T01:00:00Z"),
+        ("early", "2026-10-01T16:59:59.999-06:00"),
+        ("start", "2026-10-01T17:00:00-06:00"),
+        ("end", "2026-10-02T03:00:00+02:00"),
     ] {
         let mut row = tests::event();
         row["oid"] = serde_json::json!(id);
-        row["event"]["start"] = serde_json::json!(at);
-        row["event"]["end"] = serde_json::json!("2026-10-02T02:00:00Z");
+        row["start"] = serde_json::json!(at);
+        row["end"] = serde_json::json!("2026-10-02T02:00:00Z");
         rows.push(row);
     }
+    let mut shows = Vec::new();
     let mut request = request(&[], &[]);
     let calendars = ["calendar/".into()];
     request.calendars = &calendars;
@@ -121,47 +141,51 @@ fn calendar_results_use_exact_inclusive_start_and_exclusive_end() {
     let snapshot = collect::run(
         &["dam".into()],
         &request,
-        |_, _| Ok(output(tests::bytes(rows.clone()), vec![])),
+        |argv, _| {
+            if argv[1] == "show" {
+                shows.push(argv[2].clone());
+            }
+            Ok(answer(argv, &rows))
+        },
         Instant::now,
     )
     .unwrap();
     assert_eq!(snapshot.occasions.len(), 1);
     assert_eq!(snapshot.occasions[0].id, "start");
+    assert_eq!(shows, ["start"]);
 }
 
 #[test]
 fn aggregate_overflow_still_returns_a_valid_bounded_context_document() {
     let mut event = tests::event();
-    event["event"]["start"] = serde_json::json!("2026-10-01T23:00:00Z");
-    event["event"]["end"] = serde_json::json!("2026-10-02T00:00:00Z");
+    event["start"] = serde_json::json!("2026-10-01T23:00:00Z");
+    event["end"] = serde_json::json!("2026-10-02T00:00:00Z");
+    let collect = |event: &serde_json::Value, projects: &[String]| {
+        let calendars = ["calendar/".into()];
+        let request = request(&calendars, projects);
+        let events = [event.clone()];
+        collect::run(
+            &["dam".into()],
+            &request,
+            |argv, _| Ok(answer(argv, &events)),
+            Instant::now,
+        )
+        .unwrap()
+    };
     let (mut low, mut high) = (1usize, 65_536usize);
     while low < high {
         let size = (low + high).div_ceil(2);
         event["subject"] = serde_json::json!("x".repeat(size));
-        if decode::read(&tests::bytes(vec![event.clone()]), true, "calendar/").is_ok() {
+        if collect(&event, &["work/".into()]).status.calendar == ContextStatus::Present {
             low = size;
         } else {
             high = size - 1;
         }
     }
     event["subject"] = serde_json::json!("x".repeat(low));
-    let snapshot = collect::run(
-        &["dam".into()],
-        &request(&["calendar/".into()], &["work/".into()]),
-        |argv, _| {
-            Ok(output(
-                tests::bytes(vec![if argv[2].starts_with("kind:event") {
-                    event.clone()
-                } else {
-                    tests::task()
-                }]),
-                vec![],
-            ))
-        },
-        Instant::now,
-    )
-    .unwrap();
+    let snapshot = collect(&event, &["work/".into()]);
     assert!(vpt_protocol::context::encode(&snapshot).is_ok());
+    assert_eq!(snapshot.status.calendar, ContextStatus::Present);
     assert!(matches!(
         snapshot.status.tasks,
         ContextStatus::Failed { .. }
@@ -189,19 +213,19 @@ fn interruption_aborts_collection_instead_of_becoming_publishable_absence() {
 }
 
 #[test]
-fn excessive_query_plan_is_failed_without_spawning_or_retaining_unbounded_text() {
-    let large = format!("{}/", "x".repeat(60_000));
-    let calendars = [large];
+fn an_empty_window_fails_the_calendar_without_spawning() {
+    let calendars = ["calendar/".into()];
     let mut request = request(&calendars, &[]);
     request.tasks = false;
-    request.window.as_mut().unwrap().end.secs += 100 * 86_400;
+    let window = request.window.as_mut().unwrap();
+    window.end = window.start;
     let mut calls = 0;
     let snapshot = collect::run(
         &["dam".into()],
         &request,
         |_, _| {
             calls += 1;
-            Ok(output(b"{\"objects\":[]}".to_vec(), vec![]))
+            Ok(output(tests::agenda(vec![]), vec![]))
         },
         Instant::now,
     )

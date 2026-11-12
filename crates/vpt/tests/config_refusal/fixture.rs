@@ -110,12 +110,22 @@ impl Fixture {
         use vpt_application::ports::Clock;
         let start = vpt_adapters::SystemClock.now().secs + 3600;
         let calendar = self.sandbox.path().join("calendar.json");
-        fs::write(&calendar, serde_json::json!({"objects":[{
-            "oid":"config-refusal", "kind":"event", "subject":"Private event", "path":"calendar/work/", "labels":[],
-            "event":{"status":"confirmed", "start":vpt_domain::time::UtcInstant { secs: start }.rfc3339(), "end":vpt_domain::time::UtcInstant { secs: start + 1800 }.rfc3339()}
-        }]}).to_string()).unwrap();
+        fs::write(
+            &calendar,
+            support::dam::agenda(vec![support::dam::event(
+                "config-refusal",
+                "Private event",
+                start,
+                start + 1800,
+            )]),
+        )
+        .unwrap();
         let script = self.sandbox.path().join("bin/dam");
-        fs::write(&script, format!("#!/bin/sh\ncase \"$2\" in\n'kind:event '* ) /bin/cat {calendar:?} ;;\n'kind:task '* ) printf '%s' '{{\"objects\":[]}}' ;;\n*) exit 8;;\nesac\n")).unwrap();
+        fs::write(
+            &script,
+            format!("#!/bin/sh\n{}", support::dam::script(&calendar)),
+        )
+        .unwrap();
         fs::set_permissions(script, fs::Permissions::from_mode(0o700)).unwrap();
         let config = fs::read_to_string(self.sandbox.config_path()).unwrap();
         fs::write(self.sandbox.config_path(), format!("{config}\n[brief.trigger]\nenabled = true\n[context]\ntype = 'dam'\ncalendars = ['calendar/work/']\nprojects = ['work/']\n")).unwrap();
