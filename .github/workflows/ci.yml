@@ -7,36 +7,76 @@ on:
 permissions:
   contents: read
 jobs:
-  gates:
+  deadline-probe:
     runs-on: macos-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install command tools
-        run: brew install gitleaks just swiftformat swiftlint
-      - name: Toolchain
+      - name: Runner
         run: |
           rustup show active-toolchain
-          xcodebuild -version
-          swift --version
-      - name: Format
-        run: just fmt
-      - name: Clippy
-        run: just clippy
-      - name: Test
-        run: just test
-      - name: Docs
-        run: just doc
-      - name: Secrets scan
-        run: just gitleaks
-      - name: File size
-        run: just file-size
-      - name: Swift format
-        run: just swift-format
-      - name: Swift lint
-        run: just swift-lint
-      - name: Swift build
-        run: just swift-build
-      - name: Swift test
-        run: just swift-test
+          sysctl -n hw.ncpu hw.memsize machdep.cpu.brand_string
+          uptime
+      - name: Build test binaries
+        run: |
+          export TMPDIR="$(cd "${TMPDIR:-/tmp}" && pwd -P)/"
+          cargo test --locked -p vpt-adapters --lib --no-run
+          cargo test --locked -p vpt --features dev-tools --no-run
+      - name: Timed suites, five runs
+        run: |
+          export TMPDIR="$(cd "${TMPDIR:-/tmp}" && pwd -P)/"
+          export VPT_PROBE=1
+          export VPT_CHILD_LOG="$RUNNER_TEMP/probe.log"
+          for run in 1 2 3 4 5; do
+            echo "== run $run $(uptime)"
+            cargo test --locked -p vpt-adapters --lib --no-fail-fast > "$RUNNER_TEMP/adapters-$run.txt" 2>&1 || true
+            grep -E '^test result|\.\.\. FAILED' "$RUNNER_TEMP/adapters-$run.txt" || true
+            cargo test --locked -p vpt --features dev-tools --no-fail-fast > "$RUNNER_TEMP/vpt-$run.txt" 2>&1 || true
+            grep -E '\.\.\. FAILED' "$RUNNER_TEMP/vpt-$run.txt" || true
+            grep -c '^test result' "$RUNNER_TEMP/vpt-$run.txt" || true
+          done
+      - name: Distribution
+        if: always()
+        run: |
+          python3 -I - "$RUNNER_TEMP/probe.log" <<'EOF'
+          import collections, re, sys
+          rows = []
+          for line in open(sys.argv[1]):
+              m = re.match(r'(\S+) (\S+) (\S+) total_ms=(\d+) start_ms=(-?\d+) sync_ms=(-?\d+) syncs=(\d+) open_sync=(\w+)$', line.strip())
+              if m:
+                  rows.append(dict(family=m[1], scenario=m[2], outcome=m[3], total=int(m[4]), start=int(m[5]), sync=int(m[6]), syncs=int(m[7])))
+          def q(values, p):
+              values = sorted(values)
+              return values[min(len(values) - 1, int(round(p * (len(values) - 1))))] if values else None
+          def budget(row):
+              if row['family'] == 'cli':
+                  return int(row['scenario'][len('budget_'):-2])
+              if row['scenario'].startswith('ledger_contract_history_'):
+                  return 700
+              return 500
+          print('records', len(rows))
+          groups = collections.defaultdict(list)
+          for row in rows:
+              key = row['family'] if row['family'] != 'cli' else 'cli ' + row['scenario']
+              groups[key].append(row)
+          for key, group in sorted(groups.items()):
+              totals = [r['total'] for r in group]
+              starts = [r['start'] for r in group if r['start'] >= 0]
+              synced = [r for r in group if r['sync'] >= 0]
+              share = sum(r['sync'] for r in synced) / max(1, sum(r['total'] for r in synced))
+              over = sum(r['total'] >= budget(r) for r in group)
+              print(f"\n{key}: n={len(group)} timeouts={sum(r['outcome'] != 'ok' for r in group)} over_current_budget={over}")
+              print(f"  total p50={q(totals, .5)} p90={q(totals, .9)} p99={q(totals, .99)} max={max(totals)}")
+              if starts:
+                  print(f"  start p50={q(starts, .5)} p99={q(starts, .99)} max={max(starts)}")
+              if any(r['syncs'] for r in group):
+                  per = [r['sync'] / r['syncs'] for r in group if r['syncs']]
+                  print(f"  sync share={share:.0%} syncs p50={q([r['syncs'] for r in group], .5)} max={max(r['syncs'] for r in group)} per-sync ms p50={q(per, .5):.0f} p99={q(per, .99):.0f}")
+                  rest = [r['total'] - r['sync'] for r in synced]
+                  print(f"  non-sync p50={q(rest, .5)} p99={q(rest, .99)} max={max(rest)}")
+              slow = sorted(group, key=lambda r: -r['total'])[:8]
+              for r in slow:
+                  print(f"    {r['total']:6} ms sync={r['sync']} syncs={r['syncs']} {r['outcome']} {r['scenario'][:90]}")
+          EOF

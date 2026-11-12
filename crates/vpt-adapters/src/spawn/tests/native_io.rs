@@ -144,6 +144,36 @@ fn execute_owned(
     limit: usize,
     after_ready: impl FnOnce(&mut PipeSlots) -> io::Result<()>,
 ) -> Result<Outcome, SpawnError> {
+    let probe_started = Instant::now();
+    let result = execute_timed(fixture, command, input, limit, after_ready);
+    if let Some(path) = std::env::var_os("VPT_CHILD_LOG") {
+        use std::io::Write as _;
+        let outcome = match &result {
+            Ok(outcome) if outcome.status == Status::DeadlineExceeded => "TIMEOUT",
+            Ok(_) => "ok",
+            Err(_) => "error",
+        };
+        let line = format!(
+            "spawn native_io {outcome} total_ms={} start_ms=-1 sync_ms=0 syncs=0 open_sync=false\n",
+            probe_started.elapsed().as_millis()
+        );
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .unwrap();
+        file.write_all(line.as_bytes()).unwrap();
+    }
+    result
+}
+
+fn execute_timed(
+    fixture: &Fixture,
+    command: Command,
+    input: &[u8],
+    limit: usize,
+    after_ready: impl FnOnce(&mut PipeSlots) -> io::Result<()>,
+) -> Result<Outcome, SpawnError> {
     execute(
         command,
         input,

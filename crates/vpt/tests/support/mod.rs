@@ -169,8 +169,13 @@ fn collect_with_budget(
     started: Instant,
     spawn_return: Option<Instant>,
     mut drive: impl FnMut(),
-    budget: Duration,
+    original: Duration,
 ) -> Output {
+    let budget = if std::env::var_os("VPT_PROBE").is_some() {
+        original + Duration::from_secs(3)
+    } else {
+        original
+    };
     let mut diagnostic = Diagnostic::new(started, group.id(), spawn_return);
     group.set_deadline(started + budget + Duration::from_millis(400));
     let stdout_piped = group.stdout.is_some();
@@ -222,6 +227,22 @@ fn collect_with_budget(
     let cleaned_at = Instant::now();
     diagnostic.cleanup(cleaned_at);
     let elapsed = cleaned_at.duration_since(started);
+    if let Some(path) = std::env::var_os("VPT_CHILD_LOG") {
+        use std::io::Write as _;
+        let line = format!(
+            "cli budget_{}ms {} total_ms={} start_ms={} sync_ms=-1 syncs=0 open_sync=false\n",
+            original.as_millis(),
+            if status.is_none() { "TIMEOUT" } else { "ok" },
+            elapsed.as_millis(),
+            spawn_return.map_or(-1, |at| at.duration_since(started).as_millis() as i128),
+        );
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .unwrap();
+        file.write_all(line.as_bytes()).unwrap();
+    }
     if elapsed >= budget + Duration::from_millis(500) || status.is_none() {
         let record = diagnostic.render(
             &stdout.bytes,
@@ -229,7 +250,7 @@ fn collect_with_budget(
             stdout.finished(),
             stderr.finished(),
         );
-        if budget == Duration::from_millis(500) && elapsed >= Duration::from_secs(1) {
+        if original == Duration::from_millis(500) && elapsed >= Duration::from_secs(1) {
             panic!("command exceeded one second: {record}");
         }
         panic!(

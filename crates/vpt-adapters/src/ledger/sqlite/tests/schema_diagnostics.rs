@@ -120,7 +120,8 @@ pub(crate) fn start(phase: &'static str) -> Option<Instant> {
     let origin = ORIGIN.get_or_init(|| {
         std::env::var("VPT_DATABASE_SCENARIO")
             .is_ok_and(|scenario| {
-                scenario.starts_with("ledger_contract_")
+                std::env::var_os("VPT_PROBE").is_some()
+                    || scenario.starts_with("ledger_contract_")
                     || scenario.starts_with("ledger_verification_")
                     || scenario == "ledger_schema_foreign_keys"
             })

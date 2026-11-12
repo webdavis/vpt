@@ -23,6 +23,65 @@ pub(crate) struct ChildGuard {
     ready_offset: usize,
     started: Instant,
     deadline: Instant,
+    probe: (String, u128),
+}
+
+fn probe_epoch() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_micros()
+}
+
+impl ChildGuard {
+    fn probe_log(&self, outcome: &str) {
+        let Some(path) = std::env::var_os("VPT_CHILD_LOG") else {
+            return;
+        };
+        let text = String::from_utf8_lossy(&self.stderr.bytes);
+        let mut sync_ms = 0u128;
+        let mut syncs = 0;
+        let mut child_epoch = None;
+        let mut open_sync = None;
+        for line in text.lines() {
+            if let Some(v) = line.strip_prefix("VPT_EPOCH_US ") {
+                child_epoch = v.parse::<u128>().ok();
+            }
+            if line.contains("sync.end") {
+                syncs += 1;
+                open_sync = None;
+                sync_ms += line
+                    .split("duration_ms=")
+                    .nth(1)
+                    .and_then(|v| v.trim().parse::<u128>().ok())
+                    .unwrap_or(0);
+            } else if line.contains("sync.start") {
+                open_sync = Some(line.to_owned());
+            }
+        }
+        let start_ms = child_epoch.map(|c| (c as i128 - self.probe.1 as i128) / 1000);
+        let family = if self.probe.0.starts_with("ledger_") {
+            "ledger"
+        } else {
+            "database"
+        };
+        let line = format!(
+            "{family} {} {} total_ms={} start_ms={} sync_ms={} syncs={} open_sync={}\n",
+            self.probe.0,
+            outcome,
+            self.started.elapsed().as_millis(),
+            start_ms.map_or(-1, |v| v),
+            sync_ms,
+            syncs,
+            open_sync.is_some()
+        );
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .unwrap();
+        file.write_all(line.as_bytes()).unwrap();
+    }
 }
 
 pub(super) fn child(scenario: &str, directory: &Path) -> io::Result<ChildGuard> {
@@ -97,6 +156,9 @@ fn spawn_with_signal(
     if let Some(root_pid) = root_pid {
         command.env("VPT_DATABASE_ROOT_PID", root_pid);
     }
+    if std::env::var_os("VPT_PROBE").is_some() {
+        command.env("VPT_PROBE", "1");
+    }
     // SAFETY: the pre-exec closure uses raw process syscalls and stack-owned values.
     unsafe {
         command.pre_exec(|| {
@@ -114,9 +176,10 @@ fn spawn_with_signal(
             }
         });
     }
+    let spawn_epoch = probe_epoch();
     let mut group = ProcessGroup::new(
         command.spawn()?,
-        started + Duration::from_millis(900),
+        started + probe_widened(Duration::from_millis(900)),
         signal,
     );
     let input = group.stdin.take().expect("piped input");
@@ -130,8 +193,17 @@ fn spawn_with_signal(
         stderr,
         ready_offset: 0,
         started,
-        deadline: started + operation_budget(scenario),
+        deadline: started + probe_widened(operation_budget(scenario)),
+        probe: (scenario.to_owned(), spawn_epoch),
     })
+}
+
+fn probe_widened(budget: Duration) -> Duration {
+    if std::env::var_os("VPT_PROBE").is_some() {
+        budget + Duration::from_secs(3)
+    } else {
+        budget
+    }
 }
 
 fn operation_budget(scenario: &str) -> Duration {
@@ -152,6 +224,7 @@ impl ChildGuard {
     }
 
     fn timeout(&mut self) -> io::Error {
+        self.probe_log("TIMEOUT");
         let child = match self.group.observe() {
             Ok(None) => "running".to_owned(),
             Ok(Some(status)) => format!("exited:{status}"),
@@ -231,6 +304,7 @@ impl ChildGuard {
                 && self.stdout.finished()
                 && self.stderr.finished()
             {
+                self.probe_log("ok");
                 return Ok(Output {
                     status,
                     stdout: std::mem::take(&mut self.stdout.bytes),

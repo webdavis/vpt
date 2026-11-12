@@ -60,6 +60,15 @@ fn database_child() {
             "database participant must be a direct child of the root test"
         );
     }
+    if std::env::var_os("VPT_PROBE").is_some() {
+        eprintln!(
+            "VPT_EPOCH_US {}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_micros()
+        );
+    }
     let directory = std::env::var_os("VPT_DATABASE_ROOT").expect("owned root");
     let opening = crate::ledger::schema_diagnostics::start("root.open.start");
     let root = RootDir::open(&Path::new(&directory).join("state")).unwrap();
