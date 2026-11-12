@@ -20,6 +20,7 @@ pub mod relations;
 pub mod retention;
 pub mod review;
 pub mod run;
+pub mod search;
 pub mod sweep;
 pub mod tags;
 pub mod time;

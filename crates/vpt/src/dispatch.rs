@@ -115,6 +115,11 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             Ok(ledger) => commands::show::run(&ledger, id),
             Err(error) => Outcome::Failure(*error),
         },
+        Verb::Search(options) => commands::search::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            options,
+        ),
         Verb::Review { id } => match compose::ledger_from(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

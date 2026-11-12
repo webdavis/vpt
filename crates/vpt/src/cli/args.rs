@@ -5,6 +5,7 @@ pub(crate) mod import;
 mod options;
 pub(crate) mod redact;
 mod review;
+pub(crate) mod search;
 mod text;
 mod verbs;
 use super::format::Format;
@@ -17,7 +18,7 @@ pub const USAGE: &str = "usage: vpt [--json|--toon|--yaml] [--config <file>] <ve
 verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <path>] |\n\
        import <file> [--title <text>] [--captured-at <RFC3339>] | show <id> |\n\
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
-       synthesize <id> [--dry-run] | path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
+       synthesize <id> [--dry-run] | path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | search <word>... [--limit <n>] | storage | retention run [--dry-run] |\n\
        brief <occasion-id> [--dry-run] [--explain] | brief --title <title> --at <RFC3339> [--duration-minutes <n>] [--participant <name>]... [--tag <tag>]... | brief --upcoming |\n\
        handoff <id> --stage released|transcript|analysis|brief | redact <id> [--stage transcript|analysis] [--to <dir>] [--title <title>] | symlink deploy | symlink verify | --version\n";
 
@@ -84,6 +85,7 @@ pub enum Verb {
     Show {
         id: String,
     },
+    Search(search::Options),
     Review {
         id: String,
     },

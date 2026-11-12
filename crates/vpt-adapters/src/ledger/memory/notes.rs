@@ -42,6 +42,34 @@ impl NoteLedger for MemoryLedger {
                 .cloned()
         })
     }
+    fn visit_notes(
+        &self,
+        visitor: &mut dyn FnMut(NoteArtifact) -> std::ops::ControlFlow<()>,
+    ) -> Result<(), LedgerError> {
+        let mut notes: Vec<_> = with(self, |state| {
+            state
+                .notes
+                .iter()
+                .filter_map(|note| {
+                    let record = state.recordings.iter().find(|r| r.id == note.recording)?;
+                    Some((record.captured_at, note.clone()))
+                })
+                .collect()
+        })?;
+        notes.sort_by_key(|(at, note)| {
+            (
+                std::cmp::Reverse(*at),
+                std::cmp::Reverse(note.recording.as_str().to_owned()),
+                note.stage,
+            )
+        });
+        for (_, note) in notes {
+            if visitor(note).is_break() {
+                break;
+            }
+        }
+        Ok(())
+    }
 }
 
 pub(super) fn apply(

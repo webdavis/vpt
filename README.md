@@ -497,6 +497,22 @@ managed regions, and compute a fresh artifact digest. Frontmatter is removed fro
 artifacts are labelled and can still be emitted. Handoff does not run engines or agents, invoke hooks,
 read provider credentials, contact services, write files, upload content, or access the clipboard.
 
+## Searching transcripts and analysis
+
+`vpt search <word>... [--limit <n>] [--json|--toon|--yaml]` finds every transcript segment and every
+analysis summary or action line that holds all the words, in any letter case. A word also matches inside
+a longer word. It reads the notes vpt last wrote, as saved in the ledger, and skips a note whose file is
+no longer at its path, such as one retention moved to the Trash.
+
+Hits come newest recording first, then in note order, transcript before analysis. `--limit` caps the
+hits at a positive number, 50 by default, and `truncated` says whether more existed. Each hit carries
+`moment`, `recording`, `title`, `stage` (`transcript` or `analysis`), `seconds`, `timecode` (`mm:ss`,
+minutes past 59 kept as they are) and `quote`. `moment` is `<recording id>@<mm:ss>`. An analysis line
+takes the start of its first source; an unsourced line has `null` for `moment`, `seconds` and
+`timecode`. A quote keeps vpt's review markers, such as `[corrected: ...]` and `[unverified: ...]`, and
+drops the analysis line's sources and findings. Human output prints one line per hit: moment, title,
+stage and quote. Search runs no engine and writes nothing; without a ledger it finds nothing.
+
 ## Installation
 
 Install the command and helper separately:

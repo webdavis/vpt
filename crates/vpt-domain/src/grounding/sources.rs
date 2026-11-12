@@ -25,7 +25,7 @@ impl SourceRange {
     }
 }
 
-fn seconds(text: &str) -> Option<u64> {
+pub(crate) fn seconds(text: &str) -> Option<u64> {
     let (minutes, seconds) = text.split_once(':')?;
     if minutes.len() < 2
         || seconds.len() != 2

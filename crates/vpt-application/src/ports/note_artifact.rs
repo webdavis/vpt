@@ -56,4 +56,9 @@ pub trait NoteLedger {
         stage: NoteStage,
     ) -> Result<Option<NoteArtifact>, LedgerError>;
     fn note_at(&self, target: &Path) -> Result<Option<NoteArtifact>, LedgerError>;
+    /// Visits saved notes newest captured recording first, a transcript before its analysis.
+    fn visit_notes(
+        &self,
+        visitor: &mut dyn FnMut(NoteArtifact) -> std::ops::ControlFlow<()>,
+    ) -> Result<(), LedgerError>;
 }
