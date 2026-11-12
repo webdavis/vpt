@@ -105,7 +105,9 @@ fn setup_terminal_answer_timeout_reaps_the_owned_command() {
         is_command_deadline(&failure),
         "missing answer must hit the command deadline: {failure:?}"
     );
-    assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    assert!(
+        started.elapsed() < support::WATCHDOG.saturating_add(std::time::Duration::from_millis(500))
+    );
     assert!(!sandbox.config_path().exists());
 }
 
@@ -195,7 +197,12 @@ fn is_command_deadline(outcome: &std::thread::Result<std::process::Output>) -> b
                 .map(String::as_str)
                 .or_else(|| failure.downcast_ref::<&str>().copied())
         })
-        .is_some_and(|message| message.starts_with("command exceeded 500 ms deadline:"))
+        .is_some_and(|message| {
+            message.starts_with(&format!(
+                "command exceeded {} ms deadline:",
+                support::WATCHDOG.as_millis()
+            ))
+        })
 }
 
 #[cfg(feature = "dev-tools")]

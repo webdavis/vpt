@@ -20,12 +20,12 @@ fn completion_observed_during_poll_after_deadline_is_rejected() {
     let mut command = sandboxed_shell(&sandbox, "exit 0");
     let mut child = support::spawn(&mut command);
     observe_short_owned_child(&mut child);
-    let started = Instant::now() - Duration::from_millis(400);
+    let started = Instant::now() - support::WATCHDOG.saturating_sub(Duration::from_millis(100));
     let mut drove = false;
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         support::collect_with(child, started, None, || {
             drove = true;
-            while started.elapsed() < Duration::from_millis(501) {
+            while started.elapsed() <= support::WATCHDOG {
                 std::thread::yield_now();
             }
         })
@@ -34,7 +34,10 @@ fn completion_observed_during_poll_after_deadline_is_rejected() {
     let failure = outcome.expect_err("completion observed after the poll deadline must fail");
     let message = panic_message(&failure);
     assert!(
-        message.starts_with("command exceeded 500 ms deadline:"),
+        message.starts_with(&format!(
+            "command exceeded {} ms deadline:",
+            support::WATCHDOG.as_millis()
+        )),
         "{message}"
     );
 }
@@ -60,7 +63,10 @@ fn watchdog_timeout_reports_bounded_capture_and_phase() {
     ensure_group_gone(pid);
     let message = panic_message(&failure);
     assert!(
-        message.starts_with("command exceeded 500 ms deadline:"),
+        message.starts_with(&format!(
+            "command exceeded {} ms deadline:",
+            support::WATCHDOG.as_millis()
+        )),
         "{message}"
     );
     assert!(message.contains("stdout_bytes=81"), "{message}");
@@ -130,7 +136,8 @@ fn retained_peer_obeys_deadline(on_stderr: bool) {
         }));
         send.send(outcome.is_err()).expect("result receiver");
     });
-    let bounded = receive.recv_timeout(Duration::from_millis(700));
+    let bounded =
+        receive.recv_timeout(support::WATCHDOG.saturating_add(Duration::from_millis(200)));
     if bounded.is_err() {
         peer.shutdown(std::net::Shutdown::Both)
             .expect("release owned peer");
@@ -138,7 +145,7 @@ fn retained_peer_obeys_deadline(on_stderr: bool) {
             .recv_timeout(Duration::from_millis(150))
             .expect("released collector");
     }
-    while !worker.is_finished() && started.elapsed() < Duration::from_millis(900) {
+    while !worker.is_finished() && started.elapsed() < support::CLEANUP_BOUND {
         std::thread::yield_now();
     }
     assert!(
@@ -151,7 +158,7 @@ fn retained_peer_obeys_deadline(on_stderr: bool) {
         Some(true),
         "retained output escaped its deadline"
     );
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < support::WATCHDOG.saturating_add(Duration::from_millis(500)));
 }
 
 #[test]
@@ -198,7 +205,7 @@ fn watchdog_terminates_the_hanging_group_and_reaps_its_child() {
         .or_else(|| failure.downcast_ref::<&str>().copied())
         .expect("panic message");
     assert!(message.contains("exceeded"), "{message}");
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < support::WATCHDOG.saturating_add(Duration::from_millis(500)));
     let pids = std::fs::read_to_string(sandbox.path().join("pids")).expect("spawned process ids");
     for pid in pids
         .split_whitespace()
@@ -252,7 +259,7 @@ fn watchdog_kills_a_direct_child_that_ignores_term() {
         std::io::Error::last_os_error().raw_os_error(),
         Some(libc::ESRCH)
     );
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < support::WATCHDOG.saturating_add(Duration::from_millis(500)));
 }
 
 #[cfg(feature = "dev-tools")]
@@ -298,7 +305,7 @@ fn watchdog_parent_reaps_its_same_group_descendant() {
         std::io::Error::last_os_error().raw_os_error(),
         Some(libc::ESRCH)
     );
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < support::WATCHDOG.saturating_add(Duration::from_millis(500)));
 }
 
 fn run_now(command: &mut Command) -> std::process::Output {

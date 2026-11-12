@@ -15,6 +15,12 @@ use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
 pub const VPT: &str = env!("CARGO_BIN_EXE_vpt");
+/// Bounds a command or test child so that a hang fails its test. It does not measure
+/// performance: commands finish far inside it, and the margin absorbs a CI runner stalling the
+/// whole machine.
+pub const WATCHDOG: Duration = Duration::from_secs(2);
+/// Bounds the forced cleanup of a command that outlived the watchdog.
+pub const CLEANUP_BOUND: Duration = WATCHDOG.saturating_add(Duration::from_millis(400));
 #[cfg(feature = "dev-tools")]
 #[allow(dead_code, reason = "used only by helper integration tests")]
 pub const FAKE_ENGINE: &str = env!("CARGO_BIN_EXE_vpt-fake-engine");
@@ -129,7 +135,7 @@ pub(crate) fn spawn_with_signal(
     }
     ProcessGroup::new(
         command.spawn().expect("command spawned"),
-        started + Duration::from_millis(900),
+        started + CLEANUP_BOUND,
         signal,
     )
 }
@@ -144,13 +150,7 @@ pub fn collect_with(
     spawn_return: Option<Instant>,
     drive: impl FnMut(),
 ) -> Output {
-    collect_with_budget(
-        group,
-        started,
-        spawn_return,
-        drive,
-        Duration::from_millis(500),
-    )
+    collect_with_budget(group, started, spawn_return, drive, WATCHDOG)
 }
 
 #[allow(
@@ -229,9 +229,6 @@ fn collect_with_budget(
             stdout.finished(),
             stderr.finished(),
         );
-        if budget == Duration::from_millis(500) && elapsed >= Duration::from_secs(1) {
-            panic!("command exceeded one second: {record}");
-        }
         panic!(
             "command exceeded {} ms deadline: {record}",
             budget.as_millis()

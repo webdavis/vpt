@@ -33,7 +33,7 @@ fn sqlite_writer_child() {
     let started = Instant::now();
     while !release.exists() {
         assert!(
-            started.elapsed() < Duration::from_millis(450),
+            started.elapsed() < crate::support::WATCHDOG,
             "writer release timed out"
         );
         std::thread::sleep(Duration::from_millis(1));
@@ -71,7 +71,7 @@ fn show_and_list_read_committed_rows_while_another_process_writes() {
         .env("VPT_TEST_SQLITE_WRITER_ID", row.id.as_str());
     let started = Instant::now();
     let mut child = support::spawn(&mut command);
-    let deadline = started + Duration::from_millis(250);
+    let deadline = started + crate::support::WATCHDOG;
     while !crate::fixture::writer_ready(&state) {
         assert!(
             Instant::now() < deadline,

@@ -72,7 +72,7 @@ fn public_environment_wrapper_delivers_exact_arguments_and_input_with_owned_envi
     let outcome = vpt_adapters::run_with_env(
         &argv,
         text.as_bytes(),
-        Duration::from_millis(500),
+        crate::support::WATCHDOG,
         vpt_adapters::OUTPUT_LIMIT,
         &overrides,
     )

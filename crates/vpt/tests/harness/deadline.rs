@@ -24,7 +24,7 @@ pub(super) fn late_completion_observed_after_deadline_is_rejected() {
     let mut command = sandboxed_shell(&sandbox, "exit 0");
     let mut child = support::spawn(&mut command);
     observe_short_owned_child(&mut child);
-    let started = Instant::now() - Duration::from_millis(501);
+    let started = Instant::now() - support::WATCHDOG.saturating_add(Duration::from_millis(1));
     let mut drove = false;
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         support::collect_with(child, started, None, || drove = true)
@@ -33,7 +33,10 @@ pub(super) fn late_completion_observed_after_deadline_is_rejected() {
     let failure = outcome.expect_err("completion observed after deadline must fail");
     let message = panic_message(&failure);
     assert!(
-        message.starts_with("command exceeded 500 ms deadline:"),
+        message.starts_with(&format!(
+            "command exceeded {} ms deadline:",
+            support::WATCHDOG.as_millis()
+        )),
         "{message}"
     );
 }
@@ -53,7 +56,10 @@ pub(super) fn watchdog_absent_pipe_is_not_reported_as_eof() {
     ensure_group_gone(pid);
     let message = panic_message(&failure);
     assert!(
-        message.starts_with("command exceeded 500 ms deadline:"),
+        message.starts_with(&format!(
+            "command exceeded {} ms deadline:",
+            support::WATCHDOG.as_millis()
+        )),
         "{message}"
     );
     assert!(message.contains("stdout_eof=none"), "{message}");
@@ -64,7 +70,7 @@ pub(super) fn watchdog_absent_pipe_is_not_reported_as_eof() {
 }
 
 pub(super) fn observe_short_owned_child(child: &mut ProcessGroup) {
-    let ready_by = Instant::now() + Duration::from_millis(400);
+    let ready_by = Instant::now() + support::WATCHDOG;
     loop {
         match child.observe() {
             Ok(Some(_)) => return,
