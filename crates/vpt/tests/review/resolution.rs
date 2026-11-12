@@ -44,10 +44,13 @@ pub(super) fn resolve(
     flag: &str,
     action: &[&str],
 ) -> std::process::Output {
-    run(sandbox
-        .vpt()
-        .args(["review", id.as_str(), "--resolve", flag, "--json"])
-        .args(action))
+    support::run_with_budget(
+        sandbox
+            .vpt()
+            .args(["review", id.as_str(), "--resolve", flag, "--json"])
+            .args(action),
+        std::time::Duration::from_secs(5),
+    )
 }
 
 #[test]
