@@ -195,6 +195,10 @@ transcript or proposal bodies. `list --stage` selects stages whose state is not 
 `disabled` and `expired`. Observation results are bounded to 65,536 recordings and 16 MiB of retained
 metadata.
 
+`vpt show <id> --stage transcript` prints the accepted transcript's segments from saved state, each with
+`start` and `end` seconds, a `mm:ss` `timecode` and its `text` with review corrections applied. It
+needs no opt-in. A recording with no accepted transcript is an input error (2).
+
 `vpt storage [--json|--toon|--yaml]` reports current file counts, bytes, and oldest/newest timestamps for all seven
 stores. It works independently of the recording source and ledger.
 

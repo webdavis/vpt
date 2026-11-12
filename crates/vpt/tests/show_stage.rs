@@ -1,0 +1,91 @@
+#![allow(dead_code, reason = "shared CLI fixtures")]
+#[path = "show_list_storage/fixture.rs"]
+mod fixture;
+#[path = "redact/fixture.rs"]
+mod recording;
+mod support;
+use serde_json::json;
+use support::{Sandbox, stderr};
+use vpt_adapters::SqliteLedger;
+use vpt_application::ports::*;
+
+fn invoke(sandbox: &Sandbox, args: &[&str]) -> std::process::Output {
+    support::run_with_budget(sandbox.vpt().args(args), std::time::Duration::from_secs(5))
+}
+fn json(output: &std::process::Output) -> serde_json::Value {
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(output));
+    assert!(output.stderr.is_empty());
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+fn configured(name: &str) -> (Sandbox, vpt_domain::identity::RecordingId) {
+    let sandbox = fixture::configured(name);
+    let id = recording::seed_flags(&sandbox, true);
+    (sandbox, id)
+}
+fn show(sandbox: &Sandbox, id: &str, stage: &str) -> std::process::Output {
+    invoke(sandbox, &["show", id, "--stage", stage, "--json"])
+}
+fn correct_the_flag(sandbox: &Sandbox, id: &vpt_domain::identity::RecordingId, text: &str) {
+    let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
+        .unwrap()
+        .unwrap();
+    let flag = ledger
+        .review_snapshot(id)
+        .unwrap()
+        .unwrap()
+        .flags
+        .into_iter()
+        .find(|f| matches!(&f.content, vpt_domain::review::FlagContent::Lexical(_)))
+        .unwrap();
+    let flag = flag.identifier.hex();
+    json(&invoke(
+        sandbox,
+        &[
+            "review",
+            id.as_str(),
+            "--resolve",
+            &flag,
+            "--correct",
+            text,
+            "--json",
+        ],
+    ));
+}
+
+#[test]
+fn transcript_segments_carry_corrections_without_an_opt_in() {
+    let (sandbox, id) = configured("show-segments");
+    correct_the_flag(&sandbox, &id, "5678");
+    let before = fixture::snapshot(&sandbox);
+    let result = json(&show(&sandbox, id.as_str(), "transcript"));
+    assert_eq!(
+        result,
+        json!({
+            "schema": "vpt.result/1",
+            "command": "show",
+            "recording": id.as_str(),
+            "stage": "transcript",
+            "segments": [{
+                "start": 0.0,
+                "end": 1.0,
+                "timecode": "00:00",
+                "text": "Meet Alice with Bob via person@sample.test for 5678",
+            }],
+        })
+    );
+    assert_eq!(fixture::snapshot(&sandbox), before);
+}
+
+#[test]
+fn a_stage_without_saved_state_is_an_input_error() {
+    let sandbox = fixture::configured("show-stage-missing");
+    let id = fixture::record(&sandbox, 3, StageStates::fresh()).id;
+    let unknown = show(&sandbox, id.as_str(), "transcript");
+    assert_eq!(unknown.status.code(), Some(2), "{}", stderr(&unknown));
+    assert!(!stderr(&unknown).contains("unexpected argument"));
+    let wrong = invoke(
+        &sandbox,
+        &["show", id.as_str(), "--stage", "audio", "--json"],
+    );
+    assert_eq!(wrong.status.code(), Some(2), "{}", stderr(&wrong));
+}

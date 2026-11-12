@@ -57,5 +57,19 @@ pub fn transcript_with_spans(
         open_spans,
     })
 }
+pub fn corrected_segments(
+    transcript: &Transcript,
+    flags: &[ReviewFlag],
+) -> Result<Vec<String>, RenderError> {
+    validate::inputs(transcript, flags)?;
+    let projected = projection::project(transcript);
+    let spans = annotations::spans(&projected, flags)?;
+    projected
+        .segments
+        .iter()
+        .zip(spans)
+        .map(|(text, spans)| annotations::plain(text, &spans))
+        .collect()
+}
 #[cfg(test)]
 mod tests;

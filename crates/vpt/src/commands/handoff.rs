@@ -1,5 +1,5 @@
 mod brief;
-mod errors;
+pub(crate) mod errors;
 mod file;
 mod output;
 mod private;

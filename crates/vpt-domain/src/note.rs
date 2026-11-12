@@ -1,7 +1,7 @@
 mod rendered;
 mod stage;
 use crate::{review::ReviewFlag, transcript::Transcript};
-pub use rendered::{OpenSpan, RenderedTranscript, transcript_with_spans};
+pub use rendered::{OpenSpan, RenderedTranscript, corrected_segments, transcript_with_spans};
 pub use stage::NoteStage;
 mod analysis;
 mod annotations;
