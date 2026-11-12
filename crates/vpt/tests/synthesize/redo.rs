@@ -58,5 +58,8 @@ fn a_redo_drops_automatic_tags_the_new_proposal_omits_and_keeps_hand_set_ones() 
         assert!(!note.text.contains("beta"), "{}", note.text);
         assert!(note.text.contains("by-hand"));
     }
-    assert_eq!(fs::read_to_string(&known).unwrap(), vocabulary);
+    assert_eq!(
+        fs::read_to_string(&known).unwrap(),
+        vocabulary.replace("beta\n", "")
+    );
 }

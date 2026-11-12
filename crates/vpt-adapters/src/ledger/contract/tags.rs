@@ -6,7 +6,9 @@ use vpt_domain::{
     time::UtcInstant,
 };
 
+mod learned;
 mod renames;
+pub(crate) use learned::*;
 pub(crate) use renames::*;
 
 pub(crate) fn value() -> Tag {
@@ -243,6 +245,7 @@ macro_rules! cases {
         $case!(invalid_duplicate_and_oversized_tag_state_is_refused);
         $case!(confirmed_rejected_and_empty_tag_sets_round_trip);
         $case!(tag_renames_are_remembered_and_the_latest_rename_of_a_name_wins);
+        $case!(learned_tags_are_remembered_until_forgotten);
     };
 }
 pub(crate) use cases;

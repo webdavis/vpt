@@ -1,5 +1,5 @@
 use super::{MemoryLedger, State, with};
-use crate::ledger::tags::{check, check_rename, conflict};
+use crate::ledger::tags::{check, check_learned, check_rename, conflict};
 use vpt_application::ports::{LedgerError, TagLedger, TagRename, WorkDelta};
 use vpt_domain::{
     identity::RecordingId,
@@ -30,6 +30,33 @@ impl TagLedger for MemoryLedger {
                 .collect()
         })
     }
+    fn tag_names(&self) -> Result<Vec<(RecordingId, String)>, LedgerError> {
+        with(self, |state| {
+            state
+                .tags
+                .iter()
+                .flat_map(|(recording, tags)| {
+                    tags.iter().map(|tag| (recording.clone(), tag.name.clone()))
+                })
+                .collect()
+        })
+    }
+
+    fn learned_tags(&self) -> Result<Vec<String>, LedgerError> {
+        with(self, |state| state.learned_tags.iter().cloned().collect())
+    }
+}
+
+pub(super) fn apply_learned(state: &mut State, delta: &WorkDelta) -> Result<(), LedgerError> {
+    let Some(change) = &delta.learned_tags else {
+        return Ok(());
+    };
+    check_learned(change)?;
+    for key in &change.forgotten {
+        state.learned_tags.remove(key);
+    }
+    state.learned_tags.extend(change.learned.iter().cloned());
+    Ok(())
 }
 
 pub(super) fn apply_rename(state: &mut State, delta: &WorkDelta) -> Result<(), LedgerError> {

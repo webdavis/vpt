@@ -1,21 +1,45 @@
 use super::*;
 use std::collections::HashSet;
 
-pub fn prepare_many(path: &Path, tags: &[String]) -> Result<Update, TermsError> {
+pub struct Edit {
+    pub update: Update,
+    pub appended: Vec<String>,
+    pub keys: HashSet<String>,
+}
+
+/// Removes every line whose tag key is in `drop`, then appends the tags not yet present.
+/// `appended` holds the keys this edit added and `keys` every key the file holds afterwards.
+pub fn prepare_many(
+    path: &Path,
+    tags: &[String],
+    drop: &HashSet<String>,
+) -> Result<Edit, TermsError> {
     if tags.len() > 256 {
         return Err(TermsError::TooLarge);
     }
     Vocabulary::new(tags).map_err(error)?;
-    known_terms::prepare_with(path, |bytes| {
-        let existing = known_terms::document::lines(bytes)?;
-        let mut keys: HashSet<_> = existing
-            .iter()
-            .map(|tag| vpt_domain::tags::key(tag).map_err(error))
-            .collect::<Result<_, _>>()?;
-        let mut count = existing.len();
-        let mut output = bytes.to_vec();
+    let mut appended = Vec::new();
+    let mut keys = HashSet::new();
+    let update = known_terms::prepare_with(path, |bytes| {
+        known_terms::document::lines(bytes)?;
+        let text = std::str::from_utf8(bytes).map_err(|_| TermsError::InvalidText)?;
+        let mut output = Vec::with_capacity(bytes.len());
+        let mut count = 0;
+        for line in text.split_inclusive('\n') {
+            let tag = line.trim();
+            if !tag.is_empty() {
+                let key = vpt_domain::tags::key(tag).map_err(error)?;
+                if drop.contains(&key) {
+                    continue;
+                }
+                keys.insert(key);
+                count += 1;
+            }
+            output.extend_from_slice(line.as_bytes());
+        }
         for tag in tags {
-            if !keys.insert(vpt_domain::tags::key(tag).map_err(error)?) {
+            let key = vpt_domain::tags::key(tag).map_err(error)?;
+            if !keys.insert(key.clone()) {
                 continue;
             }
             let separator = !output.is_empty() && !output.ends_with(b"\n");
@@ -29,8 +53,14 @@ pub fn prepare_many(path: &Path, tags: &[String]) -> Result<Update, TermsError> 
             }
             output.extend_from_slice(tag.as_bytes());
             output.push(b'\n');
+            appended.push(key);
             count += 1;
         }
         Ok(output)
+    })?;
+    Ok(Edit {
+        update,
+        appended,
+        keys,
     })
 }

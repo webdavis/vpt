@@ -36,7 +36,7 @@ mod retention_history;
 mod stores;
 mod tags;
 mod transcript;
-pub use tags::{TagChange, TagLedger, TagRename};
+pub use tags::{LearnedTagChange, TagChange, TagLedger, TagRename};
 mod trash;
 
 pub use archive::{Archive, ArchiveError, Published, StageFailure, Staged};

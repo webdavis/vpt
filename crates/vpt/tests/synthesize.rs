@@ -26,6 +26,8 @@ mod profiles;
 mod progress;
 #[path = "synthesize/protocol.rs"]
 mod protocol;
+#[path = "synthesize/prune.rs"]
+mod prune;
 #[path = "synthesize/recovery.rs"]
 mod recovery;
 #[path = "synthesize/redo.rs"]

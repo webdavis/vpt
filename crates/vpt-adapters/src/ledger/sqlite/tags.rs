@@ -4,8 +4,10 @@ use vpt_domain::{
     identity::RecordingId,
     tags::{State, Tag},
 };
+mod learned;
 mod read;
 mod write;
+pub(super) use learned::apply as apply_learned;
 pub(super) use read::recording as read;
 pub(super) use write::{apply, apply_rename};
 
@@ -20,6 +22,14 @@ impl TagLedger for SqliteLedger {
 
     fn tag_states(&self) -> Result<Vec<(String, State)>, LedgerError> {
         self.snapshot(read::states)
+    }
+
+    fn tag_names(&self) -> Result<Vec<(RecordingId, String)>, LedgerError> {
+        self.snapshot(learned::names)
+    }
+
+    fn learned_tags(&self) -> Result<Vec<String>, LedgerError> {
+        self.snapshot(learned::keys)
     }
 }
 

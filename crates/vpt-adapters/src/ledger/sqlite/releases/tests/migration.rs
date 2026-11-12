@@ -9,7 +9,7 @@ pub(super) fn run(root: &crate::RootDir) {
     let ledger = SqliteLedger::open(root).unwrap();
     let (run, mut draft) = setup(&ledger);
     let row = committed(ledger.prepare_release(run, &draft)).release;
-    ledger.transaction(|c| c.execute_batch("DROP TABLE tag_renames; DROP TABLE artifact_expirations; DROP TABLE release_payloads; DROP TABLE release_completions; DROP INDEX release_recording_sequence; DROP INDEX release_destination; DROP INDEX release_report_path; ALTER TABLE releases DROP COLUMN report_digest; PRAGMA user_version=13;").map_err(super::super::super::map)).unwrap();
+    ledger.transaction(|c| c.execute_batch("DROP TABLE learned_tags; DROP TABLE tag_renames; DROP TABLE artifact_expirations; DROP TABLE release_payloads; DROP TABLE release_completions; DROP INDEX release_recording_sequence; DROP INDEX release_destination; DROP INDEX release_report_path; ALTER TABLE releases DROP COLUMN report_digest; PRAGMA user_version=13;").map_err(super::super::super::map)).unwrap();
     let observer = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
     assert!(observer.releases(&draft.recording).unwrap().is_empty());
     assert!(observer.pending_releases().unwrap().is_empty());
@@ -22,12 +22,12 @@ pub(super) fn run(root: &crate::RootDir) {
     assert!(failure.is_err());
     assert_eq!(ledger.schema_version().unwrap(), 13);
     ledger.read(|c| {
-        let tables: i64 = c.query_row("SELECT count(*) FROM sqlite_schema WHERE name IN ('release_payloads','release_completions','tag_renames')", [], |r|r.get(0)).unwrap();
+        let tables: i64 = c.query_row("SELECT count(*) FROM sqlite_schema WHERE name IN ('release_payloads','release_completions','tag_renames','learned_tags')", [], |r|r.get(0)).unwrap();
         assert_eq!(tables,0);
         Ok(())
     }).unwrap();
     let upgraded = SqliteLedger::open(root).unwrap();
-    assert_eq!(upgraded.schema_version().unwrap(), 16);
+    assert_eq!(upgraded.schema_version().unwrap(), 17);
     assert!(upgraded.releases(&draft.recording).unwrap().is_empty());
     upgraded
         .read(|c| {

@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use vpt_application::ports::{LedgerError, TagChange, TagRename};
+use vpt_application::ports::{LearnedTagChange, LedgerError, TagChange, TagRename};
 use vpt_domain::{
     run::{HistoryFact, WorkOutcome},
     tags::{Provenance, Tag},
@@ -66,6 +66,15 @@ pub(super) fn check_rename(rename: &TagRename) -> Result<(), LedgerError> {
     let new = vpt_domain::tags::key(&rename.new).map_err(|_| invalid())?;
     if old != rename.old || old == new || rename.new.len() > 262_144 {
         return Err(invalid());
+    }
+    Ok(())
+}
+
+pub(super) fn check_learned(change: &LearnedTagChange) -> Result<(), LedgerError> {
+    for key in change.learned.iter().chain(&change.forgotten) {
+        if vpt_domain::tags::key(key).ok().as_deref() != Some(key.as_str()) {
+            return Err(invalid());
+        }
     }
     Ok(())
 }

@@ -101,3 +101,20 @@ fn renaming_replaces_every_spelling_of_the_old_tag_once_and_keeps_other_lines() 
         b"fresh-name\n"
     );
 }
+
+#[test]
+fn dropping_a_tag_keeps_every_other_line_byte_for_byte() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("known-tags.txt");
+    fs::write(&path, " Project_Finance \r\n\nold-topic\nStraße").unwrap();
+    let drop = ["old-topic".to_owned()].into_iter().collect();
+    let edit = prepare_many(&path, &["new-topic".into()], &drop).unwrap();
+    assert_eq!(
+        String::from_utf8(edit.update.content().to_vec()).unwrap(),
+        " Project_Finance \r\n\nStraße\nnew-topic\n"
+    );
+    assert_eq!(edit.appended, ["new-topic"]);
+    assert!(edit.keys.contains("new-topic") && !edit.keys.contains("old-topic"));
+    let unchanged = prepare_many(&path, &[], &Default::default()).unwrap();
+    assert!(!unchanged.update.added());
+}
