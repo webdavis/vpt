@@ -1,5 +1,7 @@
 #![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared CLI fixtures")]
+#[path = "transcribe/events.rs"]
+mod events;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
 #[path = "transcribe/lexical.rs"]
@@ -16,6 +18,7 @@ mod progress;
 mod protocol;
 #[path = "transcribe/recovery.rs"]
 mod recovery;
+mod report_hook;
 mod support;
 #[path = "transcribe/cases.rs"]
 mod transcribe_cases;

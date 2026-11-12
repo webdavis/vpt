@@ -565,6 +565,13 @@ Implemented mutating commands log reports and alerts by default. Optional `[repo
 default to empty lists, so no notifications will be sent unless configured. The script chooses the
 notification system and message format.
 
+Each finished transcription logs one `transcribed` report after its transcript note is published, and
+each finished synthesis logs one `synthesized` report after its analysis note is published, from
+`vpt transcribe`, `vpt synthesize` and `vpt run` alike. Each is `state: "done"` with the `recording`
+identity and `paths.note`, and invokes the configured report command, so a caller hears about
+finished work without polling. A transcription that needs review sends its `review_needed` alert as
+well.
+
 History is saved in the private ledger before export to `events.jsonl` or hook delivery. Export or
 hook failures add a safe warning and preserve the operation's result. A later mutating command repairs
 an incomplete final log line, replays pending records with their original identifiers and occurrence

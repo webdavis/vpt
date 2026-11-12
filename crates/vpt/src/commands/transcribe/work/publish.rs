@@ -9,7 +9,7 @@ use vpt_application::{
     review::{self, alerts::ReviewNotice},
 };
 use vpt_domain::{
-    history::{EventCounts, RunId},
+    history::{Event, EventCounts, EventKind, RunId},
     identity::RecordingId,
     run::{HistoryFact, RunOutcome},
 };
@@ -113,6 +113,17 @@ pub(super) fn run<E: EventSink>(
                 .into_iter()
                 .map(|event| (at, HistoryFact::Event(event))),
         );
+    }
+    if let Ok((published, _)) = &result {
+        facts.push((
+            at,
+            HistoryFact::Event(Event::recording_done(
+                EventKind::Transcribed,
+                id.clone(),
+                published.note.clone(),
+                at,
+            )),
+        ));
     }
     facts.push((
         at,

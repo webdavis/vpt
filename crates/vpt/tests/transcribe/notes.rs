@@ -61,7 +61,7 @@ fn transcription_publishes_note_before_private_safe_review_alert() {
     assert_eq!(events[0]["counts"]["diagnostics"], 1);
     assert_eq!(events[0]["paths"]["note"], path.to_str().unwrap());
     assert!(!events[0].to_string().contains("SecretAlice"));
-    assert!(!sandbox.path().join("report-called").exists());
+    assert!(sandbox.path().join("report-called").exists());
     let log = fs::read_to_string(sandbox.path().join("state/vpt/events.jsonl")).unwrap();
     assert!(!log.contains("SecretAlice"));
     assert!(!log.contains("Private hook output"));
@@ -114,7 +114,7 @@ fn failed_alert_preserves_transcription_and_note_success_with_warning() {
             .note,
         StageState::Succeeded
     );
-    assert!(!sandbox.path().join("report-called").exists());
+    assert!(sandbox.path().join("report-called").exists());
 }
 
 #[test]

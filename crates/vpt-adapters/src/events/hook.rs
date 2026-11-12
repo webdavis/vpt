@@ -5,7 +5,7 @@ use std::time::Duration;
 use vpt_application::ports::{
     HistoryReceipt, HistoryWrite, RunHistory, SinkStop, SinkWarning, WorkDelta,
 };
-use vpt_domain::history::{Event, EventKind};
+use vpt_domain::history::Event;
 use vpt_domain::run::{HistoryFact, HistoryRecord, HookFailureClass};
 use vpt_domain::time::UtcInstant;
 use vpt_protocol::encode_hook;
@@ -64,9 +64,10 @@ impl<H: RunHistory, N: FnMut() -> UtcInstant> LoggedEvents<'_, H, N> {
     }
 
     fn command(&self, event: &Event) -> &[String] {
-        match event.kind {
-            EventKind::BriefWritten | EventKind::Retention => self.report_command,
-            _ => self.alert_command,
+        if event.kind.is_report() {
+            self.report_command
+        } else {
+            self.alert_command
         }
     }
 }

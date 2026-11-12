@@ -1321,8 +1321,11 @@ Verification alerts also include nonzero `unsourced`, `bad_reference`, and
 class. Per-recording and aggregate events count all four classes without including claim text.
 
 Event names are `review_needed`, `transcribe_failed`, `ingest_failed`, `deferred`, `brief_written`,
-`retention` and `config_refused`. `state` is `needs_attention`, `failed` or `done`. Completed briefs and
-retention summaries are reports; the other events are alerts. `counts` carries one entry per lexical
+`retention`, `config_refused`, `transcribed` and `synthesized`. `state` is `needs_attention`, `failed` or
+`done`. Completed briefs, retention summaries, finished transcriptions and finished syntheses are
+reports; the other events are alerts. `transcribed` commits with the run's end after the transcript note
+is published, and `synthesized` commits after the analysis note is published; each carries the
+`recording` and `paths.note`, with zero counts. `counts` carries one entry per lexical
 class plus `diagnostics`. Logs and hook input contain identities, counts, classes and paths, never a
 transcript span, an alternative, a title, a tag, a mask value or a brief line.
 
