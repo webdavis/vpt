@@ -33,6 +33,7 @@ impl std::fmt::Debug for Content {
     }
 }
 mod blocks;
+mod joined;
 mod timecodes;
 const MAX_TEXT: usize = 16 * 1024 * 1024;
 const MAX_ITEMS: usize = 65_536;
@@ -73,6 +74,7 @@ fn render(
         lines: vec![],
     };
     let mut line = 1;
+    let mut joined = joined::Joined::default();
     for block in blocks::read_with_markers(source, markers)? {
         if let Some(level) = block.heading {
             if skip.is_some_and(|previous| level <= previous) {
@@ -89,6 +91,7 @@ fn render(
         }
         let (text, protected) =
             timecodes::prepare(&block.text, &block.protected, options.keep_timecodes)?;
+        joined.push(&block.text, &text, &protected)?;
         let masked = redactor.apply_with_spans(&text, &protected)?;
         let text = masked.text.trim();
         if text.is_empty() {
@@ -125,6 +128,7 @@ fn render(
         decoded.push_str(&block.text);
         decoded.push('\n');
     }
+    joined.check(redactor)?;
     redactor.verify(&decoded)?;
     output.mappings = redactor.mappings().to_vec();
     Ok(output)

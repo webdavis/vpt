@@ -1222,8 +1222,13 @@ parentheses, plus signs, periods or hyphens; `number` at least four consecutive 
 currency symbol adjacent to a digit run. The residue scan runs over the same decoded representation.
 
 The residue scan runs on the assembled bytes: no real value the pass removed, no confirmed term and no
-note name may appear as a whole token. Residue is a refusal, exit 3, naming the mask label and never the
-value; the copy is not written. The private report (mode 0600, named above) maps every mask label to its
+note name may appear as a whole token. A second scan joins the pre-mask text of every kept paragraph,
+after the flag policy and without its unverified annotations, and finds every term, note name and
+pattern match in it; one whose range crosses a paragraph break or a removed annotation is residue too,
+whatever its value and whether the same value was masked whole elsewhere, and the refusal's diagnostics
+name the timecodes of the paragraphs it spans. Analysis lines are paragraphs of the same text, so the scan
+covers them. Residue is a
+refusal, exit 3, naming the mask label and never the value; the copy is not written. The private report (mode 0600, named above) maps every mask label to its
 real value and every released line to its source span, and a candidate report lists every capitalized
 non-sentence-initial token that survived, as a review prompt the operator reads with `--json` or in the
 run output. Confirming one of those tokens with `vpt confirm --term` masks it in every future copy.

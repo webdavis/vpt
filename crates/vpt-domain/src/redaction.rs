@@ -67,6 +67,22 @@ impl Redactor {
         }
         Ok(())
     }
+    pub fn crossing(
+        &self,
+        text: &str,
+        cuts: &[usize],
+    ) -> Result<Option<(Class, std::ops::Range<usize>)>, Error> {
+        validate_text(text)?;
+        let tokens = vocabulary::tokens(text)?;
+        let mut found = Vec::new();
+        self.terms.scan(&tokens, &mut found)?;
+        self.names.scan(&tokens, &mut found)?;
+        patterns::scan(text, &self.options.classes, &mut found)?;
+        Ok(matches::select(found)
+            .into_iter()
+            .find(|found| cuts.iter().any(|cut| found.range.contains(cut)))
+            .map(|found| (found.class, found.range)))
+    }
 }
 fn validate_text(text: &str) -> Result<(), Error> {
     if text.len() > MAX_TEXT {

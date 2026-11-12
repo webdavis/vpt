@@ -507,7 +507,13 @@ stores, plus `known-tags.txt`. Indexed external notes remain unchanged.
 creates a released copy and a separate private report. Transcript is the default source. The source
 note stays unchanged. Copies contain minimal frontmatter and managed content with confirmed terms,
 indexed names/aliases, and configured pattern classes masked. Open flagged spans are omitted by default;
-`[share.redact] flagged_spans = "mark"` retains them with an unverified annotation.
+`[share.redact] flagged_spans = "mark"` retains them with an unverified annotation. A term, note name or
+pattern value that the paragraphs would only reveal in parts, such as a phone number or a two-word term
+split between two transcript segments or around an unverified annotation, is refused (3, `residue`)
+before anything is written, even when the same value is masked whole elsewhere. The refusal's
+`diagnostics` name the timecodes of the paragraphs the value spans, such as `between 00:05 and 00:10`,
+never the value. Resolving the flag, or editing the transcript so the value sits in one segment, clears
+it.
 
 Copies go to `[stores] released`, or the directory supplied with `--to`. Destinations inside private
 stores, state, configuration, or Voice Memos are refused. Existing copies are never overwritten;
