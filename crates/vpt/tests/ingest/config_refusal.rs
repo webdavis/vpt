@@ -118,14 +118,14 @@ fn config_refusal_before_root_validation_never_writes_history_or_calls_hooks() {
         }
         let marker = sandbox.path().join("alert-called");
         let config = fs::read_to_string(sandbox.config_path()).unwrap();
-        fs::write(sandbox.config_path(), format!("{config}\n[stores]\naudio = {:?}\n[alert]\ncommand = ['/usr/bin/touch', {marker:?}]\n", sandbox.path().join("missing-parent/audio"))).unwrap();
+        fs::write(sandbox.config_path(), format!("{config}\n[stores]\naudio = {:?}\n[alert]\ncommand = ['/usr/bin/touch', {marker:?}]\n", sandbox.path().join("missing-parent/../audio"))).unwrap();
         let before = snapshot(&sandbox);
         let output = run(sandbox.vpt().args(["ingest", "--json"]));
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
         let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();
         assert_eq!(error["error"]["kind"], "config");
-        assert!(stderr(&output).contains("parent directory does not exist"));
+        assert!(stderr(&output).contains("below a missing directory cannot be resolved"));
         assert_eq!(snapshot(&sandbox), before);
         assert!(!marker.exists());
     }

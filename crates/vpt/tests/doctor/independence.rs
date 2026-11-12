@@ -7,7 +7,7 @@ fn bad_store_preserves_independent_checks() {
         &sandbox,
         &format!(
             "[stores]\naudio = {:?}\n",
-            sandbox.path().join("absent/audio")
+            sandbox.path().join("voice-memos/audio")
         ),
     );
     let before = snapshot(&sandbox);
@@ -40,7 +40,7 @@ fn linked_home(bad_store: bool) {
             &sandbox,
             &format!(
                 "[stores]\nreleased = {:?}\n",
-                sandbox.path().join("absent/released")
+                sandbox.path().join("absent/../released")
             ),
         );
     }

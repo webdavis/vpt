@@ -33,6 +33,12 @@ must already have mode `0700` and be owned by the current user; otherwise setup 
 prompting or writing configuration. It also rechecks each directory before using it. `--force`
 allows configuration replacement; it does not change existing directory permissions.
 
+A configured home, state directory, or store may sit below folders that do not exist yet. Writing
+commands create every missing folder with mode `0700`; `vpt doctor` and other read-only commands
+report the path as usable and create nothing. VPT checks overlaps from the nearest existing folder,
+so it refuses a path with `..` below a missing folder, a dangling symlink, a symlink that appears
+where a folder is about to be created, or a file where a folder belongs.
+
 ## Apple speech helper
 
 `vpt-macos transcribe <audio-path> --locale en-US` emits a `vpt.engine/1` transcript with word

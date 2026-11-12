@@ -5,7 +5,9 @@ use vpt_protocol::error::{ErrorDocument, ErrorKind};
 pub(crate) fn root_error(error: &RootError) -> ErrorDocument {
     let message = match error {
         RootError::NotAbsolute { key } => format!("{key} must be absolute after expansion"),
-        RootError::ParentMissing { key } => format!("{key}: the parent directory does not exist"),
+        RootError::UnresolvedParent { key } => {
+            format!("{key}: a .. below a missing directory cannot be resolved")
+        }
         RootError::NotADirectory { key } => format!("{key}: not a directory"),
         RootError::PathEscape { key } => {
             return ErrorDocument::new(
