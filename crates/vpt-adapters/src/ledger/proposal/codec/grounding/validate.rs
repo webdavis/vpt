@@ -8,16 +8,13 @@ pub(in crate::ledger::proposal::codec) fn check(
     let mut token_bytes = 0usize;
     let claims = proposal
         .claims()
-        .map(|checked| (&checked.claim.source_references, &checked.grounding, false));
+        .map(|checked| (&checked.claim.source_references, &checked.grounding));
     let dues = proposal
         .actions
         .iter()
         .filter_map(|action| action.due.as_ref())
-        .map(|due| (&due.due.source_references, &due.grounding, true));
-    for (references, grounded, due) in claims.chain(dues) {
-        if due && matches!(grounded.finding, Some(Finding::Unsupported(_))) {
-            return Err(invalid());
-        }
+        .map(|due| (&due.due.source_references, &due.grounding));
+    for (references, grounded) in claims.chain(dues) {
         if let Some(Finding::Unsupported(token)) = &grounded.finding {
             token_bytes = token_bytes.checked_add(token.len()).ok_or_else(invalid)?;
             if token_bytes > MAX_BODY {

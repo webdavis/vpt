@@ -3,8 +3,22 @@ use serde_json::Value;
 use vpt_domain::identity::RecordingId;
 
 fn analyze(name: &str, actions: Value) -> (Sandbox, RecordingId, std::process::Output) {
+    analyze_on(
+        name,
+        |sandbox| recording::seed_flags(sandbox, false),
+        "",
+        actions,
+    )
+}
+
+fn analyze_on(
+    name: &str,
+    seed: impl FnOnce(&Sandbox) -> RecordingId,
+    settings: &str,
+    actions: Value,
+) -> (Sandbox, RecordingId, std::process::Output) {
     let sandbox = fixture::configured(name);
-    let id = recording::seed_flags(&sandbox, false);
+    let id = seed(&sandbox);
     let script = sandbox.path().join("agent.sh");
     let proposal = sandbox.path().join("proposal.json");
     fs::write(&script, "#!/bin/sh\n/bin/cat >/dev/null\n/bin/cat \"$1\"\n").unwrap();
@@ -12,14 +26,28 @@ fn analyze(name: &str, actions: Value) -> (Sandbox, RecordingId, std::process::O
     fs::write(&proposal, document.to_string()).unwrap();
     fixture::write_config(
         &sandbox,
-        &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
+        &format!("[analysis]\n{settings}command=['/bin/sh', {script:?}, {proposal:?}]\n"),
     );
     let output = invoke(&sandbox, &["analyze", id.as_str(), "--json"]);
     (sandbox, id, output)
 }
 
 fn analyzed(name: &str, actions: Value) -> (Sandbox, RecordingId, Value, String) {
-    let (sandbox, id, output) = analyze(name, actions);
+    analyzed_on(
+        name,
+        |sandbox| recording::seed_flags(sandbox, false),
+        "",
+        actions,
+    )
+}
+
+pub(super) fn analyzed_on(
+    name: &str,
+    seed: impl FnOnce(&Sandbox) -> RecordingId,
+    settings: &str,
+    actions: Value,
+) -> (Sandbox, RecordingId, Value, String) {
+    let (sandbox, id, output) = analyze_on(name, seed, settings, actions);
     json(&output);
     let shown = json(&show(&sandbox, id.as_str(), "analysis"));
     let note = analysis_note(&sandbox, &id).text;
@@ -44,7 +72,7 @@ fn actions_section(note: &str) -> String {
     format!("{}\n", lines.join("\n").trim_end())
 }
 
-fn action(text: &str, extra: Value) -> Value {
+pub(super) fn action(text: &str, extra: Value) -> Value {
     let mut action = json!({"text": text, "sources": ["00:00-00:01"]});
     action
         .as_object_mut()
@@ -130,7 +158,7 @@ fn a_spoken_due_date_reaches_show_and_the_note_and_survives_a_rewrite() {
             ),
             action(
                 "call Alice",
-                json!({"due": {"date": "2026-11-20", "time": "15:00", "sources": ["00:05-00:09"]}})
+                json!({"due": {"date": "2026-11-20", "time": "15:00", "sources": ["00:00-00:01"]}})
             ),
         ]),
     );
@@ -140,7 +168,7 @@ fn a_spoken_due_date_reaches_show_and_the_note_and_survives_a_rewrite() {
     );
     assert_eq!(
         shown["actions"][1]["due"],
-        json!({"date": "2026-11-20", "time": "15:00", "sources": [{"start": 5, "end": 9, "range": "00:05-00:09"}], "finding": null})
+        json!({"date": "2026-11-20", "time": "15:00", "sources": [{"start": 0, "end": 1, "range": "00:00-00:01"}], "finding": null})
     );
     for line in shown["actions"].as_array().unwrap() {
         assert_eq!(line["moment"], format!("{}@00:00", id.as_str()));

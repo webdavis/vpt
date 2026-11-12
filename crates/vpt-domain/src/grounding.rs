@@ -1,11 +1,7 @@
-use crate::{
-    digest::Sha256Digest,
-    proposal::{Claim, Due},
-    review::ReviewFlag,
-    transcript::Word,
-};
+use crate::{digest::Sha256Digest, proposal::Claim, review::ReviewFlag, transcript::Word};
 mod context;
 mod corrections;
+mod due;
 mod evidence;
 mod facts;
 mod proposal;
@@ -99,14 +95,6 @@ impl<'a> Grounder<'a> {
             grounded.finding = Some(Finding::Unsupported(fact.text));
         }
         Ok(grounded)
-    }
-
-    pub fn due(&mut self, due: &Due) -> Result<GroundedClaim, GroundingError> {
-        if due.source_references.len() > 256 {
-            return Err(GroundingError::CapacityExceeded);
-        }
-        spend(&mut self.remaining, due.date.len() + 1)?;
-        self.sources(&due.source_references)
     }
 
     fn sources(&mut self, references: &[String]) -> Result<GroundedClaim, GroundingError> {
