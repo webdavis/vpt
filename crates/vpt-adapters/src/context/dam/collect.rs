@@ -8,12 +8,13 @@ use vpt_domain::brief::ContextStatus;
 
 pub(super) fn run(
     command: &[String],
+    max_age: &[String],
     request: &ContextRequest<'_>,
     mut runner: impl FnMut(&[String], Duration) -> Result<Outcome, SpawnError>,
     mut now: impl FnMut() -> Instant,
 ) -> Result<ContextSnapshot, ContextError> {
     let deadline = now() + Duration::from_secs(30);
-    let plan = plan::make(command, request)?;
+    let plan = plan::make(command, max_age, request)?;
     let mut snapshot = ContextSnapshot::default();
     let mut call = |args: &[String]| {
         let remaining = deadline

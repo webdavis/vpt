@@ -7,16 +7,18 @@ use vpt_application::ports::{ContextConfigError, ContextError, ContextRequest, C
 
 pub struct DamContext<'a> {
     pub command: &'a [String],
+    pub max_age: &'a [String],
 }
 impl DamContext<'_> {
     pub fn validate(&self, request: &ContextRequest<'_>) -> Result<(), ContextConfigError> {
-        plan::make(self.command, request).map(|_| ())
+        plan::make(self.command, self.max_age, request).map(|_| ())
     }
 }
 impl ContextSource for DamContext<'_> {
     fn collect(&self, request: &ContextRequest<'_>) -> Result<ContextSnapshot, ContextError> {
         collect::run(
             self.command,
+            self.max_age,
             request,
             |argv, timeout| crate::spawn::run(argv, &[], timeout, 65_537),
             std::time::Instant::now,

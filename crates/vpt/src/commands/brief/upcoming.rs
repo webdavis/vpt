@@ -33,6 +33,12 @@ fn discover(settings: &Settings) -> Result<ContextSnapshot, Box<ErrorDocument>> 
         secs: start.secs.checked_add(lead).ok_or_else(invalid)?,
     };
     let snapshot = context::collect_window(settings, ContextWindow { start, end })?;
+    if let Some(detail) = snapshot.status.calendar.detail() {
+        return Err(Box::new(ErrorDocument::new(
+            ErrorKind::Command,
+            format!("upcoming occasion discovery failed: {detail}"),
+        )));
+    }
     if snapshot.status.calendar != ContextStatus::Present {
         return Err(discovery_error());
     }

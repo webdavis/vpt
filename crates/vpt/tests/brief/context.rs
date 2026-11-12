@@ -87,6 +87,40 @@ fn manual_brief_commits_when_context_collection_crosses_a_clock_second() {
 }
 
 #[test]
+fn stale_dam_calendar_names_the_staleness_for_manual_and_upcoming_briefs() {
+    let sandbox = configured(false);
+    let path = sandbox.path().join("bin/dam");
+    let stale = r#"[ "$9 ${10}" = '--max-age gcal=15m' ] || exit 8; printf '%s' '{"error":{"kind":"refused","rule":"stale_remote","message":"PRIVATE","oids":[]}}' >&2; exit 4"#;
+    let script = fs::read_to_string(&path).unwrap();
+    fs::write(
+        &path,
+        script
+            .replace("[ $# = 8 ]", "[ $# = 10 ]")
+            .replace("printf '%s' '{\"events\":[]}'", stale),
+    )
+    .unwrap();
+    let config = fs::read_to_string(sandbox.config_path()).unwrap();
+    fs::write(
+        sandbox.config_path(),
+        format!("{config}[context.dam]\nmax_age=['gcal=15m']\n[brief.trigger]\nenabled=true\n"),
+    )
+    .unwrap();
+    let result = json(&invoke(&sandbox, &manual(&["--dry-run"])));
+    assert_eq!(result["context"]["calendar"]["reason"], "failed");
+    assert!(
+        result["context"]["calendar"]["detail"]
+            .as_str()
+            .unwrap()
+            .contains("stale")
+    );
+    assert_eq!(result["context"]["tasks"]["status"], "present");
+    let output = invoke(&sandbox, &["brief", "--upcoming", "--json"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stderr(&output).contains("calendar data is stale"));
+    assert!(!stderr(&output).contains("PRIVATE"));
+}
+
+#[test]
 fn a_dam_query_operator_in_a_selection_refuses_before_state_creation() {
     let sandbox = configured(false);
     let config = fs::read_to_string(sandbox.config_path())

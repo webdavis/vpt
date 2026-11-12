@@ -11,6 +11,7 @@ pub struct ContextSettings {
     pub calendars: Vec<String>,
     pub projects: Vec<String>,
     pub dam_command: Vec<String>,
+    pub dam_max_age: Vec<String>,
     pub google: GoogleCredentials,
 }
 #[derive(Clone, PartialEq, Eq)]
