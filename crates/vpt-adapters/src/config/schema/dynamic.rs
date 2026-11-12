@@ -25,6 +25,7 @@ pub const DYNAMIC_TABLES: &[DynamicTable] = &[
 ];
 
 const ACTION_ENV: &str = "actions.env";
+const OWNER_WORDS: &str = "actions.owner_words";
 
 pub fn spec_for(path: &str) -> Option<Kind> {
     if let Some(name) = path
@@ -32,6 +33,14 @@ pub fn spec_for(path: &str) -> Option<Kind> {
         .and_then(|rest| rest.strip_prefix('.'))
     {
         return (!name.is_empty() && !name.contains('.')).then_some(Kind::EnvSecret);
+    }
+    if let Some(kind) = path
+        .strip_prefix(OWNER_WORDS)
+        .and_then(|rest| rest.strip_prefix('.'))
+    {
+        return ["me", "other", "unknown"]
+            .contains(&kind)
+            .then_some(Kind::Text);
     }
     if let Some(known) = keys().find(|key| key.path == path) {
         return Some(known.kind);
@@ -57,6 +66,7 @@ pub fn spec_for(path: &str) -> Option<Kind> {
 pub(crate) fn table_is_declared(path: &str) -> bool {
     let as_prefix = format!("{path}.");
     path == ACTION_ENV
+        || path == OWNER_WORDS
         || keys().any(|key| key.path.starts_with(&as_prefix))
         || DYNAMIC_TABLES.iter().any(|table| {
             table.prefix.starts_with(&as_prefix)

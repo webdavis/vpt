@@ -578,6 +578,8 @@ These placeholders expand in any argument:
 - `{text}`: the action's text, exactly as the proposal gave it.
 - `{owner}`: `me`, `other` or `unknown`.
 - `{owner_name}`: the other person's name when the recording gave one.
+- `{owner_word}`: the word `[actions.owner_words]` sets for the owner's kind, or the kind itself as in
+  `{owner}` when no word is set.
 - `{due}`: the kept due date as `2026-11-19`, or `2026-11-19T15:00` when a time was kept.
 - `{due_date}` and `{due_time}`: the same date and time apart, as `2026-11-19` and `15:00`.
 - `{id}`: the action's id, described below.
@@ -588,8 +590,8 @@ These placeholders expand in any argument:
 - `{link}`: the analysis note as `obsidian://open?path=<encoded path>` under the Obsidian profile, or as
   `file://<encoded path>` under the portable profile. It opens the note, not the second.
 
-`{owner_name}`, `{due}`, `{due_date}` and `{due_time}` are optional: each is absent when the action
-has no such value, and a withheld due date is always absent. An argument list cannot leave out a flag
+`{owner_name}`, `{owner_word}`, `{due}`, `{due_date}` and `{due_time}` are optional: each is absent
+when the action has no such value, and a withheld due date is always absent. An argument list cannot leave out a flag
 by itself, so vpt drops arguments by this rule:
 
 - An argument that is exactly one absent optional placeholder is dropped.
@@ -603,6 +605,23 @@ by itself, so vpt drops arguments by this rule:
 With `"todo-tool", "add", "--", "{text}", "--due", "{due}"`, an action due at a kept time runs
 `todo-tool add -- 'Call the bank' --due 2026-11-19T15:00`, and one without a kept due date runs
 `todo-tool add -- 'Call the bank'`.
+
+`[actions.owner_words]` lets the command receive a word of your choosing per kind of owner, such as a
+label or a list name, since an argument list cannot hold a condition. Its keys are `me`, `other` and
+`unknown`; any other key refuses the configuration with exit 2. A kind with no key set gives the kind
+itself, and a key set to `""` makes `{owner_word}` absent for that kind, so the drop rule removes it
+with its flag. Changing a word does not resend actions already sent, because what decides a resend is
+the action's own text, owner and kept due date, not the configuration.
+
+```toml
+[actions]
+command = ["todo-tool", "add", "--label", "{owner_word}", "--", "{text}"]
+
+[actions.owner_words]
+me = "mine"
+other = "theirs"
+unknown = ""
+```
 
 `[actions.env]` adds environment variables to the command's own environment, for a tool that wants a
 credential. The command otherwise inherits vpt's environment as it is; an empty table, the default,

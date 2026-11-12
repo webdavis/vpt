@@ -1045,10 +1045,12 @@ go through the stage 3 gates.
 
 An action reaches the configured `[actions] command`, an argument list run with no shell and with empty
 standard input, once per new or changed action. Placeholders: `{text}`, `{owner}` (`me`, `other` or
-`unknown`), `{owner_name}`, `{due}` (`<date>` or `<date>T<time>`), `{due_date}`, `{due_time}`, `{id}`,
+`unknown`), `{owner_name}`, `{owner_word}` (the `[actions.owner_words]` word for the owner's kind,
+keys `me`, `other` and `unknown` only, falling back to the kind; an empty word is absent), `{due}` (`<date>` or `<date>T<time>`), `{due_date}`, `{due_time}`, `{id}`,
 `{moment}` (the action's moment, or the bare recording id without a source), `{recording}`, `{note}`
 (the analysis note's path) and `{link}` (`obsidian://open?path=` or `file://` and the encoded note
-path). The due placeholders and `{owner_name}` are optional. An argument that is exactly an absent
+path). The due placeholders, `{owner_name}` and `{owner_word}` are optional. Changing an owner word does
+not resend sent actions. An argument that is exactly an absent
 optional placeholder is dropped, together with the argument before it when that one starts with `-`,
 is not `--` and holds no placeholder; `-flag={optional}` with an absent value is dropped whole. The
 id is `<recording id>@<mm:ss>` from the first source, with `#2`, `#3`, ... for later actions starting
@@ -1694,6 +1696,7 @@ canary-secret test.
 | `actions.command`                    | string list    | `[]`                                                                      | run once per new or changed analysis action with its placeholders; empty sends nothing |
 | `actions.final_exit_codes`         | int list       | `[]`                                                                      | exit codes meaning the action is refused for good; other failures are retried |
 | `actions.env.<NAME>`                 | string, secret | none                                                                      | added to the action command's environment; never shown |
+| `actions.owner_words.<kind>`         | string         | none                                                                      | `me`, `other` or `unknown`: the word `{owner_word}` gives that kind; `""` makes it absent |
 | `retention.enabled`                  | bool           | `false`                                                                   | the opt-in retention run                                                                                     |
 | `retention.include_audio`            | bool           | `false`                                                                   | let the audio store expire                                                                                   |
 | `retention.hold.<store>`             | duration       | `0` for every store                                                       | files older than this move to the Trash; `0` never                                                           |

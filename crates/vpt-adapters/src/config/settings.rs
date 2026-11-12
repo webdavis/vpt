@@ -76,6 +76,12 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
             .filter_map(Value::as_integer)
             .filter_map(|code| i32::try_from(code).ok())
             .collect(),
+        actions_owner_words: get(table, "actions.owner_words")
+            .and_then(Value::as_table)
+            .into_iter()
+            .flatten()
+            .filter_map(|(kind, word)| Some((kind.clone(), word.as_str()?.to_owned())))
+            .collect(),
         actions_env: vpt_application::SecretEnv(
             get(table, "actions.env")
                 .and_then(Value::as_table)
