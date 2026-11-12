@@ -76,6 +76,14 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
             .filter_map(Value::as_integer)
             .filter_map(|code| i32::try_from(code).ok())
             .collect(),
+        actions_env: vpt_application::SecretEnv(
+            get(table, "actions.env")
+                .and_then(Value::as_table)
+                .into_iter()
+                .flatten()
+                .filter_map(|(name, value)| Some((name.clone(), value.as_str()?.to_owned())))
+                .collect(),
+        ),
         import_extract_command: strings(table, "import.extract_command")?,
         alert_aggregate_after: small(table, "alert.aggregate_after")?,
         retention: retention::from_table(table)?,

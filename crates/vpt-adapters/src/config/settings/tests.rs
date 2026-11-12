@@ -182,3 +182,17 @@ fn retention_holds_keep_each_store_and_never_defaults() {
     retention.holds.clear();
     assert_eq!(retention.hold(StoreKey::Audio).seconds(), 0);
 }
+
+#[test]
+fn action_env_values_are_kept_but_never_shown_in_debug_output() {
+    let value = "made-up-action-env-fixture-not-a-credential";
+    let loaded = settings(&format!("[actions.env]\nTODO_TOOL_TOKEN = {value:?}\n")).unwrap();
+    assert_eq!(
+        loaded.actions_env.0,
+        [("TODO_TOOL_TOKEN".to_owned(), value.to_owned())]
+    );
+    let shown = format!("{loaded:?}");
+    assert!(shown.contains("variables: 1"));
+    assert!(!shown.contains(value));
+    assert!(settings("").unwrap().actions_env.0.is_empty());
+}

@@ -53,7 +53,12 @@ pub fn note_link(note: &Path, profile: NoteProfile) -> String {
     }
 }
 
-pub fn send_action(command: &[String], refused: &[i32], send: &ActionSend<'_>) -> SendOutcome {
+pub fn send_action(
+    command: &[String],
+    refused: &[i32],
+    env: &[(String, String)],
+    send: &ActionSend<'_>,
+) -> SendOutcome {
     let fields = Fields::of(send.action);
     let moment = match send.action.claim.grounding.sources.first() {
         Some(source) => format!(
@@ -79,7 +84,13 @@ pub fn send_action(command: &[String], refused: &[i32], send: &ActionSend<'_>) -
     let Some(argv) = expand::expand(command, &values, expand::OPTIONAL) else {
         return SendOutcome::Failed;
     };
-    match spawn::run(&argv, &[], DEADLINE, OUTPUT_LIMIT).map(|outcome| outcome.status) {
+    let env: Vec<_> = env
+        .iter()
+        .map(|(name, value)| (name.as_str(), value.as_str()))
+        .collect();
+    match spawn::run_with_env(&argv, &[], DEADLINE, OUTPUT_LIMIT, &env)
+        .map(|outcome| outcome.status)
+    {
         Ok(Status::Exited(0)) => SendOutcome::Sent,
         Ok(Status::Exited(code)) if refused.contains(&code) => SendOutcome::Refused,
         Ok(_) | Err(SpawnError::NotFound(_) | SpawnError::Io(_)) => SendOutcome::Failed,

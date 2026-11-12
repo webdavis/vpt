@@ -84,6 +84,22 @@ fn check(key: &str, kind: Kind, value: &Value) -> Result<(), ConfigError> {
             Some(items) if items.iter().all(Value::is_str) => Ok(()),
             _ => Err(wrong()),
         },
+        Kind::EnvSecret => {
+            let name = key.rsplit('.').next().unwrap_or_default();
+            let mut chars = name.chars();
+            let valid_name = chars
+                .next()
+                .is_some_and(|first| first == '_' || first.is_ascii_alphabetic())
+                && chars.all(|rest| rest == '_' || rest.is_ascii_alphanumeric());
+            match value.as_str() {
+                None => Err(wrong()),
+                Some(_) if !valid_name => Err(range("an environment variable name")),
+                Some(text) if text.is_empty() || text.contains('\0') => {
+                    Err(range("a non-empty value without NUL"))
+                }
+                Some(_) => Ok(()),
+            }
+        }
         Kind::ExitCodes => match value.as_array() {
             Some(items) if items.iter().all(|item| item.as_integer().is_some()) => {
                 if items
