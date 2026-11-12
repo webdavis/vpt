@@ -1,4 +1,4 @@
-use crate::SynthesisSettings;
+use crate::{SynthesisSettings, tag_hints::TagHints};
 use std::path::Path;
 use vpt_domain::{digest::Sha256Digest, identity::RecordingId, proposal::Proposal};
 
@@ -8,6 +8,7 @@ pub struct SynthesisRequest<'a> {
     pub recording: &'a RecordingId,
     pub language: &'a str,
     pub content: &'a str,
+    pub tags: &'a TagHints,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

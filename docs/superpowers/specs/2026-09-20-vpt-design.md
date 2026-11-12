@@ -952,8 +952,8 @@ directory commit them. Consequences vpt states rather than hides:
 `[synthesis] command` is an argv list, empty by default, which means synthesis is off: `vpt run` skips it
 and `vpt synthesize` refuses with exit 2. Automatic redaction is not part of that switch; it follows
 `[share] automatic` alone (section 8.5). When set, `vpt synthesize <id>` runs the command with
-`{transcript}` (the note path), `{id}` and `{language}` substituted, writes the transcript note's content
-region on the command's stdin, records the digest of exactly those bytes as the proposal's input digest
+`{transcript}` (the note path), `{id}`, `{language}`, `{known_tags}` and `{refused_tags}` substituted,
+writes the transcript note's content region on the command's stdin, records the digest of exactly those bytes as the proposal's input digest
 (section 3.3), and reads one `vpt.proposal/1` document from its stdout within `[synthesis] timeout_secs`
 (default 600):
 
@@ -994,7 +994,12 @@ region on the command's stdin, records the digest of exactly those bytes as the 
 ```
 
 The config comment at the key says plainly that the command receives the full transcript, so whether that
-text leaves the machine is the operator's choice made at that line. Every string in the proposal is
+text leaves the machine is the operator's choice made at that line. `{known_tags}` expands to the vocabulary of section 7.3, most
+used first, each entry `name (n)` where n counts the indexed notes carrying it, at most 300 entries.
+`{refused_tags}` lists `old -> new` for each rename still in effect under section 7.3, then each tag rejected on some recording that no indexed note carries and no recording
+confirms; it is computed from saved state at call time, and tags on it are left out of `{known_tags}`.
+Each list is cut at a whole entry to at most 64 KiB and to its share of the 1 MiB argv cap, with no
+marker. Tag text never reaches stdin, so the input digest and freshness do not depend on tags. Every string in the proposal is
 rendered as data under the escaping rule of section 7.2.
 
 vpt writes the analysis note from the proposal: frontmatter as in stage 3 with `vptStage: analysis`, a

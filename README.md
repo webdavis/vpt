@@ -327,8 +327,19 @@ Requested briefs emit no automatic notification.
 
 `vpt synthesize <id> [--dry-run] [--json|--toon|--yaml]` uses the configured `[synthesis] command` argument list.
 An empty command disables synthesis and explicit invocation returns a configuration error. No model
-vendor is built in. The command receives `{transcript}`, `{id}`, and `{language}` substitutions and
-exact rendered transcript content on stdin; the default deadline is 600 seconds.
+vendor is built in. The command receives `{transcript}`, `{id}`, `{language}`, `{known_tags}`, and
+`{refused_tags}` substitutions and exact rendered transcript content on stdin; the default deadline is
+600 seconds.
+
+`{known_tags}` expands to the indexed tags and `known-tags.txt` entries, most used first, each with
+the number of indexed notes that carry it, as in `invoice (14), garden-club (6)`. It lists at most 300
+tags. `{refused_tags}` lists each rename still in effect as `billing -> invoice`, then
+each tag refused with `confirm <id> --reject-tag` that no note carries and no recording confirms. A tag
+refused on one recording but carried elsewhere comes off that recording only and stays off the list.
+Neither list holds the other's tags. An empty list expands to nothing. Each list is cut at a whole
+entry, without a marker, so that it stays within 64 KiB and the expanded command within 1 MiB. Tags
+never reach stdin, so a tag change does not change the recorded input digest or make `run` redo a
+summary. A command without either placeholder runs exactly as before.
 
 VPT grounds the returned `vpt.proposal/1`, then saves its proposal, analysis findings, tags, relations,
 and note publications together. New analysis has Summary and Actions sections. Repeated synthesis
@@ -373,9 +384,9 @@ no later than the recording's length. Every capitalized word and every number in
 in the cited text, otherwise the claim is marked `unsupported`. A claim that starts with "They" or
 "An" is marked for that reason.
 
-Both examples below ran end to end against a synthetic recording, twice each, with Claude Code
-2.1.322 and codex-cli 0.167.0. Each call took 15 to 35 seconds and produced an analysis note with no
-findings. The prompt is the same in both.
+Both examples below ran end to end against a synthetic recording, four times each, with Claude Code
+2.1.322 and codex-cli 0.167.0. Claude took 20 to 40 seconds a call and Codex about 11, and each
+produced an analysis note with no findings. The prompt is the same in both.
 
 `claude -p` with structured output prints only the document. `--safe-mode` skips the user's hooks,
 plugins and `CLAUDE.md`, and `--tools ""` removes every tool. `--json-schema` takes the schema as a
@@ -385,7 +396,7 @@ string, not a path.
 [synthesis]
 command = [
   "claude", "-p", "--safe-mode", "--tools", "", "--no-session-persistence",
-  "--system-prompt", 'Standard input is a meeting transcript. Each paragraph starts with an [mm:ss] timecode. Write a vpt.proposal/1 JSON document about it. Set schema to "vpt.proposal/1" and by to the name of your model. Put the key points in summary and each agreed task, with its owner and due date when stated, in actions, one short sentence per item. Give every item one or more sources, each a mm:ss-mm:ss range that starts at the timecode of the paragraph that supports it and ends at the timecode of the next paragraph, or one second after its own timecode for the last paragraph. State only what the transcript says, and use a capitalized word or a number only when it appears in the paragraphs you cite. Leave tags and relations empty. Print the JSON document and nothing else, with no code fence.',
+  "--system-prompt", 'Standard input is a meeting transcript. Each paragraph starts with an [mm:ss] timecode. Write a vpt.proposal/1 JSON document about it. Set schema to "vpt.proposal/1" and by to the name of your model. Put the key points in summary and each agreed task, with its owner and due date when stated, in actions, one short sentence per item. Give every item one or more sources, each a mm:ss-mm:ss range that starts at the timecode of the paragraph that supports it and ends at the timecode of the next paragraph, or one second after its own timecode for the last paragraph. State only what the transcript says, and use a capitalized word or a number only when it appears in the paragraphs you cite. Leave relations empty. Add up to five tags, each with a short reason; prefer these existing tags: {known_tags}. Never use these tags: {refused_tags}. Print the JSON document and nothing else, with no code fence.',
   "--json-schema", '{"type":"object","additionalProperties":false,"required":["schema","by","summary","actions","tags","relations"],"properties":{"schema":{"type":"string","enum":["vpt.proposal/1"]},"by":{"type":"string"},"summary":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","sources"],"properties":{"text":{"type":"string"},"sources":{"type":"array","items":{"type":"string","pattern":"^[0-9]{2,}:[0-5][0-9]-[0-9]{2,}:[0-5][0-9]$"}}}}},"actions":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","sources"],"properties":{"text":{"type":"string"},"sources":{"type":"array","items":{"type":"string","pattern":"^[0-9]{2,}:[0-5][0-9]-[0-9]{2,}:[0-5][0-9]$"}}}}},"tags":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["tag","reason"],"properties":{"tag":{"type":"string"},"reason":{"type":"string"}}}},"relations":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["kind","target","reason"],"properties":{"kind":{"type":"string"},"target":{"type":"string"},"reason":{"type":"string"}}}}}}',
 ]
 ```
@@ -408,7 +419,7 @@ command = [
   "codex", "exec", "--ephemeral", "--ignore-user-config", "--skip-git-repo-check",
   "--sandbox", "read-only", "--color", "never",
   "--output-schema", "/absolute/path/to/vpt-proposal.schema.json",
-  'Standard input is a meeting transcript. Each paragraph starts with an [mm:ss] timecode. Write a vpt.proposal/1 JSON document about it. Set schema to "vpt.proposal/1" and by to the name of your model. Put the key points in summary and each agreed task, with its owner and due date when stated, in actions, one short sentence per item. Give every item one or more sources, each a mm:ss-mm:ss range that starts at the timecode of the paragraph that supports it and ends at the timecode of the next paragraph, or one second after its own timecode for the last paragraph. State only what the transcript says, and use a capitalized word or a number only when it appears in the paragraphs you cite. Leave tags and relations empty. Print the JSON document and nothing else, with no code fence.',
+  'Standard input is a meeting transcript. Each paragraph starts with an [mm:ss] timecode. Write a vpt.proposal/1 JSON document about it. Set schema to "vpt.proposal/1" and by to the name of your model. Put the key points in summary and each agreed task, with its owner and due date when stated, in actions, one short sentence per item. Give every item one or more sources, each a mm:ss-mm:ss range that starts at the timecode of the paragraph that supports it and ends at the timecode of the next paragraph, or one second after its own timecode for the last paragraph. State only what the transcript says, and use a capitalized word or a number only when it appears in the paragraphs you cite. Leave relations empty. Add up to five tags, each with a short reason; prefer these existing tags: {known_tags}. Never use these tags: {refused_tags}. Print the JSON document and nothing else, with no code fence.',
 ]
 ```
 
