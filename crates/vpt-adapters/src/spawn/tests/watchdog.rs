@@ -10,7 +10,8 @@ use std::sync::{
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-pub(super) const WATCHDOG: Duration = Duration::from_millis(750);
+pub(super) const WATCHDOG: Duration =
+    crate::database::WATCHDOG.saturating_add(Duration::from_millis(250));
 
 pub(super) struct Registration {
     stop: Option<mpsc::Sender<()>>,
