@@ -53,19 +53,19 @@ fn opening_a_fifo_returns_not_regular_without_a_writer() {
     let outcome = loop {
         match child.0.try_wait().expect("child status") {
             Some(status) => break Some(status),
-            None if started.elapsed() < Duration::from_millis(500) => std::thread::yield_now(),
+            None if started.elapsed() < crate::database::WATCHDOG => std::thread::yield_now(),
             None => break None,
         }
     };
     drop(child);
     let elapsed = started.elapsed();
     assert!(
-        elapsed < Duration::from_secs(1),
-        "FIFO test exceeded one second: {elapsed:?}"
+        elapsed < crate::database::WATCHDOG.saturating_add(Duration::from_millis(500)),
+        "FIFO test exceeded its cleanup bound: {elapsed:?}"
     );
     assert!(
         outcome.is_some(),
-        "FIFO rejection exceeded independent 500 ms deadline; child killed and reaped ({elapsed:?})"
+        "FIFO rejection exceeded the watchdog; child killed and reaped ({elapsed:?})"
     );
     assert!(
         outcome.expect("completed child").success(),

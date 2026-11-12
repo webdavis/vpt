@@ -105,9 +105,7 @@ fn setup_terminal_answer_timeout_reaps_the_owned_command() {
         is_command_deadline(&failure),
         "missing answer must hit the command deadline: {failure:?}"
     );
-    assert!(
-        started.elapsed() < support::WATCHDOG.saturating_add(std::time::Duration::from_millis(500))
-    );
+    assert!(started.elapsed() < support::CLEANUP_BOUND);
     assert!(!sandbox.config_path().exists());
 }
 

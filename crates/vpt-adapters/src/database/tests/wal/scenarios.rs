@@ -78,7 +78,7 @@ fn native_interop(root: &RootDir, scenario: &str) {
             "{result:?}"
         );
         assert!(start.elapsed() >= Duration::from_millis(20));
-        assert!(start.elapsed() < Duration::from_millis(500));
+        assert!(start.elapsed() < crate::database::WATCHDOG);
     }
     rooted.try_close().unwrap();
 }

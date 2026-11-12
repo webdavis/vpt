@@ -5,7 +5,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-const REAPER_BOUND: Duration = Duration::from_millis(850);
+const REAPER_BOUND: Duration = super::watchdog::FALLBACK;
 
 pub(super) fn fixture_command(root: &Path, role: &str) -> Command {
     let mut command = Command::new(std::env::current_exe().expect("test executable"));

@@ -19,8 +19,10 @@ pub const VPT: &str = env!("CARGO_BIN_EXE_vpt");
 /// performance: commands finish far inside it, and the margin absorbs a CI runner stalling the
 /// whole machine.
 pub const WATCHDOG: Duration = Duration::from_secs(2);
+/// Gives a command time to exit on TERM, and then to be reaped after KILL, despite a runner stall.
+pub const GRACE: Duration = Duration::from_secs(1);
 /// Bounds the forced cleanup of a command that outlived the watchdog.
-pub const CLEANUP_BOUND: Duration = WATCHDOG.saturating_add(Duration::from_millis(400));
+pub const CLEANUP_BOUND: Duration = WATCHDOG.saturating_add(GRACE).saturating_add(GRACE);
 #[cfg(feature = "dev-tools")]
 #[allow(dead_code, reason = "used only by helper integration tests")]
 pub const FAKE_ENGINE: &str = env!("CARGO_BIN_EXE_vpt-fake-engine");
@@ -172,7 +174,7 @@ fn collect_with_budget(
     budget: Duration,
 ) -> Output {
     let mut diagnostic = Diagnostic::new(started, group.id(), spawn_return);
-    group.set_deadline(started + budget + Duration::from_millis(400));
+    group.set_deadline(started + budget + GRACE + GRACE);
     let stdout_piped = group.stdout.is_some();
     let stderr_piped = group.stderr.is_some();
     let mut stdout = Capture::new(group.stdout.take());

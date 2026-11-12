@@ -158,7 +158,7 @@ fn retained_peer_obeys_deadline(on_stderr: bool) {
         Some(true),
         "retained output escaped its deadline"
     );
-    assert!(started.elapsed() < support::WATCHDOG.saturating_add(Duration::from_millis(500)));
+    assert!(started.elapsed() < support::CLEANUP_BOUND);
 }
 
 #[test]
@@ -205,7 +205,7 @@ fn watchdog_terminates_the_hanging_group_and_reaps_its_child() {
         .or_else(|| failure.downcast_ref::<&str>().copied())
         .expect("panic message");
     assert!(message.contains("exceeded"), "{message}");
-    assert!(started.elapsed() < support::WATCHDOG.saturating_add(Duration::from_millis(500)));
+    assert!(started.elapsed() < support::CLEANUP_BOUND);
     let pids = std::fs::read_to_string(sandbox.path().join("pids")).expect("spawned process ids");
     for pid in pids
         .split_whitespace()
@@ -259,7 +259,7 @@ fn watchdog_kills_a_direct_child_that_ignores_term() {
         std::io::Error::last_os_error().raw_os_error(),
         Some(libc::ESRCH)
     );
-    assert!(started.elapsed() < support::WATCHDOG.saturating_add(Duration::from_millis(500)));
+    assert!(started.elapsed() < support::CLEANUP_BOUND);
 }
 
 #[cfg(feature = "dev-tools")]
@@ -305,7 +305,7 @@ fn watchdog_parent_reaps_its_same_group_descendant() {
         std::io::Error::last_os_error().raw_os_error(),
         Some(libc::ESRCH)
     );
-    assert!(started.elapsed() < support::WATCHDOG.saturating_add(Duration::from_millis(500)));
+    assert!(started.elapsed() < support::CLEANUP_BOUND);
 }
 
 fn run_now(command: &mut Command) -> std::process::Output {

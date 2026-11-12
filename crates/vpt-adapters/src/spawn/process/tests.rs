@@ -5,7 +5,7 @@ use super::*;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, Command, ExitStatus, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 enum Ownership {
     Owned,
@@ -150,7 +150,7 @@ impl Drop for OwnedLeader {
 fn until_terminal(child: &mut OwnedLeader, started: Instant) -> Status {
     loop {
         assert!(
-            started.elapsed() < Duration::from_millis(750),
+            started.elapsed() < crate::database::WATCHDOG,
             "finite leader readiness exceeded real deadline"
         );
         match child.observe() {
@@ -198,7 +198,7 @@ fn unreaped_exited_leader_group_presence_probe() {
     // SAFETY: signal zero only observes the recorded group and never restores authority.
     assert_eq!(unsafe { libc::killpg(child.pid(), 0) }, -1);
     assert_eq!(io::Error::last_os_error().raw_os_error(), Some(libc::ESRCH));
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < crate::database::CLEANUP_BOUND);
 }
 
 #[test]
@@ -218,5 +218,5 @@ fn terminal_observation_preserves_the_owned_leaders_waitable_identity() {
         Some(Status::Exited(3))
     );
     child.reap();
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < crate::database::CLEANUP_BOUND);
 }

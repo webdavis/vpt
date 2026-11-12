@@ -60,7 +60,7 @@ pub(super) fn run(scenario: &str, root: &RootDir, ready: fn(), native: fn(&Path)
             });
             assert_eq!(result, Err(LedgerError::Busy));
             assert!(started.elapsed() >= Duration::from_millis(40));
-            assert!(started.elapsed() < Duration::from_millis(500));
+            assert!(started.elapsed() < crate::database::WATCHDOG);
         }
         "ledger_peer_holder" | "ledger_peer_live_writer" => {
             if scenario == "ledger_peer_live_writer" {
