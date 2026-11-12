@@ -609,7 +609,8 @@ reports pending redaction without creating files or changing release history.
 `vpt search <word>... [--limit <n>] [--json|--toon|--yaml]` finds every transcript segment and every
 analysis summary or action line that holds all the words, in any letter case. A word also matches inside
 a longer word. It reads the notes vpt last wrote, as saved in the ledger, and skips a note whose file is
-no longer at its path, such as one retention moved to the Trash.
+no longer at its path, such as one retention moved to the Trash. A saved note that cannot be read is
+also skipped, and `skipped` counts those notes.
 
 Hits come newest recording first, then in note order, transcript before analysis. `--limit` caps the
 hits at a positive number, 50 by default, and `truncated` says whether more existed. Each hit carries

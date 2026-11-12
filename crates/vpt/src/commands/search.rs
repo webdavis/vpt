@@ -29,23 +29,22 @@ fn execute(
         .collect();
     let mut hits = Vec::new();
     let mut truncated = false;
-    let mut failure = None;
+    let mut skipped = 0_u64;
     ledger
         .visit_notes(&mut |note| {
+            let Ok(note) = note else {
+                skipped += 1;
+                return ControlFlow::Continue(());
+            };
             if !on_disk(&note.target) {
                 return ControlFlow::Continue(());
             }
-            let content =
-                match Document::parse(&note.text).and_then(|d| d.content().map(str::to_owned)) {
-                    Ok(content) => content,
-                    Err(_) => {
-                        failure = Some(ErrorDocument::new(
-                            ErrorKind::Ledger,
-                            "saved note does not parse",
-                        ));
-                        return ControlFlow::Break(());
-                    }
-                };
+            let Ok(content) =
+                Document::parse(&note.text).and_then(|d| d.content().map(str::to_owned))
+            else {
+                skipped += 1;
+                return ControlFlow::Continue(());
+            };
             for moment in moments(note.stage, &content).filter(|m| query.matches(&m.quote)) {
                 if hits.len() == options.limit {
                     truncated = true;
@@ -66,10 +65,7 @@ fn execute(
             ControlFlow::Continue(())
         })
         .map_err(|e| Box::new(ledger_error(e)))?;
-    if let Some(error) = failure {
-        return Err(Box::new(error));
-    }
-    Ok(success(options, hits, truncated))
+    Ok(success(options, hits, truncated, skipped))
 }
 
 fn on_disk(path: &Path) -> bool {
@@ -85,7 +81,7 @@ fn printable(text: &str) -> String {
         .collect()
 }
 
-fn success(options: &Options, hits: Vec<Value>, truncated: bool) -> Outcome {
+fn success(options: &Options, hits: Vec<Value>, truncated: bool, skipped: u64) -> Outcome {
     let human: String = hits
         .iter()
         .map(|hit| {
@@ -111,7 +107,7 @@ fn success(options: &Options, hits: Vec<Value>, truncated: bool) -> Outcome {
         },
         document: vpt_protocol::result::document(
             "search",
-            json!({"words": options.words, "limit": options.limit, "truncated": truncated, "hits": hits}),
+            json!({"words": options.words, "limit": options.limit, "truncated": truncated, "skipped": skipped, "hits": hits}),
         ),
     }
 }

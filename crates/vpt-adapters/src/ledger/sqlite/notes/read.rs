@@ -55,7 +55,7 @@ pub(super) fn target(
 }
 pub(super) fn visit(
     connection: &Connection,
-    visitor: &mut dyn FnMut(NoteArtifact) -> ControlFlow<()>,
+    visitor: &mut dyn FnMut(Result<NoteArtifact, LedgerError>) -> ControlFlow<()>,
 ) -> Result<(), LedgerError> {
     if migrations::current(connection)? < 4 {
         return Ok(());
@@ -67,7 +67,7 @@ pub(super) fn visit(
     let mut statement = connection.prepare(&sql).map_err(map)?;
     let mut rows = statement.query([]).map_err(map)?;
     while let Some(row) = rows.next().map_err(decode_error)? {
-        let note = artifact(raw(row).map_err(decode_error)?)?;
+        let note = raw(row).map_err(decode_error).and_then(artifact);
         if visitor(note).is_break() {
             break;
         }

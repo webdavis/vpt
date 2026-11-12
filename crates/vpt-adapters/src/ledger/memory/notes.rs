@@ -44,7 +44,7 @@ impl NoteLedger for MemoryLedger {
     }
     fn visit_notes(
         &self,
-        visitor: &mut dyn FnMut(NoteArtifact) -> std::ops::ControlFlow<()>,
+        visitor: &mut dyn FnMut(Result<NoteArtifact, LedgerError>) -> std::ops::ControlFlow<()>,
     ) -> Result<(), LedgerError> {
         let mut notes: Vec<_> = with(self, |state| {
             state
@@ -64,7 +64,7 @@ impl NoteLedger for MemoryLedger {
             )
         });
         for (_, note) in notes {
-            if visitor(note).is_break() {
+            if visitor(Ok(note)).is_break() {
                 break;
             }
         }
