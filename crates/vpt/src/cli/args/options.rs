@@ -48,3 +48,28 @@ pub(super) fn take_format(words: &mut Vec<String>) -> Result<Option<Format>, Usa
         format
     }))
 }
+
+pub(super) fn require_values(words: &[String]) -> Result<(), UsageError> {
+    for (index, word) in words.iter().enumerate() {
+        if matches!(
+            word.as_str(),
+            "--occasion"
+                | "--config"
+                | "--once"
+                | "--to"
+                | "--stage"
+                | "--language"
+                | "--resolve"
+                | "--recording"
+                | "--at"
+                | "--duration-minutes"
+                | "--captured-at"
+        ) && words
+            .get(index + 1)
+            .is_none_or(|value| value.starts_with("--"))
+        {
+            return Err(UsageError(format!("{word} needs a value")));
+        }
+    }
+    Ok(())
+}
