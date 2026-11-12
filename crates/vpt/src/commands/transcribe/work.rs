@@ -26,6 +26,18 @@ pub(crate) struct Context<'a, E> {
 }
 
 pub(crate) fn run<E: EventSink>(
+    context: Context<'_, E>,
+    record: RecordingRecord,
+    duration: f64,
+    run: vpt_domain::history::RunId,
+) -> Result<Outcome, Box<ErrorDocument>> {
+    let id = record.id.clone();
+    crate::cli::progress::step(&id, "transcribe", Some(duration), || {
+        transcribe_one(context, record, duration, run)
+    })
+}
+
+fn transcribe_one<E: EventSink>(
     mut context: Context<'_, E>,
     record: RecordingRecord,
     duration: f64,

@@ -20,6 +20,8 @@ mod note_profiles;
 mod output;
 #[path = "synthesize/profiles.rs"]
 mod profiles;
+#[path = "synthesize/progress.rs"]
+mod progress;
 #[path = "synthesize/protocol.rs"]
 mod protocol;
 #[path = "synthesize/recovery.rs"]

@@ -7,6 +7,9 @@ use crate::{
 };
 
 pub(crate) fn run(invocation: &Invocation) -> i32 {
+    if invocation.progress {
+        crate::cli::progress::enable();
+    }
     let outcome = match &invocation.verb {
         Verb::Handoff(options) => commands::handoff::run(
             &compose::Environment::from_process(),

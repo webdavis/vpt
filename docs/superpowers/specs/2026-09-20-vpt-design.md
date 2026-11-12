@@ -1395,7 +1395,12 @@ success one document goes to stdout; on failure one error document goes to stder
 and the error carries a `completed` field listing the work already committed (for example the recordings
 a sweep ingested before it aborted). A result with no schema of its own carries `schema: "vpt.result/1"`
 and `command: "<verb>"`; an error carries `schema: "vpt.error/1"`. Without `--json`, success prints human
-lines and failure prints `vpt: <message>`. `--config <file>` overrides the config path; `VPT_CONFIG` does
+lines and failure prints `vpt: <message>`. `--progress` is the one exception to holding output back: it
+adds compact `vpt.progress/1` JSON lines (`recording`, `step` `transcribe` or `synthesize`, `state`
+`started`, `done` or `failed`, `audio_secs`, `at`) on stderr as each engine run and synthesis command in
+`run`, `transcribe` or `synthesize` starts and ends. Stdout is unchanged; a failure's error document follows
+the progress lines, so under `--json` stderr stays one JSON object per line. Without the flag stderr
+carries only the error document. `--config <file>` overrides the config path; `VPT_CONFIG` does
 the same. An unknown argument or subcommand prints usage to stderr and exits 2, as an error document
 under `--json`.
 

@@ -10,6 +10,8 @@ mod output;
 mod pair_fixture;
 #[path = "transcribe/pairs.rs"]
 mod pairs;
+#[path = "transcribe/progress.rs"]
+mod progress;
 #[path = "transcribe/protocol.rs"]
 mod protocol;
 #[path = "transcribe/recovery.rs"]
