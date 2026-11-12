@@ -1,3 +1,4 @@
+use super::format::Format;
 use std::io::Write;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
@@ -16,23 +17,27 @@ pub(crate) enum Outcome {
     },
 }
 
-pub(crate) fn emit(outcome: Outcome, json: bool) -> i32 {
+pub(crate) fn emit(outcome: Outcome, format: Option<Format>) -> i32 {
     emit_to(
         outcome,
-        json,
+        format,
         &mut std::io::stdout(),
         &mut std::io::stderr(),
     )
 }
 
-fn emit_to(outcome: Outcome, json: bool, stdout: &mut dyn Write, stderr: &mut dyn Write) -> i32 {
+fn emit_to(
+    outcome: Outcome,
+    format: Option<Format>,
+    stdout: &mut dyn Write,
+    stderr: &mut dyn Write,
+) -> i32 {
     let parser_help = matches!(&outcome, Outcome::ParseFailure(_));
     match outcome {
         Outcome::FailedReport { error, human } => {
-            let text = if json {
-                failure_text(&error, true, false)
-            } else {
-                format!("{human}{}", failure_text(&error, false, false))
+            let text = match format {
+                Some(_) => failure_text(&error, format, false),
+                None => format!("{human}{}", failure_text(&error, None, false)),
             };
             write_failure(&error, &text, stderr)
         }
@@ -42,7 +47,10 @@ fn emit_to(outcome: Outcome, json: bool, stdout: &mut dyn Write, stderr: &mut dy
             completed,
             diagnostics,
         } => {
-            let text = if json { format!("{document}\n") } else { human };
+            let text = match format {
+                Some(format) => format.render(&document),
+                None => human,
+            };
             if stdout.write_all(text.as_bytes()).is_err() {
                 return emit_to(
                     Outcome::Failure(
@@ -50,7 +58,7 @@ fn emit_to(outcome: Outcome, json: bool, stdout: &mut dyn Write, stderr: &mut dy
                             .completed(completed)
                             .diagnostics(diagnostics),
                     ),
-                    json,
+                    format,
                     stdout,
                     stderr,
                 );
@@ -58,7 +66,7 @@ fn emit_to(outcome: Outcome, json: bool, stdout: &mut dyn Write, stderr: &mut dy
             0
         }
         Outcome::Failure(error) | Outcome::ParseFailure(error) => {
-            let text = failure_text(&error, json, parser_help);
+            let text = failure_text(&error, format, parser_help);
             write_failure(&error, &text, stderr)
         }
     }
@@ -71,9 +79,9 @@ fn write_failure(error: &ErrorDocument, text: &str, stderr: &mut dyn Write) -> i
     error.exit_code()
 }
 
-fn failure_text(error: &ErrorDocument, json: bool, parser_help: bool) -> String {
-    if json {
-        return format!("{}\n", error.to_json());
+fn failure_text(error: &ErrorDocument, format: Option<Format>, parser_help: bool) -> String {
+    if let Some(format) = format {
+        return format.render(&error.to_json());
     }
     let mut text = match (error.kind, &error.rule) {
         (ErrorKind::Refused, Some(rule)) => format!("vpt: {rule}: {}\n", error.message),

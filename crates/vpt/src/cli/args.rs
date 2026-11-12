@@ -6,12 +6,13 @@ pub(crate) mod redact;
 mod review;
 mod text;
 mod verbs;
-use options::{take_flag, take_positional, take_value};
+use super::format::Format;
+use options::{take_flag, take_format, take_positional, take_value};
 use std::ffi::OsString;
 use std::path::PathBuf;
 use verbs::parse_verb;
 
-pub const USAGE: &str = "usage: vpt [--json] [--config <file>] <verb>\n\
+pub const USAGE: &str = "usage: vpt [--json|--toon|--yaml] [--config <file>] <verb>\n\
 verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <path>] | show <id> |\n\
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
        synthesize <id> [--dry-run] | path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
@@ -97,7 +98,7 @@ pub enum Verb {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Invocation {
     pub verb: Verb,
-    pub json: bool,
+    pub format: Option<Format>,
     pub config: Option<PathBuf>,
 }
 
@@ -134,13 +135,15 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
             return Err(UsageError(format!("{word} needs a value")));
         }
     }
-    let config = take_value(&mut words, "--config")?.map(PathBuf::from);
-    let json = take_flag(&mut words, "--json");
-    let verb = parse_verb(&mut words, text)?;
+    let invocation = Invocation {
+        config: take_value(&mut words, "--config")?.map(PathBuf::from),
+        format: take_format(&mut words)?,
+        verb: parse_verb(&mut words, text)?,
+    };
     if let Some(extra) = words.first() {
         return Err(UsageError(format!("unexpected argument {extra}")));
     }
-    Ok(Invocation { verb, json, config })
+    Ok(invocation)
 }
 
 #[cfg(test)]

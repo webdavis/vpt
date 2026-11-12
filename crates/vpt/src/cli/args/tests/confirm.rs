@@ -7,7 +7,7 @@ fn tag_actions_keep_private_values_literal_and_require_a_recording() {
             let invocation =
                 parse(["vpt", "confirm", "recording", flag, value, "--json"].map(OsString::from))
                     .unwrap();
-            assert!(invocation.json);
+            assert_eq!(invocation.format, Some(Format::Json));
             assert!(!format!("{invocation:?}").contains(value));
             let Verb::ConfirmTag { id, tag, action } = invocation.verb else {
                 panic!("tag");
@@ -66,7 +66,7 @@ fn confirmation_keeps_text_values_private_and_separate_from_global_options() {
             .map(OsString::from),
         )
         .unwrap();
-        assert!(invocation.json);
+        assert_eq!(invocation.format, Some(Format::Json));
         assert_eq!(invocation.config, Some("settings.toml".into()));
         assert!(!format!("{invocation:?}").contains(term));
         let Verb::ConfirmTerm { term: parsed } = invocation.verb else {

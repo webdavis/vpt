@@ -12,6 +12,17 @@ The design is [the approved specification](docs/superpowers/specs/2026-09-20-vpt
 `just swift-build` builds it with isolated project-local caches. `just ship` runs the Rust and Swift
 workspace checks.
 
+## Machine-readable output
+
+Every command accepts one of `--json`, `--toon` or `--yaml`, in any position. Each flag prints the
+same document: a `vpt.result/1` document on standard output when the command succeeds, or a
+`vpt.error/1` document on standard error when it fails, with the same exit code. `--json` prints the
+document as one line of compact JSON. `--toon` prints it as TOON (Token-Oriented Object Notation), with
+nesting by indentation, a declared length on every array and quotes only where a bare value would
+read as something else. `--yaml` prints it as block YAML with every string double-quoted. Without a
+flag, commands print text for people. Passing two different format flags is a usage error, reported
+as text with exit code 2.
+
 ## Configuration permissions
 
 VPT requires the selected configuration file to have mode `0600` and its containing directory to
@@ -41,7 +52,7 @@ that variable. Ordinary tests skip this host-dependent case.
 
 ## Ingestion and archive recovery
 
-`vpt ingest [--once <path>] [--dry-run] [--json]` archives eligible Voice Memos recordings.
+`vpt ingest [--once <path>] [--dry-run] [--json|--toon|--yaml]` archives eligible Voice Memos recordings.
 A sweep considers only immediate `.m4a` files; it excludes sidecars and nested folders. `--once`
 selects one recording inside that directory and applies the same eligibility checks. The defaults
 are a 2 GiB size limit and a 30-second quiet period. Dataless iCloud entries are deferred without
@@ -66,7 +77,7 @@ and preserve the changed file. Different content at an expected archive path is 
 
 ## Transcription command
 
-`vpt transcribe <id> [--language <tag>] [--dry-run] [--json]` runs the configured main engine
+`vpt transcribe <id> [--language <tag>] [--dry-run] [--json|--toon|--yaml]` runs the configured main engine
 and optional checker against a private copy of archived audio. It saves the accepted transcript
 and raw engine documents, then publishes the transcript note using the selected profile and
 readability settings. Interrupted publication resumes from saved bytes. Engine failures preserve the
@@ -95,7 +106,7 @@ successful work. Failed publication emits no review alert. Retranscription leave
 
 ## Pipeline
 
-`vpt run [--dry-run] [--json]` composes ingestion, transcription, note publication, stale-finding
+`vpt run [--dry-run] [--json|--toon|--yaml]` composes ingestion, transcription, note publication, stale-finding
 verification, configured synthesis, and optional automatic redaction.
 It resumes pending or failed work in capture order, retries previously disabled incomplete stages,
 and preserves successful transcription and expired notes. Changed readability/profile settings refresh
@@ -124,11 +135,11 @@ interrupted, while preserving committed work and the normal operational-failure 
 
 ## Review and known terms
 
-`vpt review <id> [--json]` displays ranked open lexical flags, alternatives, occurrence ranges and
+`vpt review <id> [--json|--toon|--yaml]` displays ranked open lexical flags, alternatives, occurrence ranges and
 timecodes, with whole-recording diagnostics listed separately. It reads saved state without running an
 engine or changing files.
 
-`vpt review <id> --resolve <flag> --confirm|--correct <text>|--dismiss [--json]` resolves a
+`vpt review <id> --resolve <flag> --confirm|--correct <text>|--dismiss [--json|--toon|--yaml]` resolves a
 surfaced flag and rewrites the transcript note. Corrections remain separate from accepted words.
 Confirming proper-noun/agreed-unverified flags learns their record text; corrections learn the new
 text. Repeating the same action preserves its resolution time and avoids duplicate terms. Diagnostics
@@ -140,7 +151,7 @@ malformed notes and redirected term lists refuse the update. A changed content d
 synthesis pending. JSON includes the resolved flag's state, whether it changed, its note path, and the
 remaining open flags. History omits correction and transcript text.
 
-`vpt confirm --term <text> [--json]` adds a confirmed term without needing a recording or engine.
+`vpt confirm --term <text> [--json|--toon|--yaml]` adds a confirmed term without needing a recording or engine.
 It normalizes whitespace, preserves existing list content, and recognizes whole-term Unicode/case
 variants as duplicates. New files are private. The ledger saves publication bytes and intent before
 writing, and mutating startup recovers interrupted updates. Changed files or a changed configured list
@@ -149,7 +160,7 @@ without undoing a completed confirmation.
 
 ## Inspecting saved state
 
-`vpt show <id> [--json]` and `vpt list [--stage transcribe|note|synthesis] [--json]` expose
+`vpt show <id> [--json|--toon|--yaml]` and `vpt list [--stage transcribe|note|synthesis] [--json|--toon|--yaml]` expose
 stage states, accepted engine metadata, requested/reported language, open flag and diagnostic counts,
 note paths, and artifact metadata. Artifacts distinguish published, pending publication, and expired
 files; expiration retains their recorded paths and digests. Stale verification findings are excluded
@@ -159,10 +170,10 @@ transcript or proposal bodies. `list --stage` selects stages whose state is not 
 `disabled` and `expired`. Observation results are bounded to 65,536 recordings and 16 MiB of retained
 metadata.
 
-`vpt storage [--json]` reports current file counts, bytes, and oldest/newest timestamps for all seven
+`vpt storage [--json|--toon|--yaml]` reports current file counts, bytes, and oldest/newest timestamps for all seven
 stores. It works independently of the recording source and ledger.
 
-`vpt doctor [--json]` reports engine availability and locality for every configured engine. It checks
+`vpt doctor [--json|--toon|--yaml]` reports engine availability and locality for every configured engine. It checks
 executable files without running arbitrary engine commands; Apple also requires a compatible helper.
 Unavailable engines selected by the default pair or any language override fail the check. Unused
 engine definitions are reported without failing it. Generic commands' locality is explicitly labeled
@@ -172,7 +183,7 @@ contents, permissions, and ignore files unchanged.
 
 ## Note writing
 
-`vpt note write <id> [--json]` writes the transcript and any existing analysis note from saved ledger
+`vpt note write <id> [--json|--toon|--yaml]` writes the transcript and any existing analysis note from saved ledger
 state without audio or an engine. Both notes link to the archived audio and to each other. It supports
 portable and Obsidian profiles, independent Markdown/wiki link settings, inline uncertainty and
 corrections, and the optional readability pass. The first filename is pinned;
@@ -200,7 +211,7 @@ publication. Explicit regeneration of an expired transcript or analysis note ret
 provenance is saved with accepted text, so new two-engine transcriptions retain both engines after
 raw-output removal. Older accepted state without checker metadata remains readable.
 
-`vpt path <id> --stage transcript|analysis [--json]` returns the saved absolute pin, including when
+`vpt path <id> --stage transcript|analysis [--json|--toon|--yaml]` returns the saved absolute pin, including when
 the artifact is missing, changed, or pending publication. It does not read the artifact or repair state.
 
 When a note pin is missing, `note write` scans its flat store for the recording identity. A unique
@@ -216,17 +227,17 @@ clear a failed synthesis attempt. `synthesize` creates the initial analysis note
 
 ## Occasions and briefs
 
-`vpt occasions [--json]` lists saved occasions, including those without a brief, in exact start-time
+`vpt occasions [--json|--toon|--yaml]` lists saved occasions, including those without a brief, in exact start-time
 order. Output includes the occasion identity, start, source, duration, participants, tags, and saved
 brief path/status. Provider object keys stay private to the ledger.
 
-`vpt path --occasion <id> --stage brief [--json]` returns the saved absolute brief path even when its
+`vpt path --occasion <id> --stage brief [--json|--toon|--yaml]` returns the saved absolute brief path even when its
 file is missing. Both commands are observational: an absent ledger stays absent, and neither command
 publishes or repairs an artifact. Accepted brief packs and rendered text are stored together;
 mutating startup repairs pending brief publication and then marks the occasion briefed. Replaced
 files are preserved and recovery refuses to overwrite them.
 
-`vpt brief <occasion-id> [--dry-run|--explain] [--json]` writes or previews a saved occasion's brief.
+`vpt brief <occasion-id> [--dry-run|--explain] [--json|--toon|--yaml]` writes or previews a saved occasion's brief.
 Create a manual occasion with `vpt brief --title <title> --at <RFC3339>`, optionally adding
 `--duration-minutes <minutes>`, repeated `--participant <name>`, and repeated `--tag <tag>`.
 Repeated requests preserve the original brief path and first-write metadata, including after a
@@ -256,7 +267,7 @@ only `calendar.events.readonly`. Recurring events are expanded within the reques
 most ten pages per calendar and one 30-second deadline for refresh and collection. Google tasks are
 unsupported. Provider failures use fixed details without credentials or response bodies.
 
-Enable `[brief.trigger] enabled = true` to use `vpt brief --upcoming [--json]`. The default lead time is
+Enable `[brief.trigger] enabled = true` to use `vpt brief --upcoming [--json|--toon|--yaml]`. The default lead time is
 `24h`; discovery selects events with `now <= start < now + lead_time`. A writing run saves its start
 before collecting context. Failed calendar discovery exits 1 and records the failed run without
 saving an occasion or publishing a brief. Successful discovery writes each unbriefed provider identity
@@ -272,7 +283,7 @@ Requested briefs emit no automatic notification.
 
 ## Synthesis
 
-`vpt synthesize <id> [--dry-run] [--json]` uses the configured `[synthesis] command` argument list.
+`vpt synthesize <id> [--dry-run] [--json|--toon|--yaml]` uses the configured `[synthesis] command` argument list.
 An empty command disables synthesis and explicit invocation returns a configuration error. No model
 vendor is built in. The command receives `{transcript}`, `{id}`, and `{language}` substitutions and
 exact rendered transcript content on stdin; the default deadline is 600 seconds.
@@ -304,7 +315,7 @@ standalone synthesis points to the analysis note. Recovery does not resend earli
 
 ## Note verification
 
-`vpt verify-note <path> --recording <id> [--json]` checks Markdown claims against the recording's
+`vpt verify-note <path> --recording <id> [--json|--toon|--yaml]` checks Markdown claims against the recording's
 accepted transcript and current lexical flags. Findings are `unsourced`, `bad-reference`, `unsupported`,
 or `built-on-flagged-text`, in that priority order. The default citation tolerance is 15 seconds,
 configured by `synthesis.grounding_window_secs`; no agent or transcription engine is run.
@@ -337,7 +348,7 @@ or alias. VPT saves every matched accepted-word range; ambiguous matches save th
 a link. Review confirmations include newly learned terms immediately. `run` refreshes changed
 matches without rerunning engines, and indexed external notes remain untouched.
 
-`vpt confirm <id> --relation <kind>:<target> [--json]` confirms `continues`, `mentions`, `related`,
+`vpt confirm <id> --relation <kind>:<target> [--json|--toon|--yaml]` confirms `continues`, `mentions`, `related`,
 or `supersedes`. Targets can be recording IDs or unique indexed note names, aliases, or absolute
 paths. `continues` and `supersedes` require a recording ID or a validated ledger-owned note.
 Ambiguous, unknown, and self targets are refused. Confirmation preserves existing proposal provenance
@@ -346,13 +357,13 @@ history. It also works before transcription and leaves expired notes expired.
 
 ## Tag confirmation
 
-`vpt confirm <id> --tag <tag> [--json]` confirms a tag, updates `known-tags.txt`, and refreshes the
+`vpt confirm <id> --tag <tag> [--json|--toon|--yaml]` confirms a tag, updates `known-tags.txt`, and refreshes the
 transcript and existing analysis notes when accepted text is available. It works without synthesis or an engine. Existing
 vocabulary spelling is retained; new multiword tags become kebab-case. The configured confirmation
 limit applies without removing earlier tags. Repeating a confirmation keeps its saved tag timestamp
 and avoids rewriting an unchanged vocabulary file.
 
-`vpt confirm <id> --reject-tag <tag> [--json]` removes the tag from managed tags or suggestions while
+`vpt confirm <id> --reject-tag <tag> [--json|--toon|--yaml]` removes the tag from managed tags or suggestions while
 retaining operator tags and the global vocabulary. Expired notes remain expired; explicit `note write`
 can regenerate them. Tag state, note bytes, and pending vocabulary bytes commit together, and startup
 recovery completes interrupted publication while preserving operator edits.
@@ -362,7 +373,7 @@ stores, plus `known-tags.txt`. Indexed external notes remain unchanged.
 
 ## Released copies
 
-`vpt redact <id> [--stage transcript|analysis] [--to <directory>] [--title <title>] [--json]`
+`vpt redact <id> [--stage transcript|analysis] [--to <directory>] [--title <title>] [--json|--toon|--yaml]`
 creates a released copy and a separate private report. Transcript is the default source. The source
 note stays unchanged. Copies contain minimal frontmatter and managed content with confirmed terms,
 indexed names/aliases, and configured pattern classes masked. Open flagged spans are omitted by default;
@@ -382,7 +393,7 @@ reports pending redaction without creating files or changing release history.
 
 ## Text handoff
 
-`vpt handoff <id> --stage released|transcript|analysis|brief [--json]` reads an existing artifact.
+`vpt handoff <id> --stage released|transcript|analysis|brief [--json|--toon|--yaml]` reads an existing artifact.
 Human output is the text copy with a declarative VPT header; JSON output is `vpt.handoff/1`, containing
 the deterministic title, text, artifact digest, identity, provenance, and generation time. The digest
 identifies the artifact bytes before its frontmatter is removed and the handoff header is added.

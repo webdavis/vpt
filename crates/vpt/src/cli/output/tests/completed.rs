@@ -46,7 +46,15 @@ fn partial_stdout_failure_preserves_commits_recovery_and_safe_warnings() {
             },
         );
         let mut stderr = Vec::new();
-        assert_eq!(emit_to(outcome, json, &mut PartialOutput, &mut stderr), 1);
+        assert_eq!(
+            emit_to(
+                outcome,
+                json.then_some(Format::Json),
+                &mut PartialOutput,
+                &mut stderr
+            ),
+            1
+        );
         let error = String::from_utf8(stderr).unwrap();
         assert!(!error.contains("private"));
         assert!(!error.contains("uncommitted"));
@@ -89,7 +97,7 @@ fn every_human_failure_reports_completed_ids_once_including_recovered_ids() {
             },
         );
         let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
-        assert_eq!(emit_to(outcome, false, &mut stdout, &mut stderr), 1);
+        assert_eq!(emit_to(outcome, None, &mut stdout, &mut stderr), 1);
         assert!(stdout.is_empty());
         let error = String::from_utf8(stderr).unwrap();
         for id in [ID, OCCASION, RECOVERED] {

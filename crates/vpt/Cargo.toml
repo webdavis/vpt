@@ -26,5 +26,7 @@ libc = { version = "0.2.189", optional = true }
 [dev-dependencies]
 libc = "0.2.189"
 tempfile = "3.27.0"
+toon-format = { version = "=0.7.0", default-features = false }
+serde_yaml_ng = "=0.10.0"
 rusqlite = { version = "=0.39.0", default-features = false, features = ["bundled"] }
 vpt-domain = { path = "../vpt-domain", features = ["fixtures"] }
