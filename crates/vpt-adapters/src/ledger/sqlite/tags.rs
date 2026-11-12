@@ -1,14 +1,18 @@
 use super::SqliteLedger;
-use vpt_application::ports::{LedgerError, TagLedger};
+use vpt_application::ports::{LedgerError, TagLedger, TagRename};
 use vpt_domain::{identity::RecordingId, tags::Tag};
 mod read;
 mod write;
 pub(super) use read::recording as read;
-pub(super) use write::apply;
+pub(super) use write::{apply, apply_rename};
 
 impl TagLedger for SqliteLedger {
     fn tags(&self, id: &RecordingId) -> Result<Option<Vec<Tag>>, LedgerError> {
         self.snapshot(|connection| read(connection, id))
+    }
+
+    fn tag_renames(&self) -> Result<Vec<TagRename>, LedgerError> {
+        self.snapshot(read::renames)
     }
 }
 

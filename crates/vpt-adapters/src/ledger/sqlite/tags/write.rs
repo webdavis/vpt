@@ -1,4 +1,4 @@
-use crate::ledger::tags::{check, codec, conflict};
+use crate::ledger::tags::{check, check_rename, codec, conflict};
 use rusqlite::{Connection, params};
 use vpt_application::ports::{LedgerError, WorkDelta};
 use vpt_domain::{run::HistoryFact, time::UtcInstant};
@@ -28,5 +28,20 @@ pub(crate) fn apply(
     for (ordinal, tag) in change.tags.iter().enumerate() {
         connection.execute("INSERT INTO tags (recording, tag, state, provenance, updated_at, ordinal) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", params![change.recording.as_str(), tag.name, codec::state(tag.state), codec::provenance(&tag.provenance)?, tag.updated_at.map(|at| at.secs), ordinal as i64]).map_err(super::super::map)?;
     }
+    Ok(())
+}
+
+pub(crate) fn apply_rename(connection: &Connection, delta: &WorkDelta) -> Result<(), LedgerError> {
+    let Some(rename) = &delta.tag_rename else {
+        return Ok(());
+    };
+    check_rename(rename)?;
+    connection
+        .execute(
+            "INSERT INTO tag_renames (old, new, renamed_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(old) DO UPDATE SET new = excluded.new, renamed_at = excluded.renamed_at",
+            params![rename.old, rename.new, rename.at.secs],
+        )
+        .map_err(super::super::map)?;
     Ok(())
 }

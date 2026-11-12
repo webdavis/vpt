@@ -76,7 +76,7 @@ pub(super) fn run(scenario: &str, root: &crate::RootDir) -> bool {
         .unwrap();
         db.try_close().unwrap();
         let upgraded = SqliteLedger::open(root).unwrap();
-        assert_eq!(upgraded.schema_version().unwrap(), 15);
+        assert_eq!(upgraded.schema_version().unwrap(), 16);
         assert!(matches!(upgraded.occasions(), Err(LedgerError::Corrupt(_))));
         upgraded
             .read(|c| {

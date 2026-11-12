@@ -77,7 +77,7 @@ fn version(connection: &Connection) -> u32 {
 pub(in crate::ledger::sqlite) fn remove_release_extension(
     connection: &Connection,
 ) -> Result<(), LedgerError> {
-    connection.execute_batch("DROP TABLE artifact_expirations; DROP TABLE release_payloads; DROP TABLE release_completions; DROP INDEX release_recording_sequence; DROP INDEX release_destination; DROP INDEX release_report_path; ALTER TABLE releases DROP COLUMN report_digest;").map_err(map)
+    connection.execute_batch("DROP TABLE tag_renames; DROP TABLE artifact_expirations; DROP TABLE release_payloads; DROP TABLE release_completions; DROP INDEX release_recording_sequence; DROP INDEX release_destination; DROP INDEX release_report_path; ALTER TABLE releases DROP COLUMN report_digest;").map_err(map)
 }
 
 fn tables(connection: &Connection) -> Vec<String> {

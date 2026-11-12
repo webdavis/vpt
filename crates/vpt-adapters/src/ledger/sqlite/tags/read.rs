@@ -1,8 +1,8 @@
 use super::super::migrations;
 use crate::ledger::tags::{MAX_BYTES, codec, invalid, validate};
 use rusqlite::{Connection, OptionalExtension};
-use vpt_application::ports::LedgerError;
-use vpt_domain::{identity::RecordingId, tags::Tag};
+use vpt_application::ports::{LedgerError, TagRename};
+use vpt_domain::{identity::RecordingId, tags::Tag, time::UtcInstant};
 
 pub(crate) fn recording(
     connection: &Connection,
@@ -46,4 +46,28 @@ pub(crate) fn recording(
     }
     validate(&tags)?;
     Ok(Some(tags))
+}
+
+pub(crate) fn renames(connection: &Connection) -> Result<Vec<TagRename>, LedgerError> {
+    if migrations::current(connection)? < 16 {
+        return Ok(vec![]);
+    }
+    let mut statement = connection
+        .prepare("SELECT old, new, renamed_at FROM tag_renames ORDER BY renamed_at, old")
+        .map_err(|_| invalid())?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok(TagRename {
+                old: row.get(0)?,
+                new: row.get(1)?,
+                at: UtcInstant { secs: row.get(2)? },
+            })
+        })
+        .map_err(|_| invalid())?;
+    rows.map(|row| {
+        let rename = row.map_err(|_| invalid())?;
+        crate::ledger::tags::check_rename(&rename)?;
+        Ok(rename)
+    })
+    .collect()
 }

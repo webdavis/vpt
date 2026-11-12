@@ -1,12 +1,30 @@
 use super::{MemoryLedger, State, with};
-use crate::ledger::tags::{check, conflict};
-use vpt_application::ports::{LedgerError, TagLedger, WorkDelta};
+use crate::ledger::tags::{check, check_rename, conflict};
+use vpt_application::ports::{LedgerError, TagLedger, TagRename, WorkDelta};
 use vpt_domain::{identity::RecordingId, run::HistoryFact, tags::Tag, time::UtcInstant};
 
 impl TagLedger for MemoryLedger {
     fn tags(&self, id: &RecordingId) -> Result<Option<Vec<Tag>>, LedgerError> {
         with(self, |state| read(state, id))
     }
+
+    fn tag_renames(&self) -> Result<Vec<TagRename>, LedgerError> {
+        with(self, |state| {
+            let mut renames = state.tag_renames.clone();
+            renames.sort_by(|a, b| (a.at, &a.old).cmp(&(b.at, &b.old)));
+            renames
+        })
+    }
+}
+
+pub(super) fn apply_rename(state: &mut State, delta: &WorkDelta) -> Result<(), LedgerError> {
+    let Some(rename) = &delta.tag_rename else {
+        return Ok(());
+    };
+    check_rename(rename)?;
+    state.tag_renames.retain(|saved| saved.old != rename.old);
+    state.tag_renames.push(rename.clone());
+    Ok(())
 }
 
 fn read(state: &State, id: &RecordingId) -> Option<Vec<Tag>> {
