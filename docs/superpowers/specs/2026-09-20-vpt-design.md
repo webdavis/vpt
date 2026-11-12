@@ -1187,8 +1187,10 @@ selection is in the request, never a filter afterwards.
   always passed so a brief never triggers a remote pull. Each `[context.dam] max_age` value
   (`<remote>=<duration>`) is passed to `agenda` as `--max-age`; dam's exit 4 with rule `stale_remote`
   fails the calendar half with the fixed detail `calendar data is stale: dam refused it under
-  context.dam.max_age`, which `--upcoming` reports in its error. Any other non-zero exit or an error
-  document on stderr is a collector failure.
+  context.dam.max_age`, which `--upcoming` reports in its error. A missing `dam` fails with the detail
+  `dam was not found; install dam or set context.dam.command`, and exit 2, as from a `dam` without
+  `agenda`, with `dam rejected the command line; dam agenda needs a newer dam`. Any other non-zero
+  exit or an error document on stderr is a collector failure.
 - `google`: a native reader over the Google Calendar events list endpoint with `singleEvents=true` and
   `timeMin` and `timeMax` bracketing the window, per configured calendar id, following `nextPageToken`
   until exhausted within the same scope; because `timeMin` filters on end time, vpt applies the trigger

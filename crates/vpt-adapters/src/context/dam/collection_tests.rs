@@ -188,3 +188,28 @@ fn malformed_max_age_refuses_before_spawning() {
     }
     assert!(!dir.path().join("calls").exists());
 }
+
+#[test]
+fn a_missing_dam_or_one_without_agenda_fails_the_calendar_naming_what_is_missing() {
+    let (dir, mut command) = fixture("printf 'error: unrecognized subcommand' >&2; exit 2");
+    let rejected = DamContext {
+        command: &command,
+        max_age: &[],
+    }
+    .collect(&request(&["calendar/".into()], &["work/".into()]))
+    .unwrap();
+    command[0] = dir.path().join("absent").to_string_lossy().into_owned();
+    let missing = DamContext {
+        command: &command,
+        max_age: &[],
+    }
+    .collect(&request(&["calendar/".into()], &["work/".into()]))
+    .unwrap();
+    for (snapshot, words) in [
+        (rejected, ["dam agenda", "newer dam"]),
+        (missing, ["dam", "context.dam.command"]),
+    ] {
+        let detail = snapshot.status.calendar.detail().unwrap().to_owned();
+        assert!(words.iter().all(|word| detail.contains(word)), "{detail}");
+    }
+}
