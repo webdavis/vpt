@@ -33,6 +33,7 @@ pub(super) fn seed(sandbox: &Sandbox) -> vpt_domain::identity::RecordingId {
             language_source: LanguageSource::Reported,
             local: true,
             segments: vec![Segment {
+                speaker: None,
                 start: 0.0,
                 end: 1.0,
                 text: "Private accepted quote".into(),

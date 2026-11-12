@@ -22,6 +22,7 @@ fn transcript(text: &str) -> Transcript {
         language_source: LanguageSource::Reported,
         local: true,
         segments: vec![Segment {
+            speaker: None,
             start: 0.0,
             end: text.split_whitespace().count() as f64,
             text: text.into(),

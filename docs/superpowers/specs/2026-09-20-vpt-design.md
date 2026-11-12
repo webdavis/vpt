@@ -614,7 +614,11 @@ Every engine adapter produces one `vpt.engine/1` document:
 ```
 
 `confidence` is optional per word, because whisply on Apple's MLX framework reports none; an absent
-confidence is never fabricated. `family` is what the same-family check compares: `apple`, `whisper`, or
+confidence is never fabricated. `speaker` is optional per segment and, when present, non-blank. The
+whisply adapter reads whisply's per-word `speaker`, drops `UNKNOWN`, and splits a chunk where the
+speaker changes. At acceptance the record keeps its own labels; otherwise each record segment takes the
+checker label with the longest time overlap. Labels are then renumbered `Speaker 1`, `Speaker 2` in
+order of first appearance, and a transcript with fewer than two distinct speakers keeps none. `family` is what the same-family check compares: `apple`, `whisper`, or
 whatever a `command` engine declares in its config (`family = "..."`, required).
 
 - `apple` spawns `vpt-macos transcribe <path> --locale <lang>`, family `apple`, local.
@@ -836,8 +840,8 @@ The vault-relative folder syntax follows the [Obsidian internal links guide](htt
 <!-- vpt:content end -->
 ```
 
-The H1 matches the filename. Each segment is one paragraph prefixed with its `[mm:ss]` timecode; the
-timecode is the source reference every consumer uses. Transcript uncertainty appears in exactly two
+The H1 matches the filename. Each segment is one paragraph prefixed with its `[mm:ss]` timecode, then
+its speaker label and a colon when it has one; the timecode is the source reference every consumer uses. Transcript uncertainty appears in exactly two
 places, the inline markers and `vpt review <id>`: there is no summary block and no separate document.
 
 A note has two managed regions, `vpt:links` and `vpt:content`, each between a start and an end marker.
@@ -1507,7 +1511,7 @@ under `--json`.
 | `vpt redact <id> [--stage] [--to <dir>] [--title <t>]`                                        | released copy, draft report                                                                                                           | `{"written": "<path>", "report": "<path>", "masks": {"<class>": n}, "candidates": [..]}`                              | 0, 3 duplicate or residue             |
 | `vpt show <id>` / `vpt list [--stage <s>]`                                                    | nothing                                                                                                                               | the record / `{"recordings": [..]}`                                                                                   | 0, 2                                  |
 | `vpt search <word>... [--limit <n>]`                                                          | nothing                                                                                                                               | `{"words", "limit", "truncated", "skipped", "hits":[{"moment", "recording", "title", "stage", "seconds", "timecode", "quote"}]}` | 0, 2                                  |
-| `vpt show <id> --stage transcript`                                                            | nothing                                                                                                                               | `{"recording", "stage", text, "segments": [{"start", "end", "timecode", "text"}]}`                                    | 0, 2, 3 changed                       |
+| `vpt show <id> --stage transcript`                                                            | nothing                                                                                                                               | `{"recording", "stage", text, "segments": [{"start", "end", "timecode", "text", "speaker"?}]}`                        | 0, 2, 3 changed                       |
 | `vpt show <id> --stage analysis`                                                              | nothing                                                                                                                               | `{"recording", "stage", text, "summary": [line], "actions": [line + "owner", "due"]}`, line `{"moment", "text", "sources", "finding"}` | 0, 2, 3 changed                       |
 | `vpt show <id> --stage released`                                                              | nothing                                                                                                                               | `{"recording", "stage", text}`, the newest surviving release                                                          | 0, 1 pending, 2, 3 changed            |
 | `vpt show <occasion> --stage brief`                                                           | nothing                                                                                                                               | `{"occasion", "recordings", "stage", text}`; `text` = `{"title", "content", "note", "content_sha256", "provenance", "generated_at"}` | 0, 1 pending, 2, 3 changed            |

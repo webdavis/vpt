@@ -40,7 +40,10 @@ pub fn prepare(
             .as_ref()
             .map(|output| output.transcript.engine.clone()),
         recording: recording.clone(),
-        transcript: result.record.transcript.clone(),
+        transcript: vpt_domain::transcript::label_speakers(
+            &result.record.transcript,
+            result.checker.as_ref().map(|output| &output.transcript),
+        ),
         requested_language: result.language,
         duration,
         accepted_at: at,

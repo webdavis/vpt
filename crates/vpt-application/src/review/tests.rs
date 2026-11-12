@@ -44,6 +44,7 @@ fn snapshot() -> ReviewSnapshot {
                 language_source: LanguageSource::Reported,
                 local: true,
                 segments: vec![Segment {
+                    speaker: None,
                     start: 0.0,
                     end: 4.0,
                     text: "private words".into(),

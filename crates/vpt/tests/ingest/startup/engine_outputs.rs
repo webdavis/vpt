@@ -37,6 +37,7 @@ fn seed_output(sandbox: &Sandbox) -> (std::path::PathBuf, Vec<u8>) {
             language_source: LanguageSource::Reported,
             local: true,
             segments: vec![Segment {
+                speaker: None,
                 start: 0.0,
                 end: 1.0,
                 text: "private transcript canary".into(),

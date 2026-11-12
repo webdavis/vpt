@@ -49,6 +49,13 @@ pub(crate) fn validate(
             return Err(Invalid("segment order"));
         }
         previous_segment = segment.start;
+        if segment
+            .speaker
+            .as_ref()
+            .is_some_and(|speaker| speaker.trim().is_empty())
+        {
+            return Err(Invalid("speaker"));
+        }
         let mut previous_word = segment.start;
         for word in &segment.words {
             if word.text.trim().is_empty() {

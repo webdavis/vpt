@@ -134,6 +134,13 @@ for speakers, as one without speaker annotation does on `-a`, the failure says s
 diarization model the token must grant. As main engine that fails the transcription; as checker the
 main transcript is kept with a `single-engine` flag and the same message in its engine diagnostics.
 
+Speaker labels number speakers in order of first appearance: each transcript paragraph reads
+`[mm:ss] Speaker 1: text`. Whisply's own labels split a chunk where the speaker changes. When
+Whisply is the checker, each main-engine segment takes the Whisply speaker that overlaps it longest,
+so a sentence spoken across a turn change goes to its main speaker; the checker must run, so
+`checker_runs = "on_failure"` gives no labels while the main engine succeeds. A recording with fewer
+than two speakers, and every transcript accepted before the token was set, reads as before.
+
 Pairs from the same model family are refused before either engine starts. The error names both
 engines and their shared family; `[engines] allow_same_family = true` explicitly permits the pair.
 
@@ -246,7 +253,8 @@ released` (already redacted) or with `--stage brief` (not a redaction source; it
 their recordings' flags) is a usage error (2).
 
 `vpt show <id> --stage transcript` also returns the accepted transcript's segments from saved state, each with
-`start` and `end` seconds, a `mm:ss` `timecode` and its `text` with review corrections applied.
+`start` and `end` seconds, a `mm:ss` `timecode` and its `text` with review corrections applied. A
+labeled segment also carries its `speaker`, such as `"Speaker 2"`.
 `vpt show <id> --stage analysis` also returns the accepted proposal's `summary` and `actions` lines in
 proposal order. Each line has its `text`, its `sources` (`start` and `end` seconds and a `mm:ss-mm:ss`
 `range`), its verification `finding` or null, and a `moment` of the form `<recording id>@<mm:ss>` taken

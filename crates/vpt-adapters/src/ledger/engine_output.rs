@@ -2,6 +2,7 @@ use sha2::{Digest, Sha256};
 use std::path::{Component, Path};
 use vpt_application::ports::{EngineArtifact, LedgerError, TranscriptionChange, WorkDelta};
 use vpt_domain::digest::Sha256Digest;
+use vpt_domain::transcript::label_speakers;
 use vpt_protocol::engine::{self, ExpectedEngine};
 
 pub(super) fn invalid() -> LedgerError {
@@ -67,7 +68,8 @@ pub(super) fn check_batch(
         return Err(conflict());
     }
     let mut names = std::collections::BTreeSet::new();
-    let mut record_found = false;
+    let mut record = None;
+    let mut checker = None;
     for output in &delta.engine_outputs {
         let document = validate(output)?;
         if output.recording != accepted.recording
@@ -77,16 +79,13 @@ pub(super) fn check_batch(
         {
             return Err(conflict());
         }
+        let transcript =
+            crate::transcript_document::from_document(document, output.language_source);
         if output.engine == accepted.transcript.engine.name {
-            if crate::transcript_document::from_document(document, output.language_source)
-                != accepted.transcript
-            {
-                return Err(conflict());
-            }
-            record_found = true;
-        } else if accepted.checker_engine.as_ref()
-            != Some(&crate::transcript_document::from_metadata(document.engine))
-        {
+            record = Some(transcript);
+        } else if accepted.checker_engine.as_ref() == Some(&transcript.engine) {
+            checker = Some(transcript);
+        } else {
             return Err(conflict());
         }
         let (digest, pending) = previous(&output.target)?;
@@ -108,8 +107,8 @@ pub(super) fn check_batch(
             return Err(conflict());
         }
     }
-    if !record_found {
-        return Err(conflict());
+    match record {
+        Some(record) if label_speakers(&record, checker.as_ref()) == accepted.transcript => Ok(()),
+        _ => Err(conflict()),
     }
-    Ok(())
 }

@@ -25,6 +25,7 @@ fn transcript() -> Transcript {
         language_source: LanguageSource::Reported,
         local: true,
         segments: vec![Segment {
+            speaker: None,
             start: 0.0,
             end: 3.0,
             text: "Before Alice after".into(),
@@ -186,6 +187,7 @@ fn one_flag_spanning_segments_is_counted_once_and_each_retained_piece_is_marked(
     let mut transcript = transcript();
     transcript.segments = vec![
         Segment {
+            speaker: None,
             start: 0.0,
             end: 1.0,
             text: "Alice".into(),
@@ -197,6 +199,7 @@ fn one_flag_spanning_segments_is_counted_once_and_each_retained_piece_is_marked(
             }],
         },
         Segment {
+            speaker: None,
             start: 2.0,
             end: 3.0,
             text: "Smith".into(),

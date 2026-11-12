@@ -31,6 +31,8 @@ pub struct Segment {
     pub end: f64,
     pub text: String,
     pub words: Vec<Word>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]

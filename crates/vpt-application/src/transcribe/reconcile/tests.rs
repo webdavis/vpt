@@ -19,6 +19,7 @@ fn output(text: &str, language: &str) -> EngineOutput {
             language_source: LanguageSource::Reported,
             local: true,
             segments: vec![Segment {
+                speaker: None,
                 start: 0.0,
                 end: 100.0,
                 text: text.into(),

@@ -15,6 +15,7 @@ fn segments() -> Vec<Segment> {
     .map(|(n, text)| {
         let start = n as f64 * 10.0;
         Segment {
+            speaker: None,
             start,
             end: start + 5.0,
             text: text.into(),

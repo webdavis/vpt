@@ -55,6 +55,7 @@ fn accept(sandbox: &Sandbox, id: &RecordingId, segments: &[(f64, &str)]) {
             segments: segments
                 .iter()
                 .map(|(start, text)| Segment {
+                    speaker: None,
                     start: *start,
                     end: start + 4.0,
                     text: (*text).into(),

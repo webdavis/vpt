@@ -1,8 +1,8 @@
 mod diagnostics;
 mod model;
+mod turns;
 use crate::engine::{
     self, DecodedEngine, EngineDecodeError, EngineDocument, EngineMetadata, ExpectedEngine,
-    Segment, Word,
 };
 
 pub struct WhisplyRequest<'a> {
@@ -54,21 +54,7 @@ pub fn decode(
         segments: transcription
             .chunks
             .into_iter()
-            .map(|chunk| Segment {
-                start: chunk.timestamp[0],
-                end: chunk.timestamp[1],
-                text: chunk.text,
-                words: chunk
-                    .words
-                    .into_iter()
-                    .map(|word| Word {
-                        text: word.word,
-                        start: word.start,
-                        end: word.end,
-                        confidence: word.score,
-                    })
-                    .collect(),
-            })
+            .flat_map(turns::segments)
             .collect(),
     };
     let expected = ExpectedEngine {

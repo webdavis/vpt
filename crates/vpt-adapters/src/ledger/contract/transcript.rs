@@ -28,6 +28,7 @@ pub(crate) fn fixture() -> AcceptedTranscript {
             language_source: LanguageSource::Requested,
             local: true,
             segments: vec![Segment {
+                speaker: None,
                 start: 0.25,
                 end: 1.75,
                 text: "Privé 🦆".into(),

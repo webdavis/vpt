@@ -13,12 +13,16 @@ pub(super) fn json(review: &ReviewSnapshot) -> Result<Value, Box<ErrorDocument>>
         .iter()
         .zip(texts)
         .map(|(segment, text)| {
-            json!({
+            let mut value = json!({
                 "start": segment.start,
                 "end": segment.end,
                 "timecode": super::timecode(segment.start as u64),
                 "text": text,
-            })
+            });
+            if let Some(speaker) = &segment.speaker {
+                value["speaker"] = speaker.as_str().into();
+            }
+            value
         })
         .collect())
 }

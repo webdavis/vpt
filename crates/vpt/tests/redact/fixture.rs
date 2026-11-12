@@ -73,6 +73,7 @@ pub(super) fn seed_segments(
                     let words: Vec<_> = text.split_whitespace().collect();
                     let step = 1.0 / words.len() as f64;
                     Segment {
+                        speaker: None,
                         start,
                         end: start + 1.0,
                         text: (*text).into(),

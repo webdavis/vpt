@@ -57,6 +57,7 @@ fn accept(ledger: &SqliteLedger, row: &RecordingRecord) {
             language_source: LanguageSource::Requested,
             local: true,
             segments: vec![Segment {
+                speaker: None,
                 start: 0.0,
                 end: 1.0,
                 text: "um private words".into(),

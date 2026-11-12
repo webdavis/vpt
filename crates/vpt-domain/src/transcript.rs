@@ -1,4 +1,6 @@
 use std::fmt;
+mod speakers;
+pub use speakers::label_speakers;
 
 #[derive(Clone, PartialEq)]
 pub struct Transcript {
@@ -51,6 +53,7 @@ pub struct Segment {
     pub end: f64,
     pub text: String,
     pub words: Vec<Word>,
+    pub speaker: Option<String>,
 }
 
 #[derive(Clone, PartialEq)]

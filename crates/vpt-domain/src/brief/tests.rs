@@ -41,6 +41,7 @@ fn candidate(seed: u8, captured: i64) -> Candidate {
                 language_source: LanguageSource::Reported,
                 local: true,
                 segments: vec![Segment {
+                    speaker: None,
                     start: 0.0,
                     end: 1.0,
                     text: "Private quote".into(),

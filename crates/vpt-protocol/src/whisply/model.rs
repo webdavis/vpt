@@ -28,4 +28,6 @@ pub(super) struct Word {
     pub end: f64,
     #[serde(default, deserialize_with = "crate::engine::model::confidence")]
     pub score: Option<f64>,
+    #[serde(default)]
+    pub speaker: Option<String>,
 }
