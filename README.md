@@ -336,8 +336,14 @@ read-only queries. Zoned and all-day dam events preserve their local date and da
 an all-day event uses the system zone, as dam does. Exact start and end bounds select the returned
 occasions, and cancelled events are left out.
 
-Set `context.dam.max_age` to bound how old dam's calendar data may be, such as
-`max_age = ["gcal=15m"]` under `[context.dam]`. Each value is passed to `dam agenda` as `--max-age`;
+`context.type` defaults to `none`, so a user without dam gets no context collection and no change
+in behavior. With `context.type = dam`, a `dam` that is not on `PATH` fails the calendar and task
+halves with the detail `dam was not found; install dam or set context.dam.command`. A `dam` too old
+to have `dam agenda` rejects the command line, and the calendar half fails with the detail
+`dam rejected the command line; dam agenda needs a newer dam`.
+
+Set `context.dam.max_age` to bound how old dam's calendar data may be. Name your own dam remote in
+each value; for a remote called `work`, write `max_age = ["work=15m"]` under `[context.dam]`. Each value is passed to `dam agenda` as `--max-age`;
 the default, an empty list, passes none. When dam refuses with `stale_remote`, the calendar half
 fails with the detail `calendar data is stale: dam refused it under context.dam.max_age`, and
 `--upcoming` exits with that detail instead of writing nothing.

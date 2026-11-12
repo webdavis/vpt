@@ -9,6 +9,7 @@ pub(super) fn output(result: Result<Outcome, SpawnError>) -> Result<Vec<u8>, Fai
     match outcome.status {
         Status::Exited(0) => (),
         Status::Exited(4) if refused_as_stale(&outcome.stderr) => return Err(Failure::Stale),
+        Status::Exited(2) => return Err(Failure::Usage),
         Status::DeadlineExceeded => return Err(Failure::Deadline),
         Status::Interrupted => return Err(Failure::Interrupted),
         _ => return Err(Failure::Exit),

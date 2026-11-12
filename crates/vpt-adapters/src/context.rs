@@ -7,6 +7,7 @@ pub enum Failure {
     Unavailable,
     Io,
     Exit,
+    Usage,
     Deadline,
     Interrupted,
     Capacity,
@@ -20,9 +21,10 @@ pub enum Failure {
 impl Failure {
     pub fn detail(self) -> &'static str {
         match self {
-            Self::Unavailable => "context program unavailable",
+            Self::Unavailable => "dam was not found; install dam or set context.dam.command",
             Self::Io => "context program I/O failed",
             Self::Exit => "context program failed",
+            Self::Usage => "dam rejected the command line; dam agenda needs a newer dam",
             Self::Deadline => "context collection deadline exceeded",
             Self::Interrupted => "context collection interrupted",
             Self::Capacity => "context collection exceeds capacity",
