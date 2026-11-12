@@ -35,6 +35,17 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
     }
     match first.as_str() {
         "handoff" => handoff::parse(words),
+        "tag" => match take_positional(words, "rename")?.as_str() {
+            "rename" => {
+                let dry_run = take_flag(words, "--dry-run");
+                Ok(Verb::TagRename {
+                    old: text::PrivateText::new(take_positional(words, "<old>")?),
+                    new: text::PrivateText::new(take_positional(words, "<new>")?),
+                    dry_run,
+                })
+            }
+            other => Err(UsageError(format!("unknown tag subcommand {other}"))),
+        },
         "occasions" => Ok(Verb::Occasions),
         "synthesize" => {
             let dry_run = take_flag(words, "--dry-run");

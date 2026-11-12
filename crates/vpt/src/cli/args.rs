@@ -18,6 +18,7 @@ pub const USAGE: &str = "usage: vpt [--json|--toon|--yaml] [--progress] [--confi
 verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <path>] |\n\
        import <file> [--title <text>] [--captured-at <RFC3339>] | show <id> [--stage transcript|analysis] |\n\
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
+       tag rename <old> <new> [--dry-run] |\n\
        synthesize <id> [--dry-run] | path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | search <word>... [--limit <n>] | storage | retention run [--dry-run] |\n\
        brief <occasion-id> [--dry-run] [--explain] | brief --title <title> --at <RFC3339> [--duration-minutes <n>] [--participant <name>]... [--tag <tag>]... | brief --upcoming |\n\
        handoff <id> --stage released|transcript|analysis|brief | redact <id> [--stage transcript|analysis] [--to <dir>] [--title <title>] | symlink deploy | symlink verify | --version\n";
@@ -60,6 +61,11 @@ pub enum Verb {
         id: String,
         tag: text::PrivateText,
         action: vpt_domain::tags::Action,
+    },
+    TagRename {
+        old: text::PrivateText,
+        new: text::PrivateText,
+        dry_run: bool,
     },
     Version,
     Path {

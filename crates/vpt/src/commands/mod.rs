@@ -10,6 +10,7 @@ pub(crate) mod setup;
 pub(crate) mod show;
 pub(crate) mod storage;
 pub(crate) mod symlink;
+pub(crate) mod tag;
 pub(crate) mod transcribe;
 pub(crate) mod verify;
 pub(crate) mod version;

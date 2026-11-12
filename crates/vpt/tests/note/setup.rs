@@ -9,11 +9,26 @@ use vpt_domain::{
 };
 
 pub(super) fn configured() -> (Sandbox, RecordingRecord) {
+    let (sandbox, mut rows) = configured_with(&[7]);
+    (sandbox, rows.remove(0))
+}
+
+pub(super) fn configured_with(seeds: &[u8]) -> (Sandbox, Vec<RecordingRecord>) {
     let sandbox = fixture::configured("note-write");
-    let row = fixture::record(&sandbox, 7, StageStates::fresh());
-    fixture::seed(&sandbox, vec![row.clone()]);
+    let rows: Vec<_> = seeds
+        .iter()
+        .map(|seed| fixture::record(&sandbox, *seed, StageStates::fresh()))
+        .collect();
+    fixture::seed(&sandbox, rows.clone());
     let ledger =
         SqliteLedger::open(&RootDir::open(&sandbox.path().join("state/vpt")).unwrap()).unwrap();
+    for row in &rows {
+        accept(&ledger, row);
+    }
+    (sandbox, rows)
+}
+
+fn accept(ledger: &SqliteLedger, row: &RecordingRecord) {
     let at = UtcInstant { secs: 50 };
     let accepted = AcceptedTranscript {
         checker_engine: Some(EngineMetadata {
@@ -74,7 +89,6 @@ pub(super) fn configured() -> (Sandbox, RecordingRecord) {
         ),
         HistoryWrite::Committed(_)
     ));
-    (sandbox, row)
 }
 
 pub(super) fn invoke(sandbox: &Sandbox, id: &str) -> std::process::Output {

@@ -67,6 +67,15 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             tag.as_str(),
             *action,
         ),
+        Verb::TagRename { old, new, dry_run } => commands::tag::rename(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            &commands::tag::Request {
+                old: old.as_str(),
+                new: new.as_str(),
+                dry_run: *dry_run,
+            },
+        ),
         Verb::ConfirmTerm { term } => commands::confirm::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

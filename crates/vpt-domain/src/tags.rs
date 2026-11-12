@@ -1,6 +1,8 @@
 mod manual;
 mod normalize;
+mod rename;
 pub use manual::{Action, ManualEdit, ManualError};
+pub use rename::{Rename, RenameError};
 mod select;
 mod state;
 mod vocabulary;
