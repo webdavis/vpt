@@ -4,6 +4,8 @@
 mod batch;
 #[path = "synthesize/batch_input.rs"]
 mod batch_input;
+#[path = "synthesize/captured_at.rs"]
+mod captured_at;
 #[path = "synthesize/events.rs"]
 mod events;
 #[path = "synthesize/filenames.rs"]

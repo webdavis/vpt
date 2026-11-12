@@ -97,6 +97,7 @@ impl<E: EventSink> Writer<'_, E> {
                         .as_ref()
                         .ok_or_else(errors::invalid)?
                         .requested_language,
+                    captured: (input.record.captured_at, input.record.captured_offset),
                     content: &content,
                     tags: &tags,
                 })

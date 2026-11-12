@@ -44,10 +44,12 @@ fn expand(
         .to_str()
         .filter(|_| request.transcript.is_absolute())
         .ok_or(SynthesisFailure::InvalidArguments)?;
+    let captured = request.captured.0.rfc3339_with(request.captured.1);
     let values = [
         ("{transcript}", path),
         ("{id}", request.recording.as_str()),
         ("{language}", request.language),
+        ("{captured_at}", &captured),
         (KNOWN_TAGS, known),
         (REFUSED_TAGS, refused),
     ];
