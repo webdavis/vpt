@@ -49,7 +49,7 @@ pub(super) fn run(root: &crate::RootDir) {
     })
     .unwrap();
     let upgraded = SqliteLedger::open(root).unwrap();
-    assert_eq!(upgraded.schema_version().unwrap(), 15);
+    assert_eq!(upgraded.schema_version().unwrap(), 16);
     assert_eq!(
         upgraded.accepted_transcript(&accepted.recording).unwrap(),
         Some(accepted)

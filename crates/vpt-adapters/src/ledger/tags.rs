@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use vpt_application::ports::{LedgerError, TagChange};
+use vpt_application::ports::{LedgerError, TagChange, TagRename};
 use vpt_domain::{
     run::{HistoryFact, WorkOutcome},
     tags::{Provenance, Tag},
@@ -58,5 +58,14 @@ pub(super) fn check(
     if &change.expected != current || facts.iter().filter(|(at, fact)|
         *at == change.at && matches!(fact, HistoryFact::WorkStep { recording: Some(id), outcome: WorkOutcome::Completed } if *id == change.recording)
     ).count() != 1 { return Err(conflict()); }
+    Ok(())
+}
+
+pub(super) fn check_rename(rename: &TagRename) -> Result<(), LedgerError> {
+    let old = vpt_domain::tags::key(&rename.old).map_err(|_| invalid())?;
+    let new = vpt_domain::tags::key(&rename.new).map_err(|_| invalid())?;
+    if old != rename.old || old == new || rename.new.len() > 262_144 {
+        return Err(invalid());
+    }
     Ok(())
 }

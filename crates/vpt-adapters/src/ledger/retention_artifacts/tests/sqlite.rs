@@ -150,8 +150,10 @@ fn read_only_version_fourteen_inventory_and_journal_remain_observational() {
     let pending = ledger.pending_intents().unwrap();
     ledger
         .transaction(|t| {
-            t.execute_batch("DROP TABLE artifact_expirations; PRAGMA user_version=14;")
-                .unwrap();
+            t.execute_batch(
+                "DROP TABLE tag_renames; DROP TABLE artifact_expirations; PRAGMA user_version=14;",
+            )
+            .unwrap();
             Ok(())
         })
         .unwrap();
@@ -164,7 +166,7 @@ fn read_only_version_fourteen_inventory_and_journal_remain_observational() {
     drop(observer);
     assert_eq!(crate::database::snapshot(root.path()), bytes);
     let migrated = SqliteLedger::open(&root).unwrap();
-    assert_eq!(migrated.schema_version().unwrap(), 15);
+    assert_eq!(migrated.schema_version().unwrap(), 16);
     assert_eq!(migrated.retention_artifacts().unwrap(), before);
     assert_eq!(migrated.pending_intents().unwrap(), pending);
 }

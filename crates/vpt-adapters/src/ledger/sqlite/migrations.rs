@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 use vpt_application::ports::LedgerError;
 
-pub const VERSION: u32 = 15;
+pub const VERSION: u32 = 16;
 
 pub(super) fn current(connection: &Connection) -> Result<u32, LedgerError> {
     let version = connection
@@ -68,7 +68,10 @@ pub(super) fn migrate(
     if version < 14 {
         transaction.execute_batch(SCHEMA_V14).map_err(super::map)?;
     }
-    transaction.execute_batch(SCHEMA_V15).map_err(super::map)?;
+    if version < 15 {
+        transaction.execute_batch(SCHEMA_V15).map_err(super::map)?;
+    }
+    transaction.execute_batch(SCHEMA_V16).map_err(super::map)?;
     transaction
         .pragma_update(None, "user_version", VERSION)
         .map_err(super::map)?;
@@ -97,3 +100,4 @@ const SCHEMA_V13: &str = include_str!("migrations/v13.sql");
 const SCHEMA_V14: &str = include_str!("migrations/v14.sql");
 
 const SCHEMA_V15: &str = include_str!("migrations/v15.sql");
+const SCHEMA_V16: &str = include_str!("migrations/v16.sql");

@@ -42,6 +42,7 @@ struct State {
     ambiguities: Vec<(RecordingId, Vec<vpt_domain::relations::MentionAmbiguity>)>,
     relations: Vec<(RecordingId, Vec<vpt_domain::relations::Relation>)>,
     tags: Vec<(RecordingId, Vec<vpt_domain::tags::Tag>)>,
+    tag_renames: Vec<vpt_application::ports::TagRename>,
     vocabulary: Vec<vpt_application::ports::VocabularyPublication>,
     notes: Vec<vpt_application::ports::NoteArtifact>,
     flags: Vec<(RecordingId, vpt_domain::review::ReviewFlag)>,
