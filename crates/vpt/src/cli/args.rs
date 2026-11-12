@@ -1,6 +1,7 @@
 pub(crate) mod brief;
 mod confirm;
 pub(crate) mod handoff;
+pub(crate) mod import;
 mod options;
 pub(crate) mod redact;
 mod review;
@@ -13,7 +14,8 @@ use std::path::PathBuf;
 use verbs::parse_verb;
 
 pub const USAGE: &str = "usage: vpt [--json|--toon|--yaml] [--config <file>] <verb>\n\
-verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <path>] | show <id> |\n\
+verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <path>] |\n\
+       import <file> [--title <text>] [--captured-at <RFC3339>] | show <id> |\n\
        transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
        synthesize <id> [--dry-run] | path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | storage | retention run [--dry-run] |\n\
        brief <occasion-id> [--dry-run] [--explain] | brief --title <title> --at <RFC3339> [--duration-minutes <n>] [--participant <name>]... [--tag <tag>]... | brief --upcoming |\n\
@@ -23,6 +25,7 @@ verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <
 pub enum Verb {
     Brief(brief::Options),
     Redact(redact::Options),
+    Import(import::Options),
     Handoff(handoff::Options),
     Occasions,
     OccasionPath {
@@ -128,6 +131,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
                 | "--recording"
                 | "--at"
                 | "--duration-minutes"
+                | "--captured-at"
         ) && words
             .get(index + 1)
             .is_none_or(|value| value.starts_with("--"))

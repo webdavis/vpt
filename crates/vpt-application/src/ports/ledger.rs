@@ -52,6 +52,7 @@ impl StageStates {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TitleOrigin {
     VoiceMemos,
+    Import,
     Unavailable,
 }
 
@@ -59,6 +60,7 @@ impl TitleOrigin {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::VoiceMemos => "voice_memos",
+            Self::Import => "import",
             Self::Unavailable => "unavailable",
         }
     }
@@ -66,6 +68,7 @@ impl TitleOrigin {
     pub fn parse(text: &str) -> Option<Self> {
         match text {
             "voice_memos" => Some(Self::VoiceMemos),
+            "import" => Some(Self::Import),
             "unavailable" => Some(Self::Unavailable),
             _ => None,
         }
@@ -156,6 +159,7 @@ mod tests {
     fn title_origin_uses_exact_persisted_spellings() {
         for (origin, spelling) in [
             (TitleOrigin::VoiceMemos, "voice_memos"),
+            (TitleOrigin::Import, "import"),
             (TitleOrigin::Unavailable, "unavailable"),
         ] {
             assert_eq!(origin.as_str(), spelling);

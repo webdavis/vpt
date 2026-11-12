@@ -3,6 +3,7 @@ use crate::ports::{
     Archive, Candidate, Clock, EventSink, LedgerCommit, RecorderStore, RecordingLedger,
     RecordingRecord, RunHistory, SeenRow, Trash, WorkDelta,
 };
+use std::path::PathBuf;
 use vpt_domain::history::{EventId, RunId};
 use vpt_domain::run::{EffectKind, EffectOutcome, EffectReference, HistoryFact, WorkOutcome};
 use vpt_domain::time::UtcInstant;
@@ -11,6 +12,7 @@ pub(super) struct Accepted {
     pub record: RecordingRecord,
     pub existing: bool,
     pub intent: Option<EventId>,
+    pub source: PathBuf,
 }
 
 impl<R, A, L, C, T, S> Ingest<'_, R, A, L, C, T, S>
@@ -72,10 +74,12 @@ where
             record,
             existing,
             intent,
+            source,
         } = accepted;
         let id = record.id.clone();
         let first_seen = seen.map_or(now, |row| row.first_seen);
         let mut seen = fresh_seen(candidate, now);
+        seen.path.clone_from(&source);
         seen.first_seen = first_seen;
         seen.recording = Some(id.clone());
         let mut delta = WorkDelta {
@@ -86,9 +90,7 @@ where
             ..Default::default()
         };
         if existing {
-            delta
-                .source_updates
-                .push((id.clone(), candidate.path.clone()));
+            delta.source_updates.push((id.clone(), source));
         } else {
             delta.commit.recordings.push(record.clone());
         }

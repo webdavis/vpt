@@ -29,6 +29,7 @@ const EVERY_VERB: &[&[&str]] = &[
     &["handoff", "x", "--stage", "transcript"],
     &["redact", "x"],
     &["brief", "x"],
+    &["import", "/absent.mp3"],
     &["brief", "--upcoming"],
     &["ingest", "--dry-run"],
     &["run", "--dry-run"],

@@ -232,6 +232,7 @@ fn private_dry_deferral_adds_report_without_any_port_action() {
     let mode = Mode {
         dry_run: true,
         once: None,
+        import: None,
     };
 
     ingest

@@ -1,4 +1,4 @@
-use super::{IngestFailure, candidate::recorder_failure};
+use super::{IngestFailure, Mode, candidate::recorder_failure};
 use crate::SourceSettings;
 use crate::ports::{Candidate, RecorderStore, SeenRow, SourceMetadata};
 use vpt_domain::container::{Container, inspect};
@@ -39,6 +39,7 @@ pub(super) fn source<R: RecorderStore>(
     seen: Option<&SeenRow>,
     now: UtcInstant,
     settings: &SourceSettings,
+    mode: &Mode,
 ) -> Result<Result<Eligible<R::Handle>, DeferralReason>, IngestFailure> {
     let handle = recorder.open(&candidate.path).map_err(recorder_failure)?;
     let metadata = recorder.metadata(&handle).map_err(recorder_failure)?;
@@ -54,13 +55,17 @@ pub(super) fn source<R: RecorderStore>(
     }) else {
         return Ok(Err(DeferralReason::InvalidContainer));
     };
-    if let Err(reason) = rest_gate(
-        metadata.mtime,
-        metadata.size,
-        now,
-        seen.map(previous).as_ref(),
-        &limits,
-    ) {
+    let rest = match mode.import {
+        Some(_) => Ok(()),
+        None => rest_gate(
+            metadata.mtime,
+            metadata.size,
+            now,
+            seen.map(previous).as_ref(),
+            &limits,
+        ),
+    };
+    if let Err(reason) = rest {
         return Ok(Err(reason));
     }
     Ok(Ok(Eligible {

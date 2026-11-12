@@ -1,4 +1,4 @@
-use super::{Container, ContainerError, ReadFailure};
+use super::{Container, ContainerError, MPEG4_EPOCH_OFFSET, ReadFailure};
 use crate::time::UtcInstant;
 
 pub(super) fn read(
@@ -69,7 +69,7 @@ pub(super) fn read(
         return Err(ContainerError::InvalidMvhd);
     }
     let creation_unix =
-        i64::try_from(creation).map_err(|_| ContainerError::InvalidMvhd)? - 2_082_844_800;
+        i64::try_from(creation).map_err(|_| ContainerError::InvalidMvhd)? - MPEG4_EPOCH_OFFSET;
     Ok(Container {
         creation_time: UtcInstant {
             secs: creation_unix,

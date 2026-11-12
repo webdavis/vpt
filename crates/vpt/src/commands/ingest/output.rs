@@ -2,9 +2,11 @@ use crate::cli::output::Outcome;
 use crate::compose::events::warning_text;
 use crate::documents::record_json;
 use serde_json::json;
-use vpt_application::{IngestError, IngestReport};
+use vpt_application::{IngestError, IngestReport, Mode};
+use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
-pub(super) fn outcome(result: Result<IngestReport, Box<IngestError>>, dry_run: bool) -> Outcome {
+pub(super) fn outcome(result: Result<IngestReport, Box<IngestError>>, mode: &Mode) -> Outcome {
+    let dry_run = mode.dry_run;
     let report = match result {
         Ok(report) => report,
         Err(error) => {
@@ -28,6 +30,16 @@ pub(super) fn outcome(result: Result<IngestReport, Box<IngestError>>, dry_run: b
             };
         }
     };
+    if let (Some(_), Some(deferred)) = (&mode.import, report.deferred.first()) {
+        return Outcome::FailedReport {
+            error: ErrorDocument::new(
+                ErrorKind::Refused,
+                format!("import was deferred: {}", deferred.reason.as_str()),
+            )
+            .rule("import_deferred"),
+            human: String::new(),
+        };
+    }
     let mut seen = std::collections::HashSet::new();
     let completed = if dry_run {
         Vec::new()
@@ -92,7 +104,11 @@ pub(super) fn outcome(result: Result<IngestReport, Box<IngestError>>, dry_run: b
         diagnostics: diagnostics.clone(),
         human,
         document: vpt_protocol::result::document(
-            "ingest",
+            if mode.import.is_some() {
+                "import"
+            } else {
+                "ingest"
+            },
             json!({
                 "dry_run": dry_run, "ingested": records,
                 "already_ingested": report.already_ingested.iter().map(ToString::to_string).collect::<Vec<_>>(),

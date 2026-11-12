@@ -9,6 +9,7 @@ pub mod context;
 mod database;
 mod engines;
 mod events;
+mod extract;
 mod flag_identity;
 pub use engines::{
     AppleEngine, AudioError, CommandEngine, EngineAdapters, GuardedEngines, WhisplyEngine,
@@ -34,6 +35,7 @@ mod transcript_document;
 pub mod transcription;
 pub mod verification;
 mod voice_memos;
+pub use extract::{ExtractError, Extracted, extract_audio};
 pub use git_tree::enclosing_git_tree;
 pub use helper::{BUILT_AGAINST_MAJOR, CALL_DEADLINE, HelperClient, HelperError};
 pub use prompt::TtyPrompt;

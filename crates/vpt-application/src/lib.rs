@@ -13,7 +13,9 @@ pub mod transcribe;
 
 pub use setup::{Setup, SetupError, SetupOutcome, SetupWriter};
 
-pub use ingest::{Deferred, Ingest, IngestError, IngestFailure, IngestReport, Mode, WouldIngest};
+pub use ingest::{
+    Deferred, Import, Ingest, IngestError, IngestFailure, IngestReport, Mode, WouldIngest,
+};
 pub use inventory::{StoreInventory, inventory};
 pub use publication::{RepairError, RepairReport, repair_publication, repair_publications};
 pub use retention::{

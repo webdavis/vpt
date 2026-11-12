@@ -11,6 +11,9 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
     if first == "redact" {
         return redact::parse(words, text);
     }
+    if first == "import" {
+        return import::parse(words, text);
+    }
     if first != "brief" && (text.title.is_some() || !text.participants.is_empty()) {
         return Err(UsageError("--title and --participant require brief".into()));
     }

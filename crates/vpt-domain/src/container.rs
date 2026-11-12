@@ -1,6 +1,8 @@
 mod movie;
 use crate::time::UtcInstant;
 
+const MPEG4_EPOCH_OFFSET: i64 = 2_082_844_800;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ReadFailure;
 
@@ -13,6 +15,10 @@ pub struct Container {
 }
 
 impl Container {
+    pub fn recorded_creation_time(&self) -> Option<UtcInstant> {
+        (self.creation_time.secs != -MPEG4_EPOCH_OFFSET).then_some(self.creation_time)
+    }
+
     pub fn precise_duration_secs(&self) -> f64 {
         self.duration_ticks as f64 / f64::from(self.timescale)
     }

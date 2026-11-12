@@ -40,6 +40,7 @@ where
                     seen.as_ref(),
                     self.clock.now(),
                     self.settings,
+                    mode,
                 )
                 .map_err(|failure| Self::error(&report, failure, None))?
                 {

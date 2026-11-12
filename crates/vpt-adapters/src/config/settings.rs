@@ -69,6 +69,7 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         },
         report_command: strings(table, "report.command")?,
         alert_command: strings(table, "alert.command")?,
+        import_extract_command: strings(table, "import.extract_command")?,
         alert_aggregate_after: small(table, "alert.aggregate_after")?,
         retention: retention::from_table(table)?,
     })
