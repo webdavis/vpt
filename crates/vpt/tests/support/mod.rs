@@ -1,6 +1,7 @@
 pub(crate) mod capture;
 mod diagnostic;
 pub(crate) mod process;
+mod turn;
 
 use capture::Capture;
 use diagnostic::Diagnostic;
@@ -100,6 +101,7 @@ impl Sandbox {
 }
 
 pub fn run(command: &mut Command) -> Output {
+    let _turn = turn::turn();
     let started = Instant::now();
     let child = spawn(command);
     let spawn_return = Instant::now();
@@ -156,6 +158,7 @@ pub fn collect_with(
     reason = "durable recovery scenarios allow multiple filesystem synchronizations"
 )]
 pub fn run_with_budget(command: &mut Command, budget: Duration) -> Output {
+    let _turn = turn::turn();
     let started = Instant::now();
     let child = spawn(command);
     collect_with_budget(child, started, Some(Instant::now()), || {}, budget)

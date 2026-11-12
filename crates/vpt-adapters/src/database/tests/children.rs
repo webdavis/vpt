@@ -4,6 +4,7 @@ mod identity;
 mod process;
 pub(super) mod scenarios;
 mod supervision;
+mod turn;
 
 use capture::{Capture, nonblocking};
 use process::ProcessGroup;
@@ -12,6 +13,7 @@ use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{ChildStderr, ChildStdin, ChildStdout, Command, Output, Stdio};
 use std::time::{Duration, Instant};
+pub(crate) use turn::turn;
 
 pub(crate) struct ChildGuard {
     group: ProcessGroup,
