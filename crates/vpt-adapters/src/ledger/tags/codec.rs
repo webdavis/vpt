@@ -76,12 +76,7 @@ pub(crate) fn decode_row(
     let saved: SavedProvenance = serde_json::from_value(document).map_err(|_| invalid())?;
     Ok(Tag {
         name,
-        state: match state {
-            "confirmed" => State::Confirmed,
-            "suggested" => State::Suggested,
-            "rejected" => State::Rejected,
-            _ => return Err(invalid()),
-        },
+        state: decode_state(state)?,
         provenance: match saved {
             SavedProvenance::Manual => Provenance::Manual,
             SavedProvenance::Proposal { by, reason, input } => Provenance::Proposal {
@@ -92,4 +87,13 @@ pub(crate) fn decode_row(
         },
         updated_at: at.map(|secs| UtcInstant { secs }),
     })
+}
+
+pub(crate) fn decode_state(state: &str) -> Result<State, LedgerError> {
+    match state {
+        "confirmed" => Ok(State::Confirmed),
+        "suggested" => Ok(State::Suggested),
+        "rejected" => Ok(State::Rejected),
+        _ => Err(invalid()),
+    }
 }

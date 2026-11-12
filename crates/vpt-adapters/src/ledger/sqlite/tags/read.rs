@@ -2,7 +2,11 @@ use super::super::migrations;
 use crate::ledger::tags::{MAX_BYTES, codec, invalid, validate};
 use rusqlite::{Connection, OptionalExtension};
 use vpt_application::ports::{LedgerError, TagRename};
-use vpt_domain::{identity::RecordingId, tags::Tag, time::UtcInstant};
+use vpt_domain::{
+    identity::RecordingId,
+    tags::{State, Tag},
+    time::UtcInstant,
+};
 
 pub(crate) fn recording(
     connection: &Connection,
@@ -68,6 +72,25 @@ pub(crate) fn renames(connection: &Connection) -> Result<Vec<TagRename>, LedgerE
         let rename = row.map_err(|_| invalid())?;
         crate::ledger::tags::check_rename(&rename)?;
         Ok(rename)
+    })
+    .collect()
+}
+
+pub(crate) fn states(connection: &Connection) -> Result<Vec<(String, State)>, LedgerError> {
+    if migrations::current(connection)? < 6 {
+        return Ok(vec![]);
+    }
+    let mut statement = connection
+        .prepare("SELECT tag, state FROM tags ORDER BY recording, ordinal")
+        .map_err(|_| invalid())?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|_| invalid())?;
+    rows.map(|row| {
+        let (name, state) = row.map_err(|_| invalid())?;
+        Ok((name, codec::decode_state(&state)?))
     })
     .collect()
 }

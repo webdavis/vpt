@@ -220,6 +220,12 @@ pub(crate) fn confirmed_rejected_and_empty_tag_sets_round_trip(
             ),
             HistoryWrite::Committed(_)
         ));
+        assert_eq!(
+            ledger.tag_states().unwrap(),
+            tags.iter()
+                .map(|tag| (tag.name.clone(), tag.state))
+                .collect::<Vec<_>>()
+        );
         expected = Some(tags);
         assert_eq!(ledger.tags(&record(81).id).unwrap(), expected);
     }
