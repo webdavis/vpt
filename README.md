@@ -332,6 +332,68 @@ when the rendered input or grounding settings change. Synthesis review alerts fo
 include verification class counts. Pipeline alerts combine the final counts once per recording;
 standalone synthesis points to the analysis note. Recovery does not resend earlier hooks.
 
+## Synthesis harnesses
+
+Any agent command line can write the analysis. vpt runs the configured argument list directly, with no
+shell, and inherits its own environment, so the agent finds its login through `HOME` as usual. It
+writes the transcript's content region on standard input and adds no prompt of its own. The command
+must carry its own prompt, exit 0, and print exactly one `vpt.proposal/1` JSON document of at most
+1 MiB on standard output. Any other text on standard output, including a code fence, fails with
+`synthesis output document is invalid`. Standard error is captured and not shown. The agent needs no
+tools; give it none.
+
+vpt grounds every claim against the transcript, so the prompt must ask for sources in its terms. A
+source is a `mm:ss-mm:ss` range taken from the `[mm:ss]` timecodes, with the end after the start and
+no later than the recording's length. Every capitalized word and every number in a claim must occur
+in the cited text, otherwise the claim is marked `unsupported`. A claim that starts with "They" or
+"An" is marked for that reason.
+
+Both examples below ran end to end against a synthetic recording, twice each, with Claude Code
+2.1.322 and codex-cli 0.167.0. Each call took 15 to 35 seconds and produced an analysis note with no
+findings. The prompt is the same in both.
+
+`claude -p` with structured output prints only the document. `--safe-mode` skips the user's hooks,
+plugins and `CLAUDE.md`, and `--tools ""` removes every tool. `--json-schema` takes the schema as a
+string, not a path.
+
+```toml
+[synthesis]
+command = [
+  "claude", "-p", "--safe-mode", "--tools", "", "--no-session-persistence",
+  "--system-prompt", 'Standard input is a meeting transcript. Each paragraph starts with an [mm:ss] timecode. Write a vpt.proposal/1 JSON document about it. Set schema to "vpt.proposal/1" and by to the name of your model. Put the key points in summary and each agreed task, with its owner and due date when stated, in actions, one short sentence per item. Give every item one or more sources, each a mm:ss-mm:ss range that starts at the timecode of the paragraph that supports it and ends at the timecode of the next paragraph, or one second after its own timecode for the last paragraph. State only what the transcript says, and use a capitalized word or a number only when it appears in the paragraphs you cite. Leave tags and relations empty. Print the JSON document and nothing else, with no code fence.',
+  "--json-schema", '{"type":"object","additionalProperties":false,"required":["schema","by","summary","actions","tags","relations"],"properties":{"schema":{"type":"string","enum":["vpt.proposal/1"]},"by":{"type":"string"},"summary":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","sources"],"properties":{"text":{"type":"string"},"sources":{"type":"array","items":{"type":"string","pattern":"^[0-9]{2,}:[0-5][0-9]-[0-9]{2,}:[0-5][0-9]$"}}}}},"actions":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","sources"],"properties":{"text":{"type":"string"},"sources":{"type":"array","items":{"type":"string","pattern":"^[0-9]{2,}:[0-5][0-9]-[0-9]{2,}:[0-5][0-9]$"}}}}},"tags":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["tag","reason"],"properties":{"tag":{"type":"string"},"reason":{"type":"string"}}}},"relations":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["kind","target","reason"],"properties":{"kind":{"type":"string"},"target":{"type":"string"},"reason":{"type":"string"}}}}}}',
+]
+```
+
+An account manager can go in front of the harness, so that the argument list starts with it. For
+example, `"clauth", "start", "<profile>", "-p", ...` in place of `"claude", "-p", ...` ran the same way and
+pins the call to one account. vpt has no defaults for any such tool, so the account belongs in the
+user's own configuration.
+
+`codex exec` prints only the final message on standard output and appends standard input to the
+prompt. Its `--output-schema` takes a file; copy
+[`docs/examples/vpt-proposal.schema.json`](docs/examples/vpt-proposal.schema.json) somewhere stable
+and give its absolute path. `--ignore-user-config` skips the user's `config.toml`, so the model is
+Codex's default; add `--model` to pick another. Codex has no switch to remove its shell, so
+`--sandbox read-only` keeps it from writing.
+
+```toml
+[synthesis]
+command = [
+  "codex", "exec", "--ephemeral", "--ignore-user-config", "--skip-git-repo-check",
+  "--sandbox", "read-only", "--color", "never",
+  "--output-schema", "/absolute/path/to/vpt-proposal.schema.json",
+  'Standard input is a meeting transcript. Each paragraph starts with an [mm:ss] timecode. Write a vpt.proposal/1 JSON document about it. Set schema to "vpt.proposal/1" and by to the name of your model. Put the key points in summary and each agreed task, with its owner and due date when stated, in actions, one short sentence per item. Give every item one or more sources, each a mm:ss-mm:ss range that starts at the timecode of the paragraph that supports it and ends at the timecode of the next paragraph, or one second after its own timecode for the last paragraph. State only what the transcript says, and use a capitalized word or a number only when it appears in the paragraphs you cite. Leave tags and relations empty. Print the JSON document and nothing else, with no code fence.',
+]
+```
+
+A bad setup fails without touching the earlier analysis:
+
+- `synthesis command is unavailable`: the program is not on `PATH`.
+- `synthesis command exited unsuccessfully`: the harness failed, for example when it is not logged
+  in under the `HOME` vpt runs with, or when `--json-schema` is given a path.
+- `synthesis output document is invalid`: standard output held anything besides the document.
+
 ## Note verification
 
 `vpt verify-note <path> --recording <id> [--json|--toon|--yaml]` checks Markdown claims against the recording's
