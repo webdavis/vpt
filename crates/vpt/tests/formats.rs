@@ -20,6 +20,8 @@ const EVERY_VERB: &[&[&str]] = &[
     &["search", "x"],
     &["show", "x", "--stage", "transcript"],
     &["show", "x", "--stage", "analysis"],
+    &["show", "x", "--stage", "released"],
+    &["show", "x", "--stage", "brief"],
     &["path", "x", "--stage", "transcript"],
     &["path", "--occasion", "x", "--stage", "brief"],
     &["review", "x"],

@@ -2,7 +2,6 @@ use super::{
     errors, file,
     output::{self, Artifact},
 };
-use crate::cli::output::Outcome;
 use vpt_adapters::{Roots, SqliteLedger};
 use vpt_application::ports::*;
 use vpt_domain::{
@@ -16,7 +15,7 @@ pub(super) fn run(
     roots: &Roots,
     id: &RecordingId,
     kind: Kind,
-) -> Result<Outcome, Box<ErrorDocument>> {
+) -> Result<serde_json::Value, Box<ErrorDocument>> {
     let stage = match kind {
         Kind::Transcript => NoteStage::Transcript,
         Kind::Analysis => NoteStage::Analysis,
@@ -50,7 +49,7 @@ pub(super) fn run(
         .check_owner(id, stage.as_str())
         .map_err(|_| errors::changed())?;
     let (engines, flags, reviewed) = provenance(&input, stage);
-    output::success(
+    output::value(
         roots,
         Artifact {
             kind,

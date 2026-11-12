@@ -1,10 +1,10 @@
-use crate::cli::output::Outcome;
-use crate::commands::handoff::errors;
-use crate::compose::{Environment, errors::root_error, settings_from};
+use crate::cli::{args::handoff::Target, output::Outcome};
+use crate::commands::handoff::{self, errors};
+use crate::compose::Environment;
+use serde_json::{Value, json};
 use std::path::Path;
-use vpt_adapters::{SqliteLedger, config::planned_directory};
-use vpt_application::ports::{NoteInputsLedger, NoteStage};
-use vpt_domain::identity::RecordingId;
+use vpt_application::ports::NoteInputsLedger;
+use vpt_domain::{handoff::Kind, identity::RecordingId, occasion::OccasionId};
 use vpt_protocol::{
     error::{ErrorDocument, ErrorKind},
     result::document,
@@ -14,7 +14,7 @@ pub(crate) fn run(
     environment: &Environment,
     config: Option<&Path>,
     id: &str,
-    stage: NoteStage,
+    stage: Kind,
 ) -> Outcome {
     execute(environment, config, id, stage).unwrap_or_else(|error| Outcome::Failure(*error))
 }
@@ -23,32 +23,57 @@ fn execute(
     environment: &Environment,
     config: Option<&Path>,
     id: &str,
-    stage: NoteStage,
+    stage: Kind,
 ) -> Result<Outcome, Box<ErrorDocument>> {
-    let id = RecordingId::parse(id)
-        .map_err(|_| Box::new(ErrorDocument::new(ErrorKind::Usage, "invalid recording id")))?;
-    let settings = settings_from(environment, config)?;
-    let state = planned_directory(&settings.state_dir, "home.state_dir")
-        .map_err(|error| Box::new(root_error(&error)))?;
-    let ledger = SqliteLedger::open_read_only(&state)
-        .map_err(|error| Box::new(crate::compose::errors::open_error(error)))?
-        .ok_or_else(errors::missing)?;
-    let input = ledger
-        .note_inputs(&id)
-        .map_err(errors::ledger)?
-        .ok_or_else(errors::missing)?;
-    let mut body = serde_json::json!({"recording": id.as_str(), "stage": stage.as_str()});
-    match stage {
-        NoteStage::Transcript => body["segments"] = super::segments::json(&input.review)?,
-        NoteStage::Analysis => super::proposal::json(&input, &mut body)?,
+    let target = target(id, stage)?;
+    let (_, roots, ledger) = handoff::open(environment, config)?;
+    let mut body = json!({"stage": stage.as_str()});
+    flatten(
+        handoff::artifact(&ledger, &roots, &target, stage)?,
+        &mut body,
+    );
+    if let Target::Recording(id) = &target
+        && matches!(stage, Kind::Transcript | Kind::Analysis)
+    {
+        let input = ledger
+            .note_inputs(id)
+            .map_err(errors::ledger)?
+            .ok_or_else(errors::missing)?;
+        match stage {
+            Kind::Transcript => body["segments"] = super::segments::json(&input.review)?,
+            _ => super::proposal::json(&input, &mut body)?,
+        }
     }
-    let human = serde_json::to_string_pretty(&body)
-        .map(|text| format!("{text}\n"))
-        .map_err(|_| errors::document(vpt_domain::handoff::Error::Invalid))?;
+    let human = body["content"]
+        .as_str()
+        .ok_or_else(errors::changed)?
+        .to_owned();
     Ok(Outcome::Success {
         document: document("show", body),
         human,
         completed: Vec::new(),
         diagnostics: Vec::new(),
     })
+}
+
+fn target(id: &str, stage: Kind) -> Result<Target, Box<ErrorDocument>> {
+    let usage = |message: &str| Box::new(ErrorDocument::new(ErrorKind::Usage, message));
+    match stage {
+        Kind::Brief => OccasionId::parse(id)
+            .map(Target::Occasion)
+            .map_err(|_| usage("invalid occasion id")),
+        _ => RecordingId::parse(id)
+            .map(Target::Recording)
+            .map_err(|_| usage("invalid recording id")),
+    }
+}
+
+fn flatten(mut copy: Value, body: &mut Value) {
+    let identity = copy["identity"].take();
+    for (key, value) in identity.as_object().into_iter().flatten() {
+        body[key] = value.clone();
+    }
+    for key in ["title", "content", "provenance", "generated_at"] {
+        body[key] = copy[key].take();
+    }
 }

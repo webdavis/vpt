@@ -1,11 +1,12 @@
 use super::errors;
 use crate::cli::output::Outcome;
+use serde_json::Value;
 use std::path::Path;
 use vpt_adapters::{Roots, SystemClock};
 use vpt_application::ports::Clock;
 use vpt_domain::{digest::Sha256Digest, handoff::*};
 use vpt_protocol::error::ErrorDocument;
-pub(super) struct Artifact<'a> {
+pub(crate) struct Artifact<'a> {
     pub kind: Kind,
     pub identity: Identity<'a>,
     pub path: &'a Path,
@@ -13,10 +14,7 @@ pub(super) struct Artifact<'a> {
     pub body: &'a str,
     pub provenance: Provenance<'a>,
 }
-pub(super) fn success(
-    roots: &Roots,
-    artifact: Artifact<'_>,
-) -> Result<Outcome, Box<ErrorDocument>> {
+pub(crate) fn value(roots: &Roots, artifact: Artifact<'_>) -> Result<Value, Box<ErrorDocument>> {
     let path = artifact
         .path
         .strip_prefix(&roots.home)
@@ -35,7 +33,9 @@ pub(super) fn success(
         provenance: artifact.provenance,
         generated_at: SystemClock.now(),
     };
-    let value = vpt_protocol::handoff::value(&document).map_err(errors::document)?;
+    vpt_protocol::handoff::value(&document).map_err(errors::document)
+}
+pub(super) fn outcome(value: Value) -> Result<Outcome, Box<ErrorDocument>> {
     let human = value["content"]
         .as_str()
         .ok_or_else(errors::changed)?

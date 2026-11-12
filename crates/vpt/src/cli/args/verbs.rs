@@ -1,5 +1,4 @@
 use super::*;
-use vpt_domain::note::NoteStage;
 
 pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<Verb, UsageError> {
     if words.is_empty() {
@@ -100,19 +99,7 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
                 }),
             }
         }
-        "show" => {
-            let stage = take_value(words, "--stage")?
-                .map(|stage| {
-                    NoteStage::parse(&stage).ok_or_else(|| {
-                        UsageError("show --stage must be transcript or analysis".into())
-                    })
-                })
-                .transpose()?;
-            Ok(Verb::Show {
-                id: take_positional(words, "<id>")?,
-                stage,
-            })
-        }
+        "show" => show::parse(words),
         "review" => review::parse(words, text.correction),
         "search" => search::parse(words),
         "list" => Ok(Verb::List {
