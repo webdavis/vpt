@@ -59,20 +59,24 @@ fn transcript_segments_carry_corrections_without_an_opt_in() {
     correct_the_flag(&sandbox, &id, "5678");
     let before = fixture::snapshot(&sandbox);
     let result = json(&show(&sandbox, id.as_str(), "transcript"));
+    assert_eq!(result["schema"], "vpt.result/1");
+    assert_eq!(result["command"], "show");
+    assert_eq!(result["recording"], id.as_str());
+    assert_eq!(result["stage"], "transcript");
     assert_eq!(
-        result,
-        json!({
-            "schema": "vpt.result/1",
-            "command": "show",
-            "recording": id.as_str(),
-            "stage": "transcript",
-            "segments": [{
-                "start": 0.0,
-                "end": 1.0,
-                "timecode": "00:00",
-                "text": "Meet Alice with Bob via person@sample.test for 5678",
-            }],
-        })
+        result["segments"],
+        json!([{
+            "start": 0.0,
+            "end": 1.0,
+            "timecode": "00:00",
+            "text": "Meet Alice with Bob via person@sample.test for 5678",
+        }])
+    );
+    assert!(
+        result["content"]
+            .as_str()
+            .unwrap()
+            .contains("Meet Alice with Bob")
     );
     assert_eq!(fixture::snapshot(&sandbox), before);
 }
@@ -119,7 +123,9 @@ fn analysis_lists_summary_and_actions_with_a_moment_per_line() {
     assert_eq!(result["actions"][1]["finding"], "unsourced");
     assert_eq!(result["actions"].as_array().unwrap().len(), 2);
     assert_eq!(fixture::snapshot(&sandbox), before);
-    assert_eq!(json(&show(&sandbox, id.as_str(), "analysis")), result);
+    let mut again = json(&show(&sandbox, id.as_str(), "analysis"));
+    again["generated_at"] = result["generated_at"].clone();
+    assert_eq!(again, result);
 }
 
 #[test]
@@ -129,3 +135,6 @@ fn analysis_without_an_accepted_proposal_is_an_input_error() {
     assert_eq!(missing.status.code(), Some(2), "{}", stderr(&missing));
     assert!(missing.stdout.is_empty());
 }
+
+#[path = "show_stage/text.rs"]
+mod text;

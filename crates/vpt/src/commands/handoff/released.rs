@@ -2,7 +2,6 @@ use super::{
     errors, file,
     output::{self, Artifact},
 };
-use crate::cli::output::Outcome;
 use vpt_adapters::{Roots, SqliteLedger};
 use vpt_application::ports::ReleaseLedger;
 use vpt_domain::{
@@ -14,7 +13,7 @@ pub(super) fn run(
     ledger: &SqliteLedger,
     roots: &Roots,
     id: &RecordingId,
-) -> Result<Outcome, Box<ErrorDocument>> {
+) -> Result<serde_json::Value, Box<ErrorDocument>> {
     for sequence in ledger.releases(id).map_err(errors::ledger)? {
         let release = ledger
             .release(sequence)
@@ -29,7 +28,7 @@ pub(super) fn run(
             return Err(errors::changed());
         }
         let p = &release.provenance;
-        return output::success(
+        return output::value(
             roots,
             Artifact {
                 kind: Kind::Released,

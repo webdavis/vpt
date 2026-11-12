@@ -203,13 +203,24 @@ metadata, with no transcript or proposal bodies. `list --stage` selects stages w
 `disabled` and `expired`. Observation results are bounded to 65,536 recordings and 16 MiB of retained
 metadata.
 
-`vpt show <id> --stage transcript` prints the accepted transcript's segments from saved state, each with
+`vpt show <id> --stage released|transcript|analysis|brief` returns one stage's text for a person or a
+program. Brief takes an occasion ID; the others take a recording ID. Human output is the text: the
+artifact body with its frontmatter removed, under a header that names the stage, identity, open flag
+count and review state. JSON output adds beside it the `title`, `content` (that text), `note` (its path),
+`content_sha256` (the artifact bytes before frontmatter removal), `provenance` (`produced_by`, `engines`,
+`open_flags`, `reviewed`, `redacted`, and `captured_at` or, for a brief, `occasion_at`) and `generated_at`.
+A brief also lists its source `recordings`. Transcript, analysis and brief copies keep the current body,
+including operator prose outside managed regions. Released selects the newest finalized release whose file
+still exists and takes provenance from that release's saved snapshot; a changed copy is refused (3) and
+a release still pending is an operational error (1). A missing stage names the stages that exist.
+
+`vpt show <id> --stage transcript` also returns the accepted transcript's segments from saved state, each with
 `start` and `end` seconds, a `mm:ss` `timecode` and its `text` with review corrections applied.
-`vpt show <id> --stage analysis` prints the accepted proposal's `summary` and `actions` lines in
+`vpt show <id> --stage analysis` also returns the accepted proposal's `summary` and `actions` lines in
 proposal order. Each line has its `text`, its `sources` (`start` and `end` seconds and a `mm:ss-mm:ss`
 `range`), its verification `finding` or null, and a `moment` of the form `<recording id>@<mm:ss>` taken
 from the start of its first source, or null for an unsourced line. Two lines from the same second share
-a moment. The proposal has no owner or due date, so neither does this output. Neither stage needs an
+a moment. The proposal has no owner or due date, so neither does this output. No stage needs an
 opt-in. A recording with no accepted transcript or proposal is an input error (2).
 
 `vpt storage [--json|--toon|--yaml]` reports current file counts, bytes, and oldest/newest timestamps for all seven

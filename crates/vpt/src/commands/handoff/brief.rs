@@ -2,7 +2,6 @@ use super::{
     errors, file,
     output::{self, Artifact},
 };
-use crate::cli::output::Outcome;
 use vpt_adapters::{Roots, SqliteLedger};
 use vpt_application::ports::*;
 use vpt_domain::{
@@ -14,7 +13,7 @@ pub(super) fn run(
     ledger: &SqliteLedger,
     roots: &Roots,
     id: &OccasionId,
-) -> Result<Outcome, Box<ErrorDocument>> {
+) -> Result<serde_json::Value, Box<ErrorDocument>> {
     let occasion = ledger
         .occasion(id)
         .map_err(errors::ledger)?
@@ -71,7 +70,7 @@ pub(super) fn run(
     let engines: Vec<_> = engines.into_iter().collect();
     let flags = u32::try_from(saved.snapshot.pack.unresolved.flags)
         .map_err(|_| errors::document(vpt_domain::handoff::Error::CapacityExceeded))?;
-    output::success(
+    output::value(
         roots,
         Artifact {
             kind: Kind::Brief,
