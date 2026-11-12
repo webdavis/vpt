@@ -9,6 +9,7 @@ mod retention;
 pub mod review;
 mod settings;
 mod setup;
+pub mod tag_hints;
 pub mod tag_renames;
 pub mod transcribe;
 

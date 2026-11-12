@@ -34,6 +34,8 @@ mod report_hook;
 mod support;
 #[path = "synthesize/tag_defaults.rs"]
 mod tag_defaults;
+#[path = "synthesize/tag_placeholders.rs"]
+mod tag_placeholders;
 #[path = "synthesize/tag_renames.rs"]
 mod tag_renames;
 #[path = "synthesize/workflow.rs"]

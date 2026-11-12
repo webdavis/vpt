@@ -17,6 +17,10 @@ fn configured() -> (Sandbox, Vec<RecordingRecord>, std::path::PathBuf) {
             sandbox.config_path().with_file_name("known-tags.txt"),
         ),
     );
+    let config = fs::read_to_string(sandbox.config_path())
+        .unwrap()
+        .replace("'{language}'", "'{refused_tags}'");
+    fs::write(sandbox.config_path(), config).unwrap();
     for row in &rows {
         note::success(&invoke(&sandbox, row.id.as_str(), false));
     }
@@ -122,4 +126,6 @@ fn a_hand_confirmed_old_name_is_kept_and_no_longer_renamed() {
         [("billing".to_owned(), State::Confirmed)]
     );
     assert!(renamed_indices(&sandbox).is_empty());
+    let args = fs::read_to_string(sandbox.path().join("captured.args")).unwrap();
+    assert_eq!(args.lines().nth(2), Some("invoice -> bill"));
 }

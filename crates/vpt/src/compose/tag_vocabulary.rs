@@ -1,5 +1,9 @@
 use vpt_adapters::{known_tags, note_index::Index};
-use vpt_application::{Settings, ports::VocabularyKind};
+use vpt_application::{
+    Settings,
+    ports::{TagLedger, VocabularyKind},
+    tag_hints::{self, TagHints},
+};
 use vpt_domain::tags::{TagError, Vocabulary};
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
@@ -24,6 +28,29 @@ pub(crate) fn read(
         tags.push(tag.clone());
     }
     Ok((Vocabulary::new(&tags).map_err(error)?, diagnostics))
+}
+
+pub(crate) fn hints(
+    settings: &Settings,
+    index: &Index,
+    ledger: &impl TagLedger,
+) -> Result<TagHints, Box<ErrorDocument>> {
+    if !tag_hints::wanted(&settings.synthesis.command) {
+        return Ok(TagHints::default());
+    }
+    let vocabulary = known_tags::read(&settings.tags.known_tags_path).map_err(|error| {
+        crate::compose::publication::vocabulary::document(VocabularyKind::Tags, error)
+    })?;
+    let ledger_error = |error| Box::new(crate::compose::errors::ledger_error(error));
+    Ok(tag_hints::hints(
+        index
+            .notes()
+            .iter()
+            .map(|note| note.metadata.tags.as_slice()),
+        &vocabulary,
+        &ledger.tag_states().map_err(ledger_error)?,
+        &ledger.tag_renames().map_err(ledger_error)?,
+    ))
 }
 
 fn error(error: TagError) -> Box<ErrorDocument> {

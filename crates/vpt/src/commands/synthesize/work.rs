@@ -80,6 +80,11 @@ impl<E: EventSink> Writer<'_, E> {
             let digest = source.content_digest;
             source::check(&stores, source)?;
             attempted = true;
+            let tags = crate::compose::tag_vocabulary::hints(
+                self.settings,
+                mentions.index(),
+                self.ledger,
+            )?;
             crate::cli::progress::report(&id, "synthesize", "started", None);
             let generated = CommandAgent
                 .synthesize(&SynthesisRequest {
@@ -93,6 +98,7 @@ impl<E: EventSink> Writer<'_, E> {
                         .ok_or_else(errors::invalid)?
                         .requested_language,
                     content: &content,
+                    tags: &tags,
                 })
                 .map_err(errors::command)?;
             diagnostics = generated.diagnostics.clone();

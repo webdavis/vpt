@@ -1,8 +1,16 @@
 use super::*;
 use std::{fs, path::Path, time::Duration};
-use vpt_application::SynthesisSettings;
+use vpt_application::{
+    SynthesisSettings,
+    tag_hints::{KnownTag, RefusedTag, TagHints},
+};
 use vpt_domain::identity::RecordingId;
 mod boundaries;
+
+static NO_TAGS: TagHints = TagHints {
+    known: Vec::new(),
+    refused: Vec::new(),
+};
 
 fn id() -> RecordingId {
     RecordingId::parse("2026-08-24T144736-4f3ab19c02de").unwrap()
@@ -24,6 +32,7 @@ fn request<'a>(
         transcript: Path::new("/private/with spaces {language} $(Private).md"),
         language: "fr-CA",
         content: "  Private exact content\r\n[00:01] punctuation!\n",
+        tags: &NO_TAGS,
     }
 }
 fn document() -> String {
@@ -97,4 +106,48 @@ fn command_failure_missing_executable_and_timeout_are_private_typed_errors() {
         CommandAgent.synthesize(&request(&config, &id)).unwrap_err(),
         SynthesisFailure::DeadlineExceeded
     );
+}
+
+#[test]
+fn tag_lists_are_cut_at_whole_entries_to_keep_the_command_inside_its_limit() {
+    let name = |index: usize| format!("tag-{index:03}-{}", "x".repeat(200));
+    let tags = TagHints {
+        known: (0..400)
+            .map(|index| KnownTag {
+                name: name(index),
+                notes: 400 - index,
+            })
+            .collect(),
+        refused: vec![
+            RefusedTag {
+                name: "billing".into(),
+                renamed_to: Some("invoice".into()),
+            },
+            RefusedTag {
+                name: "spam".into(),
+                renamed_to: None,
+            },
+        ],
+    };
+    let id = id();
+    for (filler, shown) in [(0, 300), (1_048_576 - 20_000, 30)] {
+        let config = settings(&[
+            "/bin/sh",
+            &"f".repeat(filler),
+            "Known: {known_tags}. Refused: {refused_tags}.",
+            "{known_tags}",
+        ]);
+        let argv = arguments::argv(&SynthesisRequest {
+            tags: &tags,
+            ..request(&config, &id)
+        })
+        .unwrap();
+        assert!(argv.iter().map(String::len).sum::<usize>() <= 1_048_576);
+        let known: Vec<_> = argv[3].split(", ").collect();
+        assert_eq!(known.len(), shown);
+        for (index, entry) in known.iter().enumerate() {
+            assert_eq!(*entry, format!("{} ({})", name(index), 400 - index));
+        }
+        assert!(argv[2].ends_with(". Refused: billing -> invoice, spam."));
+    }
 }
