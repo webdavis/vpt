@@ -47,6 +47,15 @@ impl Region {
             }
             return Err(invalid("mapping address"));
         };
+        // SAFETY: base and length name the mapping created above.
+        if unsafe { libc::minherit(base.as_ptr(), length, libc::VM_INHERIT_NONE) } != 0 {
+            let error = std::io::Error::last_os_error();
+            // SAFETY: release the mapping before refusing one a forked child would inherit.
+            unsafe {
+                libc::munmap(base.as_ptr(), length);
+            }
+            return Err(io_error("map inheritance", error));
+        }
         Ok(Self {
             index,
             base,
