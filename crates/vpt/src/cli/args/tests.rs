@@ -86,7 +86,13 @@ fn every_stage_one_verb_decodes_its_arguments() {
                 once: Some("memo.m4a".into()),
             },
         ),
-        ("show memo", Verb::Show { id: "memo".into() }),
+        (
+            "show memo",
+            Verb::Show {
+                id: "memo".into(),
+                stage: None,
+            },
+        ),
         ("list", Verb::List { stage: None }),
         (
             "list --stage extract",

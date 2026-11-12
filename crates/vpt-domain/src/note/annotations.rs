@@ -5,7 +5,9 @@ use crate::{
     uncertainty::LexicalFlag,
 };
 use std::ops::Range;
+mod plain;
 mod render;
+pub(super) use plain::plain;
 pub(super) use render::render;
 
 pub(super) struct Span<'a> {

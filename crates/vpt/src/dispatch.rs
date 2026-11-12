@@ -108,7 +108,16 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             Ok(ledger) => commands::path::run(&ledger, id, stage),
             Err(error) => Outcome::Failure(*error),
         },
-        Verb::Show { id } => match compose::ledger_from(
+        Verb::Show {
+            id,
+            stage: Some(stage),
+        } => commands::show::stage::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            id,
+            *stage,
+        ),
+        Verb::Show { id, stage: None } => match compose::ledger_from(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
         ) {

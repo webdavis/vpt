@@ -1,3 +1,5 @@
+mod segments;
+pub(crate) mod stage;
 use crate::cli::output::Outcome;
 use crate::documents::observation_json;
 use vpt_application::ports::ObservationLedger;
@@ -37,4 +39,8 @@ pub(crate) fn run(ledger: &dyn ObservationLedger, id: &str) -> Outcome {
         ),
         Err(error) => Outcome::Failure(crate::compose::errors::ledger_error(error)),
     }
+}
+
+fn timecode(seconds: u64) -> String {
+    format!("{:02}:{:02}", seconds / 60, seconds % 60)
 }
