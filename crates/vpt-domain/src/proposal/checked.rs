@@ -33,7 +33,7 @@ impl CheckedDue {
     pub fn withheld(&self) -> bool {
         matches!(
             self.grounding.finding,
-            Some(Finding::Unsourced | Finding::BadReference)
+            Some(Finding::Unsourced | Finding::BadReference | Finding::Unsupported(_))
         )
     }
 }

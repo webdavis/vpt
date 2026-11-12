@@ -1025,8 +1025,11 @@ when no name was said; absent or null means unknown. Its bullet then shows `[own
 claim extraction skips that field, so it never changes a claim's text or grounding. An action may carry
 `due`: a `date` (`YYYY-MM-DD`, a real calendar date), an optional `time` (`HH:MM`) and `sources`; a
 malformed date or time makes the document invalid. The due date's sources are resolved and checked for
-flagged text as a claim's are, with no fact check; `unsourced` or `bad-reference` withholds the date, which
-is saved with its finding but shown nowhere, and the action stays. A kept date follows the owner as
+flagged text as a claim's are. Instead of a fact check, the words in the cited spans, with no grounding
+window, must hold one English time expression from the domain's time-word table (a digit, a weekday or month
+name or short form, a number or ordinal to thirty-one, or a word such as `tomorrow` or `week`), or the
+date is `unsupported`; the date arithmetic is not redone. `unsourced`, `bad-reference` or `unsupported`
+withholds the date, which is saved with its finding but shown nowhere, and the action stays. A kept date follows the owner as
 `[due:: <date>]` or `[due:: <date> <time>]`, a field claim extraction also skips. The action's moment comes
 from its own sources, never the due date's. Tags and relations
 go through the stage 3 gates.

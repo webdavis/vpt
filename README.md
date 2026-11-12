@@ -391,13 +391,20 @@ when another person will, or `{"other": null}` when the recording gives no name.
 any proposal text. `verify-note` does not read the field as part of the claim.
 
 An action may also carry `due`, as in `{"date": "2026-11-19", "time": "15:00", "sources":
-["04:12-04:19"]}`, for a due date said in the recording; `time` may be null or left out. A date that
-is not a real `YYYY-MM-DD` date, or a time that is not `HH:MM`, makes the document invalid. vpt checks
-the due date's sources the way it checks a claim's: with no source it is `unsourced`, and with a source
-that does not parse or ends past the recording it is `bad-reference`. Either finding withholds the
-date: the action stays, the date is saved with its finding, and neither the note nor `show` gives the
-date. A source on flagged text keeps the date and records `built-on-flagged-text`. The note shows a
-kept date after the owner as `[due:: 2026-11-19]` or `[due:: 2026-11-19 15:00]`.
+["04:12-04:19"]}`, for a due date said in the recording; `time` may be null or left out. A date that is
+not a real `YYYY-MM-DD` date, or a time that is not `HH:MM`, makes the document invalid. vpt checks the
+due date's sources the way it checks a claim's: with no source it is `unsourced`, and with a source
+that does not parse or ends past the recording it is `bad-reference`. The words in the cited span
+itself, without the `analysis.grounding_window_secs` tolerance claims get, must also say a time: a
+digit, a weekday or month name or its three-letter short form, a number or ordinal up to thirty-one
+spelled out in English, or one of today, tonight, tomorrow, yesterday, morning, afternoon, evening,
+noon, midnight, week, weeks, weekend, month, months, year, quarter, day, days, hour, hours, minute,
+minutes, eod, eow and deadline, matched as whole words in any case. Without one the due date is
+`unsupported`. vpt does not check that the date is the one those words mean. Any of these findings
+withholds the date: the action stays, the date is saved with its finding, and neither the note nor
+`show` gives the date. A source on flagged text keeps the date when it says a time and records
+`built-on-flagged-text`. The note shows a kept date after the owner as `[due:: 2026-11-19]` or
+`[due:: 2026-11-19 15:00]`.
 
 VPT grounds the returned `vpt.proposal/1`, then saves its proposal, analysis findings, tags, relations,
 and note publications together. New analysis has Summary and Actions sections. Repeated analysis

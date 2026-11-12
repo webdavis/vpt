@@ -147,6 +147,8 @@ fn analysis_without_an_accepted_proposal_is_an_input_error() {
 mod boundaries;
 #[path = "show_stage/copies.rs"]
 mod copies;
+#[path = "show_stage/due_words.rs"]
+mod due_words;
 #[path = "show_stage/redact.rs"]
 mod redact;
 #[path = "show_stage/text.rs"]
