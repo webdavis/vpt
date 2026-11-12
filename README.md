@@ -380,8 +380,9 @@ each value; for a remote called `work`, write `max_age = ["work=15m"]` under `[c
 value is passed to `dam agenda` as `--max-age`; the default, an empty list, passes none. When dam refuses with `stale_remote`, the calendar half
 fails with the detail `calendar data is stale: dam refused it under context.dam.max_age`, and
 `--upcoming` exits with that detail instead of writing nothing. A value whose remote dam does not
-know fails the calendar half with its own detail, `context.dam.max_age names a remote that dam does
-not know; use a name from dam remote list`.
+know, or whose data its token may not read, fails the calendar half with its own detail,
+`context.dam.max_age names a remote that dam does not know or that its token may not read; use a name
+from dam remote list`.
 
 `context.type = google` reads the configured calendar IDs through native HTTPS with rustls. Set
 `context.google.client_id`, `client_secret`, and `refresh_token`; the access-token response must grant

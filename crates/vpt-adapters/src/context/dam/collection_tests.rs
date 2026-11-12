@@ -185,7 +185,10 @@ fn an_unknown_max_age_remote_fails_the_calendar_naming_the_setting() {
     .collect(&request(&["calendar/".into()], &["work/".into()]))
     .unwrap();
     let detail = snapshot.status.calendar.detail().unwrap();
-    assert_eq!(detail, Failure::UnknownRemote.detail());
+    assert_eq!(
+        detail,
+        "context.dam.max_age names a remote that dam does not know or that its token may not read; use a name from dam remote list"
+    );
     assert!(detail.contains("context.dam.max_age") && !detail.contains("stale"));
     assert_eq!(snapshot.status.tasks, ContextStatus::Present);
 }
