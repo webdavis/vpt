@@ -26,7 +26,7 @@ CREATE TABLE recordings (
   audio_path TEXT NOT NULL,
   stage_transcribe TEXT NOT NULL,
   stage_note TEXT NOT NULL,
-  stage_synthesis TEXT NOT NULL,
+  stage_analysis TEXT NOT NULL,
   transcript_note_path TEXT,
   analysis_note_path TEXT,
   engines TEXT,

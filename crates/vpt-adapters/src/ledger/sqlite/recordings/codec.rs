@@ -9,7 +9,7 @@ use vpt_domain::sweep::DeferralReason;
 use vpt_domain::time::{FileTime, UtcInstant, UtcOffset};
 
 pub(super) const SEEN_COLUMNS: &str = "path, file_name, size, mtime_secs, mtime_nanos, flags, first_seen, last_seen, deferral_count, deferral_reason, deferred_size, source_gone_at, recording";
-pub(super) const RECORDING_COLUMNS: &str = "id, source_path, digest, captured_at, captured_offset, duration_secs, title, title_source, ingested_at, audio_path, stage_transcribe, stage_note, stage_synthesis, audio_trashed_at";
+pub(super) const RECORDING_COLUMNS: &str = "id, source_path, digest, captured_at, captured_offset, duration_secs, title, title_source, ingested_at, audio_path, stage_transcribe, stage_note, stage_analysis, audio_trashed_at";
 
 fn corrupt(field: &str) -> LedgerError {
     LedgerError::Corrupt(format!("unreadable {field}"))
@@ -99,7 +99,7 @@ pub(super) fn record_from_row(row: &Row<'_>) -> Result<RecordingRecord, LedgerEr
         stages: StageStates {
             transcribe: stage(10)?,
             note: stage(11)?,
-            synthesis: stage(12)?,
+            analysis: stage(12)?,
         },
         audio_trashed_at: field::<Option<i64>>(row, 13, "audio trashed")?
             .map(|secs| UtcInstant { secs }),

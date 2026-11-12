@@ -25,8 +25,8 @@ fn invoke_selected(
 fn configuration_overrides_publish_every_artifact_to_its_independent_store() {
     for explicit in [false, true] {
         let sandbox = configured();
-        synthesis::enable(&sandbox);
-        synthesis::append(&sandbox, "\n[share]\nautomatic=true\n");
+        analysis::enable(&sandbox);
+        analysis::append(&sandbox, "\n[share]\nautomatic=true\n");
         let source = add(&sandbox, "one.m4a", 1_787_604_456);
         let source_before: Vec<_> = fixture::snapshot(&sandbox)
             .into_iter()
@@ -46,7 +46,7 @@ fn configuration_overrides_publish_every_artifact_to_its_independent_store() {
         for (key, root) in &roots {
             stores.push_str(&format!("{}={root:?}\n", key.key_name()));
         }
-        synthesis::append(&sandbox, &stores);
+        analysis::append(&sandbox, &stores);
         let selected = sandbox.config_path().with_file_name("selected.toml");
         fs::copy(sandbox.config_path(), &selected).unwrap();
         fs::set_permissions(&selected, fs::Permissions::from_mode(0o600)).unwrap();
@@ -59,7 +59,7 @@ fn configuration_overrides_publish_every_artifact_to_its_independent_store() {
         let result = json(&invoke_selected(&sandbox, &selected, explicit, &["run"]));
         assert_eq!(result["redacted"].as_array().unwrap().len(), 2);
         let row = ledger(&sandbox).recordings().unwrap().remove(0);
-        assert_eq!(row.stages.synthesis, StageState::Succeeded);
+        assert_eq!(row.stages.analysis, StageState::Succeeded);
         let brief = json(&invoke_selected(
             &sandbox,
             &selected,
@@ -114,8 +114,8 @@ fn configuration_overrides_publish_every_artifact_to_its_independent_store() {
             assert!(artifact.path.is_file());
         }
         assert!(ledger.pending_publications().unwrap().is_empty());
-        assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
-        assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+        assert_eq!(analysis::calls(&sandbox, "calls"), 1);
+        assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
         let source_after: Vec<_> = fixture::snapshot(&sandbox)
             .into_iter()
             .filter(|entry| entry.is_within(&source))

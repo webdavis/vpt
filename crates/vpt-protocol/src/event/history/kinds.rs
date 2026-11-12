@@ -5,7 +5,7 @@ pub(super) fn run_kind(value: RunKind) -> &'static str {
         RunKind::Confirm => "confirm",
         RunKind::Review => "review",
         RunKind::VerifyNote => "verify-note",
-        RunKind::Synthesize => "synthesize",
+        RunKind::Analyze => "analyze",
         RunKind::Pipeline => "run",
         RunKind::Brief => "brief",
         RunKind::Redact => "redact",

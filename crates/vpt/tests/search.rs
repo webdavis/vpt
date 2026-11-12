@@ -34,7 +34,7 @@ fn corpus(name: &str) -> (Sandbox, String, String) {
             (4510.0, "Budget is final at 5:30 says person@sample.test"),
         ],
     );
-    seed::synthesized(
+    seed::analyzed(
         &sandbox,
         &older,
         r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[{"text":"The budget review moves to Friday","sources":["04:10-04:14"]}],"actions":[],"tags":[],"relations":[]}"#,

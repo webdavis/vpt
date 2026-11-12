@@ -26,7 +26,7 @@ pub(super) fn locate<'a>(
         let previous = input.notes.iter().find(|note| note.stage == stage);
         let state = match stage {
             NoteStage::Transcript => input.record.stages.note,
-            NoteStage::Analysis => input.record.stages.synthesis,
+            NoteStage::Analysis => input.record.stages.analysis,
         };
         if (stage == NoteStage::Analysis
             && previous.is_none()

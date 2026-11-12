@@ -36,7 +36,7 @@ pub use vpt_domain::stage::StageState;
 pub struct StageStates {
     pub transcribe: StageState,
     pub note: StageState,
-    pub synthesis: StageState,
+    pub analysis: StageState,
 }
 
 impl StageStates {
@@ -44,7 +44,7 @@ impl StageStates {
         Self {
             transcribe: StageState::Pending,
             note: StageState::Pending,
-            synthesis: StageState::Pending,
+            analysis: StageState::Pending,
         }
     }
 }
@@ -150,7 +150,7 @@ mod tests {
             StageStates {
                 transcribe: StageState::Pending,
                 note: StageState::Pending,
-                synthesis: StageState::Pending,
+                analysis: StageState::Pending,
             }
         );
     }

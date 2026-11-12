@@ -212,7 +212,7 @@ pub(crate) fn different_stage_values_round_trip<L: RecordingLedger>(ledger: &L) 
     recording.title_source = TitleOrigin::Unavailable;
     recording.stages.transcribe = StageState::Succeeded;
     recording.stages.note = StageState::Failed;
-    recording.stages.synthesis = StageState::Disabled;
+    recording.stages.analysis = StageState::Disabled;
     ledger
         .commit(&LedgerCommit {
             recordings: vec![recording.clone()],

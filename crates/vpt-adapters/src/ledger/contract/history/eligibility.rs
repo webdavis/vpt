@@ -1,13 +1,13 @@
 use super::*;
-use vpt_application::ports::{StageState, SynthesisStateChange};
+use vpt_application::ports::{AnalysisStateChange, StageState};
 
 fn change(
     ledger: &(impl RecordingLedger + RunHistory),
     from: StageState,
     to: StageState,
-) -> (vpt_domain::history::RunId, SynthesisStateChange) {
+) -> (vpt_domain::history::RunId, AnalysisStateChange) {
     let mut row = record(13);
-    row.stages.synthesis = from;
+    row.stages.analysis = from;
     ledger
         .commit(&LedgerCommit {
             recordings: vec![row.clone()],
@@ -17,7 +17,7 @@ fn change(
     let run = committed(ledger.begin_run(RunKind::Pipeline, UtcInstant { secs: 10 })).run;
     (
         run,
-        SynthesisStateChange {
+        AnalysisStateChange {
             recording: row.id,
             expected: from,
             next: to,
@@ -26,7 +26,7 @@ fn change(
     )
 }
 
-pub(crate) fn synthesis_eligibility_commits_state_and_history_without_completed_work(
+pub(crate) fn analysis_eligibility_commits_state_and_history_without_completed_work(
     ledger: &(impl RecordingLedger + RunHistory),
 ) {
     let (run, mut change) = change(ledger, StageState::Pending, StageState::Disabled);
@@ -41,7 +41,7 @@ pub(crate) fn synthesis_eligibility_commits_state_and_history_without_completed_
         let receipt = committed(ledger.commit_step(
             run,
             &WorkDelta {
-                synthesis_state: Some(change.clone()),
+                analysis_state: Some(change.clone()),
                 ..Default::default()
             },
             &facts,
@@ -49,7 +49,7 @@ pub(crate) fn synthesis_eligibility_commits_state_and_history_without_completed_
         assert!(receipt.completed.is_empty());
         assert_eq!(receipt.records.len(), 1);
         assert_eq!(receipt.records[0].fact, facts[0].1);
-        original.stages.synthesis = to;
+        original.stages.analysis = to;
         assert_eq!(
             ledger.by_id(&change.recording).unwrap(),
             Some(original.clone())
@@ -61,7 +61,7 @@ pub(crate) fn synthesis_eligibility_commits_state_and_history_without_completed_
     }
 }
 
-pub(crate) fn synthesis_eligibility_refuses_stale_or_fabricated_changes(
+pub(crate) fn analysis_eligibility_refuses_stale_or_fabricated_changes(
     ledger: &(impl RecordingLedger + RunHistory),
 ) {
     let (run, initial) = change(ledger, StageState::Pending, StageState::Disabled);
@@ -79,12 +79,12 @@ pub(crate) fn synthesis_eligibility_refuses_stale_or_fabricated_changes(
         }
         let mut facts = vec![change.fact()];
         let mut delta = WorkDelta {
-            synthesis_state: Some(change),
+            analysis_state: Some(change),
             ..Default::default()
         };
         match variant {
             5 => facts = vec![step(11, WorkOutcome::Completed)],
-            6 => delta.synthesis_state = None,
+            6 => delta.analysis_state = None,
             7 => delta
                 .source_updates
                 .push((initial.recording.clone(), "/changed.m4a".into())),
@@ -101,7 +101,7 @@ pub(crate) fn synthesis_eligibility_refuses_stale_or_fabricated_changes(
     }
 }
 
-pub(crate) fn expired_synthesis_cannot_be_reenabled_by_configuration(
+pub(crate) fn expired_analysis_cannot_be_reenabled_by_configuration(
     ledger: &(impl RecordingLedger + RunHistory),
 ) {
     let (run, mut change) = change(ledger, StageState::Expired, StageState::Pending);
@@ -112,7 +112,7 @@ pub(crate) fn expired_synthesis_cannot_be_reenabled_by_configuration(
             ledger.commit_step(
                 run,
                 &WorkDelta {
-                    synthesis_state: Some(change.clone()),
+                    analysis_state: Some(change.clone()),
                     ..Default::default()
                 },
                 &[change.fact()]
@@ -125,14 +125,14 @@ pub(crate) fn expired_synthesis_cannot_be_reenabled_by_configuration(
                 .unwrap()
                 .unwrap()
                 .stages
-                .synthesis,
+                .analysis,
             StageState::Expired
         );
         assert_eq!(ledger.pending_exports().unwrap(), before);
     }
 }
 
-pub(crate) fn synthesis_eligibility_rolls_back_when_later_history_is_invalid(
+pub(crate) fn analysis_eligibility_rolls_back_when_later_history_is_invalid(
     ledger: &(impl RecordingLedger + RunHistory),
 ) {
     let (run, change) = change(ledger, StageState::Pending, StageState::Disabled);
@@ -140,7 +140,7 @@ pub(crate) fn synthesis_eligibility_rolls_back_when_later_history_is_invalid(
     let result = ledger.commit_step(
         run,
         &WorkDelta {
-            synthesis_state: Some(change.clone()),
+            analysis_state: Some(change.clone()),
             ..Default::default()
         },
         &[
@@ -161,7 +161,7 @@ pub(crate) fn synthesis_eligibility_rolls_back_when_later_history_is_invalid(
             .unwrap()
             .unwrap()
             .stages
-            .synthesis,
+            .analysis,
         StageState::Pending
     );
     assert_eq!(ledger.pending_exports().unwrap(), before);

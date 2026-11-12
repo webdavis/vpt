@@ -5,7 +5,7 @@ pub enum RunKind {
     Pipeline,
     Review,
     VerifyNote,
-    Synthesize,
+    Analyze,
     Confirm,
     Note,
     Transcribe,

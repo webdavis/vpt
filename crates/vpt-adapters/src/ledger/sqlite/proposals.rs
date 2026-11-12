@@ -94,7 +94,7 @@ pub(super) fn apply(
     };
     connection
         .execute(
-            "UPDATE recordings SET stage_synthesis=?1 WHERE id=?2",
+            "UPDATE recordings SET stage_analysis=?1 WHERE id=?2",
             params![stage, change.recording().as_str()],
         )
         .map_err(map)?;

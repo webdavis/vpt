@@ -17,7 +17,7 @@ use vpt_protocol::error::ErrorDocument;
 struct Report {
     ingestion: IngestReport,
     transcribed: Vec<RecordingId>,
-    synthesized: Vec<RecordingId>,
+    analyzed: Vec<RecordingId>,
     redacted: Vec<super::redact::output::Written>,
     notes: Vec<(RecordingId, std::path::PathBuf)>,
     plan: Vec<(RecordingId, NextStage)>,
@@ -55,7 +55,7 @@ impl Report {
             .map(|row| &row.id)
             .chain(&self.ingestion.recovered)
             .chain(&self.transcribed)
-            .chain(&self.synthesized)
+            .chain(&self.analyzed)
             .chain(
                 self.redacted
                     .iter()

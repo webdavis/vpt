@@ -24,7 +24,7 @@ pub(super) fn run<E: EventSink>(
     });
     for mut record in records {
         super::eligibility::refresh(context, stores, run, &mut record)?;
-        let before = (report.notes.len(), report.synthesized.len());
+        let before = (report.notes.len(), report.analyzed.len());
         super::initial::run(context, stores, &mentions, &record, run, report, notices)?;
         super::verification::run(
             context,
@@ -37,7 +37,7 @@ pub(super) fn run<E: EventSink>(
         super::notices::refresh(context, &record.id, before, report, notices)?;
         super::sharing::run(context, &record.id, NoteStage::Transcript, run, report)?;
         super::eligibility::refresh(context, stores, run, &mut record)?;
-        super::synthesis::run(context, &mentions, &record.id, report)?;
+        super::analysis::run(context, &mentions, &record.id, report)?;
         super::notices::refresh(context, &record.id, before, report, notices)?;
         super::verification::run(
             context,

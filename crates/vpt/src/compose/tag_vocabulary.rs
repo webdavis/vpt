@@ -35,7 +35,7 @@ pub(crate) fn hints(
     index: &Index,
     ledger: &impl TagLedger,
 ) -> Result<TagHints, Box<ErrorDocument>> {
-    if !tag_hints::wanted(&settings.synthesis.command) {
+    if !tag_hints::wanted(&settings.analysis.command) {
         return Ok(TagHints::default());
     }
     let vocabulary = known_tags::read(&settings.tags.known_tags_path).map_err(|error| {

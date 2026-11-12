@@ -47,7 +47,7 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "stores.analysis",
         Kind::Text,
         "\"<home>/analysis\"",
-        "synthesis notes",
+        "analysis notes",
     ),
     key("stores.briefs", Kind::Text, "\"<home>/briefs\"", "briefs"),
     key(

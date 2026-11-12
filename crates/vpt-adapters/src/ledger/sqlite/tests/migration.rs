@@ -99,7 +99,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
             ).map_err(super::map)?;
             let recording = crate::ledger::contract::record(94);
             fixture.execute(
-                "INSERT INTO recordings (id, digest, captured_at, captured_offset, duration_secs, title_source, ingested_at, audio_path, stage_transcribe, stage_note, stage_synthesis) VALUES (?1, ?2, ?3, ?4, ?5, 'unavailable', ?6, ?7, 'pending', 'pending', 'pending')",
+                "INSERT INTO recordings (id, digest, captured_at, captured_offset, duration_secs, title_source, ingested_at, audio_path, stage_transcribe, stage_note, stage_analysis) VALUES (?1, ?2, ?3, ?4, ?5, 'unavailable', ?6, ?7, 'pending', 'pending', 'pending')",
                 rusqlite::params![recording.id.as_str(), recording.digest.hex(), recording.captured_at.secs, recording.captured_offset.secs, i64::try_from(recording.duration_secs).unwrap(), recording.ingested_at.secs, recording.audio_path.to_string_lossy()],
             ).map_err(super::map)?;
             fixture.commit().map_err(super::map)?;

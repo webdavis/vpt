@@ -47,7 +47,7 @@ fn lexical_confirmation_refreshes_inherited_uncertainty_once_without_retranscrib
     json(&invoke(&sandbox, &[]));
     let record = ledger(&sandbox).recordings().unwrap().remove(0);
     flag_first_word(&sandbox, &record);
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     json(&invoke(&sandbox, &[]));
     let before = ledger(&sandbox)
         .accepted_proposal(&record.id)
@@ -85,7 +85,7 @@ fn lexical_confirmation_refreshes_inherited_uncertainty_once_without_retranscrib
         std::time::Duration::from_secs(5),
     ));
     let input = ledger(&sandbox).note_inputs(&record.id).unwrap().unwrap();
-    assert_eq!(input.record.stages.synthesis, StageState::Pending);
+    assert_eq!(input.record.stages.analysis, StageState::Pending);
     assert!(
         !input
             .notes
@@ -101,7 +101,7 @@ fn lexical_confirmation_refreshes_inherited_uncertainty_once_without_retranscrib
     assert_eq!(fixture::snapshot(&sandbox), snapshot);
     let refreshed = json(&invoke(&sandbox, &[]));
     assert_eq!(
-        refreshed["synthesized"],
+        refreshed["analyzed"],
         serde_json::json!([record.id.as_str()])
     );
     let current = ledger(&sandbox)
@@ -136,10 +136,10 @@ fn lexical_confirmation_refreshes_inherited_uncertainty_once_without_retranscrib
     .unwrap();
     for _ in 0..2 {
         assert_eq!(
-            json(&invoke(&sandbox, &[]))["synthesized"],
+            json(&invoke(&sandbox, &[]))["analyzed"],
             serde_json::json!([])
         );
     }
-    assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 2);
+    assert_eq!(analysis::calls(&sandbox, "calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 2);
 }

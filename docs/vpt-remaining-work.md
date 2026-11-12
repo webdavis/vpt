@@ -17,10 +17,10 @@ publication recovery, process execution, logged events, report/alert hooks, the 
 and the `doctor`, `show`, `list`, `storage`, `symlink`, and `--version` commands already have
 implementations. Ingestion, transcription, transcript-note writing, review/resolution, known-term
 confirmation, audio retention, and the initial `run` pipeline also have command implementations.
-Unchecked items below identify remaining acceptance checks and gaps. Standalone synthesis now
+Unchecked items below identify remaining acceptance checks and gaps. Standalone analysis now
 creates analysis notes and applies proposal tags and related links. Automatic
-synthesis and stale-finding rechecks now run in the pipeline, and synthesis emits review notifications.
-Configuration-driven synthesis state changes and interrupted run outcomes are also implemented.
+analysis and stale-finding rechecks now run in the pipeline, and analysis emits review notifications.
+Configuration-driven analysis state changes and interrupted run outcomes are also implemented.
 Occasion identity persistence, `occasions`, and saved brief-path lookup now have implementations.
 On-demand and automatic pipeline redaction now create released copies and private reports with durable
 recovery. `vpt show --stage` now returns each stage's text for people and programs, with `--redact`
@@ -145,7 +145,7 @@ Product sources: specification sections 4, 5, 8.7, and 9.
   Command acceptance covers a blocked exporter, failed alert, persisted replay, duplicate event IDs,
   incomplete-tail repair, and unchanged dry runs. Adapter tests cover interrupted recovery progress,
   missing evidence, durable append acknowledgements, and the real five-second hook deadline.
-  Ingestion, pipeline, transcription, notes, synthesis, confirmation, review resolution, redaction,
+  Ingestion, pipeline, transcription, notes, analysis, confirmation, review resolution, redaction,
   and both brief-writing paths emit `config_refused` for store-creation failures after safe state
   validation. Refusals before root validation remain output-only.
 - [x] Complete ingest/retention JSON envelopes and human summaries, including safe warnings and
@@ -308,7 +308,7 @@ Product sources: specification sections 3.3, 4.3-4.5, 7, 9, and 10.
   analysis note. It also provides deliberate regeneration after expiration; automatic runs leave
   expired artifacts expired and do not regenerate artifacts with pending retention intents.
   Shared preparation now covers existing analysis notes, reciprocal links, saved finding resolutions,
-  and atomic two-note updates. Stage checks prevent metadata publication from completing stale synthesis.
+  and atomic two-note updates. Stage checks prevent metadata publication from completing stale analysis.
 - [x] Add read-only `vpt path <id> --stage <stage>`, returning the pinned absolute path even if its
   artifact is currently missing.
 - [x] Recover a uniquely renamed owned note by its recording identity during a mutating operation.
@@ -320,7 +320,7 @@ Product sources: specification sections 3.3, 4.3-4.5, 7, 9, and 10.
   configured Obsidian vault or portable transcript/analysis/brief stores, including untracked notes.
   Do not follow symlinks or treat indexed external notes as VPT-owned.
   The bounded recursive index, profile root selection, manual tag consumer, and automatic mention
-  derivation are implemented. Synthesis now uses that same index for tag vocabulary and related targets.
+  derivation are implemented. Analysis now uses that same index for tag vocabulary and related targets.
   Acceptance covers refreshed names/aliases/tags, nested untracked notes, overlapping roots, safe
   malformed-metadata diagnostics, symlink cycles, resource limits, and unchanged external file bytes.
 
@@ -333,12 +333,12 @@ Product sources: specification sections 3.3, 4.3-4.5, 7, 9, and 10.
   `vptSuggestedTags`; `write` confirms and records them automatically. Deduplicate in proposal order,
   default to five confirmed tags and ten suggestions, and preserve the operator's tags.
   Typed settings, selection rules, durable tag state, and transcript-note rendering are implemented.
-  Synthesis now applies proposals in order, preserves manual decisions, journals automatic known-tag
+  Analysis now applies proposals in order, preserves manual decisions, journals automatic known-tag
   additions with the notes, and logs syntax/cap rejections without private tag text.
   Acceptance covers default and configured caps, normalized duplicates, first-proposal provenance,
   both profiles and note types, retained operator tags, and recovery of automatic vocabulary writes.
 - [x] Add `vpt confirm <id> --tag <tag>` and `--reject-tag <tag>`, with durable tag state, known-tag
-  updates where appropriate, and note changes. Manual confirmation works without a synthesis command.
+  updates where appropriate, and note changes. Manual confirmation works without an analysis command.
   Both commands now update durable vocabulary and available notes atomically. Expiration is checked
   per artifact; a live analysis can update while its transcript remains expired.
 - [x] Derive `continues` from the immediate predecessor by capture instant then identity, provided
@@ -352,19 +352,19 @@ Product sources: specification sections 3.3, 4.3-4.5, 7, 9, and 10.
   Review confirmations include newly learned terms in the same note update. The pipeline refreshes
   changed matches without retranscription; manual relations and transcript content remain intact.
 - [x] Represent and render `related` suggestions with provenance and the configured cap, default
-  five. Synthesis proposals supply these later. Allow `supersedes` only through explicit
+  five. Analysis proposals supply these later. Allow `supersedes` only through explicit
   `vpt confirm <id> --relation <kind>:<target>`; support the four specified relation kinds.
   Both ledger backends now save typed relation state, private provenance, derivation rules, and
   mention ranges atomically with history and note publication. Saved related links render escaped
   provenance with the configured suggestion cap. Explicit relation confirmation now supports all four
   kinds, preserves proposal provenance, and commits changes to both existing notes with history.
-  Synthesis now selects related suggestions through the shared target resolver and configured cap.
+  Analysis now selects related suggestions through the shared target resolver and configured cap.
   Acceptance covers default, reduced, and zero caps; duplicate, missing, ambiguous, and self targets;
   preserved confirmations; escaped provenance in both notes; and rejection of non-related proposals.
 - [x] Render deterministic managed links, including the later transcript/analysis relationship,
   without editing any external note that VPT merely indexed. Filing remains flat per store.
   Both existing notes render saved relations and reciprocal links with either configured link style.
-  Rename recovery updates their links together, and initial synthesis publishes both notes. Wiki links
+  Rename recovery updates their links together, and initial analysis publishes both notes. Wiki links
   retain exact paths from the vault root or, for portable notes, the common parent of transcript,
   analysis, and brief stores. Outside-root targets and unsafe wiki names use encoded Markdown links.
   Tests cover both profiles/styles, matching filenames, renamed targets, duplicate indexed names,
@@ -375,7 +375,7 @@ Product sources: specification sections 3.3, 4.3-4.5, 7, 9, and 10.
 - [x] Add `vpt run [--dry-run]` initially composing ingestion, transcription, and note publication.
   Resume each recording from its earliest enabled pending/failed stage. Re-enable previously disabled
   incomplete stages when configuration enables them; preserve earlier success and expiration.
-- [x] Keep the exact rendered transcript content-region bytes and digest available as synthesis
+- [x] Keep the exact rendered transcript content-region bytes and digest available as analysis
   input. Corrections and readability changes affect that input; link-only/frontmatter/operator-prose
   changes outside the content region do not.
 - [ ] Extend `doctor` for engine availability/locality and the configured Obsidian vault, and expose
@@ -419,17 +419,17 @@ Product sources: specification sections 3.3, 4.3-4.5, 7, 9, and 10.
   seven stores. All 31 command tests now pass in both debug and release builds, including the
   active-writer case, with unchanged deadlines and fixture snapshots.
 
-## Stage 4: synthesis, briefs, sharing, and handoff
+## Stage 4: analysis, briefs, sharing, and handoff
 
 Product sources: specification sections 3.3, 8, 9, and 10.
 
-### Synthesis and analysis notes
+### Analysis step and analysis notes
 
-- [x] Add optional `[synthesis]` settings and `vpt synthesize <id> [--dry-run]`. An empty command
-  disables synthesis; explicit invocation without one is a configuration error. No model vendor is
+- [x] Add optional `[analysis]` settings and `vpt analyze <id> [--dry-run]`. An empty command
+  disables analysis; explicit invocation without one is a configuration error. No model vendor is
   built in. The default command deadline is 600 seconds.
   The CLI supports standalone execution, safe failures, bounded deadlines, and observational dry runs.
-  Automatic pipeline execution and synthesis review notifications are tracked separately below.
+  Automatic pipeline execution and analysis review notifications are tracked separately below.
 - [x] Run the configured argument list with `{transcript}`, `{id}`, and `{language}` substitution.
   Send the exact transcript `vpt:content` bytes on standard input and retain their digest.
   The command adapter performs bounded, single-pass substitution, streams the supplied content,
@@ -444,7 +444,7 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   ranges, inherited uncertainty, and the analysis publication record atomically with history.
   Acceptance refuses stale inputs or forged grounding; failed attempts preserve prior accepted
   state. Artifact-specific verification findings and their resolutions are now stored by both ledgers.
-  Markdown extraction, annotation editing, and `verify-note` are implemented. Standalone synthesis
+  Markdown extraction, annotation editing, and `verify-note` are implemented. Standalone analysis
   commits these outputs together and repairs pending note or vocabulary publication without rerunning a current agent
   result. Bad agent output and late transaction failures preserve prior accepted state.
   Note-input snapshots now include accepted proposals alongside transcript, flags, and owned notes;
@@ -462,17 +462,17 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   regeneration restores expired analysis from saved content; automatic updates preserve expiration.
   Shared preparation can now create the first analysis note from checked content while updating the
   transcript's reciprocal link and aggregate finding count. Both profiles and link styles are covered.
-  Standalone synthesis now uses this preparation, including proposal tag/relation selection. Wiki
+  Standalone analysis now uses this preparation, including proposal tag/relation selection. Wiki
   counterpart links now distinguish identical filenames and preserve renamed targets. CLI acceptance
   covers both profiles and link styles, exact escaped section content, ordered frontmatter, preserved
   operator fields, and regeneration from saved state with the agent unavailable.
-- [x] Recompute enabled synthesis when the rendered content digest changes. Invalidate derived
+- [x] Recompute enabled analysis when the rendered content digest changes. Invalidate derived
   verification findings and inherited uncertainty when their transcript or lexical-flag inputs
   change; expired outputs remain expired during automatic runs.
   Both ledgers now retain verification input digests, claim fingerprints, and grounding bases, including
   empty result sets.
   Changed transcript or lexical inputs remove stale findings from active review and counts, retain
-  their decisions for rechecking, and mark previously successful synthesis pending. Note rewrites
+  their decisions for rechecking, and mark previously successful analysis pending. Note rewrites
   remove stale analysis annotations while preserving current lexical corrections. Changed claims,
   including readability changes, invalidate that artifact before note counts are rendered and saved.
   Fingerprints ignore verification annotations and nonclaim structure, so annotation-only updates
@@ -480,14 +480,14 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   the original grounding basis, claim fingerprint, or grounding window was not recorded.
   Automatic recomputation and rendered-input comparison now run in the pipeline. Stale transcript
   findings are checked before agent input is selected; unchanged runs skip engines and agents.
-  Automatic analysis rechecking also works with synthesis disabled or the transcript expired.
+  Automatic analysis rechecking also works with analysis disabled or the transcript expired.
   Configuration-driven disabled/pending states now commit with matching history. Completed and
   expired outputs are preserved, stale enabled inputs become pending before artifact work, and
   interrupted child and pipeline runs retain their interrupted outcome. Grounding-window changes
-  trigger automatic rechecking, including empty finding sets and when synthesis is disabled, while
+  trigger automatic rechecking, including empty finding sets and when analysis is disabled, while
   preserving unchanged review decisions and expiration. CLI acceptance now also confirms that a lexical
   decision refreshes inherited uncertainty once without retranscription, while operator prose does not
-  rerun synthesis. Both ledger implementations pass the verification freshness and empty-result checks.
+  rerun analysis. Both ledger implementations pass the verification freshness and empty-result checks.
 
 ### Note grounding
 
@@ -501,7 +501,7 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   Claims expose original byte ranges and one-based line numbers for command reports.
 - [x] Classify claims in order as `unsourced`, `bad-reference`, `unsupported`, or
   `built-on-flagged-text`. Resolve time references against the recording; compare digits, money,
-  dates, and capitalized whole tokens to the cited transcript plus `synthesis.grounding_window_secs`,
+  dates, and capitalized whole tokens to the cited transcript plus `analysis.grounding_window_secs`,
   default 15 seconds. Preserve meaningful number/currency/date punctuation in grounding.
   The domain checker now validates citations, uses corrected transcript evidence, and keeps inherited
   open lexical uncertainty separate from the highest-priority finding. It bounds input, normalized
@@ -512,7 +512,7 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   recording is an ownership refusal. Findings alone are a successful command result.
 - [x] Persist finding identity by artifact, claim position, and annotation-stripped claim digest.
   Replace only that artifact's findings, retain resolutions for unchanged claims, update open counts,
-  and annotate claim endings. Apply this grounding to new analysis before reporting synthesis success.
+  and annotate claim endings. Apply this grounding to new analysis before reporting analysis success.
   Both ledgers now replace findings per owned artifact, preserve unchanged resolutions, and expose
   findings through review snapshots. SQLite recounts all open lexical and verification flags; review
   output and transcript frontmatter include verification counts. Stable identity uses recording,
@@ -523,18 +523,18 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   proposal and analysis publication in one transaction. It shares the checker with `verify-note`,
   preserves resolutions for unchanged claims, and leaves other artifacts' findings intact. Input changes
   now invalidate findings without losing their resolutions. Automatic rechecking in the pipeline and
-  synthesis notifications are now connected. Alerts retain one final count set per recording and
+  analysis notifications are now connected. Alerts retain one final count set per recording and
   aggregate across recordings; accepted publication recovery does not rerun agents or resend hooks.
   Saved checks now include the grounding window; window changes trigger rechecking without an agent
-  when synthesis is disabled. Legacy checks retain decisions but require rechecking, and migration
+  when analysis is disabled. Legacy checks retain decisions but require rechecking, and migration
   rollback and corrupt-window refusals are covered. Acceptance checks cover late transaction rollback,
   acknowledgement failure/recovery, preserved committed identifiers, and log-export warnings. Accepted
-  synthesis also retains its vocabulary publication dependency, so vocabulary-only recovery preserves
+  analysis also retains its vocabulary publication dependency, so vocabulary-only recovery preserves
   the accepted proposal without rerunning the agent or resending hooks.
   Annotation rendering now honors confirmed, dismissed, and corrected findings; correction markers
   preserve claim identity on re-extraction. Owned-document content replacement preserves frontmatter,
   managed links, and operator prose. These operations are connected to `verify-note`, review resolution,
-  and subsequent note rewrites. Standalone synthesis now uses the same checker before publication.
+  and subsequent note rewrites. Standalone analysis now uses the same checker before publication.
 
 ### Occasions and briefs
 
@@ -636,12 +636,12 @@ Product sources: specification sections 3.3, 8, 9, and 10.
 
 - [x] Add `vpt redact <id> [--stage transcript|analysis] [--to <directory>] [--title <title>]` and
   `[share]` settings. `share.automatic`, default false, creates releases after new transcript or
-  analysis artifacts during `run`, independently of whether synthesis is enabled. It does not
+  analysis artifacts during `run`, independently of whether analysis is enabled. It does not
   regenerate the same release on every unchanged run. Audio and briefs are not redaction sources.
   All share keys now reach typed runtime settings, with bounded strings/lists, validated masks and
   pattern classes, and private diagnostic output. The on-demand command now loads both source
   stages, masks current terms/names, publishes both files, and emits human/JSON output. The pipeline now
-  releases transcripts before synthesis and analysis after publication/verification. Finalized matching
+  releases transcripts before the analysis step and analysis notes after publication/verification. Finalized matching
   content is skipped on unchanged runs; enabling sharing processes existing notes. Dry runs report
   pending redaction observationally, and failed finalization recovers without an extra sequence.
 - [x] Use the configured released store or per-command destination, refusing destinations inside
@@ -704,7 +704,7 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   Recovery honors saved override destinations and retains completed IDs on later failures.
   Command tests cover frozen provenance after review changes, failed completion followed by startup
   recovery, and completed IDs on broken stdout. Automatic creation also recovers saved bytes and keeps
-  a completed transcript release when later synthesis fails. Shared publication race conditions remain
+  a completed transcript release when later analysis fails. Shared publication race conditions remain
   tracked below.
 
 ### Text handoff
@@ -730,8 +730,8 @@ Product sources: specification sections 3.3, 8, 9, and 10.
 
 ### Full pipeline and retention across all stores
 
-- [x] Extend `vpt run` with enabled synthesis, independent automatic redaction, and opt-in retention.
-  Its result lists ingested, transcribed, noted, synthesized, and redacted work plus retention
+- [x] Extend `vpt run` with enabled analysis, independent automatic redaction, and opt-in retention.
+  Its result lists ingested, transcribed, noted, analyzed, and redacted work plus retention
   outcomes. Resume the earliest pending/failed enabled stage and preserve committed partial results.
   The pipeline now invokes the existing journaled retention sweep after processing when enabled,
   merges recovered moves with new moves, and reports observational retention plans for all stores.
@@ -758,14 +758,14 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   may deliberately regenerate their artifacts; pending retention never triggers regeneration.
   End-to-end tests expire real files, recover absent pending targets before stage selection, preserve
   changed pending files, and regenerate saved notes after audio/engine-output expiration. Changed
-  synthesis inputs and rescheduled calendar events leave expired analysis and briefs absent.
+  analysis inputs and rescheduled calendar events leave expired analysis and briefs absent.
 - [x] Extend default logged events and configured hooks to all later-stage producers, including
   transcription failures, uncertainty alerts, completed automatic briefs, and combined retention.
   Retention now persists actual per-store counts and uses the same counts in logs and hooks. Older
   audio-only history remains readable. Pipeline startup recovery and new moves now contribute to one
   final event, including partial failures. Failed event commits preserve journaled moves and send no
   hook. Command tests cover default logging, independent channels, content-free diagnostics, automatic
-  briefs, transcription/synthesis review alerts, publication ordering, and no notification replay.
+  briefs, transcription/analysis review alerts, publication ordering, and no notification replay.
 
 ## Shared remaining command and configuration behavior
 
@@ -789,12 +789,12 @@ Product sources: specification sections 3.1, 3.5, 9, 10, 11, and 13.
   their final stdout result fails. Human errors also list committed IDs, including recovered
   retention work, without duplicating partial-report IDs. Dry runs and unchanged ingestion/pipeline
   retries claim no new completions. Pipeline output preserves successful engine/proposal diagnostics,
-  including when a later stage or final stdout fails; standalone synthesis shows them in human output.
+  including when a later stage or final stdout fails; standalone analysis shows them in human output.
   All 26 command forms pass human/JSON success acceptance; configuration and history/refusal matrices
   exercise their safe failure envelopes. Upcoming briefs now carry the required `vpt.result/1`
-  envelope, and final synthesis-history failures preserve accepted proposal diagnostics. Nested
+  envelope, and final analysis-history failures preserve accepted proposal diagnostics. Nested
   startup failures retain each export warning once.
-- [x] Keep all advertised dry runs observational. `run`, `transcribe`, and `synthesize` spawn no
+- [x] Keep all advertised dry runs observational. `run`, `transcribe`, and `analyze` spawn no
   engine/agent/hook and perform no migration, repair, publication, or Trash move; the brief context
   exception is limited to configured read-only collection.
   All six commands preserve filesystem bytes and metadata with absent state, a version-one database,
@@ -811,7 +811,7 @@ Product sources: specification sections 3.1, 3.5, 9, 10, 11, and 13.
   failure, and later pipeline failure in both output modes. Brief and handoff are output interfaces;
   their bounded encoders validate domain content and reject excessive JSON escape expansion.
 - [x] Apply the existing direct-argument subprocess ownership, shared deadline, bounded output,
-  and interrupt cleanup to each new external engine, synthesis, context, and helper command.
+  and interrupt cleanup to each new external engine, analysis, context, and helper command.
   Never invoke a shell to interpret configured arguments or expose raw child output in diagnostics.
   All external adapters use the shared process owner. Acceptance covers literal argv, simultaneous
   stdin/stdout/stderr, output overflow, shared deadlines, the one-second termination grace, exact

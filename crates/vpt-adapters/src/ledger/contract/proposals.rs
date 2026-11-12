@@ -82,11 +82,7 @@ pub(crate) fn acceptance_commits_proposal_analysis_and_history_before_publicatio
         })
         .collect();
     findings.sort_by_key(|finding| finding.claim_index);
-    assert_eq!(
-        findings.len(),
-        2,
-        "initial synthesis must save its findings"
-    );
+    assert_eq!(findings.len(), 2, "initial analysis must save its findings");
     assert_eq!(
         findings[0].finding,
         vpt_domain::grounding::Finding::BuiltOnFlaggedText
@@ -103,7 +99,7 @@ pub(crate) fn acceptance_commits_proposal_analysis_and_history_before_publicatio
             .unwrap()
             .unwrap()
             .stages
-            .synthesis,
+            .analysis,
         StageState::Pending
     );
     assert_eq!(
@@ -124,12 +120,12 @@ pub(crate) fn acceptance_commits_proposal_analysis_and_history_before_publicatio
             .unwrap()
             .unwrap()
             .stages
-            .synthesis,
+            .analysis,
         StageState::Succeeded
     );
 }
 
-pub(crate) fn failed_synthesis_preserves_accepted_proposal_and_analysis(ledger: &impl Ledger) {
+pub(crate) fn failed_analysis_preserves_accepted_proposal_and_analysis(ledger: &impl Ledger) {
     let run = seed(ledger);
     let accepted = accepted(ledger);
     let delta = delta(accepted.clone());
@@ -160,7 +156,7 @@ pub(crate) fn failed_synthesis_preserves_accepted_proposal_and_analysis(ledger: 
             .unwrap()
             .unwrap()
             .stages
-            .synthesis,
+            .analysis,
         StageState::Failed
     );
 }
@@ -207,15 +203,15 @@ macro_rules! cases {
         $case!(proposal_vocabulary_dependency_survives_note_publication);
         $case!(proposal_vocabulary_dependency_requires_the_exact_same_transaction);
         $case!(proposal_vocabulary_dependency_rolls_back_with_failed_history);
-        $case!(synthesis_findings_follow_rendered_markdown_and_recheck_idempotently);
-        $case!(synthesis_preserves_reviewed_claims_and_other_artifact_findings);
-        $case!(synthesis_findings_roll_back_on_late_failure);
-        $case!(synthesis_refuses_competing_verification_in_the_same_transaction);
-        $case!(analysis_metadata_publication_preserves_a_failed_synthesis_attempt);
+        $case!(analysis_findings_follow_rendered_markdown_and_recheck_idempotently);
+        $case!(analysis_preserves_reviewed_claims_and_other_artifact_findings);
+        $case!(analysis_findings_roll_back_on_late_failure);
+        $case!(analysis_refuses_competing_verification_in_the_same_transaction);
+        $case!(analysis_metadata_publication_preserves_a_failed_analysis_attempt);
         $case!(analysis_republication_keeps_changed_transcript_content_pending);
         $case!(analysis_republication_keeps_changed_lexical_basis_pending);
         $case!(acceptance_commits_proposal_analysis_and_history_before_publication);
-        $case!(failed_synthesis_preserves_accepted_proposal_and_analysis);
+        $case!(failed_analysis_preserves_accepted_proposal_and_analysis);
         $case!(missing_publication_stale_input_or_forged_grounding_rolls_back_everything);
         $case!(later_success_replaces_accepted_state_and_reports_one_recording);
         $case!(late_history_failure_preserves_prior_proposal_note_stage_and_journal);

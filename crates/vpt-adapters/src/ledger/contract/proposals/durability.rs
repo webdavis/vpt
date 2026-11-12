@@ -71,7 +71,7 @@ pub(crate) fn late_history_failure_preserves_prior_proposal_note_stage_and_journ
             .unwrap()
             .unwrap()
             .stages
-            .synthesis,
+            .analysis,
         StageState::Succeeded
     );
     assert!(ledger.pending_publications().unwrap().is_empty());

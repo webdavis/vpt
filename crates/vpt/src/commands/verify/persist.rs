@@ -35,7 +35,7 @@ impl<E: EventSink> Writer<'_, E> {
         let warnings = &mut *self.warnings;
         let source = inspect::read(path, &input, self.roots)?;
         let stage = source.stage.ok_or_else(errors::ownership)?;
-        let checked = check::run(&source, &input, settings.synthesis.grounding_window_secs)?;
+        let checked = check::run(&source, &input, settings.analysis.grounding_window_secs)?;
         let previous = input
             .notes
             .iter()
@@ -86,7 +86,7 @@ impl<E: EventSink> Writer<'_, E> {
         artifact.updated_at = at;
         let delta = WorkDelta {
             verification: Some(VerificationChange {
-                grounding_window_secs: settings.synthesis.grounding_window_secs,
+                grounding_window_secs: settings.analysis.grounding_window_secs,
                 recording: input.record.id.clone(),
                 artifact: stage,
                 input_digest: checked.input_digest,

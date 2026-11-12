@@ -4,15 +4,15 @@ use vpt_domain::review::{FlagContent, Resolution};
 #[test]
 fn empty_checks_are_rechecked_for_new_windows_and_expired_analysis_stays_expired() {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
     json(&invoke(&sandbox, &[]));
     let row = ledger(&sandbox).recordings().unwrap().remove(0);
     let config = fs::read_to_string(sandbox.config_path()).unwrap();
-    let base = config.split("[synthesis]").next().unwrap();
+    let base = config.split("[analysis]").next().unwrap();
     fs::write(
         sandbox.config_path(),
-        format!("{base}\n[synthesis]\ngrounding_window_secs=5\n"),
+        format!("{base}\n[analysis]\ngrounding_window_secs=5\n"),
     )
     .unwrap();
     let snapshot = ledger(&sandbox).review_snapshot(&row.id).unwrap().unwrap();
@@ -50,22 +50,22 @@ fn empty_checks_are_rechecked_for_new_windows_and_expired_analysis_stays_expired
         .unwrap()
         .unwrap();
     fs::remove_file(&analysis.target).unwrap();
-    sql(&sandbox, "UPDATE recordings SET stage_synthesis='expired'");
+    sql(&sandbox, "UPDATE recordings SET stage_analysis='expired'");
     fs::write(
         sandbox.config_path(),
-        format!("{base}\n[synthesis]\ngrounding_window_secs=6\n"),
+        format!("{base}\n[analysis]\ngrounding_window_secs=6\n"),
     )
     .unwrap();
     json(&invoke(&sandbox, &[]));
     assert!(!analysis.target.exists());
     assert_eq!(window(), 5);
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
 }
 
 #[test]
 fn changed_grounding_window_rechecks_analysis_without_agent_and_keeps_review_decisions() {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
+    analysis::enable(&sandbox);
     add(&sandbox, "one.m4a", 1_787_604_456);
     let engine = sandbox.path().join("engine.json");
     let mut document: serde_json::Value =
@@ -94,11 +94,11 @@ fn changed_grounding_window_rechecks_analysis_without_agent_and_keeps_review_dec
         std::time::Duration::from_secs(5),
     ));
     let config = fs::read_to_string(sandbox.config_path()).unwrap();
-    let base = config.split("[synthesis]").next().unwrap();
+    let base = config.split("[analysis]").next().unwrap();
     for window in [1, 15] {
         fs::write(
             sandbox.config_path(),
-            format!("{base}\n[synthesis]\ngrounding_window_secs={window}\n"),
+            format!("{base}\n[analysis]\ngrounding_window_secs={window}\n"),
         )
         .unwrap();
         let before = fixture::snapshot(&sandbox);
@@ -106,7 +106,7 @@ fn changed_grounding_window_rechecks_analysis_without_agent_and_keeps_review_dec
         assert_eq!(plan["plan"][0]["stage"], "verify_analysis");
         assert_eq!(fixture::snapshot(&sandbox), before);
         let result = json(&invoke(&sandbox, &[]));
-        assert_eq!(result["synthesized"], serde_json::json!([]));
+        assert_eq!(result["analyzed"], serde_json::json!([]));
         let current = ledger(&sandbox).review_snapshot(&row.id).unwrap().unwrap();
         assert!(current.stale_artifacts.is_empty());
         assert!(matches!(
@@ -141,7 +141,7 @@ fn changed_grounding_window_rechecks_analysis_without_agent_and_keeps_review_dec
                 .unwrap()
                 .is_empty()
         );
-        assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
-        assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
+        assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
+        assert_eq!(analysis::calls(&sandbox, "calls"), 1);
     }
 }

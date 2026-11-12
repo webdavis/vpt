@@ -24,9 +24,9 @@ flag, commands print text for people. Passing two different format flags is a us
 as text with exit code 2.
 
 `--progress`, in any position, adds progress lines on standard error while `run`, `transcribe` or
-`synthesize` works. Each engine run and each synthesis command writes one line of compact JSON when it
+`analyze` works. Each engine run and each analysis command writes one line of compact JSON when it
 starts and one when it ends: `{"schema": "vpt.progress/1", "recording", "step", "state", "audio_secs",
-"at"}`, where `step` is `transcribe` or `synthesize`, `state` is `started`, `done` or `failed`, and
+"at"}`, where `step` is `transcribe` or `analyze`, `state` is `started`, `done` or `failed`, and
 `audio_secs` is the recording's length for a transcription and null otherwise. Standard output is
 unchanged. On failure the error document follows the progress lines, so under `--json` standard error
 stays one JSON object per line. Other verbs and dry runs write no progress lines.
@@ -140,7 +140,7 @@ successful work. Failed publication emits no review alert. Retranscription leave
 ## Pipeline
 
 `vpt run [--dry-run] [--json|--toon|--yaml]` composes ingestion, transcription, note publication, stale-finding
-verification, configured synthesis, and optional automatic redaction.
+verification, configured analysis, and optional automatic redaction.
 It resumes pending or failed work in capture order, retries previously disabled incomplete stages,
 and preserves successful transcription and expired notes. Changed readability/profile settings refresh
 notes from saved words without rerunning engines. Unchanged notes retain their bytes and produce no
@@ -152,15 +152,15 @@ note publication; more than `[alert].aggregate_after` recordings (default three)
 alert with class counts. Dry runs report ingestion candidates and pending stages without starting
 engines, changing files, repairing state, or invoking hooks.
 
-Enabled synthesis runs after current transcript findings are rechecked. Unchanged rendered inputs and
-grounding settings skip the agent. Failed synthesis retries without repeating successful transcription;
+Enabled analysis runs after current transcript findings are rechecked. Unchanged rendered inputs and
+grounding settings skip the agent. Failed analysis retries without repeating successful transcription;
 pending publication repairs accepted analysis without rerunning its agent. Expired notes stay expired,
 including when the other artifact still needs verification. When `[retention] enabled = true`, the
 pipeline runs retention after processing and includes moved files, kept files, and per-store counts
 in its result. Audio also requires `include_audio = true` and a nonzero hold time. Dry runs list the
 current candidates without moving them. Startup reconciles pending moves, and a later retention
 failure preserves completed processing work. Retention ownership for later stores remains unfinished.
-Disabling synthesis
+Disabling analysis
 marks unfinished work disabled; enabling it again records pending work. Successful and expired outputs
 are preserved. Changed enabled inputs become pending before new artifact work. These transitions and
 their history commit together. Interrupted engines or agents mark their child run and parent pipeline
@@ -181,7 +181,7 @@ can be confirmed or dismissed. Invalid flags/actions refuse before mutating work
 Resolution state, rendered note bytes, and any known-term addition commit together before publication.
 Startup recovery resumes saved publications. Operator note edits and renamed owned notes are preserved;
 malformed notes and redirected term lists refuse the update. A changed content digest makes succeeded
-synthesis pending. JSON includes the resolved flag's state, whether it changed, its note path, and the
+analysis pending. JSON includes the resolved flag's state, whether it changed, its note path, and the
 remaining open flags. History omits correction and transcript text.
 
 `vpt confirm --term <text> [--json|--toon|--yaml]` adds a confirmed term without needing a recording or engine.
@@ -193,7 +193,7 @@ without undoing a completed confirmation.
 
 ## Inspecting saved state
 
-`vpt show <id> [--json|--toon|--yaml]` and `vpt list [--stage transcribe|note|synthesis] [--json|--toon|--yaml]` expose
+`vpt show <id> [--json|--toon|--yaml]` and `vpt list [--stage transcribe|note|analysis] [--json|--toon|--yaml]` expose
 stage states, accepted engine metadata, requested/reported language, open flag and diagnostic counts,
 note paths, and artifact metadata. Artifacts distinguish published, pending publication, and expired
 files; expiration retains their recorded paths and digests. Stale verification findings are excluded
@@ -291,8 +291,8 @@ refuse rewriting. Operator edits and first-write metadata survive recovery.
 Analysis rewrites retain saved claim content and apply matching verification resolutions. Review,
 tag, and relation updates publish both notes together; automatic updates leave expired analysis notes
 expired. The pipeline detects changes to either note, and dry runs remain observational. Publishing
-analysis metadata does not complete synthesis whose input digest or grounding basis has changed, or
-clear a failed synthesis attempt. `synthesize` creates the initial analysis note.
+analysis metadata does not complete analysis whose input digest or grounding basis has changed, or
+clear a failed analysis attempt. `analyze` creates the initial analysis note.
 
 ## Occasions and briefs
 
@@ -350,10 +350,10 @@ counts, and path, and invokes the configured report command. The completion mark
 committed together after publication. Repeated invocations and startup recovery do not resend reports.
 Requested briefs emit no automatic notification.
 
-## Synthesis
+## Analysis
 
-`vpt synthesize <id> [--dry-run] [--json|--toon|--yaml]` uses the configured `[synthesis] command` argument list.
-An empty command disables synthesis and explicit invocation returns a configuration error. No model
+`vpt analyze <id> [--dry-run] [--json|--toon|--yaml]` uses the configured `[analysis] command` argument list.
+An empty command disables analysis and explicit invocation returns a configuration error. No model
 vendor is built in. The command receives `{transcript}`, `{id}`, `{language}`, `{captured_at}`,
 `{known_tags}`, and `{refused_tags}` substitutions and exact rendered transcript content on stdin; the
 default deadline is 600 seconds.
@@ -372,9 +372,9 @@ entry, without a marker, so that it stays within 64 KiB and the expanded command
 never reach stdin, so a tag change does not change the recorded input digest or make `run` redo a
 summary. A command without either placeholder runs exactly as before.
 
-`vpt synthesize --all [--since <RFC3339>] [--dry-run]` reruns synthesis for every recording with an
+`vpt analyze --all [--since <RFC3339>] [--dry-run]` reruns analysis for every recording with an
 accepted transcript, in capture order; `--since` keeps those captured at or after the time.
-`vpt synthesize --stdin [--dry-run]` reads one recording id per line instead, so `vpt list` or
+`vpt analyze --stdin [--dry-run]` reads one recording id per line instead, so `vpt list` or
 `vpt search` output can choose the set. Both rerun the command even when the saved analysis is current,
 so a changed prompt reaches old recordings, and both carry on past a recording that fails. The result
 lists each recording with `summary_changed`, `tags_added` and `tags_removed` counts; tag names stay out
@@ -400,7 +400,7 @@ date. A source on flagged text keeps the date and records `built-on-flagged-text
 kept date after the owner as `[due:: 2026-11-19]` or `[due:: 2026-11-19 15:00]`.
 
 VPT grounds the returned `vpt.proposal/1`, then saves its proposal, analysis findings, tags, relations,
-and note publications together. New analysis has Summary and Actions sections. Repeated synthesis
+and note publications together. New analysis has Summary and Actions sections. Repeated analysis
 keeps pinned paths, operator prose/tags, and review decisions for unchanged claims. Failed or invalid
 agent output preserves prior accepted analysis. A transcript edited during the agent command is
 preserved and the new proposal is refused. Retrying pending note or proposal vocabulary publication
@@ -409,7 +409,7 @@ This also covers a vocabulary acknowledgement failure after both notes finished 
 
 Proposed tags use the indexed vocabulary and `tags.new_tags = hold|write`; automatic additions to
 `known-tags.txt` are journaled with the notes. VPT remembers which lines it appended. When a later
-synthesis drops such a tag and no recording and no other indexed note carries it, the same journaled
+analysis drops such a tag and no recording and no other indexed note carries it, the same journaled
 write removes the line. Only tags VPT learned after this version are ever removed from `known-tags.txt`;
 lines the owner typed, tags confirmed by hand, and renamed lines stay. Rejections log their proposal index and rule without
 private tag text. A proposed tag that `vpt tag rename` renamed away, by key, becomes its new name,
@@ -419,24 +419,24 @@ provenance, and respect the configured cap. Manual tag and relation decisions su
 Dry runs render an input plan without starting an agent or creating notes, logs, or directories.
 Transcript, lexical, or claim changes invalidate saved findings and remove them from active review counts.
 Note rewrites check claim freshness before rendering counts, including when readability settings change.
-Note rewrites remove stale analysis annotations. Rechecking with `verify-note` or `synthesize` retains
+Note rewrites remove stale analysis annotations. Rechecking with `verify-note` or `analyze` retains
 review decisions for unchanged claims. Older saved findings without a recorded input basis need rechecking.
 `run` rechecks stale findings and checks made with a different grounding window, including empty
-finding sets and when synthesis is disabled. Rechecking preserves decisions for unchanged claims
+finding sets and when analysis is disabled. Rechecking preserves decisions for unchanged claims
 and updates both notes' counts. Expired notes remain expired. Saved checks without a recorded window
-require rechecking; VPT does not assume they used the current default. `run` recomputes enabled synthesis
-when the rendered input or grounding settings change. Synthesis review alerts follow publication and
+require rechecking; VPT does not assume they used the current default. `run` recomputes enabled analysis
+when the rendered input or grounding settings change. Analysis review alerts follow publication and
 include verification class counts. Pipeline alerts combine the final counts once per recording;
-standalone synthesis points to the analysis note. Recovery does not resend earlier hooks.
+standalone analysis points to the analysis note. Recovery does not resend earlier hooks.
 
-## Synthesis harnesses
+## Analysis harnesses
 
 Any agent command line can write the analysis. vpt runs the configured argument list directly, with no
 shell, and inherits its own environment, so the agent finds its login through `HOME` as usual. It
 writes the transcript's content region on standard input and adds no prompt of its own. The command
 must carry its own prompt, exit 0, and print exactly one `vpt.proposal/1` JSON document of at most
 1 MiB on standard output. Any other text on standard output, including a code fence, fails with
-`synthesis output document is invalid`. Standard error is captured and not shown. The agent needs no
+`analysis output document is invalid`. Standard error is captured and not shown. The agent needs no
 tools; give it none.
 
 vpt grounds every claim against the transcript, so the prompt must ask for sources in its terms. A
@@ -454,7 +454,7 @@ plugins and `CLAUDE.md`, and `--tools ""` removes every tool. `--json-schema` ta
 string, not a path.
 
 ```toml
-[synthesis]
+[analysis]
 command = [
   "claude", "-p", "--safe-mode", "--tools", "", "--no-session-persistence",
   "--system-prompt", 'Standard input is a meeting transcript. Each paragraph starts with an [mm:ss] timecode. Write a vpt.proposal/1 JSON document about it. Set schema to "vpt.proposal/1" and by to the name of your model. Put the key points in summary and each agreed task in actions, one short sentence per item. Set the owner of each action to "me" when the speaker will do it, to {"other": name} when another person will, with the name null when the transcript does not give it, and to null when it is unclear. Give an action a due date only when the transcript says one, as {"date": "YYYY-MM-DD", "time": "HH:MM" or null, "sources": the ranges that say it}, and null otherwise; never guess one. The recording was captured on {captured_at}. Give every item one or more sources, each a mm:ss-mm:ss range that starts at the timecode of the paragraph that supports it and ends at the timecode of the next paragraph, or one second after its own timecode for the last paragraph. State only what the transcript says, and use a capitalized word or a number only when it appears in the paragraphs you cite. Leave relations empty. Add up to five tags, each with a short reason; prefer these existing tags: {known_tags}. Never use these tags: {refused_tags}. Print the JSON document and nothing else, with no code fence.',
@@ -475,7 +475,7 @@ Codex's default; add `--model` to pick another. Codex has no switch to remove it
 `--sandbox read-only` keeps it from writing.
 
 ```toml
-[synthesis]
+[analysis]
 command = [
   "codex", "exec", "--ephemeral", "--ignore-user-config", "--skip-git-repo-check",
   "--sandbox", "read-only", "--color", "never",
@@ -486,17 +486,17 @@ command = [
 
 A bad setup fails without touching the earlier analysis:
 
-- `synthesis command is unavailable`: the program is not on `PATH`.
-- `synthesis command exited unsuccessfully`: the harness failed, for example when it is not logged
+- `analysis command is unavailable`: the program is not on `PATH`.
+- `analysis command exited unsuccessfully`: the harness failed, for example when it is not logged
   in under the `HOME` vpt runs with, or when `--json-schema` is given a path.
-- `synthesis output document is invalid`: standard output held anything besides the document.
+- `analysis output document is invalid`: standard output held anything besides the document.
 
 ## Note verification
 
 `vpt verify-note <path> --recording <id> [--json|--toon|--yaml]` checks Markdown claims against the recording's
 accepted transcript and current lexical flags. Findings are `unsourced`, `bad-reference`, `unsupported`,
 or `built-on-flagged-text`, in that priority order. The default citation tolerance is 15 seconds,
-configured by `synthesis.grounding_window_secs`; no agent or transcription engine is run.
+configured by `analysis.grounding_window_secs`; no agent or transcription engine is run.
 
 External notes are report-only. Annotation requires the registered transcript or analysis path inside
 its configured store, with no symlink traversal, matching recording/stage metadata, and valid managed
@@ -536,7 +536,7 @@ history. It also works before transcription and leaves expired notes expired.
 ## Tag confirmation
 
 `vpt confirm <id> --tag <tag> [--json|--toon|--yaml]` confirms a tag, updates `known-tags.txt`, and refreshes the
-transcript and existing analysis notes when accepted text is available. It works without synthesis or an engine. Existing
+transcript and existing analysis notes when accepted text is available. It works without analysis or an engine. Existing
 vocabulary spelling is retained; new multiword tags become kebab-case. The configured confirmation
 limit applies without removing earlier tags. Repeating a confirmation keeps its saved tag timestamp
 and avoids rewriting an unchanged vocabulary file.
@@ -589,8 +589,8 @@ identical bytes anywhere directly in the destination cause a duplicate refusal. 
 list paths, aggregate mask counts, omitted/marked counts, surviving capitalized candidates, and any
 filename collision. Private mask mappings stay in the mode-0600 report under `drafts`.
 
-`[share] automatic = true` enables release creation during `run`, independently of synthesis. The
-transcript is released before synthesis runs; analysis is released after its publication and verification.
+`[share] automatic = true` enables release creation during `run`, independently of analysis. The
+transcript is released before analysis runs; analysis is released after its publication and verification.
 Previously finalized matching content in the configured destination is skipped on subsequent runs.
 Interrupted copy/report publication is recovered from saved bytes before new work. `run --dry-run`
 reports pending redaction without creating files or changing release history.
@@ -647,8 +647,8 @@ default to empty lists, so no notifications will be sent unless configured. The 
 notification system and message format.
 
 Each finished transcription logs one `transcribed` report after its transcript note is published, and
-each finished synthesis logs one `synthesized` report after its analysis note is published, from
-`vpt transcribe`, `vpt synthesize` and `vpt run` alike. Each is `state: "done"` with the `recording`
+each finished analysis logs one `analyzed` report after its analysis note is published, from
+`vpt transcribe`, `vpt analyze` and `vpt run` alike. Each is `state: "done"` with the `recording`
 identity and `paths.note`, and invokes the configured report command, so a caller hears about
 finished work without polling. A transcription that needs review sends its `review_needed` alert as
 well.

@@ -45,10 +45,10 @@ pub(in crate::ledger) fn apply(state: &mut State, target: &Path) -> Result<(), L
             NoteStage::Transcript => record.stages.note = next,
             NoteStage::Analysis => {
                 if !matches!(
-                    record.stages.synthesis,
+                    record.stages.analysis,
                     StageState::Failed | StageState::Disabled
                 ) {
-                    record.stages.synthesis = next;
+                    record.stages.analysis = next;
                 }
             }
         }

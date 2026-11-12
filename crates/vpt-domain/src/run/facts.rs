@@ -11,7 +11,7 @@ pub enum HistoryFact {
     OccasionSaved {
         occasion: crate::occasion::OccasionId,
     },
-    SynthesisStateChanged {
+    AnalysisStateChanged {
         recording: RecordingId,
         from: crate::stage::StageState,
         to: crate::stage::StageState,

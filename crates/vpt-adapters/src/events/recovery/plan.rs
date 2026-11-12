@@ -59,7 +59,7 @@ impl RecoveryPlan {
                     | HistoryFact::NoteMoved { .. }
                     | HistoryFact::TagRejected { .. }
                     | HistoryFact::TagRenamed { .. }
-                    | HistoryFact::SynthesisStateChanged { .. }
+                    | HistoryFact::AnalysisStateChanged { .. }
                     | HistoryFact::FlagResolved { .. }
                     | HistoryFact::EffectIntent { .. } => {
                         state.work_bearing = true;

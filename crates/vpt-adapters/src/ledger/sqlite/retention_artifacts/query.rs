@@ -12,7 +12,7 @@ pub(super) fn sql(version: u32) -> String {
             CASE WHEN r.id IS NULL
                 OR (n.stage='transcript' AND n.target IS NOT r.transcript_note_path)
                 OR (n.stage='analysis' AND n.target IS NOT r.analysis_note_path) THEN NULL
-                WHEN n.stage='transcript' THEN r.stage_note='expired' ELSE r.stage_synthesis='expired' END, 0, NULL
+                WHEN n.stage='transcript' THEN r.stage_note='expired' ELSE r.stage_analysis='expired' END, 0, NULL
             FROM owned_notes n LEFT JOIN recordings r ON r.id=n.recording");
     }
     if version >= 13 {

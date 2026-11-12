@@ -4,12 +4,12 @@ use vpt_domain::layout::StoreKey;
 #[path = "tests/brief.rs"]
 mod brief;
 
+#[path = "tests/analysis.rs"]
+mod analysis;
 #[path = "tests/relations.rs"]
 mod relations;
 #[path = "tests/share.rs"]
 mod share;
-#[path = "tests/synthesis.rs"]
-mod synthesis;
 #[path = "tests/tags.rs"]
 mod tags;
 

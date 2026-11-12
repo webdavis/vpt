@@ -135,7 +135,7 @@ pub(in crate::ledger::sqlite) fn refresh(
                 .map(|accepted| crate::ledger::proposal::basis::compute(accepted, &review.flags))
                 .transpose()?;
             if Some(proposal.basis) != basis {
-                connection.execute("UPDATE recordings SET stage_synthesis='pending' WHERE id=?1 AND stage_synthesis='succeeded'", [id.as_str()]).map_err(super::super::map)?;
+                connection.execute("UPDATE recordings SET stage_analysis='pending' WHERE id=?1 AND stage_analysis='succeeded'", [id.as_str()]).map_err(super::super::map)?;
             }
         }
     }

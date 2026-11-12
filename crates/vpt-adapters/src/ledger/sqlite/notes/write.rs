@@ -34,7 +34,7 @@ pub(in crate::ledger::sqlite) fn apply(
     for change in &delta.notes {
         let note = &change.artifact;
         if note.stage == NoteStage::Transcript {
-            connection.execute("UPDATE recordings SET stage_synthesis='pending' WHERE id=?1 AND stage_synthesis='succeeded'
+            connection.execute("UPDATE recordings SET stage_analysis='pending' WHERE id=?1 AND stage_analysis='succeeded'
                 AND EXISTS(SELECT 1 FROM owned_notes WHERE recording=?1 AND stage='transcript' AND content_digest != ?2)",
                 params![note.recording.as_str(), note.content_digest.hex()]).map_err(map)?;
         }

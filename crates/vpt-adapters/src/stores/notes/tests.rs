@@ -1,5 +1,5 @@
+mod analysis;
 mod discovery;
-mod synthesis;
 use super::*;
 use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 

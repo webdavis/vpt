@@ -62,7 +62,7 @@ pub(super) fn read(state: &State) -> Result<Vec<RetentionArtifact>, LedgerError>
             ),
             NoteStage::Analysis => (
                 ArtifactKind::Analysis,
-                record.stages.synthesis == StageState::Expired,
+                record.stages.analysis == StageState::Expired,
             ),
         };
         inventory.push(

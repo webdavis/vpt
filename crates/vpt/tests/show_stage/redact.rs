@@ -76,7 +76,7 @@ fn redacted_transcript_is_the_masked_text_only() {
 fn redacted_analysis_is_the_masked_text_only() {
     let (sandbox, id) = configured("show-redact-analysis");
     private(&sandbox);
-    super::text::synthesize(
+    super::text::analyze(
         &sandbox,
         &id,
         r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[{"text":"Meet Alice via person@sample.test","sources":["00:00-00:01"]}],"actions":[{"text":"Call 303-555-0123","sources":[]}],"tags":[],"relations":[]}"#,

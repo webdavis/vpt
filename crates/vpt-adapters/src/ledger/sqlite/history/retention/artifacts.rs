@@ -43,7 +43,7 @@ pub(super) fn complete(
     transaction.execute("INSERT INTO artifact_expirations(path,kind,owner,digest,trashed_at) VALUES(?1,?2,?3,?4,?5) ON CONFLICT(path) DO NOTHING", params![artifact.path.to_str().ok_or_else(conflict)?, artifact.kind.as_str(), artifact.owner.as_str(), artifact.digest.hex(), at.secs]).map_err(map)?;
     let stage = match intent.kind {
         ArtifactKind::Transcript => Some("stage_note"),
-        ArtifactKind::Analysis => Some("stage_synthesis"),
+        ArtifactKind::Analysis => Some("stage_analysis"),
         _ => None,
     };
     if let Some(stage) = stage {

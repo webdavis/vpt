@@ -8,8 +8,8 @@ mod report_failures;
 
 pub(super) fn prepared() -> (Sandbox, RecordingRecord, Vec<RetentionArtifact>) {
     let sandbox = configured();
-    synthesis::enable(&sandbox);
-    synthesis::append(&sandbox, "\n[share]\nautomatic=true\n");
+    analysis::enable(&sandbox);
+    analysis::append(&sandbox, "\n[share]\nautomatic=true\n");
     add(&sandbox, "one.m4a", 1_787_604_456);
     json(&invoke(&sandbox, &[]));
     let ledger = ledger(&sandbox);
@@ -24,7 +24,7 @@ pub(super) fn prepared() -> (Sandbox, RecordingRecord, Vec<RetentionArtifact>) {
     }
     drop(ledger);
     sandbox.install_fake_helper();
-    synthesis::append(
+    analysis::append(
         &sandbox,
         "\n[retention]\nenabled=true\ninclude_audio=true\n[retention.hold]\naudio='1d'\nengine_outputs='1d'\ntranscripts='1d'\nanalysis='1d'\ndrafts='1d'\nreleased='1d'\n",
     );
@@ -50,19 +50,13 @@ fn real_expiration_stays_terminal_and_explicit_note_restores_saved_render_inputs
     assert!(artifacts.iter().all(|a| !a.path.exists()));
     let expired = ledger(&sandbox).by_id(&row.id).unwrap().unwrap();
     assert_eq!(expired.stages.note, StageState::Expired);
-    assert_eq!(expired.stages.synthesis, StageState::Expired);
+    assert_eq!(expired.stages.analysis, StageState::Expired);
     let before = fixture::snapshot(&sandbox);
     let plan = json(&invoke(&sandbox, &["--dry-run"]));
     assert_eq!(plan["plan"], serde_json::json!([]));
     assert_eq!(fixture::snapshot(&sandbox), before);
     let again = json(&invoke(&sandbox, &[]));
-    for key in [
-        "ingested",
-        "transcribed",
-        "notes",
-        "synthesized",
-        "redacted",
-    ] {
+    for key in ["ingested", "transcribed", "notes", "analyzed", "redacted"] {
         assert_eq!(again[key], serde_json::json!([]), "{key}");
     }
     assert!(artifacts.iter().all(|a| !a.path.exists()));
@@ -74,7 +68,7 @@ fn real_expiration_stays_terminal_and_explicit_note_restores_saved_render_inputs
     ));
     let restored = ledger(&sandbox).note_inputs(&row.id).unwrap().unwrap();
     assert_eq!(restored.record.stages.note, StageState::Succeeded);
-    assert_eq!(restored.record.stages.synthesis, StageState::Succeeded);
+    assert_eq!(restored.record.stages.analysis, StageState::Succeeded);
     for note in &inputs.notes {
         let current = restored
             .notes
@@ -108,7 +102,7 @@ fn real_expiration_stays_terminal_and_explicit_note_restores_saved_render_inputs
     }
     let automatic = json(&invoke(&sandbox, &[]));
     assert_eq!(automatic["transcribed"], serde_json::json!([]));
-    assert_eq!(automatic["synthesized"], serde_json::json!([]));
+    assert_eq!(automatic["analyzed"], serde_json::json!([]));
     assert_eq!(automatic["redacted"], serde_json::json!([]));
     assert!(
         artifacts
@@ -116,8 +110,8 @@ fn real_expiration_stays_terminal_and_explicit_note_restores_saved_render_inputs
             .filter(|a| !matches!(a.kind, ArtifactKind::Transcript | ArtifactKind::Analysis))
             .all(|a| !a.path.exists())
     );
-    assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
 }
 
 #[test]
@@ -196,12 +190,12 @@ fn pending_absent_notes_are_expired_before_automatic_work_selects_stages() {
     );
     assert_eq!(recovered["retention"]["moved"], serde_json::json!([]));
     assert_eq!(recovered["notes"], serde_json::json!([]));
-    assert_eq!(recovered["synthesized"], serde_json::json!([]));
+    assert_eq!(recovered["analyzed"], serde_json::json!([]));
     assert!(notes.iter().all(|a| !a.path.exists()));
     assert!(ledger(&sandbox).pending_intents().unwrap().is_empty());
     assert!(!sandbox.fake_log().exists());
-    assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
 }
 
 #[test]
@@ -230,6 +224,6 @@ fn changed_pending_note_blocks_automatic_and_explicit_regeneration() {
         assert_eq!(ledger(&sandbox).pending_intents().unwrap().len(), 1);
     }
     assert!(!sandbox.fake_log().exists());
-    assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
-    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "calls"), 1);
+    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
 }

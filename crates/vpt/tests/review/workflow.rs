@@ -4,7 +4,7 @@ use std::fs;
 use vpt_domain::review::{Resolution, ResolutionKind};
 
 #[test]
-fn correcting_a_renamed_note_preserves_operator_edits_and_invalidates_synthesis() {
+fn correcting_a_renamed_note_preserves_operator_edits_and_invalidates_analysis() {
     let (sandbox, id, terms) = setup();
     json(&run(sandbox.vpt().args([
         "note",
@@ -26,7 +26,7 @@ fn correcting_a_renamed_note_preserves_operator_edits_and_invalidates_synthesis(
     .unwrap();
     sql(
         &sandbox,
-        "UPDATE recordings SET stage_synthesis = 'succeeded'",
+        "UPDATE recordings SET stage_analysis = 'succeeded'",
     );
     let flag = identifier(&sandbox, &id, "numeric");
     json(&resolve(
@@ -36,7 +36,7 @@ fn correcting_a_renamed_note_preserves_operator_edits_and_invalidates_synthesis(
         &["--correct", "Private\n[correction]"],
     ));
     let after = inputs(&sandbox, &id);
-    assert_eq!(after.record.stages.synthesis, StageState::Pending);
+    assert_eq!(after.record.stages.analysis, StageState::Pending);
     let note = &after.notes[0];
     assert_eq!(note.target, renamed);
     assert_eq!(note.first_written, original.first_written);

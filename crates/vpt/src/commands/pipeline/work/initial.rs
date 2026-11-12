@@ -23,7 +23,7 @@ pub(super) fn run<E: EventSink>(
         record,
         mentions,
     )? {
-        None | Some(NextStage::Synthesize | NextStage::Verify(_) | NextStage::Redact(_)) => {}
+        None | Some(NextStage::Analyze | NextStage::Verify(_) | NextStage::Redact(_)) => {}
         Some(NextStage::Transcribe) => {
             let duration = transcribe::observe::audio(record, context.settings, context.roots)?;
             let child = commit(

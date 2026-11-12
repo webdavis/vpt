@@ -1721,7 +1721,7 @@ pub const KEYS: &[KeySpec] = &[
     key("helper.path", Kind::Text, "\"vpt-macos\"", "the macOS helper, resolved on PATH when relative"),
     key("stores.audio", Kind::Text, "\"<home>/audio\"", "archive clones"),
     key("stores.transcripts", Kind::Text, "\"<home>/transcripts\"", "transcript notes"),
-    key("stores.analysis", Kind::Text, "\"<home>/analysis\"", "synthesis notes"),
+    key("stores.analysis", Kind::Text, "\"<home>/analysis\"", "analysis notes"),
     key("stores.briefs", Kind::Text, "\"<home>/briefs\"", "briefs"),
     key("stores.engine_outputs", Kind::Text, "\"<home>/engine-outputs\"", "raw engine documents"),
     key("stores.drafts", Kind::Text, "\"<home>/drafts\"", "private redaction reports"),
@@ -1764,9 +1764,9 @@ pub const KEYS: &[KeySpec] = &[
     key("tags.max_suggested", Kind::NonNegativeInt, "10", "held tags per note"),
     key("relations.session_gap_minutes", Kind::NonNegativeInt, "60", "continues window"),
     key("relations.max_suggested", Kind::NonNegativeInt, "5", "agent-proposed related links kept per note"),
-    key("synthesis.command", Kind::Argv, "[]", "the agent command; empty disables synthesis only"),
-    key("synthesis.timeout_secs", Kind::PositiveInt, "600", "the command's deadline"),
-    key("synthesis.grounding_window_secs", Kind::PositiveInt, "15", "verify-note's tolerance around a cited span"),
+    key("analysis.command", Kind::Argv, "[]", "the agent command; empty disables analysis only"),
+    key("analysis.timeout_secs", Kind::PositiveInt, "600", "the command's deadline"),
+    key("analysis.grounding_window_secs", Kind::PositiveInt, "15", "verify-note's tolerance around a cited span"),
     key("brief.lookback_days", Kind::NonNegativeInt, "180", "how far back selection reaches"),
     key("brief.max_notes", Kind::NonNegativeInt, "12", "selection cap"),
     key("brief.max_spans_per_note", Kind::NonNegativeInt, "5", "quoted spans per selected note"),
@@ -6794,7 +6794,7 @@ CREATE TABLE recordings (
   audio_path TEXT NOT NULL,
   stage_transcribe TEXT NOT NULL,
   stage_note TEXT NOT NULL,
-  stage_synthesis TEXT NOT NULL,
+  stage_analysis TEXT NOT NULL,
   transcript_note_path TEXT,
   analysis_note_path TEXT,
   engines TEXT,
@@ -7307,7 +7307,7 @@ of those to roll back.
     `pub recording: Option<RecordingId> }` (`flags` is the source's whole `st_flags` word).
   - `StageState::{Pending, Succeeded, Failed, Disabled, Expired}` with `as_str(self) -> &'static str`,
     `parse(text: &str) -> Option<StageState>`;
-    `StageStates { pub transcribe: StageState, pub note: StageState, pub synthesis: StageState }` with
+    `StageStates { pub transcribe: StageState, pub note: StageState, pub analysis: StageState }` with
     `StageStates::fresh() -> StageStates` (all `Pending`).
   - `TitleOrigin::{VoiceMemos, Unavailable}` with `as_str(self) -> &'static str`,
     `parse(text: &str) -> Option<TitleOrigin>` (named apart from the recorder port's `TitleLookup` of
@@ -7765,12 +7765,12 @@ impl StageState {
 pub struct StageStates {
     pub transcribe: StageState,
     pub note: StageState,
-    pub synthesis: StageState,
+    pub analysis: StageState,
 }
 
 impl StageStates {
     pub fn fresh() -> StageStates {
-        StageStates { transcribe: StageState::Pending, note: StageState::Pending, synthesis: StageState::Pending }
+        StageStates { transcribe: StageState::Pending, note: StageState::Pending, analysis: StageState::Pending }
     }
 }
 
@@ -7874,7 +7874,7 @@ use vpt_domain::time::{FileTime, UtcInstant, UtcOffset};
 const SEEN_COLUMNS: &str = "path, file_name, size, mtime_secs, mtime_nanos, flags, first_seen, last_seen, deferral_count, \
     deferral_reason, deferred_size, source_gone_at, recording";
 const RECORDING_COLUMNS: &str = "id, source_path, digest, captured_at, captured_offset, duration_secs, title, \
-    title_source, ingested_at, audio_path, stage_transcribe, stage_note, stage_synthesis, audio_trashed_at";
+    title_source, ingested_at, audio_path, stage_transcribe, stage_note, stage_analysis, audio_trashed_at";
 
 fn corrupt(what: &str) -> LedgerError {
     LedgerError::Corrupt(format!("unreadable {what}"))
@@ -7941,7 +7941,7 @@ fn record_from_row(row: &Row<'_>) -> Result<RecordingRecord, LedgerError> {
         title_source: TitleOrigin::parse(&row.get::<_, String>(7).map_err(map)?).ok_or_else(|| corrupt("title source"))?,
         ingested_at: UtcInstant { secs: row.get(8).map_err(map)? },
         audio_path: PathBuf::from(row.get::<_, String>(9).map_err(map)?),
-        stages: StageStates { transcribe: stage(10)?, note: stage(11)?, synthesis: stage(12)? },
+        stages: StageStates { transcribe: stage(10)?, note: stage(11)?, analysis: stage(12)? },
         audio_trashed_at: row.get::<_, Option<i64>>(13).map_err(map)?.map(|secs| UtcInstant { secs }),
     })
 }
@@ -7994,7 +7994,7 @@ fn insert_recording(connection: &Connection, recording: &RecordingRecord) -> Res
                 recording.audio_path.to_string_lossy(),
                 recording.stages.transcribe.as_str(),
                 recording.stages.note.as_str(),
-                recording.stages.synthesis.as_str(),
+                recording.stages.analysis.as_str(),
                 recording.audio_trashed_at.map(|at| at.secs),
             ],
         )
@@ -17067,7 +17067,7 @@ pub fn record_json(record: &RecordingRecord) -> Value {
         "stages": {
             "transcribe": record.stages.transcribe.as_str(),
             "note": record.stages.note.as_str(),
-            "synthesis": record.stages.synthesis.as_str(),
+            "analysis": record.stages.analysis.as_str(),
         },
         "audio_trashed_at": record.audio_trashed_at.map(|at| at.rfc3339()),
     })
@@ -17210,7 +17210,7 @@ ______________________________________________________________________
 ### Task 28: `vpt show`, `vpt list` and `vpt storage`
 
 Three read-only verbs over the ledger and the stores. `list --stage <stage>` narrows to the recordings
-whose named stage (`transcribe`, `note`, `synthesis`) has not succeeded, which is the work waiting there;
+whose named stage (`transcribe`, `note`, `analysis`) has not succeeded, which is the work waiting there;
 any other stage word is a usage error.
 
 **Files:**
@@ -17654,7 +17654,7 @@ pub fn run(ledger: &dyn RecordingLedger, stage: Option<&str>) -> Outcome {
         None => |_| StageState::Pending,
         Some("transcribe") => |record| record.stages.transcribe,
         Some("note") => |record| record.stages.note,
-        Some("synthesis") => |record| record.stages.synthesis,
+        Some("analysis") => |record| record.stages.analysis,
         Some(other) => return Outcome::Failure(ErrorDocument::new(ErrorKind::Usage, format!("{other} is not a stage"))),
     };
     let records = match ledger.recordings() {

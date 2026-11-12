@@ -58,7 +58,7 @@ pub(super) fn insert_recording(
                 recording.audio_path.to_string_lossy(),
                 recording.stages.transcribe.as_str(),
                 recording.stages.note.as_str(),
-                recording.stages.synthesis.as_str(),
+                recording.stages.analysis.as_str(),
                 recording.audio_trashed_at.map(|instant| instant.secs),
             ],
         )

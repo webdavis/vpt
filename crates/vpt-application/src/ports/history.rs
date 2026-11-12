@@ -14,7 +14,7 @@ pub struct WorkDelta {
     pub brief: Option<super::BriefChange>,
     pub brief_published: Option<super::BriefPublication>,
     pub occasion: Option<super::OccasionChange>,
-    pub synthesis_state: Option<super::SynthesisStateChange>,
+    pub analysis_state: Option<super::AnalysisStateChange>,
     pub verification: Option<super::VerificationChange>,
     pub proposal: Option<super::ProposalChange>,
     pub relations: Option<super::RelationChange>,

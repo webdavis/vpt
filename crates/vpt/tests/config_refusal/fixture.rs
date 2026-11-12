@@ -75,7 +75,7 @@ impl Fixture {
         .unwrap();
         fs::set_permissions(&alert, fs::Permissions::from_mode(0o700)).unwrap();
         let config = fs::read_to_string(sandbox.config_path()).unwrap();
-        fs::write(sandbox.config_path(), format!("{config}\n[stores]\ndrafts = {:?}\n[alert]\ncommand = [{alert:?}, {:?}]\n[report]\ncommand = ['/usr/bin/touch', {:?}]\n[synthesis]\ncommand = ['/usr/bin/false']\n", parent.join("drafts"), sandbox.path().join("alerts.jsonl"), sandbox.path().join("report-called"))).unwrap();
+        fs::write(sandbox.config_path(), format!("{config}\n[stores]\ndrafts = {:?}\n[alert]\ncommand = [{alert:?}, {:?}]\n[report]\ncommand = ['/usr/bin/touch', {:?}]\n[analysis]\ncommand = ['/usr/bin/false']\n", parent.join("drafts"), sandbox.path().join("alerts.jsonl"), sandbox.path().join("report-called"))).unwrap();
         fs::set_permissions(&parent, fs::Permissions::from_mode(0o500)).unwrap();
         Self {
             sandbox,

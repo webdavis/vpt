@@ -12,10 +12,10 @@ pub(super) fn refresh<E: EventSink>(
     report: &Report,
     notices: &mut ReviewQueue,
 ) -> Result<(), Box<ErrorDocument>> {
-    if before == (report.notes.len(), report.synthesized.len()) {
+    if before == (report.notes.len(), report.analyzed.len()) {
         return Ok(());
     }
-    let path = if report.synthesized.last() == Some(id) {
+    let path = if report.analyzed.last() == Some(id) {
         context
             .ledger
             .note_path(id, NoteStage::Analysis)

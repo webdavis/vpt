@@ -12,9 +12,9 @@ pub(super) fn apply(
         let row = state
             .recordings
             .iter_mut()
-            .find(|row| row.id == change.recording && row.stages.synthesis == change.expected)
+            .find(|row| row.id == change.recording && row.stages.analysis == change.expected)
             .ok_or_else(eligibility::conflict)?;
-        row.stages.synthesis = change.next;
+        row.stages.analysis = change.next;
     }
     Ok(())
 }

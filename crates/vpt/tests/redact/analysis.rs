@@ -1,5 +1,5 @@
 use super::*;
-fn synthesized() -> (Sandbox, vpt_domain::identity::RecordingId) {
+fn analyzed() -> (Sandbox, vpt_domain::identity::RecordingId) {
     let sandbox = fixture::configured("redact-analysis");
     let id = recording::seed_flags(&sandbox, true);
     let script = sandbox.path().join("agent.sh");
@@ -8,14 +8,14 @@ fn synthesized() -> (Sandbox, vpt_domain::identity::RecordingId) {
     fs::write(&proposal, r#"{"schema":"vpt.proposal/1","by":"private agent","summary":[{"text":"Meet Alice with Bob via person@sample.test for 1234","sources":["00:00-00:01"]}],"actions":[],"tags":[],"relations":[]}"#).unwrap();
     fixture::write_config(
         &sandbox,
-        &format!("[synthesis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
+        &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
     );
-    json(&invoke(&sandbox, &["synthesize", id.as_str(), "--json"]));
+    json(&invoke(&sandbox, &["analyze", id.as_str(), "--json"]));
     (sandbox, id)
 }
 #[test]
 fn redact_analysis_omits_whole_claims_and_explicit_mark_retains_the_accepted_claim() {
-    let (sandbox, id) = synthesized();
+    let (sandbox, id) = analyzed();
     let original = ledger(&sandbox)
         .note(&id, NoteStage::Analysis)
         .unwrap()
@@ -45,7 +45,7 @@ fn redact_analysis_omits_whole_claims_and_explicit_mark_retains_the_accepted_cla
 }
 #[test]
 fn redact_analysis_rechecks_stale_findings_after_the_source_flag_is_resolved() {
-    let (sandbox, id) = synthesized();
+    let (sandbox, id) = analyzed();
     let ledger = ledger(&sandbox);
     let flag = ledger
         .transcript_flags(&id)

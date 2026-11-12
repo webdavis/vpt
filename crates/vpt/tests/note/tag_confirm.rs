@@ -97,7 +97,7 @@ fn held_tags_can_be_confirmed_or_rejected_without_losing_other_suggestions() {
 }
 
 #[test]
-fn manual_tag_confirmation_writes_state_vocabulary_and_note_without_synthesis() {
+fn manual_tag_confirmation_writes_state_vocabulary_and_note_without_analysis() {
     let (sandbox, row, path) = configured_tags();
     let output = confirm(&sandbox, row.id.as_str(), "--tag", "Private topic");
     let result = success(&output);

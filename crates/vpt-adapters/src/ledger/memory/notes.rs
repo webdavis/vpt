@@ -111,9 +111,9 @@ pub(super) fn apply(
                 .recordings
                 .iter_mut()
                 .find(|record| record.id == change.artifact.recording)
-            && record.stages.synthesis == vpt_application::ports::StageState::Succeeded
+            && record.stages.analysis == vpt_application::ports::StageState::Succeeded
         {
-            record.stages.synthesis = vpt_application::ports::StageState::Pending;
+            record.stages.analysis = vpt_application::ports::StageState::Pending;
         }
         match state.notes.iter_mut().find(|note| {
             note.recording == change.artifact.recording && note.stage == change.artifact.stage

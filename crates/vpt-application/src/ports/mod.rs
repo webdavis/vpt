@@ -8,13 +8,13 @@ mod archive;
 mod clock;
 mod context;
 pub use context::{ContextConfigError, ContextError, ContextRequest, ContextSource, ContextWindow};
+mod analysis;
 mod engine;
 mod proposal;
-mod synthesis;
-pub use proposal::{AcceptedProposal, GroundingBasis, ProposalChange, ProposalLedger};
-pub use synthesis::{
-    AgentCommand, SynthesisFailure, SynthesisOutput, SynthesisRequest, SynthesisStateChange,
+pub use analysis::{
+    AgentCommand, AnalysisFailure, AnalysisOutput, AnalysisRequest, AnalysisStateChange,
 };
+pub use proposal::{AcceptedProposal, GroundingBasis, ProposalChange, ProposalLedger};
 mod engine_artifact;
 mod history;
 mod ledger;

@@ -8,7 +8,7 @@ fn pipeline_recovery_and_new_moves_emit_one_combined_retention_event() {
         .find(|a| a.kind == ArtifactKind::EngineOutput)
         .unwrap();
     pending(&sandbox, pending_artifact);
-    synthesis::append(
+    analysis::append(
         &sandbox,
         &format!(
             "\n[report]\ncommand=[{:?}, 'command-sink']\n",
@@ -40,7 +40,7 @@ fn pipeline_recovery_and_new_moves_emit_one_combined_retention_event() {
 #[test]
 fn retention_log_and_hook_report_actual_counts_for_each_store() {
     let (sandbox, _, artifacts) = prepared();
-    synthesis::append(
+    analysis::append(
         &sandbox,
         &format!(
             "\n[report]\ncommand=[{:?}, 'command-sink']\n",

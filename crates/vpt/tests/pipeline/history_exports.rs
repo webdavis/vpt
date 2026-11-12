@@ -19,7 +19,7 @@ fn startup_publication_refusal(verb: &str) {
         let sandbox = configured();
         add(&sandbox, "one.m4a", 1_787_604_456);
         json(&invoke(&sandbox, &[]));
-        synthesis::append(&sandbox, "\n[retention]\nenabled=true\n");
+        analysis::append(&sandbox, "\n[retention]\nenabled=true\n");
         let root = vpt_adapters::RootDir::open(&sandbox.path().join("state/vpt")).unwrap();
         let ledger = SqliteLedger::open(&root).unwrap();
         let row = ledger.recordings().unwrap().remove(0);
@@ -67,7 +67,7 @@ fn startup_publication_refusal(verb: &str) {
             "Private operator replacement"
         );
         assert_eq!(ledger.pending_publications().unwrap().len(), 1);
-        assert_eq!(synthesis::calls(&sandbox, "calls"), 1);
+        assert_eq!(analysis::calls(&sandbox, "calls"), 1);
     }
 }
 
@@ -91,7 +91,7 @@ pub(super) fn upcoming(sandbox: &Sandbox) {
     let script = sandbox.path().join("collector.sh");
     let calls = sandbox.path().join("context.calls");
     fs::write(&script, format!("printf 'called\\n' >> {calls:?}\ncase \"$2\" in\n'kind:event '*) /bin/cat {response:?};;\n'kind:task '*) printf '%s' '{{\"objects\":[]}}';;\n*) exit 9;;\nesac\n")).unwrap();
-    synthesis::append(
+    analysis::append(
         sandbox,
         &format!(
             "\n[brief.trigger]\nenabled=true\n[context]\ntype='dam'\ncalendars=['calendar/work/']\nprojects=['work/']\n[context.dam]\ncommand=['/bin/sh', {script:?}]\n"
@@ -161,10 +161,10 @@ fn required_brief_history_precedes_manual_and_upcoming_collection() {
 
 #[test]
 fn later_commands_preserve_success_and_export_every_history_record_when_logging_recovers() {
-    for verb in ["synthesize", "verify-note", "redact", "brief", "upcoming"] {
+    for verb in ["analyze", "verify-note", "redact", "brief", "upcoming"] {
         for structured in [false, true] {
             let sandbox = configured();
-            synthesis::enable(&sandbox);
+            analysis::enable(&sandbox);
             add(&sandbox, "one.m4a", 1_787_604_456);
             json(&invoke(&sandbox, &[]));
             let ledger = ledger(&sandbox);
@@ -213,7 +213,7 @@ fn later_commands_preserve_success_and_export_every_history_record_when_logging_
             assert_eq!(ledger.recovery_view().unwrap().records.len(), before);
             assert_eq!(ledger.retention_artifacts().unwrap(), artifacts_before);
             assert_eq!(fs::read_to_string(&analysis.target).unwrap(), analysis.text);
-            assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 1);
+            assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
             assert!(ledger.occasions().unwrap().is_empty());
             assert!(ledger.releases(&row.id).unwrap().is_empty());
             sql(&sandbox, "DROP TRIGGER refuse_required_history");
@@ -232,9 +232,9 @@ fn later_commands_preserve_success_and_export_every_history_record_when_logging_
             assert!(row.audio_path.is_file());
             assert!(ledger.pending_publications().unwrap().is_empty());
             let kind = match verb {
-                "synthesize" => {
-                    assert_eq!(synthesis::calls(&sandbox, "agent.calls"), 2);
-                    RunKind::Synthesize
+                "analyze" => {
+                    assert_eq!(analysis::calls(&sandbox, "agent.calls"), 2);
+                    RunKind::Analyze
                 }
                 "verify-note" => RunKind::VerifyNote,
                 "redact" => {

@@ -104,12 +104,12 @@ fn check(ledger: &impl Ledger, lexical: bool) {
             .unwrap()
             .unwrap()
             .stages
-            .synthesis,
+            .analysis,
         StageState::Pending
     );
 }
 
-pub(crate) fn analysis_metadata_publication_preserves_a_failed_synthesis_attempt(
+pub(crate) fn analysis_metadata_publication_preserves_a_failed_analysis_attempt(
     ledger: &impl Ledger,
 ) {
     let run = seed(ledger);
@@ -141,7 +141,7 @@ pub(crate) fn analysis_metadata_publication_preserves_a_failed_synthesis_attempt
             .unwrap()
             .unwrap()
             .stages
-            .synthesis,
+            .analysis,
         StageState::Failed
     );
 }
