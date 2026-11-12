@@ -30,6 +30,8 @@ mod note_boundaries;
 mod note_profiles;
 #[path = "analyze/output.rs"]
 mod output;
+#[path = "analyze/owner_words.rs"]
+mod owner_words;
 #[path = "analyze/profiles.rs"]
 mod profiles;
 #[path = "analyze/progress.rs"]

@@ -1,6 +1,12 @@
 const LIMIT: usize = 1_048_576;
 
-pub(super) const OPTIONAL: &[&str] = &["{owner_name}", "{due}", "{due_date}", "{due_time}"];
+pub(super) const OPTIONAL: &[&str] = &[
+    "{owner_name}",
+    "{owner_word}",
+    "{due}",
+    "{due_date}",
+    "{due_time}",
+];
 
 /// An argument that is exactly one absent optional placeholder, or a `-` flag joined to one by `=`,
 /// is left out. A bare placeholder also takes the argument before it when that one is a flag: it

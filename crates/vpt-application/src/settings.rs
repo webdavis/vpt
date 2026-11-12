@@ -36,6 +36,7 @@ pub struct Settings {
     pub actions_command: Vec<String>,
     pub actions_final_exit_codes: Vec<i32>,
     pub actions_env: SecretEnv,
+    pub actions_owner_words: Vec<(String, String)>,
     pub import_extract_command: Vec<String>,
     pub alert_aggregate_after: u32,
     pub retention: RetentionSettings,

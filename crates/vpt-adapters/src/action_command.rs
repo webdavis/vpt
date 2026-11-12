@@ -5,7 +5,7 @@ use fields::Fields;
 use sha2::Digest;
 use std::path::Path;
 use std::time::Duration;
-use vpt_application::NoteProfile;
+use vpt_application::{NoteProfile, Settings};
 use vpt_domain::{identity::RecordingId, proposal::CheckedAction};
 
 const DEADLINE: Duration = Duration::from_secs(30);
@@ -53,13 +53,13 @@ pub fn note_link(note: &Path, profile: NoteProfile) -> String {
     }
 }
 
-pub fn send_action(
-    command: &[String],
-    refused: &[i32],
-    env: &[(String, String)],
-    send: &ActionSend<'_>,
-) -> SendOutcome {
+pub fn send_action(settings: &Settings, send: &ActionSend<'_>) -> SendOutcome {
     let fields = Fields::of(send.action);
+    let owner_word = settings
+        .actions_owner_words
+        .iter()
+        .find(|(kind, _)| kind == fields.owner)
+        .map_or(fields.owner, |(_, word)| word.as_str());
     let moment = match send.action.claim.grounding.sources.first() {
         Some(source) => format!(
             "{}@{}",
@@ -72,6 +72,7 @@ pub fn send_action(
         ("{text}", fields.text),
         ("{owner}", fields.owner),
         ("{owner_name}", fields.owner_name),
+        ("{owner_word}", owner_word),
         ("{due}", fields.due.as_str()),
         ("{due_date}", fields.due_date),
         ("{due_time}", fields.due_time),
@@ -81,10 +82,12 @@ pub fn send_action(
         ("{note}", send.note),
         ("{link}", send.link),
     ];
-    let Some(argv) = expand::expand(command, &values, expand::OPTIONAL) else {
+    let Some(argv) = expand::expand(&settings.actions_command, &values, expand::OPTIONAL) else {
         return SendOutcome::Failed;
     };
-    let env: Vec<_> = env
+    let env: Vec<_> = settings
+        .actions_env
+        .0
         .iter()
         .map(|(name, value)| (name.as_str(), value.as_str()))
         .collect();
@@ -92,7 +95,9 @@ pub fn send_action(
         .map(|outcome| outcome.status)
     {
         Ok(Status::Exited(0)) => SendOutcome::Sent,
-        Ok(Status::Exited(code)) if refused.contains(&code) => SendOutcome::Refused,
+        Ok(Status::Exited(code)) if settings.actions_final_exit_codes.contains(&code) => {
+            SendOutcome::Refused
+        }
         Ok(_) | Err(SpawnError::NotFound(_) | SpawnError::Io(_)) => SendOutcome::Failed,
     }
 }
