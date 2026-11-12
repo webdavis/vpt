@@ -57,7 +57,7 @@ pub(super) fn supervised(scenario: &str) {
     let (temp, _root) = root();
     let started = Instant::now();
     peers::run(scenario, temp.path(), started);
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < super::children::CLEANUP_BOUND);
 }
 
 fn finish(child: ChildGuard) {

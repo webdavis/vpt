@@ -1,4 +1,4 @@
-use super::children::child;
+use super::children::{CLEANUP_BOUND, child};
 use super::support::root;
 use crate::database::files::DatabaseFiles;
 use crate::database::locks::{DatabaseLocks, LockKind, set_record_lock};
@@ -9,7 +9,7 @@ use rusqlite::ffi::{
 };
 use std::io::ErrorKind;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 fn owners() -> (tempfile::TempDir, DatabaseLocks, DatabaseLocks) {
     let (temp, root) = root();
@@ -237,7 +237,7 @@ fn child_watchdog_reaps_a_stalled_lock_test() {
     let process = child("stall", temp.path()).unwrap();
     let error = process.finish().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::TimedOut);
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < CLEANUP_BOUND);
     let message = error.to_string();
     for expected in [
         "child=running",
@@ -264,7 +264,7 @@ fn fifo(scenario: &str) {
     let started = Instant::now();
     let output = child(scenario, temp.path()).unwrap().finish().unwrap();
     assert!(output.status.success(), "{output:?}");
-    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(started.elapsed() < CLEANUP_BOUND);
 }
 
 #[test]

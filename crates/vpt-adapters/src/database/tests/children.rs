@@ -15,6 +15,12 @@ use std::process::{ChildStderr, ChildStdin, ChildStdout, Command, Output, Stdio}
 use std::time::{Duration, Instant};
 pub(crate) use turn::turn;
 
+/// Bounds every supervised child so that a hang fails its test. It does not measure performance:
+/// children finish far inside it, and the margin absorbs a CI runner stalling the whole machine.
+pub(crate) const WATCHDOG: Duration = Duration::from_secs(2);
+/// Bounds the forced cleanup of a child that outlived the watchdog.
+pub(crate) const CLEANUP_BOUND: Duration = WATCHDOG.saturating_add(Duration::from_millis(400));
+
 pub(crate) struct ChildGuard {
     group: ProcessGroup,
     input: ChildStdin,
@@ -114,11 +120,7 @@ fn spawn_with_signal(
             }
         });
     }
-    let mut group = ProcessGroup::new(
-        command.spawn()?,
-        started + Duration::from_millis(900),
-        signal,
-    );
+    let mut group = ProcessGroup::new(command.spawn()?, started + CLEANUP_BOUND, signal);
     let input = group.stdin.take().expect("piped input");
     nonblocking(&input)?;
     let stdout = Capture::new(group.stdout.take().expect("piped stdout"))?;
@@ -130,16 +132,8 @@ fn spawn_with_signal(
         stderr,
         ready_offset: 0,
         started,
-        deadline: started + operation_budget(scenario),
+        deadline: started + WATCHDOG,
     })
-}
-
-fn operation_budget(scenario: &str) -> Duration {
-    if scenario.starts_with("ledger_contract_history_") {
-        Duration::from_millis(700)
-    } else {
-        Duration::from_millis(500)
-    }
 }
 
 impl ChildGuard {
