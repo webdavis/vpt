@@ -3,8 +3,8 @@ mod vault;
 mod vocabulary;
 
 pub use directory::planned_directory;
-use directory::{private_dir, prospective};
-use std::path::{Component, Path, PathBuf};
+use directory::private_dir;
+use std::path::{Path, PathBuf};
 pub use vault::resolve_vault;
 use vpt_application::{Settings, StorePaths};
 use vpt_domain::layout::{RootName, StoreKey, check_overlaps};
@@ -12,7 +12,7 @@ use vpt_domain::layout::{RootName, StoreKey, check_overlaps};
 #[derive(Debug, PartialEq, Eq)]
 pub enum RootError {
     NotAbsolute { key: String },
-    ParentMissing { key: String },
+    UnresolvedParent { key: String },
     NotADirectory { key: String },
     PathEscape { key: String },
     Overlap { first: String, second: String },
@@ -49,7 +49,7 @@ pub fn resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootErro
             .join(config_dir)
     };
     let config_dir = planned_directory(&config_path, "config")?;
-    let stores = store_paths(settings, &home)?;
+    let stores = store_paths(settings)?;
     let mut roots = vec![
         (RootName::Home, home.as_path()),
         (RootName::State, state_dir.as_path()),
@@ -76,8 +76,8 @@ pub fn resolve(settings: &Settings, config_dir: &Path) -> Result<Roots, RootErro
 
 pub fn resolve_stores(settings: &Settings) -> Result<StorePaths, RootError> {
     resolve_vault(settings)?;
-    let home = planned_directory(&settings.home, "home.path")?;
-    let stores = store_paths(settings, &home)?;
+    planned_directory(&settings.home, "home.path")?;
+    let stores = store_paths(settings)?;
     let roots = StoreKey::all()
         .iter()
         .map(|key| (RootName::Store(*key), stores.get(*key)))
@@ -86,28 +86,12 @@ pub fn resolve_stores(settings: &Settings) -> Result<StorePaths, RootError> {
     Ok(stores)
 }
 
-fn store_paths(settings: &Settings, home: &Path) -> Result<StorePaths, RootError> {
+fn store_paths(settings: &Settings) -> Result<StorePaths, RootError> {
     let mut stores = settings.stores.clone();
     for key in StoreKey::all() {
         let configured = settings.stores.get(key);
-        let below_home = configured
-            .strip_prefix(&settings.home)
-            .ok()
-            .and_then(|rest| {
-                let mut components = rest.components();
-                match (components.next(), components.next()) {
-                    (Some(Component::Normal(name)), None) => Some(home.join(name)),
-                    _ => None,
-                }
-            });
-        stores.set(
-            key,
-            prospective(
-                configured,
-                &format!("stores.{}", key.key_name()),
-                below_home,
-            )?,
-        );
+        let key_name = format!("stores.{}", key.key_name());
+        stores.set(key, planned_directory(configured, &key_name)?);
     }
     Ok(stores)
 }

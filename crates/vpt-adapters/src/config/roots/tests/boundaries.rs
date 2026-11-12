@@ -154,20 +154,29 @@ fn relative_roots_and_regular_files_are_refused() {
 }
 
 #[test]
-fn missing_home_does_not_authorize_parent_traversal_or_deep_store_parents() {
+fn parent_traversal_below_a_missing_folder_is_refused() {
     let temp = fixture();
     let before = source_snapshot(temp.path());
-    for path in ["h/../voice-memos/evil", "h/deep/audio"] {
-        let mut settings = settings_in(temp.path());
-        settings.stores.audio = temp.path().join(path);
-        assert_eq!(
-            resolve(&settings, &temp.path().join("cfg")),
-            Err(RootError::ParentMissing {
-                key: "stores.audio".into()
-            })
-        );
-    }
+    let mut settings = settings_in(temp.path());
+    settings.stores.audio = temp.path().join("h/../voice-memos/evil");
+    assert_eq!(
+        resolve(&settings, &temp.path().join("cfg")),
+        Err(RootError::UnresolvedParent {
+            key: "stores.audio".into()
+        })
+    );
     assert_eq!(source_snapshot(temp.path()), before);
+    assert!(!temp.path().join("h").exists());
+}
+
+#[test]
+fn deep_store_below_a_missing_home_is_planned_without_writes() {
+    let temp = fixture();
+    let mut settings = settings_in(temp.path());
+    settings.stores.audio = temp.path().join("h/deep/audio");
+    let roots = resolve(&settings, &temp.path().join("cfg")).expect("resolve");
+    let canonical = temp.path().canonicalize().expect("canonical");
+    assert_eq!(roots.stores.audio, canonical.join("h/deep/audio"));
     assert!(!temp.path().join("h").exists());
 }
 

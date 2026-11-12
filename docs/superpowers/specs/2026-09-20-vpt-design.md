@@ -1656,7 +1656,7 @@ Refused at startup, before any work, exit 2 or 3 as marked:
 - config file missing (2, with the `vpt setup` command printed; `vpt setup` and `vpt --version` are the
   two verbs that run without one), unparseable (2), a missing or unsupported `config_version` (2),
   unknown key (2), a value of the wrong type or outside its range (2).
-- a configured root that is relative after expansion or whose required parent does not exist; a store
+- a configured root that is relative after expansion or that has `..` below a missing folder; a store
   overlapping another store (the home may contain its stores); a writable store, staging path, state
   directory or release destination overlapping the Voice Memos container; a release destination
   overlapping a private store, the state directory or the config directory (2, naming the keys).

@@ -64,21 +64,53 @@ fn resolution_writes_nothing_and_creation_makes_private_leaves() {
 }
 
 #[test]
-fn external_store_requires_an_existing_parent_and_creates_only_its_leaf() {
+fn creation_makes_every_missing_folder_of_a_root_private() {
     let temp = fixture();
     let mut settings = settings_in(temp.path());
-    settings.stores.audio = temp.path().join("missing/audio");
+    settings.stores.audio = temp.path().join("missing/deeper/audio");
+    settings.state_dir = temp.path().join("local/state/vpt");
+    let roots = resolve(&settings, &temp.path().join("cfg")).expect("resolve");
+    assert!(!temp.path().join("missing").exists());
+    roots.create_leaves().expect("leaves");
+    roots.create_state_dir().expect("state");
+    for leaf in [
+        "missing",
+        "missing/deeper",
+        "missing/deeper/audio",
+        "local",
+        "local/state",
+        "local/state/vpt",
+    ] {
+        let path = temp.path().join(leaf);
+        assert_eq!(
+            fs::metadata(&path).expect("created").permissions().mode() & 0o777,
+            0o700,
+            "{leaf}"
+        );
+    }
+    assert_eq!(entries(&temp.path().join("missing/deeper")), vec!["audio"]);
+}
+
+#[test]
+fn creation_refuses_a_symlink_or_file_where_a_missing_folder_was_planned() {
+    let temp = fixture();
+    let mut settings = settings_in(temp.path());
+    settings.stores.audio = temp.path().join("planned/deeper/audio");
+    let roots = resolve(&settings, &temp.path().join("cfg")).expect("resolve");
+    symlink(temp.path().join("voice-memos"), temp.path().join("planned")).expect("link");
     assert_eq!(
-        resolve(&settings, &temp.path().join("cfg")),
-        Err(RootError::ParentMissing {
+        roots.create_leaves(),
+        Err(RootError::PathEscape {
             key: "stores.audio".into()
         })
     );
-    assert!(!settings.home.exists());
-    fs::create_dir(temp.path().join("missing")).expect("parent");
-    let roots = resolve(&settings, &temp.path().join("cfg")).expect("resolve");
-    roots.create_leaves().expect("leaves");
-    assert_eq!(entries(&temp.path().join("missing")), vec!["audio"]);
+    fs::remove_file(temp.path().join("planned")).expect("unlink");
+    fs::write(temp.path().join("planned"), b"file").expect("file");
+    assert!(roots.create_leaves().is_err());
+    assert_eq!(
+        entries(&temp.path().join("voice-memos")),
+        vec!["CloudRecordings.db", "Recordings"]
+    );
 }
 
 #[test]

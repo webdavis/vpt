@@ -51,3 +51,32 @@ fn missing_vault_is_reported_without_preventing_independent_checks() {
     assert!(detail(&checks, "vault").contains("note.obsidian.vault_root"));
     assert_eq!(snapshot(&sandbox), before);
 }
+
+#[test]
+fn doctor_accepts_roots_below_missing_folders_without_creating_them() {
+    let sandbox = configured("doctor-missing-parents");
+    let vault = sandbox.path().join("vault");
+    fs::create_dir(&vault).unwrap();
+    let nested = vault.join("vpt");
+    configure(
+        &sandbox,
+        &format!(
+            "[stores]\ntranscripts = {:?}\nanalysis = {:?}\nbriefs = {:?}\n",
+            nested.join("transcripts"),
+            nested.join("analysis"),
+            nested.join("briefs")
+        ),
+    );
+    let state = sandbox.path().join("home/.local/state/vpt");
+    let config = fs::read_to_string(sandbox.config_path()).unwrap().replace(
+        sandbox.path().join("state/vpt").to_str().unwrap(),
+        state.to_str().unwrap(),
+    );
+    fs::write(sandbox.config_path(), config).unwrap();
+    let before = snapshot(&sandbox);
+    let checks = run_json(&sandbox, 0);
+    assert!(checks.iter().all(|check| check["ok"] == true), "{checks:?}");
+    assert_eq!(snapshot(&sandbox), before);
+    assert!(!nested.exists());
+    assert!(!sandbox.path().join("home/.local").exists());
+}

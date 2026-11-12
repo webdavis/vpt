@@ -20,36 +20,13 @@ pub fn planned_directory(path: &Path, key: &str) -> Result<PathBuf, RootError> {
             None => {
                 let leaf = cursor
                     .file_name()
-                    .ok_or_else(|| RootError::ParentMissing { key: key.into() })?;
+                    .ok_or_else(|| RootError::UnresolvedParent { key: key.into() })?;
                 missing.push(leaf.to_os_string());
                 cursor = cursor
                     .parent()
-                    .ok_or_else(|| RootError::ParentMissing { key: key.into() })?;
+                    .ok_or_else(|| RootError::UnresolvedParent { key: key.into() })?;
             }
         }
-    }
-}
-
-pub(super) fn prospective(
-    path: &Path,
-    key: &str,
-    below_home: Option<PathBuf>,
-) -> Result<PathBuf, RootError> {
-    if !path.is_absolute() {
-        return Err(RootError::NotAbsolute { key: key.into() });
-    }
-    if let Some(canonical) = existing_directory(path, key)? {
-        return Ok(canonical);
-    }
-    let parent = path
-        .parent()
-        .ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
-    let leaf = path
-        .file_name()
-        .ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
-    match existing_directory(parent, key)? {
-        Some(parent) => Ok(parent.join(leaf)),
-        None => below_home.ok_or_else(|| RootError::ParentMissing { key: key.into() }),
     }
 }
 
@@ -74,13 +51,18 @@ pub(super) fn existing_directory(path: &Path, key: &str) -> Result<Option<PathBu
 }
 
 pub(super) fn private_dir(path: &Path, key: &str) -> Result<(), RootError> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
-    let name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| RootError::NotAbsolute { key: key.into() })?;
+    let invalid = || RootError::NotAbsolute { key: key.into() };
+    let mut names = Vec::new();
+    let mut existing = path;
+    loop {
+        let name = existing.file_name().and_then(|name| name.to_str());
+        names.push(name.ok_or_else(invalid)?);
+        existing = existing.parent().ok_or_else(invalid)?;
+        match existing.symlink_metadata() {
+            Err(error) if error.kind() == ErrorKind::NotFound => {}
+            _ => break,
+        }
+    }
     let map = |error| match error {
         ContainedError::Io { kind, .. } => RootError::Io {
             key: key.into(),
@@ -88,6 +70,9 @@ pub(super) fn private_dir(path: &Path, key: &str) -> Result<(), RootError> {
         },
         _ => RootError::PathEscape { key: key.into() },
     };
-    let directory = RootDir::open(parent).map_err(map)?;
-    directory.subdirectory(name).map(|_| ()).map_err(map)
+    let mut directory = RootDir::open(existing).map_err(map)?;
+    for name in names.into_iter().rev() {
+        directory = directory.subdirectory(name).map_err(map)?;
+    }
+    Ok(())
 }

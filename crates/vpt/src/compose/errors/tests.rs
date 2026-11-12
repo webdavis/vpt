@@ -38,7 +38,7 @@ fn changed_publication_is_a_named_refusal_without_private_path_text() {
 #[test]
 fn operational_errors_retain_ledger_or_store_exit_classes() {
     assert_eq!(
-        root_error(&RootError::ParentMissing {
+        root_error(&RootError::UnresolvedParent {
             key: "home.state_dir".into()
         })
         .kind,

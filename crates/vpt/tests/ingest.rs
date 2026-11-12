@@ -12,6 +12,8 @@ mod fixture;
 mod identity;
 #[path = "ingest/logging.rs"]
 mod logging;
+#[path = "ingest/missing_parents.rs"]
+mod missing_parents;
 #[path = "ingest/output.rs"]
 mod output;
 #[path = "ingest/reporting.rs"]
