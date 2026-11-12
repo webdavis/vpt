@@ -6,6 +6,7 @@ use vpt_domain::layout::StoreKey;
 
 mod boundaries;
 mod vault;
+mod vocabulary;
 
 fn fixture() -> tempfile::TempDir {
     let temp = tempfile::tempdir().expect("owned fixture");
