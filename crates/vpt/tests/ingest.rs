@@ -2,6 +2,8 @@
 #![allow(dead_code, reason = "shared CLI fixtures")]
 #[path = "ingest/abort.rs"]
 mod abort;
+#[path = "ingest/absent_source.rs"]
+mod absent_source;
 #[path = "ingest/capture_time.rs"]
 mod capture_time;
 #[path = "ingest/config_refusal.rs"]

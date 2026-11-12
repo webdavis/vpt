@@ -19,7 +19,7 @@ use vpt_domain::time::FileTime;
 pub use selection::APPLE_SUBDIRECTORIES;
 
 pub struct VoiceMemosStore {
-    recordings: RootDir,
+    recordings: Option<RootDir>,
     titles: Option<Titles>,
 }
 
@@ -35,10 +35,23 @@ impl VoiceMemosStore {
     }
 
     pub fn open(recordings_dir: &Path) -> Result<Self, ContainedError> {
+        let recordings = match RootDir::open(recordings_dir) {
+            Err(ContainedError::Io {
+                kind: std::io::ErrorKind::NotFound,
+                ..
+            }) => None,
+            opened => Some(opened?),
+        };
         Ok(Self {
-            recordings: RootDir::open(recordings_dir)?,
+            recordings,
             titles: None,
         })
+    }
+
+    fn recordings(&self, path: &Path) -> Result<&RootDir, RecorderError> {
+        self.recordings
+            .as_ref()
+            .ok_or_else(|| RecorderError::NotFound(path.into()))
     }
 }
 
@@ -60,19 +73,20 @@ impl RecorderStore for VoiceMemosStore {
     }
 
     fn refresh_titles(&self) -> Result<(), RecorderError> {
-        self.titles
-            .as_ref()
-            .map_or(Ok(()), |titles| titles.refresh(&self.recordings))
+        match (&self.titles, &self.recordings) {
+            (Some(titles), Some(recordings)) => titles.refresh(recordings),
+            _ => Ok(()),
+        }
     }
 
     fn candidates(&self) -> Result<Vec<Candidate>, RecorderError> {
-        let names = self
-            .recordings
+        let recordings = self.recordings.as_ref().ok_or(RecorderError::Absent)?;
+        let names = recordings
             .names()
-            .map_err(|error| listing_error(self.recordings.path(), error))?;
+            .map_err(|error| listing_error(recordings.path(), error))?;
         let mut candidates = Vec::new();
         for name in names {
-            match selection::named(&self.recordings, &name) {
+            match selection::named(recordings, &name) {
                 Ok(Some(candidate)) => candidates.push(candidate),
                 Ok(None) | Err(RecorderError::NotRegular(_)) => {}
                 Err(error) => return Err(error),
@@ -82,20 +96,19 @@ impl RecorderStore for VoiceMemosStore {
     }
 
     fn candidate(&self, path: &Path) -> Result<Candidate, RecorderError> {
-        let leaf = self
-            .recordings
+        let recordings = self.recordings(path)?;
+        let leaf = recordings
             .leaf(path)
             .map_err(|error| recorder_error(path, error))?;
         let name = leaf
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or_else(|| RecorderError::Escape(path.into()))?;
-        selection::named(&self.recordings, name)?
-            .ok_or_else(|| RecorderError::NotFound(path.into()))
+        selection::named(recordings, name)?.ok_or_else(|| RecorderError::NotFound(path.into()))
     }
 
     fn open(&self, path: &Path) -> Result<File, RecorderError> {
-        self.recordings
+        self.recordings(path)?
             .open_file(path, Access::Read)
             .map_err(|error| recorder_error(path, error))
     }
@@ -130,18 +143,7 @@ impl RecorderStore for VoiceMemosStore {
     }
 
     fn subdirectory_counts(&self) -> Vec<(String, Option<u64>)> {
-        APPLE_SUBDIRECTORIES
-            .iter()
-            .map(|name| {
-                let count = self
-                    .recordings
-                    .open_subdirectory(name)
-                    .ok()
-                    .and_then(|directory| directory.names().ok())
-                    .map(|entries| entries.len() as u64);
-                ((*name).into(), count)
-            })
-            .collect()
+        selection::subdirectory_counts(self.recordings.as_ref())
     }
 }
 

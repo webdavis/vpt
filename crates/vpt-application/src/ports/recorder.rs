@@ -21,6 +21,7 @@ pub struct SourceMetadata {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RecorderError {
+    Absent,
     Unreadable(String),
     NotRegular(PathBuf),
     NotFound(PathBuf),

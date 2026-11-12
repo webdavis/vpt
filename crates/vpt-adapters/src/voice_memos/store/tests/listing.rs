@@ -109,14 +109,13 @@ pub(super) fn counts(f: &Fixture) {
 }
 
 pub(super) fn root_guards(f: &Fixture) {
-    let absent = f.audio.join("absent");
-    assert!(matches!(
-        VoiceMemosStore::open(&absent),
-        Err(ContainedError::Io {
-            kind: std::io::ErrorKind::NotFound,
-            ..
-        })
-    ));
+    let absent = VoiceMemosStore::open(&f.audio.join("absent")).unwrap();
+    assert_eq!(absent.candidates(), Err(RecorderError::Absent));
+    let missing = f.audio.join("absent/a.m4a");
+    assert_eq!(
+        absent.candidate(&missing),
+        Err(RecorderError::NotFound(missing.clone()))
+    );
     let linked = f.audio.join("linked");
     symlink(&f.recordings, &linked).unwrap();
     assert!(matches!(

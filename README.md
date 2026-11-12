@@ -74,6 +74,11 @@ opening them. A previously deferred file must also keep the same size across swe
 is the container's creation time when it is set, else the file's modification time. A creation time
 before 1971 counts as unset.
 
+Voice Memos creates its `Recordings` folder with its first recording. Until then, `vpt ingest` and
+`vpt run` find nothing to ingest, exit 0, and say so in `diagnostics`, so `vpt run` still processes
+imported recordings. vpt never creates the folder. A folder that exists but cannot be read still fails
+the sweep, and so does a folder that disappears after vpt has ingested from it.
+
 Deferrals retain their reason and consecutive count. The fourth deferral sends one alert if an alert
 command is configured; later retries do not repeat it. `source.deferral_page_threshold` changes that
 threshold. Successful ingestion clears the deferral state. Dry runs leave files, ledger state,

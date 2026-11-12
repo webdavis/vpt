@@ -1,10 +1,13 @@
 use super::*;
+use std::os::unix::fs::PermissionsExt;
 
 #[test]
 fn unreadable_source_records_one_safe_failure_event() {
     let sandbox = configured();
-    std::fs::remove_dir(sandbox.path().join("voice-memos/Recordings")).unwrap();
+    let recordings = sandbox.path().join("voice-memos/Recordings");
+    std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o000)).unwrap();
     let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
     let log = std::fs::read_to_string(sandbox.path().join("state/vpt/events.jsonl")).unwrap();

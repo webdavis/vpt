@@ -152,17 +152,22 @@ fn startup_refuses_replaced_brief_bytes_and_keeps_the_pending_pack() {
 }
 
 #[test]
-fn startup_preserves_brief_completion_when_pipeline_source_is_missing() {
-    let sandbox = fixture::configured("brief-then-missing-source");
+fn startup_preserves_brief_completion_when_pipeline_source_is_unreadable() {
+    use std::os::unix::fs::PermissionsExt;
+    let sandbox = fixture::configured("brief-then-unreadable-source");
     let artifact = pending(&sandbox);
+    let recordings = sandbox.path().join("unreadable-source/Recordings");
+    std::fs::create_dir_all(&recordings).unwrap();
+    std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o000)).unwrap();
     fixture::write_config(
         &sandbox,
         &format!(
             "[source]\nrecordings_dir={:?}\n[engines]\nmain='custom'\n[engines.custom]\nkind='command'\nfamily='independent'\nlocal=true\ncommand=['/usr/bin/false']\n",
-            sandbox.path().join("missing-source/Recordings")
+            recordings
         ),
     );
     let output = invoke(&sandbox, &["run", "--json"]);
+    std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert!(!output.status.success());
     let error: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(
