@@ -58,7 +58,7 @@ fn foreign_recording_header_is_refused_before_any_mutation() {
     fs::write(
         &path,
         format!(
-            "---\nvptRecording: {}\n---\n- Private claim\n",
+            "---\nvpt-recording: {}\n---\n- Private claim\n",
             fixture::record(&sandbox, 9, StageStates::fresh()).id
         ),
     )

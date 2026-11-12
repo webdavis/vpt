@@ -88,24 +88,24 @@ fn brief_profiles_keep_exact_evidence_inline_certainty_and_saved_provenance() {
             assert!(content.contains("## Open tasks\n\nNone."));
             assert!(content.contains("vpt confirm --term"));
             for field in [
-                "vptKind: \"brief\"",
-                "vptOccasion:",
-                "vptOccasionAt:",
-                "vptSource: \"manual\"",
-                "vptNotes:",
-                "vptUnresolved:",
-                "vptContext:",
+                "vpt-kind: \"brief\"",
+                "vpt-occasion:",
+                "vpt-occasion-at:",
+                "vpt-source: \"manual\"",
+                "vpt-notes:",
+                "vpt-unresolved:",
+                "vpt-context:",
             ] {
                 assert!(saved.text.contains(field), "{field}");
             }
             assert!(saved.text.contains(&source.digest.hex()));
             assert!(saved.text.contains("2026-10-01T10:00:00-06:00"));
-            assert!(!saved.text.contains("createdDate:"));
-            assert!(!saved.text.contains("createdTime:"));
+            assert!(!saved.text.contains("created-date:"));
+            assert!(!saved.text.contains("created-time:"));
             if profile == "obsidian" {
                 let date = saved.first_written.civil(saved.write_offset);
                 assert!(saved.text.contains(&format!(
-                    "startDate: \"{:04}-{:02}-{:02}\"",
+                    "start-date: \"{:04}-{:02}-{:02}\"",
                     date.year, date.month, date.day
                 )));
                 let hub = if style == "wiki" {

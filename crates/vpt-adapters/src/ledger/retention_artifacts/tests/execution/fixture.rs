@@ -173,8 +173,8 @@ pub fn seed(ledger: &impl Ledger, world: &World) {
             world.paths.analysis.join("owned.md")
         };
         note.text = note.text.replace(
-            "vptStage: transcript",
-            &format!("vptStage: {}", stage.as_str()),
+            "vpt-stage: transcript",
+            &format!("vpt-stage: {}", stage.as_str()),
         );
         note.digest = notes::hash(note.text.as_bytes());
         delta.commit.publications[0].target = note.target.clone();

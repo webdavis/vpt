@@ -26,14 +26,14 @@ impl<'a> Document<'a> {
                 .map(|field| field.value_node)
                 .ok_or(NoteError::Frontmatter)
         };
-        let schema = tree.integer(get("vptSchema")?)?;
+        let schema = tree.integer(get("vpt-schema")?)?;
         if schema == 0 {
             return Err(NoteError::Frontmatter);
         }
-        if tree.string(get("vptKind")?)? != "brief" {
+        if tree.string(get("vpt-kind")?)? != "brief" {
             return Err(NoteError::Stage);
         }
-        let id = OccasionId::parse(tree.string(get("vptOccasion")?)?)
+        let id = OccasionId::parse(tree.string(get("vpt-occasion")?)?)
             .map_err(|_| NoteError::Identity)?;
         let tags = fields
             .iter()

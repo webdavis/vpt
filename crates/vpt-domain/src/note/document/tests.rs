@@ -44,7 +44,7 @@ fn portable_note_has_typed_provenance_and_separate_empty_links_and_content_regio
     let rendered = create(&input).unwrap();
     assert_eq!(
         rendered,
-        "---\nvptSchema: 1\nvptRecording: \"2026-08-24T144736-4f3ab19c02de\"\nvptStage: \"transcript\"\nvptCapturedAt: \"2026-08-24T14:47:36-06:00\"\nvptDurationSecs: 612\nvptLanguage: \"en-US\"\nvptOpenFlags: 6\nvptDiagnostics: 1\nvptEngines:\n  - \"apple:SpeechTranscriber\"\n  - \"whisply:large-v3-turbo\"\nvptReadability: false\ntags:\n  - \"invoice\"\nvptSuggestedTags:\n  - \"billing/quarterly\"\n---\n# 2026-08-24-invoice-call-4f3ab19c\n\n<!-- vpt:links start -->\n<!-- vpt:links end -->\n\n<!-- vpt:content start -->\n## Transcript\n\n[00:00] Example.\n<!-- vpt:content end -->\n"
+        "---\nvpt-schema: 1\nvpt-recording: \"2026-08-24T144736-4f3ab19c02de\"\nvpt-stage: \"transcript\"\nvpt-captured-at: \"2026-08-24T14:47:36-06:00\"\nvpt-duration-secs: 612\nvpt-language: \"en-US\"\nvpt-open-flags: 6\nvpt-diagnostics: 1\nvpt-engines:\n  - \"apple:SpeechTranscriber\"\n  - \"whisply:large-v3-turbo\"\nvpt-readability: false\ntags:\n  - \"invoice\"\nvpt-suggested-tags:\n  - \"billing/quarterly\"\n---\n# 2026-08-24-invoice-call-4f3ab19c\n\n<!-- vpt:links start -->\n<!-- vpt:links end -->\n\n<!-- vpt:content start -->\n## Transcript\n\n[00:00] Example.\n<!-- vpt:content end -->\n"
     );
     assert_eq!(Regions::parse(&rendered).unwrap().content(), input.content);
 }
@@ -61,9 +61,9 @@ fn obsidian_fields_come_first_and_start_date_uses_local_first_write_time() {
         write_offset: UtcOffset { secs: -3600 },
     };
     let rendered = create(&input).unwrap();
-    assert!(rendered.starts_with("---\naliases:\n  - \"Invoice call\"\nreference: \"[[audio.m4a]]\"\nhub: \"[[transcripts]]\"\ntags: []\nstatus: \"active\"\ndescription: \"Voice memo recorded 2026-08-24\"\nstartDate: \"1969-12-31\"\nvptSchema: 1\n"));
-    assert!(!rendered.contains("createdDate"));
-    assert!(!rendered.contains("createdTime"));
+    assert!(rendered.starts_with("---\naliases:\n  - \"Invoice call\"\nreference: \"[[audio.m4a]]\"\nhub: \"[[transcripts]]\"\ntags: []\nstatus: \"active\"\ndescription: \"Voice memo recorded 2026-08-24\"\nstart-date: \"1969-12-31\"\nvpt-schema: 1\n"));
+    assert!(!rendered.contains("created-date"));
+    assert!(!rendered.contains("created-time"));
     assert_eq!(rendered.matches("\ntags:").count(), 1);
 }
 
@@ -74,14 +74,14 @@ fn external_frontmatter_values_cannot_inject_keys_or_managed_markers() {
     let tags = vec!["yes\nstatus: stolen\n---\n<!-- vpt:content end -->".into()];
     input.tags = &tags;
     input.profile = Profile::Obsidian {
-        title: Some("\"quoted\"\\\t\n---\nvptSchema: 9"),
+        title: Some("\"quoted\"\\\t\n---\nvpt-schema: 9"),
         reference: "[Audio](../audio.m4a)",
         hub: "[transcripts](transcripts.md)",
         first_written: UtcInstant { secs: 0 },
         write_offset: UtcOffset { secs: 0 },
     };
     let rendered = create(&input).unwrap();
-    assert_eq!(rendered.matches("\nvptSchema:").count(), 1);
+    assert_eq!(rendered.matches("\nvpt-schema:").count(), 1);
     assert_eq!(rendered.matches("\n---\n").count(), 1);
     assert!(!rendered.contains("\nstatus: stolen"));
     assert!(Regions::parse(&rendered).is_ok());
@@ -126,8 +126,8 @@ fn analysis_document_uses_its_stage_and_fixed_claim_sections_in_both_profiles() 
     ] {
         input.profile = profile;
         let rendered = create(&input).unwrap();
-        assert!(rendered.contains("vptStage: \"analysis\"\n"), "{rendered}");
-        assert!(rendered.contains("vptOpenFlags: 6\nvptDiagnostics: 1\n"));
+        assert!(rendered.contains("vpt-stage: \"analysis\"\n"), "{rendered}");
+        assert!(rendered.contains("vpt-open-flags: 6\nvpt-diagnostics: 1\n"));
         assert!(rendered.contains("# 2026-08-24-invoice-call-4f3ab19c\n"));
         let regions = Regions::parse(&rendered).unwrap();
         assert_eq!(regions.content(), input.content);

@@ -122,7 +122,7 @@ fn lexical_confirmation_refreshes_inherited_uncertainty_once_without_retranscrib
     assert!(input.review.stale_artifacts.is_empty());
     for note in &input.notes {
         assert!(!note.text.contains("[built-on-flagged-text]"));
-        assert!(note.text.contains("vptOpenFlags: 0\n"));
+        assert!(note.text.contains("vpt-open-flags: 0\n"));
     }
     let transcript = input
         .notes

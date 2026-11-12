@@ -15,7 +15,7 @@ fn each_store_uses_its_own_hold_and_preserves_modified_pending_and_untracked_not
         .unwrap();
     let mut changed = std::fs::read_to_string(&analysis.path)
         .unwrap()
-        .replace("vptStage: analysis", "vptStage: transcript");
+        .replace("vpt-stage: analysis", "vpt-stage: transcript");
     std::fs::write(&analysis.path, &changed).unwrap();
     std::fs::write(world.paths.analysis.join("manual.md"), "operator file").unwrap();
     let trash = MovingTrash::new(&ledger, &world);
@@ -40,7 +40,7 @@ fn each_store_uses_its_own_hold_and_preserves_modified_pending_and_untracked_not
     );
     assert!(report.kept.iter().any(|r| r.reason.as_str() == "untracked"));
     assert!(ledger.pending_intents().unwrap().is_empty());
-    changed = changed.replace("vptStage: transcript", "vptStage: analysis");
+    changed = changed.replace("vpt-stage: transcript", "vpt-stage: analysis");
     std::fs::write(&analysis.path, &changed).unwrap();
     ledger
         .commit(&LedgerCommit {

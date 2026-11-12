@@ -70,8 +70,8 @@ fn rewriting_keeps_the_pin_and_operator_content_while_applying_readability() {
     success(&invoke(&sandbox, row.id.as_str()));
     let first = saved(&sandbox, &row);
     let edited = first.text.replace(
-        "tags: []",
-        "tags: [manual]\nstatus: complete\ncustom: 'operator field'",
+        "\ntags: []",
+        "\ntags: [manual]\nstatus: complete\ncustom: 'operator field'",
     ) + "\nOperator ending\n";
     std::fs::write(&first.target, &edited).unwrap();
     fixture::write_config(
@@ -112,7 +112,7 @@ fn an_untracked_occupant_is_preserved_even_with_matching_identity() {
     let directory = sandbox.path().join("home/.vpt/transcripts");
     std::fs::create_dir_all(&directory).unwrap();
     let path = directory.join("2026-08-24-title-7-07070707.md");
-    let foreign = format!("---\nvptRecording: {}\n---\nOperator file", row.id);
+    let foreign = format!("---\nvpt-recording: {}\n---\nOperator file", row.id);
     std::fs::write(&path, &foreign).unwrap();
     let output = invoke(&sandbox, row.id.as_str());
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
@@ -170,7 +170,7 @@ fn a_future_schema_is_readable_but_not_rewritten() {
     let (sandbox, row) = configured();
     success(&invoke(&sandbox, row.id.as_str()));
     let first = saved(&sandbox, &row);
-    let text = first.text.replace("vptSchema: 1", "vptSchema: 2");
+    let text = first.text.replace("vpt-schema: 1", "vpt-schema: 2");
     std::fs::write(&first.target, &text).unwrap();
     let output = invoke(&sandbox, row.id.as_str());
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
@@ -187,7 +187,7 @@ fn explicit_regeneration_preserves_saved_operator_edits_after_expiration() {
     let first = saved(&sandbox, &row);
     let edited = first
         .text
-        .replace("tags: []", "tags: [manual]\ncustom: 'keep me'")
+        .replace("\ntags: []", "\ntags: [manual]\ncustom: 'keep me'")
         + "\nOperator ending\n";
     std::fs::write(&first.target, edited).unwrap();
     success(&invoke(&sandbox, row.id.as_str()));

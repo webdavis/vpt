@@ -58,7 +58,7 @@ fn seeded(extra: &str) -> (Sandbox, RecordingRecord) {
         .unwrap()
         .replace_content(&content)
         .unwrap()
-        .replace("vptStage: \"transcript\"", "vptStage: \"analysis\"");
+        .replace("vpt-stage: \"transcript\"", "vpt-stage: \"analysis\"");
     let stores = FilesystemStores::open(&[]).unwrap();
     note.digest = stores.digest_bytes(note.text.as_bytes());
     note.content_digest = stores.digest_bytes(content.as_bytes());
@@ -258,7 +258,7 @@ fn resolving_an_analysis_finding_updates_its_annotation_and_both_counts() {
         next.text
     );
     for note in [saved(&sandbox, &row), next.clone()] {
-        assert!(note.text.contains("vptOpenFlags: 0\n"));
+        assert!(note.text.contains("vpt-open-flags: 0\n"));
     }
     success(&invoke(&sandbox, row.id.as_str()));
     assert_eq!(analysis(&sandbox, &row).text, next.text);

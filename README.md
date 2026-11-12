@@ -262,7 +262,7 @@ Malformed markers, foreign occupants, and unsupported schemas refuse rewriting.
 Readability is off by default. `[readability] enabled = true` capitalizes sentence starts,
 adds missing segment-ending full stops, and removes `um`, `uh`, `erm`, and `like` followed by a
 comma. Every lexical flag protects its original words, including formatting flags; corrections and
-uncertainty markers are preserved. The note records `vptReadability`, and accepted transcripts and
+uncertainty markers are preserved. The note records `vpt-readability`, and accepted transcripts and
 raw engine documents remain unchanged. Changing the setting refreshes notes from saved state.
 
 Wiki links include the target's folder path, so transcript and analysis notes with the same filename

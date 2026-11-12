@@ -5,7 +5,7 @@ fn id() -> RecordingId {
 }
 fn owned() -> String {
     format!(
-        "---\nvptSchema: 1\nvptRecording: {}\nvptStage: transcript\ntitle: PRIVATE\ntags: [PRIVATE]\n---\nOperator PRIVATE\n<!-- vpt:links start -->\n[PRIVATE](secret)\n<!-- vpt:links end -->\n<!-- vpt:content start -->\nAlice met Atlas.\n<!-- vpt:content end -->\nOperator tail PRIVATE\n",
+        "---\nvpt-schema: 1\nvpt-recording: {}\nvpt-stage: transcript\ntitle: PRIVATE\ntags: [PRIVATE]\n---\nOperator PRIVATE\n<!-- vpt:links start -->\n[PRIVATE](secret)\n<!-- vpt:links end -->\n<!-- vpt:content start -->\nAlice met Atlas.\n<!-- vpt:content end -->\nOperator tail PRIVATE\n",
         id()
     )
 }

@@ -408,7 +408,7 @@ Five rules:
 1. Retention considers only files the ledger records as vpt's own: an audio clone, an engine output, a
    transcript or analysis note, a brief, a private report or a released copy, current artifacts included.
    Before a move it verifies that the path still identifies that artifact: for a note or brief, its
-   canonical ledger-owned path, its `vptRecording` or `vptOccasion`, its `vptStage` or `vptKind` and its
+   canonical ledger-owned path, its `vpt-recording` or `vpt-occasion`, its `vpt-stage` or `vpt-kind` and its
    required markers must all identify the selected artifact, the same test `verify-note` applies (section
    8.2); for every other file, the recorded digest must match. An untracked regular file in a store and a
    path whose identity, stage or digest names another artifact are kept and reported under `kept` with
@@ -663,7 +663,7 @@ Flags come in three shapes. A lexical flag covers one or more word ranges of the
 flag covers the whole recording and has no range: `single-engine`, `language-mismatch` and `divergent`. A
 verification finding (section 8.2) belongs to one claim of one artifact and may have no source range.
 Diagnostic flags appear in `vpt review`, are counted separately (`diagnostics` in events,
-`vptDiagnostics` in frontmatter), and overlap no span, so they neither hold back the readability pass nor
+`vpt-diagnostics` in frontmatter), and overlap no span, so they neither hold back the readability pass nor
 omit text from a redacted copy. `divergent` additionally marks the transcript unverified for consumers (a
 brief and a stage's text report `reviewed: false`) while confidence and risk-class classification continue
 over the record engine's text.
@@ -701,7 +701,7 @@ capitalization, a terminal full stop at a segment boundary that lacks one, and r
 closed filler list (`um`, `uh`, `erm`, `like` only when followed by a comma). It never touches a span
 that carries a lexical flag of any class, including `formatting`: the flagged words and their inline
 markers are copied through byte for byte. The pass is a pure function of (segments, flags, config) and
-the note records `vptReadability: true` when it ran.
+the note records `vpt-readability: true` when it ran.
 
 ### 6.6 What gets written
 
@@ -734,7 +734,7 @@ resolved flag stays resolved across re-runs. Every resolution re-renders the not
 changes the analysis input and makes a succeeded analysis `pending` again (section 3.3). The inline
 marker in the note is the exact word wrapped as `[unverified: <record text> | <alternative>]` for a
 disagreement and `[unverified: <text>]` for the other classes; the note's frontmatter carries
-`vptOpenFlags`.
+`vpt-open-flags`.
 
 ## 7. Stage 3: Vault note
 
@@ -743,25 +743,25 @@ disagreement and `[unverified: <text>]` for the other classes; the note's frontm
 `[note] profile` is `portable` (shipped default, what every test runs against) or `obsidian`. Both write
 the same body; the profile decides the frontmatter and the link style.
 
-Portable frontmatter, flat keys only, every key prefixed `vpt` in camelCase because that is what a
-Dataview query reads as `p.vptRecording`:
+Portable frontmatter, flat keys only, every key prefixed `vpt-` in kebab-case, which is the vault's rule for
+every property name; a Dataview query reads one as `p["vpt-recording"]`:
 
 ```markdown
 ---
-vptSchema: 1
-vptRecording: 2026-08-24T144736-4f3ab19c02de
-vptStage: transcript
-vptCapturedAt: 2026-08-24T14:47:36-06:00
-vptDurationSecs: 612
-vptOpenFlags: 6
-vptDiagnostics: 0
-vptEngines:
+vpt-schema: 1
+vpt-recording: 2026-08-24T144736-4f3ab19c02de
+vpt-stage: transcript
+vpt-captured-at: 2026-08-24T14:47:36-06:00
+vpt-duration-secs: 612
+vpt-open-flags: 6
+vpt-diagnostics: 0
+vpt-engines:
   - apple:SpeechTranscriber
   - whisply:large-v3-turbo
-vptReadability: false
+vpt-readability: false
 tags:
   - invoice
-vptSuggestedTags:
+vpt-suggested-tags:
   - billing/quarterly
 ---
 ```
@@ -779,23 +779,23 @@ tags:
   - invoice
 status: active
 description: Voice memo recorded 2026-08-24
-startDate: 2026-08-24
-vptSchema: 1
-vptRecording: 2026-08-24T144736-4f3ab19c02de
+start-date: 2026-08-24
+vpt-schema: 1
+vpt-recording: 2026-08-24T144736-4f3ab19c02de
 ...
 ---
 ```
 
 `hub` is `[note.obsidian] hub_transcripts`, `hub_analysis` and `hub_briefs`, the folder note names
-(defaults `transcripts`, `analysis`, `briefs`). On first write `status` is `active` and `startDate` is
+(defaults `transcripts`, `analysis`, `briefs`). On first write `status` is `active` and `start-date` is
 the note's own creation date, the local date on which vpt first writes it, which is the vault's rule for
-a regular note; the capture instant stays in `vptCapturedAt` and the capture date in the filename. A
-rewrite preserves whatever `status`, `startDate` and `description` the note carries, so a value the
+a regular note; the capture instant stays in `vpt-captured-at` and the capture date in the filename. A
+rewrite preserves whatever `status`, `start-date` and `description` the note carries, so a value the
 operator set (`complete`, `archived`, `capture`, `needs-correction`) is never undone. Uncertainty is
-carried by `vptOpenFlags` and the inline markers, never by `status`. A wiki link in frontmatter is always
-quoted, because the unquoted form parses as a nested sequence. `vptSchema` is an integer and the only
-compatibility signal: a note whose `vptSchema` is higher than the build understands is read and never
-rewritten, and the mismatch is reported. `createdDate` and `createdTime` are never written.
+carried by `vpt-open-flags` and the inline markers, never by `status`. A wiki link in frontmatter is always
+quoted, because the unquoted form parses as a nested sequence. `vpt-schema` is an integer and the only
+compatibility signal: a note whose `vpt-schema` is higher than the build understands is read and never
+rewritten, and the mismatch is reported. `created-date` and `created-time` are never written.
 
 `[note] link_style` is `markdown` (default; `[Name](relative/path.md)`, destination URL-encoded) or
 `wiki` (`[[Name]]`). The `obsidian` profile does not force `wiki`; the operator sets both.
@@ -885,7 +885,7 @@ Indexing grants no write authority: vpt still writes into no note it did not cre
   When a later analysis drops one of those tags and no recording's tag state and no other indexed
   note carries it, the line leaves `known-tags.txt` in the same journaled publication. Any other line
   stays.
-- `hold` (shipped default): a new tag is written to `vptSuggestedTags` as `suggested` until
+- `hold` (shipped default): a new tag is written to `vpt-suggested-tags` as `suggested` until
   `vpt confirm <id> --tag <t>` promotes it or `--reject-tag` drops it.
 
 Relations and links are always written, in both settings. The switch governs tags only.
@@ -922,7 +922,7 @@ deterministic filing: total (every stage has a store), pure (a path is a functio
 title and identity, and of nothing else, not of tags, not of the clock, not of the directory's contents),
 stable (the path is pinned in the ledger at first write), explainable (`vpt path <id> --stage <stage>`
 prints it and writes nothing), collision-free (the name carries `hash8`, and a target that exists
-carrying a different `vptRecording` is refused naming both).
+carrying a different `vpt-recording` is refused naming both).
 
 Slug sanitization: Unicode normalization form KC, case folding; every character that is not a letter,
 digit or hyphen becomes a hyphen; runs collapse; leading and trailing hyphens trimmed; truncate to
@@ -930,7 +930,7 @@ digit or hyphen becomes a hyphen; runs collapse; leading and trailing hyphens tr
 that escapes its store or traverses a symbolic link in any component is refused, never repaired.
 
 When the operator renames a note inside their editor, vpt finds it again: the pinned path is missing, so
-vpt scans the store for the one note whose `vptRecording` equals the identity, re-pins to it and logs one
+vpt scans the store for the one note whose `vpt-recording` equals the identity, re-pins to it and logs one
 line. No match means the note is rewritten at the pinned path; more than one match is a refusal naming
 every claimant.
 
@@ -1015,7 +1015,7 @@ Each list is cut at a whole entry to at most 64 KiB and to its share of the 1 Mi
 marker. Tag text never reaches stdin, so the input digest and freshness do not depend on tags. Every string in the proposal is
 rendered as data under the escaping rule of section 7.2.
 
-vpt writes the analysis note from the proposal: frontmatter as in stage 3 with `vptStage: analysis`, a
+vpt writes the analysis note from the proposal: frontmatter as in stage 3 with `vpt-stage: analysis`, a
 `vpt:links` region, and a `vpt:content` region holding a `Summary` section and an `Actions` section. The
 layout is fixed: one bullet per proposal line, in proposal order, each ending with its `[mm:ss-mm:ss]`
 source reference and any verify-note annotation, and no headings of the agent's own. An action may carry
@@ -1037,9 +1037,9 @@ go through the stage 3 gates.
 reports findings for any readable note, and it writes into a vpt-owned artifact only, which means all
 three of: the path, resolved through no symbolic link, is the artifact path the ledger registers for
 `--recording` (a path re-pinned by committed rename recovery, section 7.4, included); the note's
-`vptRecording` and `vptStage` match that artifact; and its required markers validate. Any other readable
+`vpt-recording` and `vpt-stage` match that artifact; and its required markers validate. Any other readable
 file is report-only: it is left byte-identical, its findings go to the output alone and no ledger state
-changes. A file carrying a different `vptRecording` is refused, exit 3 `ownership`. Claims are read from
+changes. A file carrying a different `vpt-recording` is refused, exit 3 `ownership`. Claims are read from
 the `vpt:content` region (from the whole body of a file vpt does not own), excluding frontmatter,
 headings, code fences, the links region and any earlier verify-note annotation. Every list item and every
 sentence in a paragraph is a claim line. Four classes, in order:
@@ -1130,8 +1130,8 @@ selects nothing and appears in a `Not selected` section with the `vpt confirm --
 fix it. `--explain` prints every candidate, its selector and the matched value, rejected ones included,
 and writes nothing.
 
-The brief's Markdown carries `vptKind: brief`, `vptOccasion`, `vptOccasionAt`, `vptSource`, `vptNotes`,
-`vptUnresolved`, `vptContext`, a managed `vpt:brief` block with `Occasion`, `Unresolved`,
+The brief's Markdown carries `vpt-kind: brief`, `vpt-occasion`, `vpt-occasion-at`, `vpt-source`, `vpt-notes`,
+`vpt-unresolved`, `vpt-context`, a managed `vpt:brief` block with `Occasion`, `Unresolved`,
 `From your notes` (at most `[brief] max_spans_per_note`, default 5, per note), `Open tasks` and
 `Not selected` sections. A line resting on a flagged span carries `[unverified]` in place, inside the
 line, as well as being counted, because a consumer that quotes one bullet drops a footer and keeps the
@@ -1756,10 +1756,10 @@ Refused during a run, the recording or artifact left as it was:
 
 - a wholeness or rest gate (deferred, not refused); an unreadable or empty recordings store (1).
 - a note whose managed markers are missing, doubled or unbalanced (3, `markers`).
-- a target path carrying a different `vptRecording` or `vptOccasion` (3, `collision`).
+- a target path carrying a different `vpt-recording` or `vpt-occasion` (3, `collision`).
 - two notes claiming one identity (3, `ambiguous_note`).
 - a resolved path escaping its store or traversing a symlink (3, `path_escape`).
-- a `vptSchema` above the build's (3, `schema_ahead`, the note read and never rewritten).
+- a `vpt-schema` above the build's (3, `schema_ahead`, the note read and never rewritten).
 - residue after redaction (3, `residue`); a byte-identical released duplicate (3, `duplicate`).
 - a released destination inside a private store, the state directory, the config directory or the Voice
   Memos container (3, `private_destination`).

@@ -25,7 +25,7 @@ fn verification_updates_only_the_selected_artifact_and_counts_both_finding_sets(
     analysis.target = root.join("analysis.md");
     analysis.text = analysis
         .text
-        .replace("vptStage: \"transcript\"", "vptStage: \"analysis\"");
+        .replace("vpt-stage: \"transcript\"", "vpt-stage: \"analysis\"");
     analysis.digest = stores.digest_bytes(analysis.text.as_bytes());
     let at = UtcInstant { secs: 100 };
     analysis.updated_at = at;
@@ -83,7 +83,7 @@ fn verification_updates_only_the_selected_artifact_and_counts_both_finding_sets(
     assert!(
         fs::read_to_string(&analysis.target)
             .unwrap()
-            .contains("vptOpenFlags: 2\n")
+            .contains("vpt-open-flags: 2\n")
     );
     let connection = rusqlite::Connection::open(sandbox.path().join("state/vpt/vpt.db")).unwrap();
     fixture::preserve_wal(&connection);

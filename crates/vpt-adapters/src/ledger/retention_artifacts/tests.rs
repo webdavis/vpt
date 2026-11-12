@@ -33,7 +33,7 @@ fn inventory(
     note.target = "/analysis/pinned.md".into();
     note.text = note
         .text
-        .replace("vptStage: transcript", "vptStage: analysis");
+        .replace("vpt-stage: transcript", "vpt-stage: analysis");
     note.digest = notes::hash(note.text.as_bytes());
     analysis.commit.publications[0].target = note.target.clone();
     analysis.commit.publications[0].intended = note.digest;

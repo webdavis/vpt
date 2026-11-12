@@ -87,7 +87,7 @@ fn manual_brief_publishes_one_pinned_owned_file_and_rewrites_by_identity() {
     );
     assert!(ledger.occasion(&id).unwrap().unwrap().briefed_at.is_some());
     let edited =
-        before.text.replace("tags:", "operator: keep\ntags:") + "\nPrivate operator prose\n";
+        before.text.replace("\ntags:", "\noperator: keep\ntags:") + "\nPrivate operator prose\n";
     std::fs::write(&before.target, &edited).unwrap();
     json(&invoke(&sandbox, &["brief", id.as_str(), "--json"]));
     let after = ledger.brief(&id).unwrap().unwrap();

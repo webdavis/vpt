@@ -9,9 +9,9 @@ fn check_profile(note: &NoteArtifact, profile: &str, style: &str) {
     let document = Document::parse(&note.text).unwrap();
     document.check_owner(&note.recording, "analysis").unwrap();
     assert_eq!(document.content().unwrap(), expected_content());
-    assert!(note.text.contains("vptOpenFlags: 2\n"));
-    assert!(!note.text.contains("createdDate:"));
-    assert!(!note.text.contains("createdTime:"));
+    assert!(note.text.contains("vpt-open-flags: 2\n"));
+    assert!(!note.text.contains("created-date:"));
+    assert!(!note.text.contains("created-time:"));
     let header = note
         .text
         .strip_prefix("---\n")
@@ -39,7 +39,7 @@ fn check_profile(note: &NoteArtifact, profile: &str, style: &str) {
                 "tags",
                 "status",
                 "description",
-                "startDate"
+                "start-date"
             ]
         );
         let hub = if style == "wiki" {
@@ -51,7 +51,7 @@ fn check_profile(note: &NoteArtifact, profile: &str, style: &str) {
         assert!(note.text.contains("status: \"active\""));
         let date = note.first_written.rfc3339_with(note.write_offset);
         assert!(note.text.contains(&format!(
-            "startDate: \"{}\"",
+            "start-date: \"{}\"",
             date.split('T').next().unwrap()
         )));
     }
@@ -76,15 +76,15 @@ fn analysis_profiles_preserve_fixed_body_operator_metadata_and_saved_regeneratio
                 .unwrap()
                 .unwrap();
             check_profile(&before, profile, style);
-            let mut edited = before.text.replace("tags: []", "tags: [operator]");
+            let mut edited = before.text.replace("\ntags: []", "\ntags: [operator]");
             if profile == "obsidian" {
                 edited = edited
                     .lines()
                     .map(|line| {
                         if line.starts_with("status:") {
                             "status: archived"
-                        } else if line.starts_with("startDate:") {
-                            "startDate: '2001-02-03'"
+                        } else if line.starts_with("start-date:") {
+                            "start-date: '2001-02-03'"
                         } else if line.starts_with("description:") {
                             "description: Operator description"
                         } else {
@@ -122,7 +122,7 @@ fn analysis_profiles_preserve_fixed_body_operator_metadata_and_saved_regeneratio
             if profile == "obsidian" {
                 for line in [
                     "status: archived",
-                    "startDate: '2001-02-03'",
+                    "start-date: '2001-02-03'",
                     "description: Operator description",
                 ] {
                     assert!(saved.text.contains(line));

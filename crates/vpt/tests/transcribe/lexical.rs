@@ -160,7 +160,7 @@ fn readability_toggle_only_changes_rendered_text_and_preserves_every_lexical_mar
         .note(&row.id, NoteStage::Transcript)
         .unwrap()
         .unwrap();
-    assert!(original.text.contains("vptReadability: false"));
+    assert!(original.text.contains("vpt-readability: false"));
     assert!(
         original
             .text
@@ -200,7 +200,7 @@ fn readability_toggle_only_changes_rendered_text_and_preserves_every_lexical_mar
             .note(&row.id, NoteStage::Transcript)
             .unwrap()
             .unwrap();
-        assert!(note.text.contains(&format!("vptReadability: {enabled}")));
+        assert!(note.text.contains(&format!("vpt-readability: {enabled}")));
         let expected = if enabled {
             "[00:06] Hello. We like this.\n"
         } else {

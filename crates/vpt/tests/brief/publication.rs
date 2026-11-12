@@ -68,12 +68,12 @@ fn obsidian_profile_rewrites_preserve_properties_and_pinned_path() {
     let artifact = ledger.brief(&id).unwrap().unwrap();
     assert!(artifact.text.contains("[[Planning hub]]"));
     assert!(artifact.text.contains("aliases:"));
-    assert!(artifact.text.contains("startDate:"));
+    assert!(artifact.text.contains("start-date:"));
     std::fs::write(
         &artifact.target,
         artifact
             .text
-            .replace("vptSchema:", "operator: keep\nvptSchema:")
+            .replace("vpt-schema:", "operator: keep\nvpt-schema:")
             + "\nOperator prose\n",
     )
     .unwrap();

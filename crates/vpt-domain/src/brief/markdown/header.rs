@@ -32,19 +32,19 @@ pub(super) fn write(output: &mut Writer, note: &Note<'_>) -> Result<(), RenderEr
         )?;
         yaml::field(
             output,
-            "startDate",
+            "start-date",
             &format!("{:04}-{:02}-{:02}", local.year, local.month, local.day),
         )?;
     }
-    output.literal("vptSchema: 1\n")?;
-    yaml::field(output, "vptKind", "brief")?;
-    yaml::field(output, "vptOccasion", document.id.as_str())?;
-    yaml::field(output, "vptOccasionAt", document.occasion.at.as_str())?;
-    yaml::field(output, "vptSource", document.source.as_str())?;
+    output.literal("vpt-schema: 1\n")?;
+    yaml::field(output, "vpt-kind", "brief")?;
+    yaml::field(output, "vpt-occasion", document.id.as_str())?;
+    yaml::field(output, "vpt-occasion-at", document.occasion.at.as_str())?;
+    yaml::field(output, "vpt-source", document.source.as_str())?;
     output.literal(if document.pack.sources.is_empty() {
-        "vptNotes: []\n"
+        "vpt-notes: []\n"
     } else {
-        "vptNotes:\n"
+        "vpt-notes:\n"
     })?;
     for source in &document.pack.sources {
         yaml::field(output, "  - recording", source.recording.as_str())?;
@@ -57,10 +57,10 @@ pub(super) fn write(output: &mut Writer, note: &Note<'_>) -> Result<(), RenderEr
     }
     let unresolved = &document.pack.unresolved;
     output.literal(&format!(
-        "vptUnresolved:\n  flags: {}\n  notes_with_flags: {}\n  reviewed: {}\n",
+        "vpt-unresolved:\n  flags: {}\n  notes-with-flags: {}\n  reviewed: {}\n",
         unresolved.flags, unresolved.notes_with_flags, unresolved.reviewed
     ))?;
-    output.literal("vptContext:\n")?;
+    output.literal("vpt-context:\n")?;
     for (name, status) in [
         ("calendar", &document.context.calendar),
         ("tasks", &document.context.tasks),
@@ -78,7 +78,7 @@ pub(super) fn write(output: &mut Writer, note: &Note<'_>) -> Result<(), RenderEr
             output.literal("    detail: null\n")?;
         }
     }
-    yaml::field(output, "vptGeneratedAt", &document.generated_at.rfc3339())?;
+    yaml::field(output, "vpt-generated-at", &document.generated_at.rfc3339())?;
     if matches!(note.profile, Profile::Portable) {
         yaml::list(
             output,

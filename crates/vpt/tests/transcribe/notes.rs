@@ -39,7 +39,7 @@ fn transcription_publishes_note_before_private_safe_review_alert() {
         .expect("transcription publishes a note");
     assert_eq!(note.target, path);
     assert!(note.text.contains("[unverified: SecretAlice]"));
-    assert!(note.text.contains("vptOpenFlags: 2"));
+    assert!(note.text.contains("vpt-open-flags: 2"));
     assert_eq!(fs::read_to_string(&path).unwrap(), note.text);
     assert_eq!(result["note"], path.to_str().unwrap());
     assert_eq!(result["flags"]["low_confidence"], 1);
@@ -151,8 +151,8 @@ fn resolved_flags_stay_closed_and_corrections_survive_retranscription() {
         .note(&row.id, NoteStage::Transcript)
         .unwrap()
         .unwrap();
-    assert!(note.text.contains("vptOpenFlags: 0"));
-    assert!(note.text.contains("vptDiagnostics: 0"));
+    assert!(note.text.contains("vpt-open-flags: 0"));
+    assert!(note.text.contains("vpt-diagnostics: 0"));
     assert!(note.text.contains("[corrected: Private correction]"));
 }
 
@@ -200,7 +200,7 @@ fn transcription_uses_obsidian_readability_and_recovers_an_operator_renamed_note
         .note(&row.id, NoteStage::Transcript)
         .unwrap()
         .unwrap();
-    assert!(first.text.contains("vptReadability: true"));
+    assert!(first.text.contains("vpt-readability: true"));
     assert!(first.text.contains("[00:00] Private transcript canary."));
     assert!(first.text.contains("status: \"active\""));
     assert!(first.text.contains(&format!(

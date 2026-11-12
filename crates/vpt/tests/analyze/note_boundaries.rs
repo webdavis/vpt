@@ -25,14 +25,14 @@ fn rewriting_both_notes_restores_managed_regions_and_preserves_operator_bytes() 
                     CONTENT_START,
                     &format!("Operator middle: 世界\n\n{CONTENT_START}"),
                 )
-                .replace("tags: []", "tags: [operator]")
-                .replace("vptOpenFlags: 1", "vptOpenFlags: 77")
+                .replace("\ntags: []", "\ntags: [operator]")
+                .replace("vpt-open-flags: 1", "vpt-open-flags: 77")
                 .replace("status: \"active\"", "status: archived # keep comment")
                 .replace(
                     "description: \"Voice memo recorded 2026-08-24\"",
                     "description: |\n  Operator description\n  second line",
                 )
-                .replacen("startDate: ", "startDate: &first ", 1)
+                .replacen("start-date: ", "start-date: &first ", 1)
                 .replacen("\n---\n", "\ncustom: {nested: [one, two]} # mine\n---\n", 1)
                 + "\nOperator ending\n";
             fs::write(&artifact.target, edited).unwrap();
@@ -61,7 +61,7 @@ fn rewriting_both_notes_restores_managed_regions_and_preserves_operator_bytes() 
                 assert!(artifact.text.contains(preserved));
             }
             assert!(artifact.text.ends_with("\nOperator ending\n"));
-            assert!(artifact.text.contains("vptOpenFlags: 1\n"));
+            assert!(artifact.text.contains("vpt-open-flags: 1\n"));
             if profile == "obsidian" {
                 assert!(artifact.text.contains("status: archived # keep comment\n"));
                 assert!(
@@ -69,7 +69,7 @@ fn rewriting_both_notes_restores_managed_regions_and_preserves_operator_bytes() 
                         .text
                         .contains("description: |\n  Operator description\n  second line\n")
                 );
-                assert!(artifact.text.contains("startDate: &first "));
+                assert!(artifact.text.contains("start-date: &first "));
             }
             assert_eq!(fs::read_to_string(artifact.target).unwrap(), artifact.text);
         }
@@ -102,8 +102,8 @@ fn malformed_or_foreign_note_refuses_the_whole_two_note_rewrite() {
                 ),
                 (
                     damaged.text.replace(
-                        &format!("vptStage: \"{}\"", damaged.stage.as_str()),
-                        &format!("vptStage: \"{other_stage}\""),
+                        &format!("vpt-stage: \"{}\"", damaged.stage.as_str()),
+                        &format!("vpt-stage: \"{other_stage}\""),
                     ),
                     "foreign_note",
                 ),
@@ -114,7 +114,7 @@ fn malformed_or_foreign_note_refuses_the_whole_two_note_rewrite() {
                     "foreign_note",
                 ),
                 (
-                    damaged.text.replace("vptSchema: 1", "vptSchema: 2"),
+                    damaged.text.replace("vpt-schema: 1", "vpt-schema: 2"),
                     "schema_ahead",
                 ),
             ] {

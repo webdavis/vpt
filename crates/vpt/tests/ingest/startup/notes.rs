@@ -12,7 +12,7 @@ fn seed_note(sandbox: &Sandbox) -> NoteArtifact {
     std::fs::create_dir_all(&directory).unwrap();
     let stores = vpt_adapters::FilesystemStores::open(std::slice::from_ref(&directory)).unwrap();
     let text = format!(
-        "---\nvptSchema: 1\nvptRecording: {}\nvptStage: transcript\n---\n# Pinned\n<!-- vpt:links start -->\n<!-- vpt:links end -->\n<!-- vpt:content start -->\nPrivate note canary\n<!-- vpt:content end -->\nOperator prose canary\n",
+        "---\nvpt-schema: 1\nvpt-recording: {}\nvpt-stage: transcript\n---\n# Pinned\n<!-- vpt:links start -->\n<!-- vpt:links end -->\n<!-- vpt:content start -->\nPrivate note canary\n<!-- vpt:content end -->\nOperator prose canary\n",
         row.id
     );
     let content = vpt_adapters::note_document::Document::parse(&text)

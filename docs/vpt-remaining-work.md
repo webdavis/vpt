@@ -330,7 +330,7 @@ Product sources: specification sections 3.3, 4.3-4.5, 7, 9, and 10.
   existing spelling; multi-word tags become kebab-case; accepted syntax contains letters, digits,
   underscores, hyphens, or slashes, has a nonnumeric character, and has no leading `#`.
 - [x] Implement `tags.new_tags = hold|write`. The default `hold` keeps unknown tags in
-  `vptSuggestedTags`; `write` confirms and records them automatically. Deduplicate in proposal order,
+  `vpt-suggested-tags`; `write` confirms and records them automatically. Deduplicate in proposal order,
   default to five confirmed tags and ten suggestions, and preserve the operator's tags.
   Typed settings, selection rules, durable tag state, and transcript-note rendering are implemented.
   Analysis now applies proposals in order, preserves manual decisions, journals automatic known-tag

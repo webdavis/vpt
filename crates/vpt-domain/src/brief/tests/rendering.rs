@@ -50,14 +50,14 @@ fn brief_markdown_keeps_provenance_inline_uncertainty_and_all_managed_sections()
     let input = note(&occasion, &id, &pack, &context);
     let rendered = markdown::create(&input).unwrap();
     for key in [
-        "vptSchema: 1",
-        "vptKind: \"brief\"",
-        "vptOccasion:",
-        "vptOccasionAt:",
-        "vptSource:",
-        "vptNotes:",
-        "vptUnresolved:",
-        "vptContext:",
+        "vpt-schema: 1",
+        "vpt-kind: \"brief\"",
+        "vpt-occasion:",
+        "vpt-occasion-at:",
+        "vpt-source:",
+        "vpt-notes:",
+        "vpt-unresolved:",
+        "vpt-context:",
     ] {
         assert!(rendered.contains(key), "{key}");
     }
@@ -137,7 +137,7 @@ fn fetched_text_cannot_create_markers_links_or_sections_and_obsidian_uses_first_
     };
     let rendered = markdown::create(&input).unwrap();
     assert!(rendered.starts_with("---\naliases:"));
-    assert!(rendered.contains("startDate: \"1969-12-31\""));
+    assert!(rendered.contains("start-date: \"1969-12-31\""));
     assert!(rendered.contains("hub: \"[[briefs]]\""));
     assert!(!rendered.contains("\n## Injected"));
     assert!(!rendered.contains("<script>"));

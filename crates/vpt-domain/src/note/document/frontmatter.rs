@@ -26,36 +26,36 @@ pub(super) fn write(output: &mut Writer, note: &RecordingNote<'_>) -> Result<(),
         )?;
         yaml::field(
             output,
-            "startDate",
+            "start-date",
             &format!("{:04}-{:02}-{:02}", local.year, local.month, local.day),
         )?;
     }
-    output.literal("vptSchema: 1\n")?;
-    yaml::field(output, "vptRecording", note.recording.as_str())?;
-    yaml::field(output, "vptStage", note.stage.as_str())?;
+    output.literal("vpt-schema: 1\n")?;
+    yaml::field(output, "vpt-recording", note.recording.as_str())?;
+    yaml::field(output, "vpt-stage", note.stage.as_str())?;
     yaml::field(
         output,
-        "vptCapturedAt",
+        "vpt-captured-at",
         &note.captured_at.rfc3339_with(note.offset),
     )?;
-    output.literal(&format!("vptDurationSecs: {}\n", note.duration_secs))?;
-    yaml::field(output, "vptLanguage", note.language)?;
+    output.literal(&format!("vpt-duration-secs: {}\n", note.duration_secs))?;
+    yaml::field(output, "vpt-language", note.language)?;
     output.literal(&format!(
-        "vptOpenFlags: {}\nvptDiagnostics: {}\n",
+        "vpt-open-flags: {}\nvpt-diagnostics: {}\n",
         note.open_flags, note.diagnostics
     ))?;
     yaml::list(
         output,
-        "vptEngines",
+        "vpt-engines",
         note.engines.iter().map(String::as_str),
     )?;
-    output.literal(&format!("vptReadability: {}\n", note.readability))?;
+    output.literal(&format!("vpt-readability: {}\n", note.readability))?;
     if matches!(note.profile, Profile::Portable) {
         yaml::list(output, "tags", note.tags.iter().map(String::as_str))?;
     }
     yaml::list(
         output,
-        "vptSuggestedTags",
+        "vpt-suggested-tags",
         note.suggested_tags.iter().map(String::as_str),
     )?;
     output.literal("---\n")

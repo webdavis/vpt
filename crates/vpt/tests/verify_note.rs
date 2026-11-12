@@ -74,7 +74,7 @@ fn owned_note_verification_saves_current_claims_annotations_and_counts_atomicall
     let edited = document
         .replace_content("- Bob [00:00-00:01]\n")
         .unwrap()
-        .replace("vptOpenFlags: 0\n", "")
+        .replace("vpt-open-flags: 0\n", "")
         + "\nOperator ending\n";
     fs::write(&old.target, &edited).unwrap();
     let accepted = ledger(&sandbox).accepted_transcript(&record.id).unwrap();
@@ -96,7 +96,7 @@ fn owned_note_verification_saves_current_claims_annotations_and_counts_atomicall
             .text
             .contains("- Bob [00:00-00:01] [unsupported: Bob]")
     );
-    assert!(current.text.contains("vptOpenFlags: 1\n"));
+    assert!(current.text.contains("vpt-open-flags: 1\n"));
     assert!(current.text.ends_with("\nOperator ending\n"));
     assert_eq!(fs::read_to_string(&old.target).unwrap(), current.text);
     assert_eq!(

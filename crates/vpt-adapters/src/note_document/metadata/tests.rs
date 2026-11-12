@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn external_notes_expose_names_and_tags_without_owned_note_requirements() {
-    let metadata = read("---\naliases: [Ada, 'A. Lovelace']\ntags:\n  - Project_Finance\nvptSchema: 99\nvptRecording: foreign\ncustom: preserve\n---\n# Operator note\n").unwrap();
+    let metadata = read("---\naliases: [Ada, 'A. Lovelace']\ntags:\n  - Project_Finance\nvpt-schema: 99\nvpt-recording: foreign\ncustom: preserve\n---\n# Operator note\n").unwrap();
     assert_eq!(metadata.aliases, ["Ada", "A. Lovelace"]);
     assert_eq!(metadata.tags, ["Project_Finance"]);
 }

@@ -76,7 +76,7 @@ fn lexical_review_invalidates_analysis_in_the_same_publication() {
         assert!(
             !note.text.contains("[built-on-flagged-text]") && !note.text.contains("[unsourced]")
         );
-        assert!(note.text.contains("vptOpenFlags: 0"));
+        assert!(note.text.contains("vpt-open-flags: 0"));
         if stage == NoteStage::Transcript {
             assert!(note.text.contains("[corrected: Fixed words]"));
         }
@@ -240,7 +240,7 @@ fn changed_transcript_removes_stale_annotations_and_rechecking_keeps_the_review_
             !analysis.text.contains("[corrected:"),
             "stale findings must not be rendered as current"
         );
-        assert!(analysis.text.contains("vptOpenFlags: 0"));
+        assert!(analysis.text.contains("vpt-open-flags: 0"));
         assert!(
             ledger(&sandbox)
                 .review_snapshot(&record.id)
@@ -277,7 +277,7 @@ fn changed_transcript_removes_stale_annotations_and_rechecking_keeps_the_review_
             .unwrap()
             .unwrap();
         assert!(analysis.text.contains("[corrected: Operator correction]"));
-        assert!(analysis.text.contains("vptOpenFlags: 0"));
+        assert!(analysis.text.contains("vpt-open-flags: 0"));
         note::success(&invoke(&sandbox, record.id.as_str(), false));
         assert!(
             ledger(&sandbox)

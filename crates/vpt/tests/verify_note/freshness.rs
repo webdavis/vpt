@@ -16,7 +16,7 @@ fn readability_changes_invalidate_findings_before_counts_and_notes_are_published
     let current = note::saved(&sandbox, &record);
     assert!(!current.text.contains("[unsourced]"));
     assert!(
-        current.text.contains("vptOpenFlags: 0"),
+        current.text.contains("vpt-open-flags: 0"),
         "counts must omit findings checked against old claims"
     );
     let review = ledger(&sandbox)

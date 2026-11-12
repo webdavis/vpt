@@ -23,7 +23,7 @@ fn deeply_nested_or_oversized_frontmatter_is_refused() {
 fn cyclic_and_exponential_aliases_are_bounded_during_rendering() {
     let source = document("");
     let parsed = Document::parse(&source).unwrap();
-    let cycle = document("vptExtra: &cycle [*cycle]\n");
+    let cycle = document("vpt-extra: &cycle [*cycle]\n");
     assert!(matches!(
         parsed.rewrite(&cycle, &[]),
         Err(NoteError::CapacityExceeded)
@@ -36,7 +36,7 @@ fn cyclic_and_exponential_aliases_are_bounded_during_rendering() {
             index - 1
         ));
     }
-    extra.push_str("vptExtra: *a19\n");
+    extra.push_str("vpt-extra: *a19\n");
     assert!(matches!(
         parsed.rewrite(&document(&extra), &[]),
         Err(NoteError::CapacityExceeded)
@@ -51,8 +51,10 @@ fn malformed_repeated_documents_and_unsupported_schema_types_are_refused() {
     assert!(Document::parse(&document("...\n---\nother: operator prose\n")).is_ok());
     for schema in ["!!str 1", "1.0", "-1", "4294967296", "[1]"] {
         assert!(
-            Document::parse(&document("").replace("vptSchema: 1", &format!("vptSchema: {schema}")))
-                .is_err()
+            Document::parse(
+                &document("").replace("vpt-schema: 1", &format!("vpt-schema: {schema}"))
+            )
+            .is_err()
         );
     }
 }
