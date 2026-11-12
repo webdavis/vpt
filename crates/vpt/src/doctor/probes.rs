@@ -186,6 +186,7 @@ mod tests {
             Check {
                 name: "source_gone".into(),
                 ok: false,
+                notice: false,
                 detail: expected.into()
             }
         );

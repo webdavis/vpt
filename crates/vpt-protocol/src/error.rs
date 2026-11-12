@@ -40,6 +40,8 @@ impl ErrorKind {
 pub struct Check {
     pub name: String,
     pub ok: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub notice: bool,
     pub detail: String,
 }
 
@@ -112,6 +114,9 @@ impl ErrorDocument {
                             let mut fields = serde_json::Map::new();
                             fields.insert("name".into(), check.name.clone().into());
                             fields.insert("ok".into(), check.ok.into());
+                            if check.notice {
+                                fields.insert("notice".into(), true.into());
+                            }
                             fields.insert("detail".into(), check.detail.clone().into());
                             Value::Object(fields)
                         })

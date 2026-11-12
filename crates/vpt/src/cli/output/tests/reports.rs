@@ -25,6 +25,7 @@ fn failure() -> ErrorDocument {
         .checks(vec![vpt_protocol::error::Check {
             name: "helper".into(),
             ok: false,
+            notice: false,
             detail: "absent".into(),
         }])
 }

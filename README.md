@@ -274,7 +274,11 @@ engine definitions are reported without failing it. Generic commands' locality i
 as declared configuration. A Whisply engine with a token reads `speaker labels on`; the token itself
 is never shown. Doctor also reports the Obsidian vault and every store's Git placement,
 calling out audio ignore rules and sensitive engine outputs and redaction reports. It leaves vault
-contents, permissions, and ignore files unchanged.
+contents, permissions, and ignore files unchanged. A check that passes but needs attention prints as
+`note` and carries `"notice": true`; it never fails doctor. On a Mac where Voice Memos has not stored a
+recording yet, the Voice Memos `Recordings` folder does not exist, and doctor reports that as a notice:
+the folder appears after the first recording, and `vpt import` works without it. A folder that exists
+but cannot be read, for example because the privacy system refuses access, still fails.
 
 ## Note writing
 

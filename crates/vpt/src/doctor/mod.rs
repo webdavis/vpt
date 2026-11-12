@@ -1,6 +1,7 @@
 mod checks;
 mod engines;
 mod probes;
+mod source;
 mod vault;
 
 use crate::cli::output::Outcome;
@@ -19,7 +20,11 @@ pub(crate) fn run(environment: &Environment, config: Option<&Path>) -> Outcome {
         .map(|check| {
             format!(
                 "{} {:<26} {}\n",
-                if check.ok { "ok  " } else { "FAIL" },
+                match (check.ok, check.notice) {
+                    (false, _) => "FAIL",
+                    (true, true) => "note",
+                    (true, false) => "ok  ",
+                },
                 check.name,
                 check.detail
             )
