@@ -19,8 +19,8 @@ for it.
 vpt collects the voice memos a person records on an iPhone and that iCloud syncs to their Mac, keeps a
 byte-identical copy of each original, transcribes it with one or two engines, writes a transcript note in
 Markdown, and optionally hands the transcript to an agent command for a synthesis note. Around that
-pipeline it offers per-occasion briefs assembled from those notes, redacted copies for sharing, a handoff
-document for an external notebook, and a small amount of housekeeping.
+pipeline it offers per-occasion briefs assembled from those notes, redacted copies for sharing, each
+stage's text for another program to read, and a small amount of housekeeping.
 
 It is for one person on one Mac: someone who records everyday personal voice memos, keeps notes in
 Markdown (in an Obsidian vault or in a plain directory), and wants transcripts that say plainly where the
@@ -159,7 +159,7 @@ trait.
 
 `vpt-protocol` holds the documents that cross a process boundary, each carrying a `schema` string with a
 major version: `vpt.engine/1` (an engine's transcript), `vpt.event/1` (a report or alert), `vpt.proposal/1`
-(an agent's synthesis), `vpt.context/1` (calendar and task context), `vpt.brief/1`, `vpt.handoff/1`, and
+(an agent's synthesis), `vpt.context/1` (calendar and task context), `vpt.brief/1`, and
 the `--json` output and error documents. It is plain serde over JSON. An unknown major version is refused
 with the version named; an unknown additive field is accepted and named in diagnostics; byte, depth,
 array-length and text-length limits are enforced while a document is read, before it is fully allocated:
@@ -665,7 +665,7 @@ verification finding (section 8.2) belongs to one claim of one artifact and may 
 Diagnostic flags appear in `vpt review`, are counted separately (`diagnostics` in events,
 `vptDiagnostics` in frontmatter), and overlap no span, so they neither hold back the readability pass nor
 omit text from a redacted copy. `divergent` additionally marks the transcript unverified for consumers (a
-brief and a handoff report `reviewed: false`) while confidence and risk-class classification continue
+brief and a stage's text report `reviewed: false`) while confidence and risk-class classification continue
 over the record engine's text.
 
 Lexical candidates are every disagreement between the two engines, every record word below
@@ -1255,24 +1255,25 @@ another release of the same recording has byte-identical redacted text.
 Audio is never a redaction source. A brief is not a redaction source in this version. The released file
 does not name vpt.
 
-### 8.6 The Open Notebook handoff
+### 8.6 Reading a stage's text
 
 ```
-vpt handoff <id> --stage released|transcript|analysis|brief [--json]
+vpt show <id> --stage released|transcript|analysis [--redact] [--json]
+vpt show <occasion> --stage brief [--json]
 ```
 
-A pure function from (record, artifact bytes, stage) to one `vpt.handoff/1` document on stdout. It opens
-no socket, resolves no name, reads no credential and writes no file:
+One read command serves a person and a program. It opens no socket, resolves no name, reads no
+credential and writes no file. Human output is the text; JSON output is the `show` result document with
+the text and its metadata beside the structured fields:
 
 ```json
 {
-  "schema": "vpt.handoff/1",
-  "kind": "released",
-  "identity": {
-    "recording": "2026-08-24T144736-4f3ab19c02de",
-    "note": "released/2026-08-24-transcript-4f3ab19c.md",
-    "content_sha256": "9f2c..."
-  },
+  "schema": "vpt.result/1",
+  "command": "show",
+  "recording": "2026-08-24T144736-4f3ab19c02de",
+  "stage": "released",
+  "note": "released/2026-08-24-transcript-4f3ab19c.md",
+  "content_sha256": "9f2c...",
   "title": "vpt released 2026-08-24-transcript-4f3ab19c",
   "content": "# vpt released copy, 2026-08-24-transcript-4f3ab19c\n\n...",
   "provenance": {
@@ -1289,29 +1290,36 @@ no socket, resolves no name, reads no credential and writes no file:
 }
 ```
 
-`kind` has four values and a fifth is a compile-time impossibility. By default only `released` is
-permitted: `--stage transcript|analysis|brief` is refused with exit 3 unless
-`[handoff] allow_private = true`. `--stage released` selects the recording's newest release by creation
-sequence whose file still exists and verifies its digest; no release is exit 2, and a file whose bytes
-changed since release is exit 3 `artifact_changed`. Its `provenance` is the release row's snapshot, and
-its `content` is rendered from the immutable released body: the released file's frontmatter is dropped,
-the fixed declarative header is prepended, and the body follows byte for byte. Neither half is
-reconstructed from the recording's current transcription or review state, so a later re-transcription or
-flag resolution never relabels an older copy. `content` is text always; the schema has no field that can
-carry audio, and an identifier that resolves to a recording rather than to a rendering is refused listing
-the stages that exist. The note's frontmatter does not cross; the fixed declarative header carries the
-identity, the unresolved count (the snapshot's `open_flags` total for a release) and the derived-copy
-sentence, with no imperative sentence in it. An unreviewed artifact is emitted, labelled, never refused.
-The header names vpt. The function is pure apart from `generated_at`, so the digest is meaningful and a
-lost copy is recoverable by re-running one command.
+A brief carries `occasion` and its source `recordings` in place of `recording`, and `occasion_at` in
+place of `captured_at`. Transcript adds `segments` and analysis adds `summary` and `actions`. No stage
+needs an opt-in. `--stage released` selects the recording's newest release by creation sequence whose
+file still exists and verifies its digest; no release is exit 2, and a file whose bytes changed since
+release is exit 3 `artifact_changed`. Its `provenance` is the release row's snapshot, and its `content`
+is rendered from the immutable released body: the released file's frontmatter is dropped, the fixed
+declarative header is prepended, and the body follows byte for byte. Neither half is reconstructed from
+the recording's current transcription or review state, so a later re-transcription or flag resolution
+never relabels an older copy. `content` is text always; a missing stage is refused listing the stages that
+exist. The note's frontmatter does not cross; the fixed declarative header carries the identity, the
+unresolved count (the snapshot's `open_flags` total for a release) and the derived-copy sentence, with no
+imperative sentence in it. An unreviewed artifact is emitted, labelled, never refused. The header names
+vpt. The output is pure apart from `generated_at`.
+
+`--redact` masks the transcript or analysis text at call time with the masking `vpt redact` uses
+(8.5) and the configured `[share]` settings, prefixes `share.source_line` and sets
+`provenance.redacted`. The redacted document carries that one masked text and no structured text:
+`segments`, `summary` and `actions` are absent, so no second masking pipeline can show more than the
+text. It withholds the note path (`note` is null, `title` names the recording ID). Its `content_sha256`
+is the digest of the redacted `content` it returns. A pending note publication stops it as it stops the
+plain read. It saves nothing: no release, no report, no
+ledger row and no event. It is a throwaway view; `vpt redact` remains the provable record of what was
+shared. `--redact` with `--stage released` is a usage error, since a released copy is already redacted;
+with `--stage brief` it is a usage error too, because a brief is not a redaction source (8.5) and its
+quotes carry no map to their recordings' open flags.
 
 No configuration key and no production source line names Open Notebook's vocabulary: a test greps the
 shipped Rust and Swift sources and the shipped configuration template (documentation, tests and fixtures
-excluded) for `open.notebook`, `notebook_id`, `5055`, `8502` and `surreal` and finds nothing. The mapping
-from `vpt.handoff/1` to the notebook's own source-creation call, the credential holder, the transport
-recipe, the return path for a note authored there, and a remote identifier that would let a re-handoff
-replace rather than duplicate, all wait until that service is deployed; a re-handoff today duplicates,
-and the deterministic `title` is what makes the duplicate findable.
+excluded) for `open.notebook`, `notebook_id`, `5055`, `8502` and `surreal` and finds nothing. A consumer
+such as an external notebook maps this document to its own calls; vpt carries no transport for it.
 
 ### 8.7 Logged reports and opt-in alert commands
 
@@ -1456,7 +1464,6 @@ under `--json`.
 | `vpt brief <occasion> [--explain] [--dry-run]` / `--title --at ...` / `--upcoming`            | brief note, occasion row, events                                                                                                      | `vpt.brief/1`, or `{"written": [..]}` for `--upcoming`                                                                | 0, 2, 3                               |
 | `vpt occasions`                                                                               | nothing                                                                                                                               | `{"occasions": [..]}`                                                                                                 | 0                                     |
 | `vpt redact <id> [--stage] [--to <dir>] [--title <t>]`                                        | released copy, draft report                                                                                                           | `{"written": "<path>", "report": "<path>", "masks": {"<class>": n}, "candidates": [..]}`                              | 0, 3 duplicate or residue             |
-| `vpt handoff <id> --stage <kind>`                                                             | nothing                                                                                                                               | `vpt.handoff/1`                                                                                                       | 0, 2, 3 private refused               |
 | `vpt show <id>` / `vpt list [--stage <s>]`                                                    | nothing                                                                                                                               | the record / `{"recordings": [..]}`                                                                                   | 0, 2                                  |
 | `vpt search <word>... [--limit <n>]`                                                          | nothing                                                                                                                               | `{"words", "limit", "truncated", "hits":[{"moment", "recording", "title", "stage", "seconds", "timecode", "quote"}]}` | 0, 2                                  |
 | `vpt show <id> --stage transcript`                                                            | nothing                                                                                                                               | `{"recording", "stage", text, "segments": [{"start", "end", "timecode", "text"}]}`                                    | 0, 2, 3 changed                       |
@@ -1607,7 +1614,6 @@ canary-secret test.
 | `share.redact.classes`               | string list    | `["email", "url", "phone", "number", "money"]`                            | pattern classes; terms and note names are always masked                                                      |
 | `share.redact.mask`                  | string         | `[{class} {n}]`                                                           | rendered in place of a removed value                                                                         |
 | `share.redact.flagged_spans`         | enum           | `omit`                                                                    | `omit` or `mark`                                                                                             |
-| `handoff.allow_private`              | bool           | `false`                                                                   | let transcripts, analysis notes and briefs be handed off                                                     |
 | `report.command`                     | string list    | `[]`                                                                      | optional routine-report command; receives `vpt.event/1` JSON on stdin; empty means logs only |
 | `import.extract_command`             | string list    | `["ffmpeg"]`                                                              | audio extractor for `vpt import` of files other than `.m4a`; vpt appends its own arguments   |
 | `alert.command`                      | string list    | `[]`                                                                      | optional failure or review-needed command; receives `vpt.event/1` JSON on stdin; empty means logs only |
@@ -1649,8 +1655,8 @@ the node number is the tree's.
 | 12.4  | secrets are values in `config.toml`; rendering them is the operator's concern                 |
 | 14.6  | vpt installs to `~/.cargo/bin`                                                                |
 | 14.8  | vpt ships no bash; the only non-Rust code is the Swift helper                                 |
-| 15.6  | an unreviewed artifact is handed off labelled, never refused                                  |
-| 15.7  | the handoff header names vpt                                                                  |
+| 15.6  | an unreviewed artifact is shown labelled, never refused                                       |
+| 15.7  | the stage text header names vpt                                                               |
 
 ### 10.2 An example profile: a home inside an Obsidian vault
 
@@ -1682,9 +1688,6 @@ type = "dam"
 calendars = ["calendar/"]
 projects = ["work/"]
 
-[handoff]
-allow_private = true
-
 [report]
 command = []
 
@@ -1714,8 +1717,8 @@ Refused at startup, before any work, exit 2 or 3 as marked:
 - the `obsidian` profile with `note.obsidian.vault_root` empty, relative or not an existing directory
   (2).
 - the helper present with a different major version (3, `helper_version`).
-- `brief --upcoming` with the trigger disabled (2); `synthesize` with no command (2); `handoff --stage`
-  private without `allow_private` (3, `private_handoff`).
+- `brief --upcoming` with the trigger disabled (2); `synthesize` with no command (2); `show --redact`
+  without `--stage` or with `--stage released` (2).
 
 `vpt doctor` never refuses at startup: it runs every check, prints the whole result and exits 3 when any
 failed, so a machine that cannot start still gets a diagnosis. Human output lists every check either way.
@@ -1789,7 +1792,7 @@ one aggregated flag (stage 2); the portable profile emits none of the vault's ke
 a store with no `.obsidian` directory produces no vault syntax, and a rewrite preserves every byte
 outside the markers (stage 3); the released file contains no removed value, no `vpt` key and no source
 slug, a byte-identical duplicate is refused, `verify-note` leaves a note the ledger does not own
-byte-identical, a proposal line holding a managed delimiter renders as text, `vpt handoff` writes no file
+byte-identical, a proposal line holding a managed delimiter renders as text, `vpt show --stage` writes no file
 and succeeds with name resolution failing, and the grep for notebook vocabulary finds nothing (stage 4).
 
 The Swift helper has its own `swift test` suite in `helper/vpt-macos/Tests`, and it reaches no real
@@ -1818,7 +1821,7 @@ each gate as a recipe and `just ship` runs them all in CI order.
   binary into `~/.cargo/bin`. The helper is built with `swift build -c release` in `helper/vpt-macos` and
   copied beside it; the README states both steps and `vpt doctor` reports a missing helper with those two
   commands. Without the helper, vpt still ingests, transcribes with whisply or a command engine, writes
-  notes, briefs, redactions and handoffs.
+  notes, briefs and redactions, and shows each stage's text.
 - **The dotfiles builder.** The author's dotfiles repository builds from a local clone, the same shape as
   its scalebar builder: a data file declaring the clone's path and the install directory (`~/.cargo/bin`,
   the rust tools' declared home), one `run_onchange_after_*` script hashing the clone's manifests and
@@ -1876,12 +1879,12 @@ composing stages 1 to 3. Depends on stage 2.
 Ships `[synthesis]`, `vpt.proposal/1`, `vpt synthesize`, `vpt verify-note` and the analysis note;
 occasions, `vpt brief` in all three forms, `vpt occasions`, `vpt.brief/1`, `vpt.context/1`, the `dam`,
 `google` and `none` context sources, the calendar trigger and `brief_written`; `vpt redact`, `[share]`,
-the release rows and the draft reports; `vpt handoff` and `vpt.handoff/1`; and `vpt run` extended with
+the release rows and the draft reports; `vpt show --stage` with its text and `--redact`; and `vpt run` extended with
 synthesis and automatic redaction. Depends on stage 3.
 
 ### Deferred until the external notebook is deployed
 
-The mapping from `vpt.handoff/1` to the notebook's source-creation call, the transport recipe and where
-it lives, who holds the notebook's password and whether an agent gets write access, the return path for a
-note authored in the notebook, and a remote identifier that lets a re-handoff replace rather than
-duplicate. None of these is vpt code today; the handoff verb ships complete in stage 4 without them.
+The mapping from the `show --stage` document to the notebook's source-creation call, the transport recipe
+and where it lives, who holds the notebook's password and whether an agent gets write access, the return
+path for a note authored in the notebook, and a remote identifier that lets a second copy replace rather
+than duplicate. None of these is vpt code today.

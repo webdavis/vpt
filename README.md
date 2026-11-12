@@ -552,25 +552,6 @@ Previously finalized matching content in the configured destination is skipped o
 Interrupted copy/report publication is recovered from saved bytes before new work. `run --dry-run`
 reports pending redaction without creating files or changing release history.
 
-## Text handoff
-
-`vpt handoff <id> --stage released|transcript|analysis|brief [--json|--toon|--yaml]` reads an existing artifact.
-Human output is the text copy with a declarative VPT header; JSON output is `vpt.handoff/1`, containing
-the deterministic title, text, artifact digest, identity, provenance, and generation time. The digest
-identifies the artifact bytes before its frontmatter is removed and the handoff header is added.
-
-Released handoffs choose the newest finalized release whose file still exists. A changed digest is
-refused; missing newer copies allow selection of an older surviving release. Provenance comes from the
-release's saved snapshot, so later transcription or review changes do not relabel an old copy. A pending
-release alone is an operational error; handoff does not repair it.
-
-Private stages require `[handoff] allow_private = true`. Transcript and analysis use a recording ID;
-brief uses an occasion ID. Brief JSON identifies the occasion and its source recordings, with
-`occasion_at` in provenance. Private copies preserve the current body, including operator prose outside
-managed regions, and compute a fresh artifact digest. Frontmatter is removed from every kind. Unreviewed
-artifacts are labelled and can still be emitted. Handoff does not run engines or agents, invoke hooks,
-read provider credentials, contact services, write files, upload content, or access the clipboard.
-
 ## Searching transcripts and analysis
 
 `vpt search <word>... [--limit <n>] [--json|--toon|--yaml]` finds every transcript segment and every
@@ -601,7 +582,7 @@ helper location. `vpt --version --json` reports both versions, and `vpt doctor` 
 incompatible helper with installation instructions.
 
 Without the helper, configure Whisply or a command engine to transcribe. Ingestion, notes, briefs,
-redaction, and handoff remain available. Retention refuses removal when the helper is unavailable.
+redaction, and `show --stage` remain available. Retention refuses removal when the helper is unavailable.
 Apple transcription requires macOS 26 or newer and installed speech assets for the selected locale.
 
 An external scheduler can invoke `vpt run` periodically. Each invocation finishes and releases its

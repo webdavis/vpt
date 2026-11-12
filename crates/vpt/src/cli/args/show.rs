@@ -1,5 +1,5 @@
 use super::*;
-use vpt_domain::handoff::Kind;
+use vpt_domain::copy::Kind;
 
 pub(super) fn parse(words: &mut Vec<String>) -> Result<Verb, UsageError> {
     let redact = take_flag(words, "--redact");

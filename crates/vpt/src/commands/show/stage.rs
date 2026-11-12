@@ -1,10 +1,12 @@
-use crate::cli::{args::handoff::Target, output::Outcome};
-use crate::commands::handoff::{self, errors};
+use super::{
+    artifact::{self, Target},
+    errors,
+};
+use crate::cli::output::Outcome;
 use crate::compose::Environment;
-use serde_json::{Value, json};
 use std::path::Path;
 use vpt_application::ports::NoteInputsLedger;
-use vpt_domain::{handoff::Kind, identity::RecordingId, occasion::OccasionId};
+use vpt_domain::{copy::Kind, identity::RecordingId, occasion::OccasionId};
 use vpt_protocol::{
     error::{ErrorDocument, ErrorKind},
     result::document,
@@ -31,18 +33,17 @@ fn execute(
     redact: bool,
 ) -> Result<Outcome, Box<ErrorDocument>> {
     let target = target(id, stage)?;
-    let (settings, roots, ledger) = handoff::open(environment, config)?;
-    let mut body = json!({"stage": stage.as_str()});
-    let copy = match (&target, redact) {
+    let (settings, roots, ledger) = artifact::open(environment, config)?;
+    let mut body = match (&target, redact) {
         (Target::Recording(id), true) => {
             super::redacted::copy(&settings, &roots, &ledger, id, stage)?
         }
         (Target::Occasion(_), true) => {
             return Err(Box::new(ErrorDocument::new(ErrorKind::Usage, BRIEF_REDACT)));
         }
-        (_, false) => handoff::artifact(&ledger, &roots, &target, stage)?,
+        (_, false) => artifact::read(&ledger, &roots, &target, stage)?,
     };
-    flatten(copy, &mut body);
+    body["stage"] = stage.as_str().into();
     if let Target::Recording(id) = &target
         && !redact
         && matches!(stage, Kind::Transcript | Kind::Analysis)
@@ -77,15 +78,5 @@ fn target(id: &str, stage: Kind) -> Result<Target, Box<ErrorDocument>> {
         _ => RecordingId::parse(id)
             .map(Target::Recording)
             .map_err(|_| usage("invalid recording id")),
-    }
-}
-
-fn flatten(mut copy: Value, body: &mut Value) {
-    let identity = copy["identity"].take();
-    for (key, value) in identity.as_object().into_iter().flatten() {
-        body[key] = value.clone();
-    }
-    for key in ["title", "content", "provenance", "generated_at"] {
-        body[key] = copy[key].take();
     }
 }

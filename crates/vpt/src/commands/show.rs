@@ -1,5 +1,12 @@
+mod artifact;
+mod brief;
+mod errors;
+mod file;
+mod output;
 mod proposal;
+mod recording;
 mod redacted;
+mod released;
 mod segments;
 pub(crate) mod stage;
 use crate::cli::output::Outcome;

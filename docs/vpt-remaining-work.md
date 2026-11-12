@@ -23,7 +23,8 @@ synthesis and stale-finding rechecks now run in the pipeline, and synthesis emit
 Configuration-driven synthesis state changes and interrupted run outcomes are also implemented.
 Occasion identity persistence, `occasions`, and saved brief-path lookup now have implementations.
 On-demand and automatic pipeline redaction now create released copies and private reports with durable
-recovery. Read-only text handoff now emits released and explicitly enabled private artifacts.
+recovery. `vpt show --stage` now returns each stage's text for people and programs, with `--redact`
+masking it at call time.
 Remaining work covers ingestion/logging acceptance, command timing, and shared boundary guarantees.
 
 All source changes from the implementation worktrees are preserved in `main` and its history.
@@ -723,6 +724,9 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   Eleven command tests cover all four kinds, current private prose and digests, immutable release
   provenance, missing/changed/pending artifacts, available-stage errors, and observational output.
   Protocol bounds, retained-file checks, and the production vocabulary independence test pass.
+- [x] Fold `handoff` into `vpt show --stage released|transcript|analysis|brief`, returning the same
+  text and provenance beside the structured fields with no opt-in, and add `--redact` for a masked
+  view that saves nothing. The `handoff` verb, `vpt.handoff/1` and `handoff.allow_private` are gone.
 
 ### Full pipeline and retention across all stores
 

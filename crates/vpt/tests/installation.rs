@@ -111,12 +111,12 @@ fn installed_command_and_whisply_engines_work_without_helper_and_scheduled_runs_
         let release = json(&runtime::invoke(&sandbox, &["redact", id, "--json"]));
         assert!(std::path::Path::new(release["written"].as_str().unwrap()).is_file());
         let before = fixture::snapshot(&sandbox);
-        let handoff = json(&runtime::invoke(
+        let released = json(&runtime::invoke(
             &sandbox,
-            &["handoff", id, "--stage", "released", "--json"],
+            &["show", id, "--stage", "released", "--json"],
         ));
-        assert_eq!(handoff["schema"], "vpt.handoff/1");
-        assert_eq!(handoff["kind"], "released");
+        assert_eq!(released["command"], "show");
+        assert_eq!(released["stage"], "released");
         assert_eq!(fixture::snapshot(&sandbox), before);
         let log = std::fs::read_to_string(sandbox.path().join("state/vpt/events.jsonl")).unwrap();
         assert!(!log.contains("Private words"));

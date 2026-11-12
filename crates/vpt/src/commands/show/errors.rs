@@ -9,15 +9,6 @@ pub(crate) fn missing() -> Box<ErrorDocument> {
         "no existing artifact for this identity and stage",
     ))
 }
-pub(crate) fn private() -> Box<ErrorDocument> {
-    Box::new(
-        ErrorDocument::new(
-            ErrorKind::Refused,
-            "private handoff requires handoff.allow_private",
-        )
-        .rule("private_handoff"),
-    )
-}
 pub(crate) fn changed() -> Box<ErrorDocument> {
     Box::new(
         ErrorDocument::new(ErrorKind::Refused, "artifact bytes or ownership changed")
@@ -30,12 +21,12 @@ pub(crate) fn pending() -> Box<ErrorDocument> {
         "artifact publication is pending",
     ))
 }
-pub(crate) fn document(error: vpt_domain::handoff::Error) -> Box<ErrorDocument> {
+pub(crate) fn document(error: vpt_domain::copy::Error) -> Box<ErrorDocument> {
     Box::new(ErrorDocument::new(
         ErrorKind::Store,
         match error {
-            vpt_domain::handoff::Error::Invalid => "invalid handoff metadata",
-            vpt_domain::handoff::Error::CapacityExceeded => "handoff capacity exceeded",
+            vpt_domain::copy::Error::Invalid => "invalid text copy metadata",
+            vpt_domain::copy::Error::CapacityExceeded => "text copy capacity exceeded",
         },
     ))
 }

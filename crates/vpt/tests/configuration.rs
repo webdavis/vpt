@@ -43,10 +43,11 @@ fn commands(sandbox: &Sandbox) -> Vec<Vec<String>> {
         vec!["brief", "--upcoming"],
         vec!["redact", &id, "--stage", "transcript"],
         vec!["redact", &id, "--stage", "analysis"],
-        vec!["handoff", &id, "--stage", "released"],
-        vec!["handoff", &id, "--stage", "transcript"],
-        vec!["handoff", &id, "--stage", "analysis"],
-        vec!["handoff", &occasion, "--stage", "brief"],
+        vec!["show", &id, "--stage", "released"],
+        vec!["show", &id, "--stage", "transcript"],
+        vec!["show", &id, "--stage", "transcript", "--redact"],
+        vec!["show", &id, "--stage", "analysis"],
+        vec!["show", &occasion, "--stage", "brief"],
         vec!["retention", "run"],
     ]
     .into_iter()

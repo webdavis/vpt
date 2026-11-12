@@ -37,7 +37,6 @@ fn a_multiply_linked_journal_stops_every_command_without_touching_its_referent()
 fn assert_link_refused(leaf: &str, hard_link: bool) {
     let (sandbox, mutations) = history_guards::prepare();
     let observations = history_guards::observations(&sandbox);
-    synthesis::append(&sandbox, "\n[handoff]\nallow_private=true\n");
     let state = sandbox.path().join("state/vpt");
     let path = state.join(leaf);
     let held = sandbox.path().join("operator-private-file");

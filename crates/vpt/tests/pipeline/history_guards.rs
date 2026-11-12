@@ -169,10 +169,11 @@ pub(super) fn observations(sandbox: &Sandbox) -> Vec<Vec<String>> {
         vec!["path", id.as_str(), "--stage", "transcript"],
         vec!["path", id.as_str(), "--stage", "analysis"],
         vec!["path", "--occasion", occasion.as_str(), "--stage", "brief"],
-        vec!["handoff", id.as_str(), "--stage", "released"],
-        vec!["handoff", id.as_str(), "--stage", "transcript"],
-        vec!["handoff", id.as_str(), "--stage", "analysis"],
-        vec!["handoff", occasion.as_str(), "--stage", "brief"],
+        vec!["show", id.as_str(), "--stage", "released"],
+        vec!["show", id.as_str(), "--stage", "transcript"],
+        vec!["show", id.as_str(), "--stage", "transcript", "--redact"],
+        vec!["show", id.as_str(), "--stage", "analysis"],
+        vec!["show", occasion.as_str(), "--stage", "brief"],
     ]
     .into_iter()
     .map(|args| args.into_iter().map(str::to_owned).collect())

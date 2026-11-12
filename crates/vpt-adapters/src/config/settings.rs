@@ -50,7 +50,6 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         brief: brief::from_table(table)?,
         context: context::from_table(table)?,
         share: share::from_table(table)?,
-        handoff_allow_private: boolean(table, "handoff.allow_private")?,
         relations: vpt_domain::relations::Options {
             session_gap_minutes: small(table, "relations.session_gap_minutes")?,
             max_suggested: small(table, "relations.max_suggested")?,

@@ -49,10 +49,4 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "\"omit\"",
         "omit or mark",
     ),
-    key(
-        "handoff.allow_private",
-        Kind::Bool,
-        "false",
-        "let transcripts, analysis notes and briefs be handed off",
-    ),
 ];

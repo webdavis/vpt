@@ -33,7 +33,6 @@ pub(super) fn parse_verb(words: &mut Vec<String>, text: text::Values) -> Result<
         return Err(UsageError("--tag and --reject-tag require confirm".into()));
     }
     match first.as_str() {
-        "handoff" => handoff::parse(words),
         "tag" => match take_positional(words, "rename")?.as_str() {
             "rename" => {
                 let dry_run = take_flag(words, "--dry-run");
