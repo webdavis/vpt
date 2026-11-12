@@ -97,6 +97,10 @@ fn every_fact_variant_round_trips_with_typed_safe_event_fields() {
             index: 3,
             reason: vpt_domain::tags::Rejection::Syntax,
         },
+        HistoryFact::TagRenamed {
+            recording: crate::ledger::contract::record(2).id,
+            index: 4,
+        },
         HistoryFact::RunStarted(RunKind::Pipeline),
         HistoryFact::RunFinished(RunOutcome::Completed),
         HistoryFact::RunFinished(RunOutcome::Failed),

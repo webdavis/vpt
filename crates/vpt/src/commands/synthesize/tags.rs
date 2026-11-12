@@ -1,4 +1,5 @@
 use super::{errors, prepare::Context};
+mod renames;
 mod vocabulary;
 use vpt_application::ports::*;
 use vpt_domain::{
@@ -11,6 +12,7 @@ pub(super) struct Changes {
     pub tags: Option<TagChange>,
     pub vocabulary: Option<VocabularyPublication>,
     pub rejections: Vec<tags::Rejected>,
+    pub renamed: Vec<usize>,
 }
 
 pub(super) fn apply(
@@ -53,10 +55,16 @@ pub(super) fn apply(
     let mut indices = Vec::new();
     let mut rejections = Vec::new();
     let mut reasons = std::collections::HashMap::new();
+    let (renames, states) = renames::read(context.ledger)?;
+    let renames = vpt_application::tag_renames::active(&renames, &states);
+    let mut renamed = Vec::new();
     for (index, proposed) in proposal.proposal.tags.iter().enumerate() {
+        let tag = vpt_application::tag_renames::follow(&renames, &proposed.tag)
+            .inspect(|_| renamed.push(index))
+            .unwrap_or_else(|| proposed.tag.clone());
         let normalized = vocabulary
             .select(
-                std::slice::from_ref(&proposed.tag),
+                std::slice::from_ref(&tag),
                 Options {
                     max_per_note: 1,
                     max_suggested: 1,
@@ -80,7 +88,7 @@ pub(super) fn apply(
             continue;
         }
         reasons.entry(key).or_insert(&proposed.reason);
-        candidates.push(proposed.tag.clone());
+        candidates.push(tag);
         indices.push(index);
     }
     let options = context.settings.tags.options;
@@ -137,5 +145,6 @@ pub(super) fn apply(
         tags: change,
         vocabulary,
         rejections,
+        renamed,
     })
 }

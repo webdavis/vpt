@@ -30,6 +30,9 @@ pub(in crate::ledger::sqlite::history::codec) fn encode(
         } => {
             json!({"tag":"tag_rejected", "recording":recording.as_str(), "index":index, "reason":reason.as_str()})
         }
+        HistoryFact::TagRenamed { recording, index } => {
+            json!({"tag":"tag_renamed", "recording":recording.as_str(), "index":index})
+        }
         HistoryFact::FlagResolved {
             recording,
             flag,

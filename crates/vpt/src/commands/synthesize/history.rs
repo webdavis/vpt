@@ -31,5 +31,14 @@ pub(super) fn facts(
             },
         )
     }));
+    facts.extend(prepared.renamed.iter().map(|index| {
+        (
+            at,
+            HistoryFact::TagRenamed {
+                recording: id.clone(),
+                index: *index as u32,
+            },
+        )
+    }));
     facts
 }

@@ -58,6 +58,7 @@ impl RecoveryPlan {
                     | HistoryFact::BriefPublished { .. }
                     | HistoryFact::NoteMoved { .. }
                     | HistoryFact::TagRejected { .. }
+                    | HistoryFact::TagRenamed { .. }
                     | HistoryFact::SynthesisStateChanged { .. }
                     | HistoryFact::FlagResolved { .. }
                     | HistoryFact::EffectIntent { .. } => {

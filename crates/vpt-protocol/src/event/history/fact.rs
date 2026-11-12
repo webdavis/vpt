@@ -25,6 +25,9 @@ pub(super) fn value(fact: &HistoryFact) -> Result<Value, EventEncodeError> {
         } => {
             json!({"tag":"tag_rejected", "recording":recording.as_str(), "index":index, "reason":reason.as_str()})
         }
+        HistoryFact::TagRenamed { recording, index } => {
+            json!({"tag":"tag_renamed", "recording":recording.as_str(), "index":index})
+        }
         HistoryFact::FlagResolved {
             recording,
             flag,
