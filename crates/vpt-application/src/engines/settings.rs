@@ -16,6 +16,7 @@ pub enum EngineKind {
         command: Vec<String>,
         device: String,
         model: String,
+        hf_token: Option<String>,
     },
     Command {
         command: Vec<String>,
@@ -79,6 +80,7 @@ impl Default for EngineSettings {
                     command: vec!["whisply".into()],
                     device: "mlx".into(),
                     model: "large-v3-turbo".into(),
+                    hf_token: None,
                 },
             },
         ]

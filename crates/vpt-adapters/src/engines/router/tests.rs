@@ -21,6 +21,7 @@ fn external_engine_kinds_run_without_probing_an_absent_apple_helper() {
             command: vec!["/usr/bin/false".into()],
             device: "cpu".into(),
             model: "medium".into(),
+            hf_token: None,
         },
     ] {
         let engine = EngineConfig {

@@ -3,15 +3,16 @@ use std::time::Duration;
 use vpt_application::ports::EngineFailure;
 
 pub(super) fn run(argv: &[String], timeout: Duration) -> Result<Outcome, EngineFailure> {
-    run_with_limit(argv, timeout, super::DOCUMENT_LIMIT + 1)
+    run_with_limit(argv, timeout, super::DOCUMENT_LIMIT + 1, &[])
 }
 
 pub(super) fn run_with_limit(
     argv: &[String],
     timeout: Duration,
     limit: usize,
+    env: &[(&str, &str)],
 ) -> Result<Outcome, EngineFailure> {
-    spawn::run(argv, b"", timeout, limit).map_err(|error| match error {
+    spawn::run_with_env(argv, b"", timeout, limit, env).map_err(|error| match error {
         SpawnError::NotFound(_) => EngineFailure::Unavailable,
         SpawnError::Io(_) => EngineFailure::Io,
     })

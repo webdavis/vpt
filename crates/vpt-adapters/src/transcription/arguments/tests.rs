@@ -44,6 +44,7 @@ fn whisply_receives_supported_base_codes_with_configured_argv_device_and_model()
             command: vec!["uv".into(), "run".into(), "whisply".into()],
             device: "cpu".into(),
             model: "large-v3".into(),
+            hf_token: None,
         };
         let actual = build(kind, tag).unwrap();
         assert_eq!(
@@ -92,6 +93,7 @@ fn whisply_defaults_and_language_refusal_are_applied_before_spawning() {
         command: vec!["whisply".into()],
         device: "cpu".into(),
         model: "small.en".into(),
+        hf_token: None,
     };
     assert_eq!(
         build(english.clone(), "fr-FR"),

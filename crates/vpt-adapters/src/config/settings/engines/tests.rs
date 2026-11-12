@@ -23,6 +23,7 @@ fn defaults_select_local_apple_and_optional_whisply() {
             command: vec!["whisply".into()],
             device: "mlx".into(),
             model: "large-v3-turbo".into(),
+            hf_token: None,
         }
     );
 }
@@ -70,7 +71,8 @@ checker = ""
         EngineKind::Whisply {
             command: vec!["/bin/whisply".into(), "--verbose".into()],
             device: "cpu".into(),
-            model: "medium".into()
+            model: "medium".into(),
+            hf_token: None,
         }
     );
 }

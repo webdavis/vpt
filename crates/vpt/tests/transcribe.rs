@@ -19,6 +19,8 @@ mod protocol;
 #[path = "transcribe/recovery.rs"]
 mod recovery;
 mod report_hook;
+#[path = "transcribe/speakers.rs"]
+mod speakers;
 mod support;
 #[path = "transcribe/cases.rs"]
 mod transcribe_cases;

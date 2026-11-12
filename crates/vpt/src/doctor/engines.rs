@@ -18,6 +18,19 @@ pub(super) fn inspect(settings: &EngineSettings, helper_available: bool) -> Chec
             let used = selected.contains(name);
             let (available, locality) = match &engine.kind {
                 EngineKind::Apple => (helper_available, "local"),
+                EngineKind::Whisply {
+                    command,
+                    hf_token: Some(_),
+                    ..
+                } if used => (available(command), "local, speaker labels on"),
+                EngineKind::Whisply {
+                    command,
+                    hf_token: Some(_),
+                    ..
+                } => (
+                    available(command),
+                    "local, token set but whisply is not selected, so no speaker labels",
+                ),
                 EngineKind::Whisply { command, .. } => (available(command), "local"),
                 EngineKind::Command { command, local, .. } => (
                     available(command),
