@@ -494,7 +494,10 @@ vpt grounds every claim against the transcript, so the prompt must ask for sourc
 source is a `mm:ss-mm:ss` range taken from the `[mm:ss]` timecodes, with the end after the start and
 no later than the recording's length. Every capitalized word and every number in a claim must occur
 in the cited text, otherwise the claim is marked `unsupported`. A claim that starts with "They" or
-"An" is marked for that reason.
+"An" is marked for that reason. A claim may name a speaker as the whole label, such as "Speaker 2",
+when a segment its sources overlap carries that label; the named label is then not checked as a fact.
+A label's words never support anything else, so "Speaker 2 approved 2 hires" still needs a cited "2",
+and they never count as the time words a due date needs.
 
 Both examples below ran against a synthetic transcript, four times each, with Claude Code 2.1.322
 and codex-cli 0.167.0. Claude took 17 to 24 seconds a call and Codex 9 to 12. Every call exited 0 with

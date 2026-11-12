@@ -208,15 +208,11 @@ pub(crate) fn analysis_findings_follow_rendered_markdown_and_recheck_idempotentl
         let previous = flags(ledger);
         let claim = &mut proposal.proposal.summary[0];
         claim.claim.source_references = vec![source.into()];
-        claim.grounding = Grounder::new(
-            transcript.transcript.segments.iter().flat_map(|s| &s.words),
-            &previous,
-            transcript.duration,
-            0,
-        )
-        .unwrap()
-        .check(&claim.claim)
-        .unwrap();
+        claim.grounding =
+            Grounder::for_transcript(&transcript.transcript, &previous, transcript.duration, 0)
+                .unwrap()
+                .check(&claim.claim)
+                .unwrap();
         assert_eq!(claim.grounding.finding, Some(Finding::BadReference));
         let mut next = delta(proposal.clone());
         if let Some(old) = &old {

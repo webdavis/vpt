@@ -4,6 +4,7 @@ mod corrections;
 mod due;
 mod evidence;
 mod facts;
+mod labels;
 mod proposal;
 mod sources;
 pub(crate) use sources::seconds as timecode_seconds;
@@ -63,6 +64,7 @@ pub enum GroundingError {
 pub struct Grounder<'a> {
     words: Vec<&'a Word>,
     evidence: Vec<corrections::EvidenceWord<'a>>,
+    labels: Vec<corrections::EvidenceWord<'a>>,
     flags: &'a [ReviewFlag],
     duration: f64,
     window_secs: u32,
@@ -88,7 +90,8 @@ impl<'a> Grounder<'a> {
             self.window_secs,
             &mut self.remaining,
         )?;
-        if let Some(fact) = facts::extract(&claim.text, &mut self.remaining)?
+        let text = labels::without_cited(&claim.text, &self.labels, &grounded.sources);
+        if let Some(fact) = facts::extract(&text, &mut self.remaining)?
             .into_iter()
             .find(|fact| fact.required && !evidence.contains(&fact.key))
         {

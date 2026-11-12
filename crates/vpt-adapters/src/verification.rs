@@ -40,13 +40,9 @@ pub fn check(
         markdown_claims::extract(content)
     }
     .map_err(|_| CheckError)?;
-    let mut grounder = Grounder::new(
-        transcript.transcript.segments.iter().flat_map(|s| &s.words),
-        flags,
-        transcript.duration,
-        window,
-    )
-    .map_err(|_| CheckError)?;
+    let mut grounder =
+        Grounder::for_transcript(&transcript.transcript, flags, transcript.duration, window)
+            .map_err(|_| CheckError)?;
     let mut checked = Checked {
         report: vec![],
         findings: vec![],
