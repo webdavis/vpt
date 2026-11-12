@@ -40,7 +40,7 @@ fn execute(
     let mut body = serde_json::json!({"recording": id.as_str(), "stage": stage.as_str()});
     match stage {
         NoteStage::Transcript => body["segments"] = super::segments::json(&input.review)?,
-        NoteStage::Analysis => return Err(errors::missing()),
+        NoteStage::Analysis => super::proposal::json(&input, &mut body)?,
     }
     let human = serde_json::to_string_pretty(&body)
         .map(|text| format!("{text}\n"))
