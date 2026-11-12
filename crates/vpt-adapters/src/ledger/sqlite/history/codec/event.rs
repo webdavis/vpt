@@ -55,6 +55,7 @@ pub(super) fn decode(value: &Value) -> Result<Event, LedgerError> {
         "config_refused" => EventKind::ConfigRefused,
         "transcribed" => EventKind::Transcribed,
         "analyzed" => EventKind::Analyzed,
+        "actions_sent" => EventKind::ActionsSent,
         _ => return Err(corrupt()),
     };
     let state = match string(value, "state")? {

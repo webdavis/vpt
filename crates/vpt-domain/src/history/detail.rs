@@ -26,6 +26,11 @@ pub enum EventDetail {
         completed: u32,
         failed: u32,
     },
+    Actions {
+        sent: u32,
+        failed: u32,
+        refused: u32,
+    },
 }
 
 impl Event {
@@ -55,6 +60,13 @@ impl Event {
             }
             EventDetail::Retention { completed, failed } => {
                 format!("{completed} retention items completed, {failed} failed")
+            }
+            EventDetail::Actions {
+                sent,
+                failed,
+                refused,
+            } => {
+                format!("{sent} sent, {failed} failed, {refused} refused")
             }
         }
     }

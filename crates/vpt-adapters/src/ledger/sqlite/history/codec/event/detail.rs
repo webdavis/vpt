@@ -28,6 +28,13 @@ pub(super) fn encode(value: EventDetail) -> Value {
         EventDetail::Retention { completed, failed } => {
             json!({"tag":"retention","completed":completed,"failed":failed})
         }
+        EventDetail::Actions {
+            sent,
+            failed,
+            refused,
+        } => {
+            json!({"tag":"actions","sent":sent,"failed":failed,"refused":refused})
+        }
     }
 }
 
@@ -77,6 +84,11 @@ pub(super) fn decode(value: &Value) -> Result<EventDetail, LedgerError> {
         "retention" => Ok(EventDetail::Retention {
             completed: count(value, "completed")?,
             failed: count(value, "failed")?,
+        }),
+        "actions" => Ok(EventDetail::Actions {
+            sent: count(value, "sent")?,
+            failed: count(value, "failed")?,
+            refused: count(value, "refused")?,
         }),
         _ => Err(corrupt()),
     }

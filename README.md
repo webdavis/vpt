@@ -623,7 +623,10 @@ A send counts once the command exits 0. If vpt stops between that exit and savin
 next run sends the action again, so the command must accept a repeat. Dry runs send nothing.
 
 When the command is set, the result of `vpt analyze <id>` and of `vpt run` carries `"actions": {"sent",
-"failed", "refused"}` counts. Only analyses published while the command is set are recorded, so setting it does not
+"failed", "refused"}` counts. Each recording whose actions vpt tried to send logs one `actions_sent`
+report with the `recording`, `paths.note` and a `detail` such as `3 sent, 1 failed, 0 refused`, in
+state `failed` when any send failed or was refused and `done` otherwise, and invokes the configured
+report command. Only analyses published while the command is set are recorded, so setting it does not
 send earlier analyses' actions. The action text reaches only the command, never `events.jsonl` or
 vpt's output.
 
