@@ -159,7 +159,7 @@ fn transient(error: &io::Error) -> bool {
 }
 
 fn check_bound(root: &Path, started: Instant) {
-    if started.elapsed() >= Duration::from_millis(600) {
+    if started.elapsed() >= crate::database::WATCHDOG.saturating_add(Duration::from_millis(100)) {
         std::process::exit(
             if std::fs::write(root.join("fallback"), b"expired").is_ok() {
                 75

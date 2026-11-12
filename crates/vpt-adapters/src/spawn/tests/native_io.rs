@@ -147,7 +147,7 @@ fn execute_owned(
     execute(
         command,
         input,
-        Duration::from_millis(500),
+        crate::database::WATCHDOG,
         limit,
         Controls {
             interrupted: || false,
