@@ -62,6 +62,7 @@ fn search_returns_every_line_holding_all_words_with_its_moment() {
     assert_eq!(result["words"], json!(["budget", "review"]));
     assert_eq!(result["limit"], 50);
     assert_eq!(result["truncated"], false);
+    assert_eq!(result["skipped"], 0);
     assert_eq!(
         result["hits"],
         json!([
@@ -174,4 +175,39 @@ fn search_without_a_ledger_finds_nothing_and_creates_nothing() {
     let before = record::snapshot(&sandbox);
     assert_eq!(hits(&sandbox, &["budget"]), Vec::<Value>::new());
     assert_eq!(record::snapshot(&sandbox), before);
+}
+
+#[test]
+fn search_skips_a_saved_note_that_cannot_be_read_and_counts_it() {
+    let (sandbox, older, newer) = corpus("search-unreadable");
+    let connection = rusqlite::Connection::open(sandbox.path().join("state/vpt/vpt.db")).unwrap();
+    record::preserve_wal(&connection);
+    connection
+        .execute(
+            "UPDATE owned_notes SET body = 'Private canary' WHERE recording = ?1 AND stage = 'transcript'",
+            [older.as_str()],
+        )
+        .unwrap();
+    drop(connection);
+    let output = invoke(&sandbox, &["--json", "search", "budget"]);
+    assert!(!stdout(&output).contains("Private canary"));
+    let result = json(&output);
+    assert_eq!(result["skipped"], 1);
+    let found: Vec<_> = result["hits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|hit| (hit["recording"].clone(), hit["stage"].clone()))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            (json!(newer), json!("transcript")),
+            (json!(older), json!("analysis"))
+        ]
+    );
+    assert_eq!(
+        json(&invoke(&sandbox, &["--json", "search", "lunch"]))["skipped"],
+        1
+    );
 }

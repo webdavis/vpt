@@ -33,7 +33,7 @@ impl NoteLedger for SqliteLedger {
     }
     fn visit_notes(
         &self,
-        visitor: &mut dyn FnMut(NoteArtifact) -> std::ops::ControlFlow<()>,
+        visitor: &mut dyn FnMut(Result<NoteArtifact, LedgerError>) -> std::ops::ControlFlow<()>,
     ) -> Result<(), LedgerError> {
         self.read(|connection| read::visit(connection, visitor))
     }
