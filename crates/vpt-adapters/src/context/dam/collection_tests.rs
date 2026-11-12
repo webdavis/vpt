@@ -170,6 +170,27 @@ fn max_age_is_passed_to_agenda_and_a_stale_refusal_fails_only_the_calendar() {
 }
 
 #[test]
+fn an_unknown_max_age_remote_fails_the_calendar_naming_the_setting() {
+    let (_dir, command) = fixture(concat!(
+        "case \"$2\" in\n",
+        "agenda) printf '%s' '{\"error\":{\"kind\":\"refused\",\"rule\":\"no_such_remote\",\"message\":\"PRIVATE\",\"oids\":[]}}' >&2; exit 4;;\n",
+        "*) printf '%s' '{\"objects\":[]}';;\n",
+        "esac",
+    ));
+    let max_age = ["missing=15m".into()];
+    let snapshot = DamContext {
+        command: &command,
+        max_age: &max_age,
+    }
+    .collect(&request(&["calendar/".into()], &["work/".into()]))
+    .unwrap();
+    let detail = snapshot.status.calendar.detail().unwrap();
+    assert_eq!(detail, Failure::UnknownRemote.detail());
+    assert!(detail.contains("context.dam.max_age") && !detail.contains("stale"));
+    assert_eq!(snapshot.status.tasks, ContextStatus::Present);
+}
+
+#[test]
 fn malformed_max_age_refuses_before_spawning() {
     let (dir, command) = fixture("echo invoked > \"$1\"");
     for value in ["gcal", "=15m", "gcal=", "-x=1h", "gcal=15 m"] {

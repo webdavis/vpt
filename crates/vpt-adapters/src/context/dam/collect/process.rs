@@ -8,7 +8,11 @@ pub(super) fn output(result: Result<Outcome, SpawnError>) -> Result<Vec<u8>, Fai
     })?;
     match outcome.status {
         Status::Exited(0) => (),
-        Status::Exited(4) if refused_as_stale(&outcome.stderr) => return Err(Failure::Stale),
+        Status::Exited(4) => match refusal(&outcome.stderr).as_deref() {
+            Some("stale_remote") => return Err(Failure::Stale),
+            Some("no_such_remote") => return Err(Failure::UnknownRemote),
+            _ => return Err(Failure::Exit),
+        },
         Status::Exited(2) => return Err(Failure::Usage),
         Status::DeadlineExceeded => return Err(Failure::Deadline),
         Status::Interrupted => return Err(Failure::Interrupted),
@@ -32,10 +36,9 @@ pub(super) fn output(result: Result<Outcome, SpawnError>) -> Result<Vec<u8>, Fai
     Ok(outcome.stdout)
 }
 
-fn refused_as_stale(stderr: &[u8]) -> bool {
-    stderr.len() <= 65_536
-        && vpt_protocol::read_bounded(stderr, &vpt_protocol::Limits::incoming())
-            .is_ok_and(|v| v["error"]["rule"] == "stale_remote")
+fn refusal(stderr: &[u8]) -> Option<String> {
+    let document = vpt_protocol::read_bounded(stderr, &vpt_protocol::Limits::incoming()).ok()?;
+    Some(document["error"]["rule"].as_str()?.to_owned())
 }
 
 pub(super) fn merge(target: &mut ContextSnapshot, input: ContextSnapshot) -> Result<(), Failure> {

@@ -343,10 +343,12 @@ to have `dam agenda` rejects the command line, and the calendar half fails with 
 `dam rejected the command line; dam agenda needs a newer dam`.
 
 Set `context.dam.max_age` to bound how old dam's calendar data may be. Name your own dam remote in
-each value; for a remote called `work`, write `max_age = ["work=15m"]` under `[context.dam]`. Each value is passed to `dam agenda` as `--max-age`;
-the default, an empty list, passes none. When dam refuses with `stale_remote`, the calendar half
+each value; for a remote called `work`, write `max_age = ["work=15m"]` under `[context.dam]`. Each
+value is passed to `dam agenda` as `--max-age`; the default, an empty list, passes none. When dam refuses with `stale_remote`, the calendar half
 fails with the detail `calendar data is stale: dam refused it under context.dam.max_age`, and
-`--upcoming` exits with that detail instead of writing nothing.
+`--upcoming` exits with that detail instead of writing nothing. A value whose remote dam does not
+know fails the calendar half with its own detail, `context.dam.max_age names a remote that dam does
+not know; use a name from dam remote list`.
 
 `context.type = google` reads the configured calendar IDs through native HTTPS with rustls. Set
 `context.google.client_id`, `client_secret`, and `refresh_token`; the access-token response must grant
