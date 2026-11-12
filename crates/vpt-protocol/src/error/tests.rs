@@ -59,12 +59,20 @@ fn checks_appear_only_when_given() {
             Check {
                 name: "helper".into(),
                 ok: false,
+                notice: false,
                 detail: "absent".into(),
             },
             Check {
                 name: "config".into(),
                 ok: true,
+                notice: false,
                 detail: "valid".into(),
+            },
+            Check {
+                name: "recordings_dir".into(),
+                ok: true,
+                notice: true,
+                detail: "absent".into(),
             },
         ])
         .to_json();
@@ -72,7 +80,8 @@ fn checks_appear_only_when_given() {
         json["error"]["checks"],
         json!([
             {"name": "helper", "ok": false, "detail": "absent"},
-            {"name": "config", "ok": true, "detail": "valid"}
+            {"name": "config", "ok": true, "detail": "valid"},
+            {"name": "recordings_dir", "ok": true, "notice": true, "detail": "absent"}
         ])
     );
 }

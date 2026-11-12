@@ -67,29 +67,6 @@ fn resolved_home_link_preserves_git_checks_with_bad_store() {
 }
 
 #[test]
-fn unavailable_source_marks_only_its_dependencies() {
-    let sandbox = configured("doctor-missing-source");
-    std::fs::rename(
-        sandbox.path().join("voice-memos/Recordings"),
-        sandbox.path().join("held-source"),
-    )
-    .unwrap();
-    let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 3);
-    assert_eq!(check(&checks, "recordings_dir")["ok"], false);
-    for name in vpt_adapters::APPLE_SUBDIRECTORIES {
-        assert_eq!(check(&checks, &format!("subdirectory:{name}"))["ok"], false);
-        assert_eq!(
-            detail(&checks, &format!("subdirectory:{name}")),
-            "not run: recordings_dir could not be opened"
-        );
-    }
-    assert_eq!(check(&checks, "helper")["ok"], true);
-    assert_eq!(check(&checks, "source_gone")["ok"], true);
-    assert_eq!(snapshot(&sandbox), before);
-}
-
-#[test]
 fn one_bad_apple_subdirectory_preserves_other_checks() {
     let sandbox = configured("doctor-bad-subdir");
     std::os::unix::fs::symlink(

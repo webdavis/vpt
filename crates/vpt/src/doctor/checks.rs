@@ -1,9 +1,8 @@
 use super::probes;
 use crate::compose::{Environment, settings_from};
 use std::path::Path;
+use vpt_adapters::APPLE_SUBDIRECTORIES;
 use vpt_adapters::config::{planned_directory, resolve};
-use vpt_adapters::{APPLE_SUBDIRECTORIES, VoiceMemosStore};
-use vpt_application::ports::RecorderStore;
 use vpt_domain::layout::StoreKey;
 use vpt_protocol::error::Check;
 
@@ -11,7 +10,15 @@ pub(super) fn check(name: impl Into<String>, ok: bool, detail: impl Into<String>
     Check {
         name: name.into(),
         ok,
+        notice: false,
         detail: detail.into(),
+    }
+}
+
+pub(super) fn notice(name: impl Into<String>, detail: &str) -> Check {
+    Check {
+        notice: true,
+        ..check(name, true, detail)
     }
 }
 
@@ -85,46 +92,10 @@ pub(super) fn all(environment: &Environment, config: Option<&Path>) -> Vec<Check
     let helper = probes::helper(&settings);
     checks.push(super::engines::inspect(&settings.engines, helper.ok));
     checks.push(helper);
-    let source = if settings.source.recordings_dir.is_absolute() {
-        settings
-            .source
-            .recordings_dir
-            .canonicalize()
-            .map_err(|error| error.kind().to_string())
-            .and_then(|path| {
-                VoiceMemosStore::open(&path)
-                    .map(|store| (path, store))
-                    .map_err(|error| crate::compose::errors::contained_error(error).message)
-            })
-    } else {
-        Err("source.recordings_dir must be absolute".into())
-    };
-    checks.push(match &source {
-        Ok((_, store)) => match store.candidates() {
-            Ok(candidates) => check(
-                "recordings_dir",
-                true,
-                format!("readable, {} candidates", candidates.len()),
-            ),
-            Err(_) => check(
-                "recordings_dir",
-                false,
-                "recordings directory could not be read",
-            ),
-        },
-        Err(detail) => check("recordings_dir", false, detail),
-    });
+    let (recordings, subdirectories) = super::source::inspect(&settings.source.recordings_dir);
+    checks.push(recordings);
     checks.push(probes::symlink(&settings));
-    for name in APPLE_SUBDIRECTORIES {
-        checks.push(match &source {
-            Ok((path, _)) => probes::subdirectory(path, name),
-            Err(_) => check(
-                format!("subdirectory:{name}"),
-                false,
-                "not run: recordings_dir could not be opened",
-            ),
-        });
-    }
+    checks.extend(subdirectories);
     checks.push(match &roots {
         Ok(roots) => probes::cleanup_pending(&roots.stores.audio),
         Err(_) => check(

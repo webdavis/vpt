@@ -10,6 +10,8 @@ mod independence;
 mod observations;
 #[path = "show_list_storage/fixture.rs"]
 mod observations_fixture;
+#[path = "doctor/source.rs"]
+mod source;
 #[allow(
     dead_code,
     reason = "shared integration support serves other test targets"
