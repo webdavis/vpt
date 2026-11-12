@@ -859,7 +859,11 @@ processed in this order, and a rejection is a log line naming the step, never a 
 
 1. Normalize: a multi-word proposal is joined into kebab-case, and a proposal that differs from a
    vocabulary tag only by case or separator is folded onto that tag's existing spelling. An existing tag
-   is never reshaped.
+   is never reshaped. A proposal whose key matches the old name of a recorded `vpt tag rename` becomes
+   the new name, following later renames in a chain; a cycle leaves the proposal as written. A rename
+   stops applying once a later rename reverses it or any recording holds its old name as `confirmed`,
+   which only a hand confirmation can now cause. Each replacement logs `tag_renamed` with the proposal
+   index and no tag text. Hand confirmations are taken as typed.
 1. Syntax: letters, digits, `_`, `-`, `/`; at least one non-numeric character; no leading `#`. A tag that
    still fails after normalization is rejected.
 1. Classify: a tag in the vocabulary or in `known-tags.txt` is `confirmed`; any other tag follows

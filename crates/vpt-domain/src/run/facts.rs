@@ -21,6 +21,10 @@ pub enum HistoryFact {
         index: u32,
         reason: crate::tags::Rejection,
     },
+    TagRenamed {
+        recording: RecordingId,
+        index: u32,
+    },
     FlagResolved {
         recording: RecordingId,
         flag: crate::digest::Sha256Digest,
@@ -66,7 +70,7 @@ pub enum HistoryFact {
 impl HistoryFact {
     pub fn referenced_ids_are_nonzero(&self) -> bool {
         match self {
-            Self::TagRejected { index, .. } => *index < 256,
+            Self::TagRejected { index, .. } | Self::TagRenamed { index, .. } => *index < 256,
             Self::RecoveryProgress { evidence, .. } | Self::RecoverySummary { evidence, .. } => {
                 evidence.affected_runs.iter().all(|run| run.sequence() != 0)
             }

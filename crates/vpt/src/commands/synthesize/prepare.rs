@@ -18,6 +18,7 @@ pub(super) struct Context<'a> {
 pub(super) struct Prepared {
     pub delta: WorkDelta,
     pub rejections: Vec<vpt_domain::tags::Rejected>,
+    pub renamed: Vec<usize>,
 }
 pub(super) fn delta(
     mut input: NoteInputs,
@@ -124,5 +125,6 @@ pub(super) fn delta(
     Ok(Prepared {
         delta,
         rejections: tags.rejections,
+        renamed: tags.renamed,
     })
 }

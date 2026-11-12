@@ -45,6 +45,14 @@ pub(super) fn decode(value: &Value) -> Result<HistoryFact, LedgerError> {
             reason: vpt_domain::tags::Rejection::parse(string(value, "reason")?)
                 .ok_or_else(corrupt)?,
         }),
+        "tag_renamed" => Ok(HistoryFact::TagRenamed {
+            recording: recording(value, "recording")?.ok_or_else(corrupt)?,
+            index: unsigned(value, "index")?
+                .try_into()
+                .ok()
+                .filter(|index| *index < 256)
+                .ok_or_else(corrupt)?,
+        }),
         "flag_resolved" => Ok(HistoryFact::FlagResolved {
             recording: recording(value, "recording")?.ok_or_else(corrupt)?,
             flag: vpt_domain::digest::Sha256Digest::from_hex(string(value, "flag")?)
