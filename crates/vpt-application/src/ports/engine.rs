@@ -24,6 +24,7 @@ pub enum EngineFailure {
     InvalidAudioDuration,
     Io,
     Exited(i32),
+    SpeakerAnnotation(i32),
     Signaled(i32),
     DeadlineExceeded,
     Interrupted,

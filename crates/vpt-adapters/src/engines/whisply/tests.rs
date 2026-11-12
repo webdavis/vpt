@@ -53,6 +53,7 @@ done
                 command: vec![executable.to_str().unwrap().into()],
                 device: "cpu".into(),
                 model: "medium".into(),
+                hf_token: None,
             },
         }
     }

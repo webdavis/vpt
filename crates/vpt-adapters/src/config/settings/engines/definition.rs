@@ -23,6 +23,10 @@ pub(super) fn read(table: &Table, name: &str) -> Result<EngineConfig, ConfigErro
             },
             device: text_or(table, &format!("{prefix}.device"), "mlx")?,
             model: text_or(table, &format!("{prefix}.model"), "large-v3-turbo")?,
+            hf_token: get(table, &format!("{prefix}.hf_token"))
+                .and_then(toml::Value::as_str)
+                .filter(|token| !token.is_empty())
+                .map(str::to_owned),
         },
         "command" => EngineKind::Command {
             command: command(table, &format!("{prefix}.command"))?,

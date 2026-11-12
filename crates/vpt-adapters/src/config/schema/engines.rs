@@ -68,6 +68,12 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "the model name",
     ),
     key(
+        "engines.whisply.hf_token",
+        Kind::Secret,
+        "\"\"",
+        "a Hugging Face token; when set, whisply labels speakers",
+    ),
+    key(
         "reconcile.confidence_floor",
         Kind::Ratio,
         "0.35",

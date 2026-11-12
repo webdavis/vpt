@@ -9,11 +9,13 @@ impl fmt::Debug for EngineKind {
                 command,
                 device,
                 model,
+                hf_token,
             } => formatter
                 .debug_struct("Whisply")
                 .field("argument_count", &command.len())
                 .field("device", device)
                 .field("model", model)
+                .field("speaker_labels", &hf_token.is_some())
                 .finish(),
             Self::Command {
                 command,

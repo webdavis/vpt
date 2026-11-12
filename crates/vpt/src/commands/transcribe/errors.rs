@@ -72,6 +72,10 @@ pub(crate) fn attempt(failure: &vpt_application::transcribe::AttemptFailure) -> 
             "{}: engine executable or helper is unavailable",
             failure.engine
         ),
+        EngineFailure::SpeakerAnnotation(code) => format!(
+            "{}: whisply exited {code} when asked for speaker annotation (-a); it may lack speaker annotation, or the Hugging Face token may not grant pyannote/speaker-diarization-3.1",
+            failure.engine
+        ),
         cause => format!("{}: {cause:?}", failure.engine),
     }
 }

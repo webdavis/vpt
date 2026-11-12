@@ -40,6 +40,7 @@ pub fn invocation(
             command,
             device,
             model,
+            ..
         } => {
             backend_language = language::whisply(language, model)?;
             let mut argv = command.clone();

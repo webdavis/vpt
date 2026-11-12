@@ -621,6 +621,9 @@ whatever a `command` engine declares in its config (`family = "..."`, required).
 - `whisply` spawns `whisply run -f <path> -o <dir> -d <device> -m <model> -l <lang> -e json` with
   `[engines.whisply] device` (default `mlx`) and `model` (default `large-v3-turbo`), parses its JSON,
   family `whisper`, local; with `device = "cpu"` per-word scores are read, with `mlx` they are absent.
+  With `[engines.whisply] hf_token` set, it adds `-a` and passes the token as the `HF_TOKEN`
+  environment variable, never as an argument. A non-zero exit of such a run is reported as a failed
+  speaker annotation rather than a bare exit code.
 - `command` spawns `[engines.<name>] command` (an argv list) with the tokens `{audio}`, `{language}` and
   `{out_dir}` substituted, reads a `vpt.engine/1` document from its stdout, and carries the declared
   `family` and `local`. Its output supplies text only: it takes part in no disagreement, confidence or
@@ -1608,6 +1611,7 @@ canary-secret test.
 | `engines.whisply.command`            | string list    | `["whisply"]`                                                             | how whisply is invoked                                                                                       |
 | `engines.whisply.device`             | string         | `mlx`                                                                     | `mlx` reports no confidence, `cpu` does                                                                      |
 | `engines.whisply.model`              | string         | `large-v3-turbo`                                                          | the model name                                                                                               |
+| `engines.whisply.hf_token`           | string         | `""`                                                                      | a Hugging Face token, secret; when set, whisply runs with `-a` and receives it as `HF_TOKEN`                 |
 | `engines.<name>.kind`                | enum           | none                                                                      | `command` for a generic engine                                                                               |
 | `engines.<name>.command`             | string list    | none                                                                      | argv with `{audio}`, `{language}`, `{out_dir}` tokens                                                        |
 | `engines.<name>.family`              | string         | none, required for `command`                                              | the model family for the same-family check                                                                   |

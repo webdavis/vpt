@@ -119,6 +119,21 @@ readability settings. Interrupted publication resumes from saved bytes. Engine f
 previous accepted text; note failures retain newly accepted text and leave the note pending. Dry runs report the selected engines and their locality without starting them
 or changing files.
 
+`[engines.whisply] hf_token` holds a Hugging Face access token. When it is set, Whisply runs with
+`-a` to annotate speakers, and vpt passes the token in the `HF_TOKEN` environment variable, never in
+the argument list. Whisply uses the token to download the gated pyannote diarization model from
+Hugging Face and diarizes locally. vpt reads the configuration only when the file is private
+(0600), and no output, event, note or engine document repeats the token.
+
+Without a token, nothing changes: Whisply gets no `-a`, no `HF_TOKEN`, and vpt prints no extra
+diagnostic. The shipped configuration selects only Apple, so a default setup never runs Whisply and
+never shows labels. With a token set, `vpt doctor` reads `speaker labels on` for a selected Whisply
+and says `token set but whisply is not selected, so no speaker labels` otherwise; a selected Whisply
+that is not installed fails the engines check as before. When Whisply exits unsuccessfully while asked
+for speakers, as one without speaker annotation does on `-a`, the failure says so and names the
+diarization model the token must grant. As main engine that fails the transcription; as checker the
+main transcript is kept with a `single-engine` flag and the same message in its engine diagnostics.
+
 Pairs from the same model family are refused before either engine starts. The error names both
 engines and their shared family; `[engines] allow_same_family = true` explicitly permits the pair.
 
@@ -248,7 +263,8 @@ stores. It works independently of the recording source and ledger.
 executable files without running arbitrary engine commands; Apple also requires a compatible helper.
 Unavailable engines selected by the default pair or any language override fail the check. Unused
 engine definitions are reported without failing it. Generic commands' locality is explicitly labeled
-as declared configuration. Doctor also reports the Obsidian vault and every store's Git placement,
+as declared configuration. A Whisply engine with a token reads `speaker labels on`; the token itself
+is never shown. Doctor also reports the Obsidian vault and every store's Git placement,
 calling out audio ignore rules and sensitive engine outputs and redaction reports. It leaves vault
 contents, permissions, and ignore files unchanged.
 

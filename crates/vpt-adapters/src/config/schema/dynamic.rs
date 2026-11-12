@@ -19,6 +19,7 @@ pub const DYNAMIC_TABLES: &[DynamicTable] = &[
             ("local", Kind::Bool),
             ("device", Kind::Text),
             ("model", Kind::Text),
+            ("hf_token", Kind::Secret),
         ],
     },
 ];

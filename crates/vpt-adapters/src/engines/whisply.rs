@@ -16,6 +16,7 @@ impl Engine for WhisplyEngine {
             command,
             device,
             model,
+            hf_token,
         } = &request.engine.kind
         else {
             return Err(EngineFailure::InvalidArguments);
@@ -29,7 +30,15 @@ impl Engine for WhisplyEngine {
         }
         let language = language::base(request.language, model)?;
         let workspace = workspace::Workspace::new(request.out_dir, request.audio)?;
-        let result = execute(request, command, device, model, language, &workspace);
+        let result = execute(
+            request,
+            command,
+            device,
+            model,
+            language,
+            hf_token.as_deref(),
+            &workspace,
+        );
         workspace.close()?;
         result
     }
@@ -41,6 +50,7 @@ fn execute(
     device: &str,
     model: &str,
     language: &str,
+    hf_token: Option<&str>,
     workspace: &workspace::Workspace,
 ) -> Result<EngineOutput, EngineFailure> {
     let mut argv = command.to_vec();
@@ -57,9 +67,19 @@ fn execute(
         ]
         .map(str::to_owned),
     );
+    let env: Vec<_> = hf_token
+        .map(|token| ("HF_TOKEN", token))
+        .into_iter()
+        .collect();
+    if !env.is_empty() {
+        argv.push("-a".into());
+    }
     workspace.revalidate()?;
-    let outcome = process::run_with_limit(&argv, request.timeout, crate::OUTPUT_LIMIT)?;
-    process::success(outcome.status)?;
+    let outcome = process::run_with_limit(&argv, request.timeout, crate::OUTPUT_LIMIT, &env)?;
+    process::success(outcome.status).map_err(|failure| match failure {
+        EngineFailure::Exited(code) if hf_token.is_some() => EngineFailure::SpeakerAnnotation(code),
+        failure => failure,
+    })?;
     let decoded = vpt_protocol::whisply::decode(
         &workspace.read_document()?,
         &vpt_protocol::whisply::WhisplyRequest {
