@@ -1,6 +1,5 @@
 pub(crate) mod brief;
 mod confirm;
-pub(crate) mod handoff;
 pub(crate) mod import;
 mod options;
 pub(crate) mod redact;
@@ -22,14 +21,13 @@ verbs: run [--dry-run] | setup [--force] | doctor | ingest [--dry-run] [--once <
        tag rename <old> <new> [--dry-run] |\n\
        synthesize <id> [--dry-run] | path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | search <word>... [--limit <n>] | storage | retention run [--dry-run] |\n\
        brief <occasion-id> [--dry-run] [--explain] | brief --title <title> --at <RFC3339> [--duration-minutes <n>] [--participant <name>]... [--tag <tag>]... | brief --upcoming |\n\
-       handoff <id> --stage released|transcript|analysis|brief | redact <id> [--stage transcript|analysis] [--to <dir>] [--title <title>] | symlink deploy | symlink verify | --version\n";
+       redact <id> [--stage transcript|analysis] [--to <dir>] [--title <title>] | symlink deploy | symlink verify | --version\n";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Verb {
     Brief(brief::Options),
     Redact(redact::Options),
     Import(import::Options),
-    Handoff(handoff::Options),
     Occasions,
     OccasionPath {
         id: String,
@@ -91,7 +89,7 @@ pub enum Verb {
     },
     Show {
         id: String,
-        stage: Option<vpt_domain::handoff::Kind>,
+        stage: Option<vpt_domain::copy::Kind>,
         redact: bool,
     },
     Search(search::Options),

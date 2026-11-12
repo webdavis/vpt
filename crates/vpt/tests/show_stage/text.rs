@@ -1,6 +1,6 @@
 use super::*;
 
-fn text_fields(result: &serde_json::Value, stage: &str) {
+pub(super) fn text_fields(result: &serde_json::Value, stage: &str) {
     let content = result["content"].as_str().unwrap();
     assert!(
         content.starts_with(&format!("# vpt {stage} copy, ")),
@@ -70,60 +70,4 @@ fn analysis_returns_the_text_beside_the_summary_and_actions() {
             .contains("Alice meets Bob")
     );
     assert_eq!(result["provenance"]["redacted"], false);
-}
-
-#[test]
-fn released_returns_the_saved_redacted_copy() {
-    let (sandbox, id) = configured("show-text-released");
-    let release = json(&invoke(&sandbox, &["redact", id.as_str(), "--json"]));
-    let before = fixture::snapshot(&sandbox);
-    let result = json(&show(&sandbox, id.as_str(), "released"));
-    text_fields(&result, "released");
-    assert_eq!(result["recording"], id.as_str());
-    assert_eq!(result["stage"], "released");
-    assert_eq!(result["provenance"]["redacted"], true);
-    let written = release["written"].as_str().unwrap();
-    assert!(written.ends_with(result["note"].as_str().unwrap()));
-    assert!(
-        !result["content"]
-            .as_str()
-            .unwrap()
-            .contains("person@sample.test")
-    );
-    assert_eq!(fixture::snapshot(&sandbox), before);
-}
-
-#[test]
-fn brief_returns_the_occasion_text_and_its_source_recordings() {
-    let (sandbox, id) = configured("show-text-brief");
-    json(&invoke(
-        &sandbox,
-        &["confirm", id.as_str(), "--tag", "planning", "--json"],
-    ));
-    let created = json(&invoke(
-        &sandbox,
-        &[
-            "brief",
-            "--title",
-            "Planning",
-            "--at",
-            "2026-08-25T10:00:00-06:00",
-            "--tag",
-            "planning",
-            "--json",
-        ],
-    ));
-    let occasion = created["occasion"]["id"].as_str().unwrap();
-    let before = fixture::snapshot(&sandbox);
-    let result = json(&show(&sandbox, occasion, "brief"));
-    text_fields(&result, "brief");
-    assert_eq!(result["occasion"], occasion);
-    assert_eq!(result["recordings"], json!([id.as_str()]));
-    assert!(result.get("recording").is_none());
-    assert_eq!(
-        result["provenance"]["occasion_at"],
-        "2026-08-25T10:00:00-06:00"
-    );
-    assert!(!result["content"].as_str().unwrap().contains("vptOccasion:"));
-    assert_eq!(fixture::snapshot(&sandbox), before);
 }

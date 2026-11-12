@@ -49,7 +49,7 @@ pub(super) fn exists(path: &Path) -> Result<bool, Box<ErrorDocument>> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(_) => Err(Box::new(vpt_protocol::error::ErrorDocument::new(
             vpt_protocol::error::ErrorKind::Store,
-            "cannot inspect handoff artifact",
+            "cannot inspect stage artifact",
         ))),
     }
 }

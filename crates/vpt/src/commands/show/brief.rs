@@ -5,7 +5,7 @@ use super::{
 use vpt_adapters::{Roots, SqliteLedger};
 use vpt_application::ports::*;
 use vpt_domain::{
-    handoff::{Identity, Kind, Provenance},
+    copy::{Identity, Kind, Provenance},
     occasion::OccasionId,
 };
 use vpt_protocol::error::ErrorDocument;
@@ -40,7 +40,7 @@ pub(crate) fn run(
     document.check_owner(id).map_err(|_| errors::changed())?;
     let mut sources = Vec::new();
     let mut engines = std::collections::BTreeSet::new();
-    let capacity = || errors::document(vpt_domain::handoff::Error::CapacityExceeded);
+    let capacity = || errors::document(vpt_domain::copy::Error::CapacityExceeded);
     if saved.snapshot.pack.sources.len() > 65_536 {
         return Err(capacity());
     }
@@ -53,7 +53,7 @@ pub(crate) fn run(
             .map_err(errors::ledger)?
             .ok_or_else(errors::missing)?;
         let (names, _, current_reviewed) =
-            super::private::provenance(&input, NoteStage::Transcript);
+            super::recording::provenance(&input, NoteStage::Transcript);
         reviewed &= current_reviewed
             && input
                 .notes
@@ -69,7 +69,7 @@ pub(crate) fn run(
     }
     let engines: Vec<_> = engines.into_iter().collect();
     let flags = u32::try_from(saved.snapshot.pack.unresolved.flags)
-        .map_err(|_| errors::document(vpt_domain::handoff::Error::CapacityExceeded))?;
+        .map_err(|_| errors::document(vpt_domain::copy::Error::CapacityExceeded))?;
     output::value(
         roots,
         Artifact {

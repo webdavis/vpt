@@ -1,4 +1,4 @@
-use crate::commands::handoff::errors;
+use super::errors;
 use serde_json::{Value, json};
 use vpt_application::ports::NoteInputs;
 use vpt_domain::{identity::RecordingId, proposal::CheckedClaim};

@@ -141,6 +141,10 @@ fn analysis_without_an_accepted_proposal_is_an_input_error() {
     assert!(missing.stdout.is_empty());
 }
 
+#[path = "show_stage/boundaries.rs"]
+mod boundaries;
+#[path = "show_stage/copies.rs"]
+mod copies;
 #[path = "show_stage/redact.rs"]
 mod redact;
 #[path = "show_stage/text.rs"]

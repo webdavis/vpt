@@ -5,7 +5,7 @@ use super::{
 use vpt_adapters::{Roots, SqliteLedger};
 use vpt_application::ports::*;
 use vpt_domain::{
-    handoff::{Identity, Kind, Provenance},
+    copy::{Identity, Kind, Provenance},
     identity::RecordingId,
     review::{FlagContent, Resolution},
 };

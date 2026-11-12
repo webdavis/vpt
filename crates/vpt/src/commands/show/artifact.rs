@@ -1,35 +1,16 @@
-pub(crate) mod brief;
-pub(crate) mod errors;
-mod file;
-pub(crate) mod output;
-pub(crate) mod private;
-mod released;
-use crate::{
-    cli::{
-        args::handoff::{Options, Target},
-        output::Outcome,
-    },
-    compose::{Environment, settings_from},
-};
+use super::{brief, errors, recording, released};
+use crate::compose::{Environment, settings_from};
 use std::path::Path;
 use vpt_adapters::{Roots, SqliteLedger};
 use vpt_application::Settings;
-use vpt_domain::handoff::Kind;
+use vpt_domain::{copy::Kind, identity::RecordingId, occasion::OccasionId};
 use vpt_protocol::error::ErrorDocument;
-pub(crate) fn run(environment: &Environment, config: Option<&Path>, options: &Options) -> Outcome {
-    execute(environment, config, options).unwrap_or_else(|e| Outcome::Failure(*e))
+
+pub(crate) enum Target {
+    Recording(RecordingId),
+    Occasion(OccasionId),
 }
-fn execute(
-    environment: &Environment,
-    config: Option<&Path>,
-    options: &Options,
-) -> Result<Outcome, Box<ErrorDocument>> {
-    let (settings, roots, ledger) = open(environment, config)?;
-    if options.kind != Kind::Released && !settings.handoff_allow_private {
-        return Err(errors::private());
-    }
-    output::outcome(artifact(&ledger, &roots, &options.target, options.kind)?)
-}
+
 pub(crate) fn open(
     environment: &Environment,
     config: Option<&Path>,
@@ -50,7 +31,8 @@ pub(crate) fn open(
         .ok_or_else(errors::missing)?;
     Ok((settings, roots, ledger))
 }
-pub(crate) fn artifact(
+
+pub(crate) fn read(
     ledger: &SqliteLedger,
     roots: &Roots,
     target: &Target,
@@ -58,7 +40,7 @@ pub(crate) fn artifact(
 ) -> Result<serde_json::Value, Box<ErrorDocument>> {
     match target {
         Target::Recording(id) if kind == Kind::Released => released::run(ledger, roots, id),
-        Target::Recording(id) => private::run(ledger, roots, id, kind),
+        Target::Recording(id) => recording::run(ledger, roots, id, kind),
         Target::Occasion(id) => brief::run(ledger, roots, id),
     }
 }

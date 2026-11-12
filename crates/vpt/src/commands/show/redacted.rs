@@ -1,14 +1,14 @@
-use crate::commands::handoff::{
+use super::{
     errors,
     output::{self, Artifact},
-    private::provenance,
+    recording::provenance,
 };
 use crate::commands::redact::{prepare, source::Source};
 use serde_json::Value;
 use vpt_adapters::{Roots, SqliteLedger};
 use vpt_application::{Settings, ports::*};
 use vpt_domain::{
-    handoff::{Identity, Kind, Provenance},
+    copy::{Identity, Kind, Provenance},
     identity::RecordingId,
     note::NoteStage,
 };
@@ -59,7 +59,7 @@ pub(super) fn copy(
         },
     )?;
     let emitted = value["content"].as_str().unwrap_or_default().as_bytes();
-    value["identity"]["content_sha256"] = source.stores.digest_bytes(emitted).hex().into();
+    value["content_sha256"] = source.stores.digest_bytes(emitted).hex().into();
     Ok(value)
 }
 

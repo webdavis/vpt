@@ -11,11 +11,6 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
         crate::cli::progress::enable();
     }
     let outcome = match &invocation.verb {
-        Verb::Handoff(options) => commands::handoff::run(
-            &compose::Environment::from_process(),
-            invocation.config.as_deref(),
-            options,
-        ),
         Verb::Redact(options) => commands::redact::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

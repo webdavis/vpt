@@ -60,7 +60,6 @@ fn observational_commands_emit_one_versioned_document_and_preserve_all_files() {
         sandbox.vpt().args(["redact", id.as_str(), "--json"]),
         Duration::from_secs(5),
     ));
-    synthesis::append(&sandbox, "\n[handoff]\nallow_private=true\n");
     let before = fixture::snapshot(&sandbox);
     for args in history_guards::observations(&sandbox) {
         for structured in [false, true] {
@@ -80,18 +79,8 @@ fn observational_commands_emit_one_versioned_document_and_preserve_all_files() {
             assert!(!output.stdout.is_empty());
             if structured {
                 let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-                assert_eq!(
-                    document["schema"],
-                    if args[0] == "handoff" {
-                        "vpt.handoff/1"
-                    } else {
-                        "vpt.result/1"
-                    },
-                    "{args:?}"
-                );
-                if args[0] != "handoff" {
-                    assert_eq!(document["command"], args[0]);
-                }
+                assert_eq!(document["schema"], "vpt.result/1", "{args:?}");
+                assert_eq!(document["command"], args[0]);
             }
             assert_eq!(fixture::snapshot(&sandbox), before, "{args:?}");
         }

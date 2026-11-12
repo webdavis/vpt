@@ -5,7 +5,7 @@ use super::{
 use vpt_adapters::{Roots, SqliteLedger};
 use vpt_application::ports::ReleaseLedger;
 use vpt_domain::{
-    handoff::{Identity, Kind, Provenance},
+    copy::{Identity, Kind, Provenance},
     identity::RecordingId,
 };
 use vpt_protocol::error::ErrorDocument;
@@ -56,5 +56,5 @@ pub(super) fn run(
             return Err(errors::pending());
         }
     }
-    Err(super::private::missing_stages(ledger, id)?)
+    Err(super::recording::missing_stages(ledger, id)?)
 }

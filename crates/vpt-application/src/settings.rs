@@ -25,7 +25,6 @@ pub struct Settings {
     pub brief: BriefSettings,
     pub context: ContextSettings,
     pub share: ShareSettings,
-    pub handoff_allow_private: bool,
     pub home: PathBuf,
     pub state_dir: PathBuf,
     pub symlink_target: Option<PathBuf>,
