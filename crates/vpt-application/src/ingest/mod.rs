@@ -54,7 +54,7 @@ where
             let failure = Self::error(&report, candidate::recorder_failure(error), None);
             return Err(self.finish_failure(started.run, self.clock.now(), failure, &mut report));
         }
-        let candidates = match self.select(mode, &report) {
+        let candidates = match self.select(mode, &mut report) {
             Ok(candidates) => candidates,
             Err(error) => {
                 return Err(self.finish_failure(started.run, self.clock.now(), error, &mut report));

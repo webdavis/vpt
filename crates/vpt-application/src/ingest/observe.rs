@@ -18,7 +18,7 @@ where
 {
     pub(super) fn observe(&self, mode: &Mode) -> Result<IngestReport, Box<IngestError>> {
         let mut report = IngestReport::default();
-        let candidates = self.select(mode, &report)?;
+        let candidates = self.select(mode, &mut report)?;
         for candidate in candidates {
             let mut known = None;
             let seen = self

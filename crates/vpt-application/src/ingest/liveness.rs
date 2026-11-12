@@ -1,10 +1,13 @@
 use super::{Ingest, IngestError, IngestFailure, IngestReport, Mode, candidate::recorder_failure};
 use crate::ports::{
-    Archive, Candidate, Clock, EventSink, LedgerCommit, RecorderStore, RecordingLedger, RunHistory,
-    Trash, WorkDelta,
+    Archive, Candidate, Clock, EventSink, LedgerCommit, RecorderError, RecorderStore,
+    RecordingLedger, RunHistory, Trash, WorkDelta,
 };
 use vpt_domain::history::RunId;
 use vpt_domain::run::{HistoryFact, WorkOutcome};
+
+const ABSENT: &str =
+    "Voice Memos has not stored a recording on this Mac yet; nothing to ingest from recordings_dir";
 
 impl<R, A, L, C, T, S> Ingest<'_, R, A, L, C, T, S>
 where
@@ -18,14 +21,21 @@ where
     pub(super) fn select(
         &self,
         mode: &Mode,
-        report: &IngestReport,
+        report: &mut IngestReport,
     ) -> Result<Vec<Candidate>, Box<IngestError>> {
+        let mut absent = false;
         let candidates = match &mode.once {
             Some(path) => self
                 .recorder
                 .candidate(path)
                 .map(|candidate| vec![candidate]),
-            None => self.recorder.candidates(),
+            None => match self.recorder.candidates() {
+                Err(RecorderError::Absent) => {
+                    absent = true;
+                    Ok(Vec::new())
+                }
+                listed => listed,
+            },
         }
         .map_err(|error| Self::error(report, recorder_failure(error), None))?;
         if mode.once.is_none() && candidates.is_empty() {
@@ -39,6 +49,9 @@ where
             {
                 return Err(Self::error(report, IngestFailure::EmptyStore, None));
             }
+        }
+        if absent {
+            report.log.push(ABSENT.into());
         }
         Ok(candidates)
     }

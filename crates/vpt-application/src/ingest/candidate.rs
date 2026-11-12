@@ -98,6 +98,7 @@ pub(super) fn recorder_failure(error: RecorderError) -> IngestFailure {
             IngestFailure::PathEscape(path)
         }
         RecorderError::Unreadable(detail) => IngestFailure::StoreUnreadable(detail),
+        RecorderError::Absent => IngestFailure::StoreUnreadable("absent".into()),
         RecorderError::NotFound(path) => IngestFailure::OnceMissing(path),
         RecorderError::Io(detail) => IngestFailure::Recorder(detail),
     }

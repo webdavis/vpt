@@ -518,8 +518,9 @@ path and takes nothing.
 
 | Condition                                                | Sweep behavior                                | Event                                                                                       |
 | -------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `recordings_dir` absent, never seen a recording          | nothing to ingest, exit 0, one diagnostic     | none                                                                                        |
 | `recordings_dir` unreadable                              | abort, exit 1, nothing ingested               | `ingest_failed`, once per run                                                               |
-| readable, zero `.m4a`, store previously seen non-empty   | abort, exit 1                                 | `ingest_failed` (an empty store is the silent failure)                                      |
+| absent or zero `.m4a`, store previously seen non-empty   | abort, exit 1                                 | `ingest_failed` (an empty store is the silent failure)                                      |
 | database copy or read fails                              | continue, untitled                            | none, recorded per recording                                                                |
 | a gate fails                                             | defer, retry next sweep                       | `deferred` after `[source] deferral_page_threshold` (default 4) consecutive deferrals, once |
 | `SF_DATALESS`                                            | defer, never open                             | as above                                                                                    |

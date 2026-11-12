@@ -34,3 +34,16 @@ pub(super) fn named(root: &RootDir, name: &str) -> Result<Option<Candidate>, Rec
         Kind::Directory | Kind::Other => Ok(None),
     }
 }
+
+pub(super) fn subdirectory_counts(recordings: Option<&RootDir>) -> Vec<(String, Option<u64>)> {
+    APPLE_SUBDIRECTORIES
+        .iter()
+        .map(|name| {
+            let count = recordings
+                .and_then(|recordings| recordings.open_subdirectory(name).ok())
+                .and_then(|directory| directory.names().ok())
+                .map(|entries| entries.len() as u64);
+            ((*name).into(), count)
+        })
+        .collect()
+}

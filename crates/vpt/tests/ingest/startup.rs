@@ -3,6 +3,7 @@ mod engine_outputs;
 #[path = "startup/notes.rs"]
 mod notes;
 use super::*;
+use std::os::unix::fs::PermissionsExt;
 
 use vpt_adapters::{RootDir, SqliteLedger, digest_open};
 use vpt_application::ports::{
@@ -97,8 +98,10 @@ fn assert_recovered_before_source_failure(fail_delivery: bool) {
         )
         .unwrap();
     }
-    std::fs::remove_dir(sandbox.path().join("voice-memos/Recordings")).unwrap();
+    let recordings = sandbox.path().join("voice-memos/Recordings");
+    std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o000)).unwrap();
     let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
     assert!(output.stdout.is_empty());
     let error: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
