@@ -98,7 +98,6 @@ Product sources: specification sections 4, 5, 8.7, and 9.
   write. Known titles come from existing ledger state; otherwise the title is unavailable.
   Selection/refusal and full-snapshot command tests complement adapter checks for known-title
   lookup without refresh. Existing dirty-publication/retention/engine-output dry runs remain covered.
-  Evidence and the separate unresolved timing failures are in `reports/vpt-ingestion-progress.md`.
 - [x] Complete ingestion startup under the write lock, including unfinished publication repair,
   pending retention reconciliation, and logging recovery before new mutating work. Failed staging
   goes to Trash when possible; if the helper is unavailable, retain the staged file and report it.
@@ -114,7 +113,7 @@ Product sources: specification sections 4, 5, 8.7, and 9.
   external-effect intent from a confirmed result. Preserve known completed work on later failure.
   Manual and upcoming briefs now save and export their run start before context collection or store
   creation; failed and interrupted collection records the corresponding run outcome. Required-history
-  refusal and exporter recovery cases are recorded in `reports/vpt-ingestion-progress.md`.
+  refusal and exporter recovery cases are covered.
   All 17 ledger-backed mutating forms pass the run-start guard matrix in both output modes. Shared
   memory/durable ledger contracts cover atomic work/history persistence, planned versus confirmed
   effects, and rollback; the report maps the evidence and records the separate timing failure.
@@ -153,7 +152,7 @@ Product sources: specification sections 4, 5, 8.7, and 9.
   exists uses command output only. Observational commands and dry runs do not create or repair logs.
   Ingestion and retention command suites cover partial work, missing helpers, unavailable logs,
   failed hooks, broken final output, and human/JSON summaries. The expanded command run also verifies
-  every event kind's producer and channel; evidence is in `reports/vpt-ingestion-progress.md`.
+  every event kind's producer and channel.
 
 ### Audio retention
 
@@ -530,8 +529,7 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   rollback and corrupt-window refusals are covered. Acceptance checks cover late transaction rollback,
   acknowledgement failure/recovery, preserved committed identifiers, and log-export warnings. Accepted
   synthesis also retains its vocabulary publication dependency, so vocabulary-only recovery preserves
-  the accepted proposal without rerunning the agent or resending hooks. The acceptance evidence is
-  recorded in `reports/vpt-stage4-progress.md`.
+  the accepted proposal without rerunning the agent or resending hooks.
   Annotation rendering now honors confirmed, dismissed, and corrected findings; correction markers
   preserve claim identity on re-extraction. Owned-document content replacement preserves frontmatter,
   managed links, and operator prose. These operations are connected to `verify-note`, review resolution,
@@ -724,8 +722,7 @@ Product sources: specification sections 3.3, 8, 9, and 10.
   or file write occurs as part of the command.
   Eleven command tests cover all four kinds, current private prose and digests, immutable release
   provenance, missing/changed/pending artifacts, available-stage errors, and observational output.
-  Protocol bounds, retained-file checks, and the production vocabulary independence test pass;
-  verification details are recorded in `reports/vpt-stage4-progress.md`.
+  Protocol bounds, retained-file checks, and the production vocabulary independence test pass.
 
 ### Full pipeline and retention across all stores
 
@@ -792,15 +789,14 @@ Product sources: specification sections 3.1, 3.5, 9, 10, 11, and 13.
   All 26 command forms pass human/JSON success acceptance; configuration and history/refusal matrices
   exercise their safe failure envelopes. Upcoming briefs now carry the required `vpt.result/1`
   envelope, and final synthesis-history failures preserve accepted proposal diagnostics. Nested
-  startup failures retain each export warning once. Evidence and the command/contract mapping are
-  recorded in `reports/vpt-stage4-progress.md` and `reports/vpt-ingestion-progress.md`.
+  startup failures retain each export warning once.
 - [x] Keep all advertised dry runs observational. `run`, `transcribe`, and `synthesize` spawn no
   engine/agent/hook and perform no migration, repair, publication, or Trash move; the brief context
   exception is limited to configured read-only collection.
   All six commands preserve filesystem bytes and metadata with absent state, a version-one database,
   an unsupported future schema, pending publication/retention/history recovery, and a held write lock.
   Existing brief previews and explanations preserve pending work; automatic pipeline brief context
-  is not collected during a dry run. Evidence is in `reports/vpt-ingestion-progress.md`.
+  is not collected during a dry run.
 - [x] Apply bounded versioned documents to the new engine, proposal, context, brief, and handoff
   interfaces: unknown major versions refuse, additive fields produce named diagnostics, and input
   limits apply before unbounded allocation. Engine documents allow 16 MiB, proposals 1 MiB, other
@@ -810,7 +806,6 @@ Product sources: specification sections 3.1, 3.5, 9, 10, 11, and 13.
   Command cases retain accepted engine/proposal diagnostics through success, rollback, publication
   failure, and later pipeline failure in both output modes. Brief and handoff are output interfaces;
   their bounded encoders validate domain content and reject excessive JSON escape expansion.
-  Evidence and the interface-to-test mapping are in `reports/vpt-ingestion-progress.md`.
 - [x] Apply the existing direct-argument subprocess ownership, shared deadline, bounded output,
   and interrupt cleanup to each new external engine, synthesis, context, and helper command.
   Never invoke a shell to interpret configured arguments or expose raw child output in diagnostics.
