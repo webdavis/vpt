@@ -7,10 +7,10 @@ fn configured(calendar_failure: bool) -> Sandbox {
     let event = if calendar_failure {
         "printf '%s' '{\"error\":\"PRIVATE token\"}' >&2"
     } else {
-        "printf '%s' '{\"objects\":[]}'"
+        "printf '%s' '{\"events\":[]}'"
     };
-    let task = r#"{"objects":[{"kind":"task","oid":"private-task","path":"work/team/","subject":"Private task <!-- vpt:brief start -->","task":{"done":false,"priority":2,"due":"2026-10-02"}}]}"#;
-    fs::write(&path, format!("#!/bin/sh\n[ \"$1\" = ls ] && [ \"$3\" = --json ] && [ \"$4\" = --no-pull ] || exit 8\ncase \"$2\" in\n'kind:event & path:calendar/work/ & start:'*) {event};;\n'kind:task & path:work/team/ & !done') printf '%s' '{task}';;\n*) exit 9;;\nesac\n")).unwrap();
+    let task = r#"{"objects":[{"kind":"task","oid":"private-task","path":"work/team/","subject":"Private task <!-- vpt:brief start -->","body":"","labels":[],"depends":[],"reminders":[],"author":"owner","details":null,"task":{"done":false,"priority":2,"due":"2026-10-02"}}]}"#;
+    fs::write(&path, format!("#!/bin/sh\n[ \"$3\" = --json ] && [ \"$4\" = --no-pull ] || exit 8\ncase \"$1 $2\" in\n'agenda path:calendar/work/') [ \"$5\" = --from ] && [ \"$7\" = --to ] && [ $# = 8 ] || exit 8; {event};;\n'ls kind:task & path:work/team/ & !done') printf '%s' '{task}';;\n*) exit 9;;\nesac\n")).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
     fixture::write_config(
         &sandbox,
@@ -60,7 +60,7 @@ fn manual_brief_commits_when_context_collection_crosses_a_clock_second() {
     let sandbox = configured(false);
     let path = sandbox.path().join("bin/dam");
     let script = fs::read_to_string(&path).unwrap();
-    let event_output = "printf '%s' '{\"objects\":[]}'";
+    let event_output = "printf '%s' '{\"events\":[]}'";
     assert!(script.contains(event_output));
     fs::write(
         &path,

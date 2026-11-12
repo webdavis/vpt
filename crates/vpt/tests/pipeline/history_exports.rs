@@ -83,14 +83,26 @@ fn invoke_later(sandbox: &Sandbox, args: &[&str], structured: bool) -> std::proc
 pub(super) fn upcoming(sandbox: &Sandbox) {
     let now = vpt_adapters::SystemClock.now().secs;
     let response = sandbox.path().join("calendar.json");
-    fs::write(&response, serde_json::json!({"objects":[{
-        "oid":"export-brief", "kind":"event", "path":"calendar/work/", "subject":"Private occasion",
-        "event":{"status":"confirmed", "start":vpt_domain::time::UtcInstant { secs:now + 3600 }.rfc3339(),
-        "end":vpt_domain::time::UtcInstant { secs:now + 5400 }.rfc3339()}
-    }]}).to_string()).unwrap();
+    fs::write(
+        &response,
+        support::dam::agenda(vec![support::dam::event(
+            "export-brief",
+            "Private occasion",
+            now + 3600,
+            now + 5400,
+        )]),
+    )
+    .unwrap();
     let script = sandbox.path().join("collector.sh");
     let calls = sandbox.path().join("context.calls");
-    fs::write(&script, format!("printf 'called\\n' >> {calls:?}\ncase \"$2\" in\n'kind:event '*) /bin/cat {response:?};;\n'kind:task '*) printf '%s' '{{\"objects\":[]}}';;\n*) exit 9;;\nesac\n")).unwrap();
+    fs::write(
+        &script,
+        format!(
+            "printf 'called\\n' >> {calls:?}\n{}",
+            support::dam::script(&response)
+        ),
+    )
+    .unwrap();
     analysis::append(
         sandbox,
         &format!(

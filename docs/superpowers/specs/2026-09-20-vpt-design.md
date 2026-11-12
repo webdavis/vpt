@@ -186,7 +186,7 @@ not depend on `vpt-protocol`.
 | `Stores`                  | resolve a store path; write a file atomically; read; list; walk up for a git working tree | `filesystem`                                                                                       |
 | `Trash`                   | move a path to the system Trash                                                           | `macos_helper` (`vpt-macos trash`)                                                                 |
 | `EventSink`               | log an `Event` and invoke its configured report or alert hook                              | logging with optional command execution                                                           |
-| `ContextSource`           | a `ContextSnapshot` (occasions and tasks) for a window and a selection                    | `dam` (spawns `dam ls --json --no-pull`), `google` (native HTTPS, read-only scope), `none`         |
+| `ContextSource`           | a `ContextSnapshot` (occasions and tasks) for a window and a selection                    | `dam` (spawns `dam agenda`, `show` and `ls` with `--json --no-pull`), `google` (native HTTPS, read-only scope), `none`         |
 | `AgentCommand`            | run the configured analysis command over a transcript and read a `Proposal` back          | `command`                                                                                          |
 | `KnownTerms`, `KnownTags` | read and append the two confirmation lists                                                | `filesystem`                                                                                       |
 
@@ -1175,14 +1175,17 @@ naming the key whenever the selected provider supports that half and the verb as
 selection is in the request, never a filter afterwards.
 
 - `dam`: vpt spawns `[context.dam] command` (default `["dam"]`) as
-  `dam ls "kind:event & path:<calendar> & start:<YYYY-MM-DD>" --json --no-pull` once per configured
-  calendar path and per day in the window, and
-  `dam ls "kind:task & path:<project> & !done" --json --no-pull` once per configured project. Each
-  calendar is a dam path prefix (the `path` a Google Calendar remote is mounted at in dam's config, such
-  as `calendar/`), each project a task path prefix. dam's `attendees` become participants by email, its
-  `organizer` supplies a name when present, `subject` is the title, `start` and `end` give `at` and
-  `duration_secs`. `--no-pull` is always passed so a brief never triggers a remote pull. A non-zero exit
-  or an error document on stderr is a collector failure.
+  `dam agenda "path:<calendar> | path:<calendar>" --json --no-pull --from <start> --to <end>` once
+  per window, with `start` and `end` as UTC RFC 3339 times, then
+  `dam show <oid> --json --no-pull` for each returned event that starts inside the window and whose
+  row carries no `attendees`, and `dam ls "kind:task & path:<project> & !done" --json --no-pull` once
+  per configured project. Each calendar is a dam path prefix (the `path` a Google Calendar remote is
+  mounted at in dam's config, such as `calendar/`), each project a task path prefix. dam's `attendees`
+  become participants by email, its `organizer` supplies a name when present, `subject` is the title,
+  `oid` the identity, `labels` the tags, and `start` and `end` give `at` and `duration_secs`; an
+  all-day date starts at midnight in the system zone. Cancelled events are dropped. `--no-pull` is
+  always passed so a brief never triggers a remote pull. A non-zero exit or an error document on
+  stderr is a collector failure.
 - `google`: a native reader over the Google Calendar events list endpoint with `singleEvents=true` and
   `timeMin` and `timeMax` bracketing the window, per configured calendar id, following `nextPageToken`
   until exhausted within the same scope; because `timeMin` filters on end time, vpt applies the trigger

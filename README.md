@@ -322,15 +322,19 @@ transcripts supply no evidence; unaccepted changes to managed transcript content
 
 With `context.type = none`, both context halves are disabled. `context.type = dam` reads the selected
 `context.calendars` and `context.projects` through the configured `context.dam.command` (default
-`["dam"]`). Each query includes its selected path and `--json --no-pull`; no remote pull is requested.
-Both selections must be nonempty. Paths containing query operators or whitespace are refused before
-state creation. Collection shares one 30-second deadline and validates bounded provider output.
+`["dam"]`). Calendar events come from one `dam agenda` call for the window, whose query selects the
+configured calendar paths. vpt then runs `dam show <oid>` for each event that starts inside the window,
+to read its attendees and organizer; an agenda row that already carries attendees needs no `show`.
+Open tasks come from one `dam ls` query per project. Every call passes `--json --no-pull`, so no remote
+pull is requested. Both selections must be nonempty. Paths containing query operators or whitespace
+are refused before state creation. Collection shares one 30-second deadline and validates bounded
+provider output.
 
 Calendar and task failures are reported separately, and manual briefs can still publish with the
 successful half. Open task text is escaped and saved with its source. Previews may perform these
 read-only queries. Zoned and all-day dam events preserve their local date and daylight-saving duration;
-an all-day event without a declared zone uses the system zone. Boundary days are queried to include
-events whose local date differs from UTC, then exact start/end bounds select the returned occasions.
+an all-day event uses the system zone, as dam does. Exact start and end bounds select the returned
+occasions, and cancelled events are left out.
 
 `context.type = google` reads the configured calendar IDs through native HTTPS with rustls. Set
 `context.google.client_id`, `client_secret`, and `refresh_token`; the access-token response must grant

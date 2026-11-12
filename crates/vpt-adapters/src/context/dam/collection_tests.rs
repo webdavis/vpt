@@ -34,24 +34,43 @@ pub(super) fn request<'a>(calendars: &'a [String], projects: &'a [String]) -> Co
 }
 
 #[test]
-fn collector_scopes_every_request_and_always_disables_pulls() {
-    let (dir, command) =
-        fixture("log=$1; shift\nprintf '%s\\n' \"$@\" >> \"$log\"\nprintf '%s' '{\"objects\":[]}'");
+fn collector_reads_the_selected_agenda_window_then_shows_only_selected_events() {
+    let (dir, command) = fixture(concat!(
+        "log=$1; shift\nprintf '%s\\n' \"$@\" >> \"$log\"\n",
+        "case \"$1\" in\n",
+        "agenda) printf '%s' '{\"events\":[",
+        "{\"oid\":\"inside\",\"subject\":\"s\",\"path\":\"calendar/work/\",\"labels\":[],\"status\":\"confirmed\",\"transparency\":\"busy\",\"all_day\":false,\"start\":\"2026-10-02T00:00:00Z\",\"end\":\"2026-10-02T00:30:00Z\",\"busy\":true},",
+        "{\"oid\":\"before\",\"subject\":\"s\",\"path\":\"calendar/work/\",\"labels\":[],\"status\":\"confirmed\",\"transparency\":\"busy\",\"all_day\":false,\"start\":\"2026-10-01T22:00:00Z\",\"end\":\"2026-10-01T23:30:00Z\",\"busy\":true}",
+        "]}';;\n",
+        "show) printf '%s' '{\"oid\":\"inside\",\"kind\":\"event\",\"subject\":\"s\",\"path\":\"calendar/work/\",\"event\":{\"attendees\":[{\"email\":\"a@example.org\",\"response\":\"accepted\"}]}}';;\n",
+        "*) printf '%s' '{\"objects\":[]}';;\n",
+        "esac",
+    ));
     let snapshot = DamContext { command: &command }
-        .collect(&request(&["calendar/work/".into()], &["work/team/".into()]))
+        .collect(&request(
+            &["calendar/work/".into(), "calendar/home/".into()],
+            &["work/team/".into()],
+        ))
         .unwrap();
     assert_eq!(snapshot.status.calendar, ContextStatus::Present);
     assert_eq!(snapshot.status.tasks, ContextStatus::Present);
+    assert_eq!(snapshot.occasions.len(), 1);
+    assert_eq!(
+        snapshot.occasions[0].details.participants[0]
+            .email
+            .as_deref(),
+        Some("a@example.org")
+    );
     let calls = fs::read_to_string(dir.path().join("calls")).unwrap();
-    for day in ["2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03"] {
-        assert!(
-            calls.contains(&format!(
-                "ls\nkind:event & path:calendar/work/ & start:{day}\n--json\n--no-pull\n"
-            )),
-            "{calls}"
-        );
-    }
-    assert!(calls.ends_with("ls\nkind:task & path:work/team/ & !done\n--json\n--no-pull\n"));
+    assert_eq!(
+        calls,
+        concat!(
+            "agenda\npath:calendar/work/ | path:calendar/home/\n--json\n--no-pull\n",
+            "--from\n2026-10-01T23:00:00Z\n--to\n2026-10-02T01:00:00Z\n",
+            "show\ninside\n--json\n--no-pull\n",
+            "ls\nkind:task & path:work/team/ & !done\n--json\n--no-pull\n",
+        )
+    );
 }
 
 #[test]
@@ -77,7 +96,7 @@ fn missing_and_query_injected_selections_refuse_before_spawning() {
 #[test]
 fn failed_calendar_does_not_discard_successful_tasks_or_expose_provider_stderr() {
     let (_dir, command) = fixture(
-        "case \"$3\" in kind:event*) echo '{\"error\":\"PRIVATE token\"}' >&2; printf '%s' '{\"objects\":[]}';; *) printf '%s' '{\"objects\":[]}' ;; esac",
+        "case \"$2\" in agenda) echo '{\"error\":\"PRIVATE token\"}' >&2; printf '%s' '{\"events\":[]}';; *) printf '%s' '{\"objects\":[]}' ;; esac",
     );
     let snapshot = DamContext { command: &command }
         .collect(&request(&["calendar/".into()], &["work/".into()]))

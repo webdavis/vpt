@@ -11,10 +11,9 @@ use std::{fs, os::unix::fs::PermissionsExt};
 use vpt_adapters::SystemClock;
 
 fn event(id: &str, secs: i64) -> Value {
-    json!({"oid":id,"kind":"event","subject":"Private event","path":"calendar/work/",
-        "labels":["private-project"],"event":{"status":"confirmed",
-        "start":vpt_domain::time::UtcInstant{secs}.rfc3339(),
-        "end":vpt_domain::time::UtcInstant{secs:secs+1800}.rfc3339()}})
+    let mut row = support::dam::event(id, "Private event", secs, secs + 1800);
+    row["labels"] = json!(["private-project"]);
+    row
 }
 fn configured() -> Sandbox {
     let sandbox = fixture::configured("brief-upcoming");
@@ -23,14 +22,19 @@ fn configured() -> Sandbox {
         "[brief.trigger]\nenabled=true\n[context]\ntype='dam'\ncalendars=['calendar/work/']\nprojects=['work/']\n",
     );
     let script = sandbox.path().join("bin/dam");
-    fs::write(&script, format!("#!/bin/sh\ncase \"$2\" in\n'kind:event '* ) /bin/cat '{}' ;;\n'kind:task '* ) printf '%s' '{{\"objects\":[]}}' ;;\n*) exit 8;;\nesac\n", sandbox.path().join("calendar.json").display())).unwrap();
+    let calendar = sandbox.path().join("calendar.json");
+    fs::write(
+        &script,
+        format!("#!/bin/sh\n{}", support::dam::script(&calendar)),
+    )
+    .unwrap();
     fs::set_permissions(script, fs::Permissions::from_mode(0o700)).unwrap();
     sandbox
 }
 fn reply(sandbox: &Sandbox, events: Vec<Value>) {
     fs::write(
         sandbox.path().join("calendar.json"),
-        json!({"objects":events}).to_string(),
+        support::dam::agenda(events),
     )
     .unwrap();
 }
@@ -64,6 +68,10 @@ fn upcoming_publishes_each_identity_once_and_preserves_labels_and_rescheduled_pa
     assert_eq!(rows.len(), 2);
     for row in &rows {
         assert_eq!(row.details.tags, ["private-project"]);
+        assert_eq!(
+            row.details.participants[0].email.as_deref(),
+            Some("guest@example.org")
+        );
         assert!(row.briefed_at.is_some());
         let brief = ledger.brief(&row.id).unwrap().unwrap();
         assert_eq!(brief.snapshot.occasion.tags, ["private-project"]);
