@@ -1,11 +1,12 @@
 pub(crate) mod errors;
+mod observe;
 mod output;
 pub(crate) mod runtime;
 pub(crate) mod startup_failure;
 use crate::compose::startup;
 
 use crate::cli::output::Outcome;
-use crate::compose::{Environment, RuntimeLedger, config_refusal, settings_from};
+use crate::compose::{Environment, config_refusal, settings_from};
 use std::path::Path;
 use vpt_adapters::{ClonefileArchive, HelperClient, LoggedEvents, SqliteLedger, VoiceMemosStore};
 use vpt_application::Mode;
@@ -37,32 +38,7 @@ fn execute(
     let helper = HelperClient::new(settings.helper_path.clone());
     let recorder = VoiceMemosStore::open(&roots.recordings_dir);
     if mode.dry_run {
-        let recorder = recorder.map_err(|error| Box::new(errors::source(error)))?;
-        let ledger = RuntimeLedger::read_only(&roots.state_dir)?;
-        let archive = ClonefileArchive::open_read_only(&roots.stores.audio)
-            .map_err(|error| Box::new(crate::compose::errors::contained_error(error)))?;
-        let mut sink = crate::compose::events::Observation;
-        let report = match &ledger {
-            RuntimeLedger::Sqlite(ledger) => runtime::execute(
-                &recorder,
-                &archive,
-                ledger,
-                &helper,
-                &mut sink,
-                &settings.source,
-                mode,
-            ),
-            RuntimeLedger::Empty(ledger) => runtime::execute(
-                &recorder,
-                &archive,
-                ledger,
-                &helper,
-                &mut sink,
-                &settings.source,
-                mode,
-            ),
-        };
-        return Ok(output::outcome(report, true));
+        return observe::run(recorder, &roots, &helper, &settings.source, mode);
     }
     let state = crate::compose::mutation::state(&roots)?;
     let _lock = crate::compose::mutation::lock(&state)?;
