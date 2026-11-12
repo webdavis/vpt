@@ -44,10 +44,13 @@ pub(crate) fn accepted(ledger: &impl Ledger) -> AcceptedProposal {
             text: "Privé".into(),
             source_references: vec!["00:00-00:01".into()],
         }],
-        actions: vec![Claim {
-            text: "a private task".into(),
-            source_references: vec![],
-        }],
+        actions: vec![
+            Claim {
+                text: "a private task".into(),
+                source_references: vec![],
+            }
+            .into(),
+        ],
         tags: vec![Tag {
             tag: "private-tag".into(),
             reason: "private reason".into(),

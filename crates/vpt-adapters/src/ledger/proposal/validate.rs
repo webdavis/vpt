@@ -87,12 +87,7 @@ pub(in crate::ledger) fn check(
         accepted.grounding_window_secs,
     )
     .map_err(|_| invalid())?;
-    for checked in accepted
-        .proposal
-        .summary
-        .iter()
-        .chain(&accepted.proposal.actions)
-    {
+    for checked in accepted.proposal.claims() {
         if checker.check(&checked.claim).map_err(|_| invalid())? != checked.grounding {
             return Err(invalid());
         }

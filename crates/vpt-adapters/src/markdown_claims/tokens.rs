@@ -7,6 +7,7 @@ pub(super) struct Token {
     pub annotation: bool,
     pub correction: bool,
     pub reference: bool,
+    pub field: bool,
 }
 
 pub(super) fn scan(
@@ -44,11 +45,17 @@ pub(super) fn scan(
             || (original.starts_with("[unsupported: ")
                 && original.ends_with(']')
                 && !original.contains('\n'));
+        let field = vpt_domain::note::ACTION_FIELDS
+            .iter()
+            .any(|prefix| original.starts_with(prefix))
+            && original.ends_with(']')
+            && !original.contains('\n');
         let reference = !correction
+            && !field
             && (value.trim().is_empty()
                 || value.trim() == "-"
                 || (value.contains(':') && value.contains('-')));
-        if annotation || reference || correction {
+        if annotation || reference || correction || field {
             if marked {
                 raw.end += vpt_domain::note::FINDING_CORRECTION_MARKER.len();
             }
@@ -61,6 +68,7 @@ pub(super) fn scan(
                 annotation,
                 correction,
                 reference,
+                field,
             });
         }
     }

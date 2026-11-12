@@ -1,11 +1,11 @@
-use super::{Claim, Related, Tag};
+use super::{Claim, Owner, Related, Tag};
 use crate::grounding::GroundedClaim;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct CheckedProposal {
     pub by: String,
     pub summary: Vec<CheckedClaim>,
-    pub actions: Vec<CheckedClaim>,
+    pub actions: Vec<CheckedAction>,
     pub tags: Vec<Tag>,
     pub relations: Vec<Related>,
 }
@@ -14,6 +14,20 @@ pub struct CheckedProposal {
 pub struct CheckedClaim {
     pub claim: Claim,
     pub grounding: GroundedClaim,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CheckedAction {
+    pub claim: CheckedClaim,
+    pub owner: Option<Owner>,
+}
+
+impl CheckedProposal {
+    pub fn claims(&self) -> impl Iterator<Item = &CheckedClaim> {
+        self.summary
+            .iter()
+            .chain(self.actions.iter().map(|action| &action.claim))
+    }
 }
 
 impl std::fmt::Debug for CheckedProposal {

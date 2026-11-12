@@ -38,15 +38,18 @@ fn versioned_saved_proposals_preserve_every_finding_shape_and_private_metadata()
             vec!["bad private reference".into()],
         ),
     ] {
-        accepted.proposal.actions.push(CheckedClaim {
-            claim: vpt_domain::proposal::Claim {
-                text: "private claim".into(),
-                source_references: references,
-            },
-            grounding: GroundedClaim {
-                sources,
-                finding,
-                inherited_flags: inherited,
+        accepted.proposal.actions.push(CheckedAction {
+            owner: None,
+            claim: CheckedClaim {
+                claim: vpt_domain::proposal::Claim {
+                    text: "private claim".into(),
+                    source_references: references,
+                },
+                grounding: GroundedClaim {
+                    sources,
+                    finding,
+                    inherited_flags: inherited,
+                },
             },
         });
     }

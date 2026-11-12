@@ -40,7 +40,7 @@ fn inherited_uncertainty_is_kept_when_a_higher_priority_finding_is_rendered() {
         vec![Sha256Digest([1; 32])]
     );
     assert_eq!(
-        checked.actions[0].grounding.inherited_flags,
+        checked.actions[0].claim.grounding.inherited_flags,
         vec![Sha256Digest([1; 32])]
     );
 }

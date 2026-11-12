@@ -7,7 +7,7 @@ use vpt_application::ports::{AcceptedProposal, GroundingBasis, LedgerError};
 use vpt_domain::{
     digest::Sha256Digest,
     identity::RecordingId,
-    proposal::{CheckedClaim, CheckedProposal},
+    proposal::{CheckedAction, CheckedClaim, CheckedProposal},
     time::UtcInstant,
 };
 
@@ -51,7 +51,7 @@ pub(in crate::ledger) fn encode(accepted: &AcceptedProposal) -> Result<String, L
             .proposal
             .actions
             .iter()
-            .map(|claim| grounding::save(&claim.grounding))
+            .map(|action| grounding::save(&action.claim.grounding))
             .collect(),
     };
     super::super::json::encode(&saved, MAX_BODY).map_err(|_| invalid())
@@ -83,7 +83,19 @@ pub(in crate::ledger) fn decode(
         .map_err(|_| invalid())?
         .proposal;
     let summary = restore(raw.summary, saved.summary)?;
-    let actions = restore(raw.actions, saved.actions)?;
+    if raw.actions.len() != saved.actions.len() {
+        return Err(invalid());
+    }
+    let (claims, owners): (Vec<_>, Vec<_>) = raw
+        .actions
+        .into_iter()
+        .map(|action| (action.claim, action.owner))
+        .unzip();
+    let actions = restore(claims, saved.actions)?
+        .into_iter()
+        .zip(owners)
+        .map(|(claim, owner)| CheckedAction { claim, owner })
+        .collect();
     let accepted = AcceptedProposal {
         vocabulary_publication: saved
             .vocabulary_publication

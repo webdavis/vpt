@@ -12,7 +12,7 @@ pub(super) fn unknown_fields(value: &Value) -> Vec<String> {
     );
     for (key, known) in [
         ("summary", &["text", "sources"][..]),
-        ("actions", &["text", "sources"][..]),
+        ("actions", &["text", "sources", "owner"][..]),
         ("tags", &["tag", "reason"][..]),
         ("relations", &["kind", "target", "reason"][..]),
     ] {

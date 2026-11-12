@@ -6,7 +6,7 @@ pub struct ProposalDocument {
     pub schema: String,
     pub by: String,
     pub summary: Vec<Claim>,
-    pub actions: Vec<Claim>,
+    pub actions: Vec<Action>,
     pub tags: Vec<Tag>,
     pub relations: Vec<Relation>,
 }
@@ -15,6 +15,21 @@ pub struct ProposalDocument {
 pub struct Claim {
     pub text: String,
     pub sources: Vec<String>,
+}
+
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct Action {
+    pub text: String,
+    pub sources: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<Owner>,
+}
+
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Owner {
+    Me,
+    Other(Option<String>),
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]

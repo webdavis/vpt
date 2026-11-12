@@ -92,6 +92,8 @@ pub(super) fn assemble(
             {
                 text.push(' ');
             }
+        } else if token.field {
+            identity.push_str(&source[token.raw.clone()]);
         } else if !token.annotation {
             text.push_str(&block.text[token.range.clone()]);
             identity.push_str(&block.text[token.range.clone()]);

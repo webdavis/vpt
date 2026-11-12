@@ -2,7 +2,7 @@ mod diagnostics;
 mod model;
 mod validate;
 use crate::LimitViolation;
-pub use model::{Claim, ProposalDocument, Relation, Tag};
+pub use model::{Action, Claim, Owner, ProposalDocument, Relation, Tag};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProposalDecodeError {

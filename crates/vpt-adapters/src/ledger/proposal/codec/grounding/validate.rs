@@ -6,7 +6,7 @@ pub(in crate::ledger::proposal::codec) fn check(
 ) -> Result<(), LedgerError> {
     let mut items = 0usize;
     let mut token_bytes = 0usize;
-    for checked in proposal.summary.iter().chain(&proposal.actions) {
+    for checked in proposal.claims() {
         let grounded = &checked.grounding;
         if let Some(Finding::Unsupported(token)) = &grounded.finding {
             token_bytes = token_bytes.checked_add(token.len()).ok_or_else(invalid)?;

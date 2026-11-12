@@ -1,4 +1,5 @@
-use vpt_domain::proposal::{Claim, Proposal, Related, Tag};
+use vpt_domain::proposal::{Action, Claim, Owner, Proposal, Related, Tag};
+use vpt_protocol::proposal as protocol;
 pub use vpt_protocol::proposal::ProposalDecodeError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,7 +16,7 @@ pub fn decode(bytes: &[u8]) -> Result<DecodedProposal, ProposalDecodeError> {
         proposal: Proposal {
             by: document.by,
             summary: claims(document.summary),
-            actions: claims(document.actions),
+            actions: document.actions.into_iter().map(action).collect(),
             tags: document
                 .tags
                 .into_iter()
@@ -36,7 +37,20 @@ pub fn decode(bytes: &[u8]) -> Result<DecodedProposal, ProposalDecodeError> {
     })
 }
 
-fn claims(claims: Vec<vpt_protocol::proposal::Claim>) -> Vec<Claim> {
+fn action(action: protocol::Action) -> Action {
+    Action {
+        claim: Claim {
+            text: action.text,
+            source_references: action.sources,
+        },
+        owner: action.owner.map(|owner| match owner {
+            protocol::Owner::Me => Owner::Me,
+            protocol::Owner::Other(name) => Owner::Other(name),
+        }),
+    }
+}
+
+fn claims(claims: Vec<protocol::Claim>) -> Vec<Claim> {
     claims
         .into_iter()
         .map(|claim| Claim {
