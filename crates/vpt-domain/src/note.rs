@@ -6,7 +6,8 @@ pub use stage::NoteStage;
 mod analysis;
 mod annotations;
 pub use analysis::{
-    FINDING_CORRECTION_MARKER, analysis_content, finding_annotation, resolved_finding_annotation,
+    ACTION_FIELDS, FINDING_CORRECTION_MARKER, analysis_content, finding_annotation,
+    resolved_finding_annotation,
 };
 pub mod document;
 pub mod filename;

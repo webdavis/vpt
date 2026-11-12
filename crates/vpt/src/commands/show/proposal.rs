@@ -1,20 +1,40 @@
 use super::errors;
 use serde_json::{Value, json};
 use vpt_application::ports::NoteInputs;
-use vpt_domain::{identity::RecordingId, proposal::CheckedClaim};
+use vpt_domain::{
+    identity::RecordingId,
+    proposal::{CheckedAction, CheckedClaim, Owner},
+};
 use vpt_protocol::error::ErrorDocument;
 
 pub(super) fn json(input: &NoteInputs, body: &mut Value) -> Result<(), Box<ErrorDocument>> {
     let accepted = input.proposal.as_ref().ok_or_else(errors::missing)?;
-    let lines = |claims: &[CheckedClaim]| -> Vec<Value> {
-        claims
-            .iter()
-            .map(|claim| line(&input.record.id, claim))
-            .collect()
-    };
-    body["summary"] = json!(lines(&accepted.proposal.summary));
-    body["actions"] = json!(lines(&accepted.proposal.actions));
+    let id = &input.record.id;
+    let summary: Vec<_> = accepted
+        .proposal
+        .summary
+        .iter()
+        .map(|claim| line(id, claim))
+        .collect();
+    let actions: Vec<_> = accepted
+        .proposal
+        .actions
+        .iter()
+        .map(|action| action_line(id, action))
+        .collect();
+    body["summary"] = json!(summary);
+    body["actions"] = json!(actions);
     Ok(())
+}
+
+fn action_line(id: &RecordingId, action: &CheckedAction) -> Value {
+    let mut line = line(id, &action.claim);
+    line["owner"] = match &action.owner {
+        None => Value::Null,
+        Some(Owner::Me) => json!("me"),
+        Some(Owner::Other(name)) => json!({ "other": name }),
+    };
+    line
 }
 
 fn line(id: &RecordingId, claim: &CheckedClaim) -> Value {

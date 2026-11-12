@@ -26,10 +26,13 @@ fn adapter_preserves_every_ordered_field_as_domain_data_and_hides_private_debug_
                     source_references: vec![]
                 }
             ],
-            actions: vec![Claim {
-                text: "Private action".into(),
-                source_references: vec!["00:01-00:02".into()]
-            }],
+            actions: vec![
+                Claim {
+                    text: "Private action".into(),
+                    source_references: vec!["00:01-00:02".into()]
+                }
+                .into()
+            ],
             tags: vec![Tag {
                 tag: "Private tag".into(),
                 reason: "Private reason".into()

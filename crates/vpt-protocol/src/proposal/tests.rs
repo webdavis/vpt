@@ -129,3 +129,25 @@ fn an_empty_proposal_is_valid_and_claim_markup_remains_literal_data() {
     doc["summary"][0]["text"] = json!(text);
     assert_eq!(decoded(&doc).unwrap().document.summary[0].text, text);
 }
+
+#[test]
+fn an_action_owner_round_trips_and_a_blank_name_is_refused() {
+    let mut value = document();
+    for owner in [
+        json!("me"),
+        json!({"other": "Dana"}),
+        json!({"other": null}),
+    ] {
+        value["actions"][0]["owner"] = owner;
+        let result = decoded(&value).unwrap();
+        assert_eq!(serde_json::to_value(&result.document).unwrap(), value);
+        assert!(result.diagnostics.is_empty());
+    }
+    value["actions"][0]["owner"] = json!(null);
+    let result = decoded(&value).unwrap();
+    assert_eq!(serde_json::to_value(&result.document).unwrap(), document());
+    for owner in [json!({"other": " "}), json!("them"), json!({"other": 1})] {
+        value["actions"][0]["owner"] = owner;
+        assert!(decoded(&value).is_err());
+    }
+}

@@ -37,11 +37,13 @@ fn generated_analysis_reverification_preserves_grounding_and_exact_annotation_by
             Claim {
                 text: "call Bob & ask".into(),
                 source_references: vec!["00:00-00:01".into()],
-            },
+            }
+            .into(),
             Claim {
                 text: "another action".into(),
                 source_references: vec![],
-            },
+            }
+            .into(),
         ],
         tags: vec![],
         relations: vec![],
@@ -55,11 +57,7 @@ fn generated_analysis_reverification_preserves_grounding_and_exact_annotation_by
     assert_eq!(parsed.claims.len(), 3);
     let mut grounder = Grounder::new(words.iter(), &flags, 1.0, 0).unwrap();
     let mut findings = Vec::new();
-    for (extracted, expected) in parsed
-        .claims
-        .iter()
-        .zip(checked.summary.iter().chain(&checked.actions))
-    {
+    for (extracted, expected) in parsed.claims.iter().zip(checked.claims()) {
         assert_eq!(extracted.claim, expected.claim);
         let grounded = grounder.check(&extracted.claim).unwrap();
         assert_eq!(grounded, expected.grounding);

@@ -1,11 +1,24 @@
-use super::{ProposalDecodeError, ProposalDocument};
+use super::{Owner, ProposalDecodeError, ProposalDocument};
 
 pub(super) fn validate(document: &ProposalDocument) -> Result<(), ProposalDecodeError> {
     text(&document.by, true, "author")?;
-    for claim in document.summary.iter().chain(&document.actions) {
-        text(&claim.text, true, "claim text")?;
-        for source in &claim.sources {
+    let claims = document
+        .summary
+        .iter()
+        .map(|claim| (&claim.text, &claim.sources));
+    let actions = document
+        .actions
+        .iter()
+        .map(|action| (&action.text, &action.sources));
+    for (claim, sources) in claims.chain(actions) {
+        text(claim, true, "claim text")?;
+        for source in sources {
             text(source, false, "source reference")?;
+        }
+    }
+    for action in &document.actions {
+        if let Some(Owner::Other(Some(name))) = &action.owner {
+            text(name, true, "owner")?;
         }
     }
     for tag in &document.tags {

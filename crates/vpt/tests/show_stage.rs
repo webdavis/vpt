@@ -1,4 +1,6 @@
 #![allow(dead_code, reason = "shared CLI fixtures")]
+#[path = "show_stage/actions.rs"]
+mod actions;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
 #[path = "redact/fixture.rs"]

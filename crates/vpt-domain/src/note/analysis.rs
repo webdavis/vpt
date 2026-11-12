@@ -1,8 +1,10 @@
 use super::{RenderError, writer::Writer};
 use crate::{
     grounding::Finding,
-    proposal::{CheckedClaim, CheckedProposal},
+    proposal::{CheckedAction, CheckedClaim, CheckedProposal},
 };
+mod action;
+pub use action::ACTION_FIELDS;
 mod validate;
 
 pub const FINDING_CORRECTION_MARKER: &str = "<!-- vpt:verification-correction -->";
@@ -10,39 +12,53 @@ pub const FINDING_CORRECTION_MARKER: &str = "<!-- vpt:verification-correction --
 pub fn analysis_content(proposal: &CheckedProposal) -> Result<String, RenderError> {
     validate::input(proposal)?;
     let mut output = Writer::default();
-    section(&mut output, "Summary", &proposal.summary)?;
+    heading(&mut output, "Summary", proposal.summary.is_empty())?;
+    for checked in &proposal.summary {
+        item(&mut output, checked, None)?;
+    }
     output.literal("\n")?;
-    section(&mut output, "Actions", &proposal.actions)?;
+    heading(&mut output, "Actions", proposal.actions.is_empty())?;
+    for action in &proposal.actions {
+        item(&mut output, &action.claim, Some(action))?;
+    }
     Ok(output.finish())
 }
 
-fn section(output: &mut Writer, title: &str, claims: &[CheckedClaim]) -> Result<(), RenderError> {
+fn heading(output: &mut Writer, title: &str, empty: bool) -> Result<(), RenderError> {
     output.literal(&format!("## {title}\n"))?;
-    if !claims.is_empty() {
-        output.literal("\n")?;
-    }
-    for checked in claims {
-        output.literal("- ")?;
-        output.text(&checked.claim.text)?;
-        for source in &checked.claim.source_references {
-            output.literal(" [")?;
-            if source
-                .bytes()
-                .all(|b| b.is_ascii_digit() || matches!(b, b':' | b'-'))
-            {
-                output.literal(source)?;
-            } else {
-                output.text(source)?;
-            }
-            output.literal("]")?;
-        }
-        if let Some(finding) = &checked.grounding.finding {
-            output.literal(" ")?;
-            annotation(output, finding)?;
-        }
+    if !empty {
         output.literal("\n")?;
     }
     Ok(())
+}
+
+fn item(
+    output: &mut Writer,
+    checked: &CheckedClaim,
+    action: Option<&CheckedAction>,
+) -> Result<(), RenderError> {
+    output.literal("- ")?;
+    output.text(&checked.claim.text)?;
+    for source in &checked.claim.source_references {
+        output.literal(" [")?;
+        if source
+            .bytes()
+            .all(|b| b.is_ascii_digit() || matches!(b, b':' | b'-'))
+        {
+            output.literal(source)?;
+        } else {
+            output.text(source)?;
+        }
+        output.literal("]")?;
+    }
+    if let Some(action) = action {
+        action::fields(output, action)?;
+    }
+    if let Some(finding) = &checked.grounding.finding {
+        output.literal(" ")?;
+        annotation(output, finding)?;
+    }
+    output.literal("\n")
 }
 
 pub fn finding_annotation(finding: &Finding) -> Result<String, RenderError> {

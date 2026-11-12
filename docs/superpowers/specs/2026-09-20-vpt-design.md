@@ -978,7 +978,10 @@ writes the transcript note's content region on the command's stdin, records the 
       "text": "Bring the last three statements.",
       "sources": [
         "02:07-02:11"
-      ]
+      ],
+      "owner": {
+        "other": "Dana"
+      }
     }
   ],
   "tags": [
@@ -1009,7 +1012,11 @@ rendered as data under the escaping rule of section 7.2.
 vpt writes the analysis note from the proposal: frontmatter as in stage 3 with `vptStage: analysis`, a
 `vpt:links` region, and a `vpt:content` region holding a `Summary` section and an `Actions` section. The
 layout is fixed: one bullet per proposal line, in proposal order, each ending with its `[mm:ss-mm:ss]`
-source reference and any verify-note annotation, and no headings of the agent's own. Tags and relations
+source reference and any verify-note annotation, and no headings of the agent's own. An action may carry
+`owner`: `"me"` for the speaker's own task, `{"other": "<name>"}` for another person's, `{"other": null}`
+when no name was said; absent or null means unknown. Its bullet then shows `[owner:: me]`,
+`[owner:: <name>]` or `[owner:: someone else]` after the sources, with the name escaped under section 7.2;
+claim extraction skips that field, so it never changes a claim's text or grounding. Tags and relations
 go through the stage 3 gates.
 
 ### 8.2 verify-note
@@ -1472,7 +1479,7 @@ under `--json`.
 | `vpt show <id>` / `vpt list [--stage <s>]`                                                    | nothing                                                                                                                               | the record / `{"recordings": [..]}`                                                                                   | 0, 2                                  |
 | `vpt search <word>... [--limit <n>]`                                                          | nothing                                                                                                                               | `{"words", "limit", "truncated", "hits":[{"moment", "recording", "title", "stage", "seconds", "timecode", "quote"}]}` | 0, 2                                  |
 | `vpt show <id> --stage transcript`                                                            | nothing                                                                                                                               | `{"recording", "stage", text, "segments": [{"start", "end", "timecode", "text"}]}`                                    | 0, 2, 3 changed                       |
-| `vpt show <id> --stage analysis`                                                              | nothing                                                                                                                               | `{"recording", "stage", text, "summary": [line], "actions": [line]}`, line `{"moment", "text", "sources", "finding"}` | 0, 2, 3 changed                       |
+| `vpt show <id> --stage analysis`                                                              | nothing                                                                                                                               | `{"recording", "stage", text, "summary": [line], "actions": [line + "owner"]}`, line `{"moment", "text", "sources", "finding"}` | 0, 2, 3 changed                       |
 | `vpt show <id> --stage released`                                                              | nothing                                                                                                                               | `{"recording", "stage", text}`, the newest surviving release                                                          | 0, 1 pending, 2, 3 changed            |
 | `vpt show <occasion> --stage brief`                                                           | nothing                                                                                                                               | `{"occasion", "recordings", "stage", text}`; `text` = `{"title", "content", "note", "content_sha256", "provenance", "generated_at"}` | 0, 1 pending, 2, 3 changed            |
 | `vpt show <id> --stage <s> --redact`                                                          | nothing                                                                                                                               | `{"recording", "stage", text}` with `content` masked by `[share]`, no structured fields                               | 0, 2, 3 changed or residue            |

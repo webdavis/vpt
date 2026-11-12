@@ -17,10 +17,13 @@ fn content(text: &str) -> String {
             text: text.into(),
             source_references: vec!["00:00-00:01".into()],
         }],
-        actions: vec![Claim {
-            text: "another task".into(),
-            source_references: vec![],
-        }],
+        actions: vec![
+            Claim {
+                text: "another task".into(),
+                source_references: vec![],
+            }
+            .into(),
+        ],
         tags: vec![],
         relations: vec![],
     };

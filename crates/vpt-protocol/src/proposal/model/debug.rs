@@ -18,6 +18,19 @@ impl fmt::Debug for Claim {
             .finish()
     }
 }
+impl fmt::Debug for Action {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Action")
+            .field("sources", &self.sources.len())
+            .field("owner", &self.owner.is_some())
+            .finish()
+    }
+}
+impl fmt::Debug for Owner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Owner")
+    }
+}
 impl fmt::Debug for Tag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Tag")

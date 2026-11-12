@@ -111,7 +111,7 @@ pub(crate) fn synthesis_preserves_reviewed_claims_and_other_artifact_findings(
     let Some(ProposalChange::Accept(proposal)) = &mut next.proposal else {
         unreachable!()
     };
-    proposal.proposal.actions[0].claim.text = "a changed task".into();
+    proposal.proposal.actions[0].claim.claim.text = "a changed task".into();
     let content = vpt_domain::note::analysis_content(&proposal.proposal).unwrap();
     set_content(&mut next, &content);
     committed(ledger.commit_step(run, &next, &[fact(90, WorkOutcome::Completed)]));

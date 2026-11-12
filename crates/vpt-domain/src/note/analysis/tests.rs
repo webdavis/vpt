@@ -17,7 +17,7 @@ fn proposal(summary: Vec<Claim>, actions: Vec<Claim>) -> Proposal {
     Proposal {
         by: "Private agent".into(),
         summary,
-        actions,
+        actions: actions.into_iter().map(Into::into).collect(),
         tags: vec![Tag {
             tag: "private-tag".into(),
             reason: "private reason".into(),
@@ -54,9 +54,9 @@ fn checks_each_claim_in_order_and_preserves_proposal_metadata() {
     assert_eq!(checked.summary.len(), 1);
     assert_eq!(checked.summary[0].claim, original.summary[0]);
     assert_eq!(checked.summary[0].grounding.finding, None);
-    assert_eq!(checked.actions[0].claim, original.actions[0]);
+    assert_eq!(checked.actions[0].claim.claim, original.actions[0].claim);
     assert_eq!(
-        checked.actions[0].grounding.finding,
+        checked.actions[0].claim.grounding.finding,
         Some(Finding::Unsupported("Bob".into()))
     );
     for private in [

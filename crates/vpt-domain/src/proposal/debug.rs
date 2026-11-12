@@ -18,6 +18,22 @@ impl fmt::Debug for Claim {
             .finish()
     }
 }
+impl fmt::Debug for Action {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Action")
+            .field("claim", &self.claim)
+            .field("owner", &self.owner)
+            .finish()
+    }
+}
+impl fmt::Debug for Owner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Me => "Me",
+            Self::Other(_) => "Other",
+        })
+    }
+}
 impl fmt::Debug for Tag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("ProposedTag")

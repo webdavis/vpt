@@ -163,7 +163,7 @@ fn proposal_checks_share_one_budget_across_sections_and_return_no_partial_accept
     let proposal = Proposal {
         by: "agent".into(),
         summary: vec![claim("a", &[])],
-        actions: vec![claim("bbbb", &[])],
+        actions: vec![claim("bbbb", &[]).into()],
         tags: vec![],
         relations: vec![],
     };

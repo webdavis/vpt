@@ -1,5 +1,6 @@
 use super::*;
-use vpt_protocol::proposal::{Claim, ProposalDocument, Relation, Tag};
+use vpt_domain::proposal::Owner;
+use vpt_protocol::proposal::{self as protocol, Claim, ProposalDocument, Relation, Tag};
 
 pub(super) fn encode(proposal: &CheckedProposal) -> Result<String, LedgerError> {
     let mut remaining = 1_048_576usize;
@@ -15,7 +16,12 @@ pub(super) fn encode(proposal: &CheckedProposal) -> Result<String, LedgerError> 
         return Err(invalid());
     }
     text(&proposal.by)?;
-    for checked in proposal.summary.iter().chain(&proposal.actions) {
+    for action in &proposal.actions {
+        if let Some(Owner::Other(Some(name))) = &action.owner {
+            text(name)?;
+        }
+    }
+    for checked in proposal.claims() {
         text(&checked.claim.text)?;
         if checked.claim.source_references.len() > 256 {
             return Err(invalid());
@@ -35,8 +41,8 @@ pub(super) fn encode(proposal: &CheckedProposal) -> Result<String, LedgerError> 
     let document = ProposalDocument {
         schema: "vpt.proposal/1".into(),
         by: proposal.by.clone(),
-        summary: claims(&proposal.summary),
-        actions: claims(&proposal.actions),
+        summary: proposal.summary.iter().map(claim).collect(),
+        actions: proposal.actions.iter().map(action).collect(),
         tags: proposal
             .tags
             .iter()
@@ -60,12 +66,21 @@ pub(super) fn encode(proposal: &CheckedProposal) -> Result<String, LedgerError> 
     Ok(json)
 }
 
-fn claims(claims: &[CheckedClaim]) -> Vec<Claim> {
-    claims
-        .iter()
-        .map(|checked| Claim {
-            text: checked.claim.text.clone(),
-            sources: checked.claim.source_references.clone(),
-        })
-        .collect()
+fn claim(checked: &CheckedClaim) -> Claim {
+    Claim {
+        text: checked.claim.text.clone(),
+        sources: checked.claim.source_references.clone(),
+    }
+}
+
+fn action(action: &CheckedAction) -> protocol::Action {
+    let Claim { text, sources } = claim(&action.claim);
+    protocol::Action {
+        text,
+        sources,
+        owner: action.owner.as_ref().map(|owner| match owner {
+            Owner::Me => protocol::Owner::Me,
+            Owner::Other(name) => protocol::Owner::Other(name.clone()),
+        }),
+    }
 }

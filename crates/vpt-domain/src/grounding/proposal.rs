@@ -1,5 +1,5 @@
 use super::{Grounder, GroundingError, MAX_ITEMS};
-use crate::proposal::{CheckedClaim, CheckedProposal, Claim, Proposal};
+use crate::proposal::{Action, CheckedAction, CheckedClaim, CheckedProposal, Claim, Proposal};
 
 impl Grounder<'_> {
     pub fn proposal(&mut self, proposal: Proposal) -> Result<CheckedProposal, GroundingError> {
@@ -10,19 +10,15 @@ impl Grounder<'_> {
         {
             return Err(GroundingError::CapacityExceeded);
         }
-        let mut check = |claim: Claim| {
-            let grounding = self.check(&claim)?;
-            Ok(CheckedClaim { claim, grounding })
-        };
         let summary = proposal
             .summary
             .into_iter()
-            .map(&mut check)
+            .map(|claim| self.claim(claim))
             .collect::<Result<_, _>>()?;
         let actions = proposal
             .actions
             .into_iter()
-            .map(&mut check)
+            .map(|action| self.action(action))
             .collect::<Result<_, _>>()?;
         Ok(CheckedProposal {
             by: proposal.by,
@@ -30,6 +26,18 @@ impl Grounder<'_> {
             actions,
             tags: proposal.tags,
             relations: proposal.relations,
+        })
+    }
+
+    fn claim(&mut self, claim: Claim) -> Result<CheckedClaim, GroundingError> {
+        let grounding = self.check(&claim)?;
+        Ok(CheckedClaim { claim, grounding })
+    }
+
+    fn action(&mut self, action: Action) -> Result<CheckedAction, GroundingError> {
+        Ok(CheckedAction {
+            claim: self.claim(action.claim)?,
+            owner: action.owner,
         })
     }
 }
