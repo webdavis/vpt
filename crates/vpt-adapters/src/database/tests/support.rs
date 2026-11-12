@@ -166,6 +166,9 @@ fn child(directory: &File, name: &CString, path: &Path, result: &mut Vec<Snapsho
         assert!(fd >= 0);
         // SAFETY: successful openat transferred this fresh descriptor.
         let mut file = unsafe { File::from_raw_fd(fd) };
+        if path.as_os_str().as_bytes().ends_with(b"-shm") {
+            write_back(&file);
+        }
         let opened = metadata(&file);
         assert_eq!(
             (opened.st_dev, opened.st_ino, opened.st_mode),
@@ -181,6 +184,14 @@ fn child(directory: &File, name: &CString, path: &Path, result: &mut Vec<Snapsho
     } else {
         result.push(entry(path, stat, Vec::new()));
     }
+}
+
+/// Writes back the WAL index pages a writer left dirty through its shared mapping. The kernel
+/// otherwise writes them back seconds later and changes the file's times after the snapshot.
+fn write_back(file: &File) {
+    // SAFETY: fsync receives the descriptor this snapshot owns.
+    let result = unsafe { libc::fsync(file.as_raw_fd()) };
+    assert_eq!(result, 0, "{}", std::io::Error::last_os_error());
 }
 
 struct Directory(*mut libc::DIR);
