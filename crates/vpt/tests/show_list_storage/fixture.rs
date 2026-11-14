@@ -199,6 +199,9 @@ pub(super) fn snapshot(sandbox: &Sandbox) -> Vec<SnapshotEntry> {
         } else {
             None
         };
+        // macOS updates ctime when the final mapping of -shm closes after earlier mapped writes,
+        // and that close can land after a test's own connection is gone.
+        let mapped = metadata.is_file() && path.to_string_lossy().ends_with("-shm");
         rows.push(SnapshotEntry {
             path: path.to_path_buf(),
             kind: metadata.mode() & libc::S_IFMT as u32,
@@ -206,8 +209,8 @@ pub(super) fn snapshot(sandbox: &Sandbox) -> Vec<SnapshotEntry> {
             inode: metadata.ino(),
             links: metadata.nlink(),
             size: metadata.size(),
-            ctime: metadata.ctime(),
-            ctime_nanos: metadata.ctime_nsec(),
+            ctime: if mapped { 0 } else { metadata.ctime() },
+            ctime_nanos: if mapped { 0 } else { metadata.ctime_nsec() },
             flags: metadata.st_flags(),
             mode: metadata.permissions().mode() & 0o777,
             mtime: metadata.mtime(),
