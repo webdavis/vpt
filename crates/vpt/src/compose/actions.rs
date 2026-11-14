@@ -24,6 +24,28 @@ impl Counts {
     pub(crate) fn json(self) -> serde_json::Value {
         serde_json::json!({"sent": self.sent, "failed": self.failed, "refused": self.refused})
     }
+
+    pub(crate) fn parse(value: &serde_json::Value) -> Self {
+        let field = |name: &str| {
+            value[name]
+                .as_u64()
+                .and_then(|count| u32::try_from(count).ok())
+                .unwrap_or_default()
+        };
+        Self {
+            sent: field("sent"),
+            failed: field("failed"),
+            refused: field("refused"),
+        }
+    }
+}
+
+impl std::ops::AddAssign for Counts {
+    fn add_assign(&mut self, other: Self) {
+        self.sent += other.sent;
+        self.failed += other.failed;
+        self.refused += other.refused;
+    }
 }
 
 pub(crate) fn queue(
@@ -72,10 +94,7 @@ impl<E: EventSink> Delivery<'_, E> {
                 .into_iter()
                 .partition(|queued| queued.recording == recording);
             pending = rest;
-            let counts = self.recording(&recording, &mine)?;
-            total.sent += counts.sent;
-            total.failed += counts.failed;
-            total.refused += counts.refused;
+            total += self.recording(&recording, &mine)?;
         }
         Ok(total)
     }

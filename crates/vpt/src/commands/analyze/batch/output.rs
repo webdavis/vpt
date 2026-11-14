@@ -1,27 +1,35 @@
 use super::{Entry, Failure};
-use crate::cli::output::Outcome;
+use crate::{cli::output::Outcome, compose::actions::Counts};
 use serde_json::{Value, json};
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
-pub(super) fn report(entries: Vec<Entry>, dry_run: bool) -> Outcome {
+pub(super) fn report(entries: Vec<Entry>, dry_run: bool, actions: bool) -> Outcome {
     let total = entries.len();
     let rows: Vec<_> = entries.iter().filter_map(row).collect();
     let human: String = entries.iter().map(line).collect();
     let mut completed = Vec::new();
     let mut failures = Vec::new();
+    let mut counts = Counts::default();
     for entry in entries {
         match entry {
-            Entry::Succeeded(id, _) => completed.push(id.to_string()),
+            Entry::Succeeded(id, change) => {
+                completed.push(id.to_string());
+                counts += change.actions;
+            }
             Entry::Failed(failure) => failures.push(failure),
             Entry::Planned(_) => {}
         }
     }
     if failures.is_empty() {
+        let mut document = vpt_protocol::result::document(
+            "analyze",
+            json!({"dry_run": dry_run, "recordings": rows}),
+        );
+        if actions {
+            document["actions"] = counts.json();
+        }
         return Outcome::Success {
-            document: vpt_protocol::result::document(
-                "analyze",
-                json!({"dry_run": dry_run, "recordings": rows}),
-            ),
+            document,
             human: if human.is_empty() {
                 "no recordings\n".into()
             } else {

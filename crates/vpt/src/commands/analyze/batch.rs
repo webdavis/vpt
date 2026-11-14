@@ -3,7 +3,7 @@ mod select;
 use super::mutation;
 use crate::{
     cli::{args::analyze::Scope, output::Outcome},
-    compose::{Environment, RuntimeLedger},
+    compose::{Environment, RuntimeLedger, actions::Counts},
 };
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -27,6 +27,7 @@ struct Change {
     summary_changed: bool,
     tags_added: usize,
     tags_removed: usize,
+    actions: Counts,
 }
 
 #[derive(Default)]
@@ -58,7 +59,7 @@ fn execute(
             .into_iter()
             .map(|candidate| candidate.map_or_else(Entry::Failed, Entry::Planned))
             .collect();
-        return Ok(output::report(entries, true));
+        return Ok(output::report(entries, true, false));
     }
     let state = crate::compose::mutation::state(&roots)?;
     let _lock = crate::compose::mutation::lock(&state)?;
@@ -70,7 +71,11 @@ fn execute(
             Err(failure) => Entry::Failed(failure),
         })
         .collect();
-    Ok(output::report(entries, false))
+    Ok(output::report(
+        entries,
+        false,
+        !settings.actions_command.is_empty(),
+    ))
 }
 
 fn redo(
@@ -82,12 +87,13 @@ fn redo(
 ) -> Entry {
     let before = snapshot(ledger, &id);
     match mutation::locked(&id, settings, roots, state) {
-        Outcome::Success { .. } => {
+        Outcome::Success { document, .. } => {
             let after = snapshot(ledger, &id);
             let change = Change {
                 summary_changed: before.summary != after.summary,
                 tags_added: after.tags.difference(&before.tags).count(),
                 tags_removed: before.tags.difference(&after.tags).count(),
+                actions: Counts::parse(&document["actions"]),
             };
             Entry::Succeeded(id, change)
         }
