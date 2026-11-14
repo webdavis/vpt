@@ -382,7 +382,7 @@ Product sources: specification sections 3.3, 4.3-4.5, 7, 9, and 10.
 - [x] Keep the exact rendered transcript content-region bytes and digest available as analysis
   input. Corrections and readability changes affect that input; link-only/frontmatter/operator-prose
   changes outside the content region do not.
-- [ ] Extend `doctor` for engine availability/locality and the configured Obsidian vault, and expose
+- [x] Extend `doctor` for engine availability/locality and the configured Obsidian vault, and expose
   the placement of audio, engine outputs, and private redaction reports inside Git-tracked trees.
   These observations never alter the vault or its ignore files.
   Engine executable checks and declared locality now cover default and language-specific selections;
@@ -398,6 +398,9 @@ Product sources: specification sections 3.3, 4.3-4.5, 7, 9, and 10.
   command run passes 18 review cases but still times out in the active-writer doctor case. Temporary
   probes observed both a pre-main timeout and a separate timeout after entering the helper version
   check. They do not establish a common cause; the probes were removed and deadlines are unchanged.
+  The timing failures are resolved: timed test children now run one at a time under a two-second
+  hang watchdog sized from measurements on the CI runner, and the one test that timed itself from
+  before its turn in that queue no longer does.
   A subsequent host-access run also times out in that doctor case and two review cases (53 passed,
   3 timed out overall), so the managed sandbox alone does not explain these failures.
   A live sample of a later failed review command reached WAL-index recovery during history export.
