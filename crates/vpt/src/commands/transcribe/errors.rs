@@ -73,7 +73,7 @@ pub(crate) fn attempt(failure: &vpt_application::transcribe::AttemptFailure) -> 
             failure.engine
         ),
         EngineFailure::SpeakerAnnotation(code) => format!(
-            "{}: whisply exited {code} when asked for speaker annotation (-a); it may lack speaker annotation, or the Hugging Face token may not grant pyannote/speaker-diarization-3.1",
+            "{}: whisply exited {code} when asked for speaker annotation (-a); it may lack speaker annotation, or the Hugging Face account behind the token may not have accepted the terms of pyannote/speaker-diarization-3.1 and pyannote/segmentation-3.0",
             failure.engine
         ),
         cause => format!("{}: {cause:?}", failure.engine),

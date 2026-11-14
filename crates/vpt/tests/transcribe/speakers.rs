@@ -122,5 +122,12 @@ fn a_whisply_without_speaker_annotation_is_named_in_the_failure() {
     let error: Value = serde_json::from_str(&stderr(&output)).unwrap();
     let detail = error["error"]["diagnostics"].to_string();
     assert!(detail.contains("speaker annotation"), "{detail}");
+    for needed in [
+        "accepted the terms",
+        "pyannote/speaker-diarization-3.1",
+        "pyannote/segmentation-3.0",
+    ] {
+        assert!(detail.contains(needed), "{detail}");
+    }
     assert_no_leak(&sandbox, &[&output]);
 }
