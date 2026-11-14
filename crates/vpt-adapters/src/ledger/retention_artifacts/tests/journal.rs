@@ -57,7 +57,7 @@ fn memory_journal_preserves_occasion_owners_and_refuses_inconsistent_kinds() {
 
 #[test]
 fn sqlite_journal_preserves_occasion_owners_and_refuses_inconsistent_kinds() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let ledger = SqliteLedger::open(&root).unwrap();
     refuse_mismatch(&ledger);
@@ -68,7 +68,7 @@ fn sqlite_journal_preserves_occasion_owners_and_refuses_inconsistent_kinds() {
 
 #[test]
 fn sqlite_journal_round_trips_a_brief_intent() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     round_trip(&SqliteLedger::open(&root).unwrap());
 }

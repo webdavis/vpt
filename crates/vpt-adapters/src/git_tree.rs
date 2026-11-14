@@ -25,7 +25,7 @@ mod tests {
 
     #[test]
     fn nearest_nested_git_entry_wins() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = crate::test_temp::tempdir().unwrap();
         std::fs::create_dir(dir.path().join(".git")).unwrap();
         let inner = dir.path().join("inner");
         std::fs::create_dir_all(inner.join(".git")).unwrap();
@@ -37,7 +37,7 @@ mod tests {
 
     #[test]
     fn git_file_counts_as_repository() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = crate::test_temp::tempdir().unwrap();
         std::fs::write(dir.path().join(".git"), b"gitdir: owned").unwrap();
         assert_eq!(
             enclosing_git_tree(dir.path()).unwrap(),
@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     fn git_symlink_counts_without_following() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = crate::test_temp::tempdir().unwrap();
         std::os::unix::fs::symlink(dir.path().join("absent"), dir.path().join(".git")).unwrap();
         assert_eq!(
             enclosing_git_tree(dir.path()).unwrap(),

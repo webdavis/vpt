@@ -12,7 +12,7 @@ mod privacy;
 mod proof;
 
 fn fixture() -> (tempfile::TempDir, RootDir) {
-    let temp = tempfile::tempdir().expect("owned log fixture");
+    let temp = crate::test_temp::tempdir().expect("owned log fixture");
     let path = temp.path().canonicalize().expect("canonical fixture");
     fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).expect("private state");
     let root = RootDir::open(&path).expect("retained root");

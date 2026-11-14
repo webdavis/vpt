@@ -3,7 +3,7 @@ use std::fs;
 
 #[test]
 fn mention_resolution_uses_external_names_and_unique_aliases_without_writing_notes() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let first = temp.path().join("Alpha.md");
     let second = temp.path().join("Beta.md");
     let first_text = "---\naliases: [New York, NYC, shared, Alpha]\n---\nPrivate first prose\n";

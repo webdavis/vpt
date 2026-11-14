@@ -118,7 +118,7 @@ fn memory_deliberate_regeneration_clears_only_its_expiration() {
 }
 #[test]
 fn sqlite_deliberate_regeneration_clears_only_its_expiration() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     regenerate(&SqliteLedger::open(&root).unwrap());
 }
@@ -128,7 +128,7 @@ fn memory_pending_retention_refuses_engine_republication() {
 }
 #[test]
 fn sqlite_pending_retention_refuses_engine_republication() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     pending_engine(&SqliteLedger::open(&root).unwrap());
 }

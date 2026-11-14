@@ -44,7 +44,7 @@ fn document() -> String {
 
 #[test]
 fn passes_exact_content_on_stdin_and_literal_arguments_then_returns_a_bound_domain_proposal() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = crate::test_temp::tempdir().unwrap();
     let input = directory.path().join("stdin");
     let args = directory.path().join("arguments");
     let doc = document();

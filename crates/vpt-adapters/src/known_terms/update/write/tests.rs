@@ -3,7 +3,7 @@ use std::fs;
 
 #[test]
 fn staging_failure_preserves_the_original_and_removes_the_temporary() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     fs::write(&path, "Before\n").unwrap();
     let root = RootDir::open(temp.path()).unwrap();
@@ -23,7 +23,7 @@ fn staging_failure_preserves_the_original_and_removes_the_temporary() {
 
 #[test]
 fn operator_edit_during_staging_is_preserved_and_the_temporary_is_removed() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     fs::write(&path, "Before\n").unwrap();
     let root = RootDir::open(temp.path()).unwrap();
@@ -48,7 +48,7 @@ fn operator_edit_during_staging_is_preserved_and_the_temporary_is_removed() {
 
 #[test]
 fn uncertain_publication_can_be_retried_without_duplicating_the_term() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     let root = RootDir::open(temp.path()).unwrap();
     assert_eq!(
@@ -69,7 +69,7 @@ fn uncertain_publication_can_be_retried_without_duplicating_the_term() {
 
 #[test]
 fn changed_bytes_after_replacement_are_not_acknowledged_as_published() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     let root = RootDir::open(temp.path()).unwrap();
     let result = publish_with(&root, &path, None, b"After\n", |point| {
@@ -84,7 +84,7 @@ fn changed_bytes_after_replacement_are_not_acknowledged_as_published() {
 
 #[test]
 fn directory_redirection_removes_only_the_owned_temporary_through_the_retained_descriptor() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let parent = temp.path().join("parent");
     let moved = temp.path().join("moved");
     let outside = temp.path().join("outside");
@@ -117,7 +117,7 @@ fn directory_redirection_removes_only_the_owned_temporary_through_the_retained_d
 #[test]
 fn changed_or_replaced_temporary_is_never_published() {
     for replace in [false, true] {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let path = temp.path().join("terms");
         fs::write(&path, "Before\n").unwrap();
         let root = RootDir::open(temp.path()).unwrap();

@@ -4,7 +4,7 @@ use vpt_application::ports::ContextWindow;
 use vpt_domain::{brief::ContextStatus, occasion::time::OccasionTime};
 
 pub(super) fn fixture(body: &str) -> (tempfile::TempDir, Vec<String>) {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = crate::test_temp::tempdir().unwrap();
     let script = dir.path().join("collector");
     fs::write(&script, format!("#!/bin/sh\n{body}\n")).unwrap();
     fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();

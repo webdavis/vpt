@@ -17,7 +17,7 @@ fn committed<T: std::fmt::Debug>(write: HistoryWrite<T>) -> T {
     }
 }
 fn fixture() -> (tempfile::TempDir, Settings, Roots, SqliteLedger) {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let base = temp.path().canonicalize().unwrap();
     let mut settings = vpt_adapters::config::from_table(
         &vpt_adapters::config::load_text("config_version=1").unwrap(),

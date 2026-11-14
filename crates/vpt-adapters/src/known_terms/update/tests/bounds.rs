@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn a_full_list_allows_duplicates_but_refuses_a_new_term() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     let original = "Existing\n".repeat(65_536);
     fs::write(&path, &original).unwrap();
@@ -15,7 +15,7 @@ fn a_full_list_allows_duplicates_but_refuses_a_new_term() {
 
 #[test]
 fn output_size_is_bounded_before_publishing() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     let original = "x".repeat(65_535) + "\n";
     let original = original.repeat(256);
@@ -27,7 +27,7 @@ fn output_size_is_bounded_before_publishing() {
 
 #[test]
 fn unicode_term_character_boundary_is_exact() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     let text = "語".repeat(65_536);
     prepare(&path, &text).unwrap().publish().unwrap();

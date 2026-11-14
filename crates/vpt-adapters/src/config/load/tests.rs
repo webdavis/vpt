@@ -271,7 +271,7 @@ fn language_table_cannot_be_used_as_an_engine() {
 #[test]
 fn file_loading_reads_only_the_selected_fixture_and_classifies_failures() {
     use std::os::unix::fs::PermissionsExt;
-    let dir = tempfile::tempdir().unwrap();
+    let dir = crate::test_temp::tempdir().unwrap();
     std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     let path = dir.path().join("config.toml");
     assert_eq!(

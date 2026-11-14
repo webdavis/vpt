@@ -109,7 +109,7 @@ fn memory_inventory_covers_every_owned_artifact_and_publication_state() {
 
 #[test]
 fn sqlite_inventory_covers_every_owned_artifact_and_publication_state() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     inventory(&SqliteLedger::open(&root).unwrap());
 }
@@ -154,7 +154,7 @@ fn memory_retention_kind_cannot_expire_another_artifact() {
 
 #[test]
 fn sqlite_retention_kind_cannot_expire_another_artifact() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     wrong_kind(&SqliteLedger::open(&root).unwrap());
 }

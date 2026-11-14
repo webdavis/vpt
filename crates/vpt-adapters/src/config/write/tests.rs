@@ -6,7 +6,7 @@ fn mode(path: &Path) -> u32 {
     fs::metadata(path).expect("metadata").permissions().mode() & 0o777
 }
 fn sandbox() -> (tempfile::TempDir, PathBuf) {
-    let temp = tempfile::tempdir().expect("owned sandbox");
+    let temp = crate::test_temp::tempdir().expect("owned sandbox");
     let base = temp.path().canonicalize().expect("canonical");
     fs::set_permissions(&base, fs::Permissions::from_mode(0o700)).expect("private sandbox");
     (temp, base)

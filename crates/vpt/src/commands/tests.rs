@@ -159,7 +159,7 @@ fn list_directly_filters_only_succeeded_stages() {
 
 #[test]
 fn storage_directly_reports_named_stores_from_entries() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     std::fs::write(temp.path().join("a.m4a"), b"abc").unwrap();
     let root = temp.path().to_path_buf();
     let paths = StorePaths {

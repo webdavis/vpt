@@ -165,7 +165,7 @@ fn until_terminal(child: &mut OwnedLeader, started: Instant) -> Status {
 
 #[test]
 fn unreaped_exited_leader_group_presence_probe() {
-    let root = tempfile::tempdir().expect("owned root");
+    let root = crate::test_temp::tempdir().expect("owned root");
     let started = Instant::now();
     let mut child = OwnedLeader::new(root.path());
     let status = until_terminal(&mut child, started);
@@ -203,7 +203,7 @@ fn unreaped_exited_leader_group_presence_probe() {
 
 #[test]
 fn terminal_observation_preserves_the_owned_leaders_waitable_identity() {
-    let root = tempfile::tempdir().expect("owned root");
+    let root = crate::test_temp::tempdir().expect("owned root");
     let started = Instant::now();
     let mut child = OwnedLeader::new(root.path());
     until_terminal(&mut child, started);

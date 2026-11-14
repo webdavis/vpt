@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn writer_waits_for_the_previous_lock_to_be_released() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let held = WriteLock::acquire(&root, Duration::ZERO).unwrap();
     let release = std::thread::spawn(move || {
@@ -19,7 +19,7 @@ fn writer_waits_for_the_previous_lock_to_be_released() {
 
 #[test]
 fn writer_contention_is_an_operational_error() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let _held = WriteLock::acquire(&root, Duration::ZERO).unwrap();
     let error = lock_with_wait(&root, Duration::ZERO)

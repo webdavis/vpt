@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn read_only_inventory_supports_an_older_schema_without_migrating_it() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let ledger = SqliteLedger::open(&root).unwrap();
     inventory(&ledger);
@@ -24,7 +24,7 @@ fn read_only_inventory_supports_an_older_schema_without_migrating_it() {
 
 #[test]
 fn pending_note_publication_takes_precedence_over_an_expired_stage() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let ledger = SqliteLedger::open(&root).unwrap();
     inventory(&ledger);
@@ -63,7 +63,7 @@ fn inventory_refuses_note_and_brief_paths_that_disagree_with_the_owner_pin() {
         ("recordings", "analysis_note_path"),
         ("occasions", "brief_path"),
     ] {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let root = RootDir::open(temp.path()).unwrap();
         let ledger = SqliteLedger::open(&root).unwrap();
         inventory(&ledger);
@@ -85,7 +85,7 @@ fn inventory_refuses_note_and_brief_paths_that_disagree_with_the_owner_pin() {
 
 #[test]
 fn metadata_inventory_does_not_parse_or_return_private_artifact_bodies() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let ledger = SqliteLedger::open(&root).unwrap();
     inventory(&ledger);
@@ -105,7 +105,7 @@ fn malformed_sqlite_metadata_is_refused_before_allocating_owned_values() {
         ("id", "Private malformed identity".into()),
         ("digest", "a".repeat(65)),
     ] {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let root = RootDir::open(temp.path()).unwrap();
         let ledger = SqliteLedger::open(&root).unwrap();
         ledger
@@ -130,7 +130,7 @@ fn malformed_sqlite_metadata_is_refused_before_allocating_owned_values() {
 
 #[test]
 fn read_only_version_fourteen_inventory_and_journal_remain_observational() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let ledger = SqliteLedger::open(&root).unwrap();
     inventory(&ledger);

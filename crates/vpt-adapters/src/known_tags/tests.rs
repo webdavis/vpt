@@ -3,7 +3,7 @@ use std::fs;
 
 #[test]
 fn publishing_an_already_selected_tag_preserves_its_spelling() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("known-tags.txt");
     prepare_confirmed(&path, "Project_Finance")
         .unwrap()
@@ -22,7 +22,7 @@ fn publishing_an_already_selected_tag_preserves_its_spelling() {
 
 #[test]
 fn separator_and_case_variants_preserve_existing_spelling_and_file_bytes() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("known-tags.txt");
     let original = " Project_Finance \r\nStraße\n";
     fs::write(&path, original).unwrap();
@@ -39,7 +39,7 @@ fn separator_and_case_variants_preserve_existing_spelling_and_file_bytes() {
 
 #[test]
 fn multiword_tags_are_normalized_without_changing_existing_bytes() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("known-tags.txt");
     fs::write(&path, "Existing_Tag").unwrap();
     let update = prepare(&path, "  Private  Topic ").unwrap();
@@ -51,7 +51,7 @@ fn multiword_tags_are_normalized_without_changing_existing_bytes() {
 
 #[test]
 fn invalid_proposals_and_invalid_saved_vocabulary_are_refused() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("known-tags.txt");
     for tag in ["#private", "1234", "private!", "", "\0private"] {
         assert_eq!(prepare(&path, tag).unwrap_err(), TermsError::InvalidText);
@@ -70,7 +70,7 @@ fn invalid_proposals_and_invalid_saved_vocabulary_are_refused() {
 
 #[test]
 fn preparing_missing_tags_is_observational_and_preserves_later_edits() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("missing/known-tags.txt");
     assert!(read(&path).unwrap().is_empty());
     let update = prepare(&path, "Private topic").unwrap();
@@ -83,7 +83,7 @@ fn preparing_missing_tags_is_observational_and_preserves_later_edits() {
 
 #[test]
 fn renaming_replaces_every_spelling_of_the_old_tag_once_and_keeps_other_lines() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("known-tags.txt");
     let rename = vpt_domain::tags::Vocabulary::new(&[])
         .unwrap()
@@ -104,7 +104,7 @@ fn renaming_replaces_every_spelling_of_the_old_tag_once_and_keeps_other_lines() 
 
 #[test]
 fn dropping_a_tag_keeps_every_other_line_byte_for_byte() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("known-tags.txt");
     fs::write(&path, " Project_Finance \r\n\nold-topic\nStraße").unwrap();
     let drop = ["old-topic".to_owned()].into_iter().collect();

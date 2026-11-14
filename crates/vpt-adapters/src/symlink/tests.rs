@@ -15,7 +15,7 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
-        let root = tempfile::tempdir().expect("owned fixture");
+        let root = crate::test_temp::tempdir().expect("owned fixture");
         let canonical = root.path().canonicalize().expect("canonical fixture");
         std::fs::create_dir(canonical.join("notes")).expect("target parent");
         Self {

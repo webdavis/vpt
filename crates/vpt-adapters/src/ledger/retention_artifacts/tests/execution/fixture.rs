@@ -70,7 +70,7 @@ pub struct World {
 }
 impl World {
     pub fn new() -> Self {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let base = temp.path().canonicalize().unwrap();
         let paths = StorePaths {
             audio: base.join("audio"),
