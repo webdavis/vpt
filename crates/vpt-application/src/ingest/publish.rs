@@ -80,6 +80,12 @@ where
         let intent_id = self.archive_intent(run, &target_name, now, report)?;
         let (audio_path, duplicate) = match self.archive.publish(&staged, archived, &target_name) {
             Ok(Published::Placed(path)) => (path, false),
+            Ok(Published::PlacedLeavingStage(path)) => {
+                report
+                    .log
+                    .push("staged cleanup pending: staging file remains after publication".into());
+                (path, false)
+            }
             Ok(Published::Exists(path)) => {
                 self.validate_existing(&path, &staged, report)?;
                 (path, true)

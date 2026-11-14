@@ -1,4 +1,5 @@
 use super::*;
+use std::os::unix::fs::MetadataExt;
 
 #[test]
 fn publish_places_an_absent_target_and_removes_the_staged_name() {
@@ -46,29 +47,34 @@ fn the_archive_publishes_and_syncs_through_its_port() {
 }
 
 #[test]
-fn file_sync_precedes_exclusive_rename_and_directory_sync_follows() {
+fn file_sync_precedes_placement_and_directory_sync_follows() {
     let (_temp, audio, root) = audio();
     let staged = write(&root, ".vpt-staging-order.m4a", b"bytes");
+    let staged_inode = std::fs::metadata(&staged).expect("staged").ino();
     let target = audio.join("id.m4a");
     let calls = std::cell::RefCell::new(Vec::new());
     let result = exclusive_with(
         &root,
         &staged,
         "id.m4a",
-        |_, path| {
-            assert_eq!(path, staged);
-            assert!(staged.exists());
-            assert!(!target.exists());
-            calls.borrow_mut().push("file");
+        |_, file| {
+            if file.metadata().expect("synced").ino() == staged_inode {
+                assert!(!target.exists());
+                calls.borrow_mut().push("staged");
+            } else {
+                assert_eq!(std::fs::read(&target).expect("target"), b"bytes");
+                calls.borrow_mut().push("archive");
+            }
             Ok(())
         },
         |_| {
-            assert!(!staged.exists());
             assert_eq!(std::fs::read(&target).expect("target"), b"bytes");
+            assert!(staged.exists());
             calls.borrow_mut().push("directory");
             Ok(())
         },
     );
     assert_eq!(result, Ok(Published::Placed(target)));
-    assert_eq!(*calls.borrow(), ["file", "directory"]);
+    assert_eq!(*calls.borrow(), ["staged", "archive", "directory"]);
+    assert!(!staged.exists());
 }

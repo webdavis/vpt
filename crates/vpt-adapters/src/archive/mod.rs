@@ -1,3 +1,4 @@
+mod placement;
 mod port;
 mod publish;
 mod reader;

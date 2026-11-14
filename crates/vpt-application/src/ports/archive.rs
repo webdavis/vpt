@@ -31,6 +31,7 @@ pub struct StageFailure {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Published {
     Placed(PathBuf),
+    PlacedLeavingStage(PathBuf),
     Exists(PathBuf),
 }
 
