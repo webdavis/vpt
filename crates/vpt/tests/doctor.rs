@@ -6,6 +6,8 @@ mod engines;
 mod fixture;
 #[path = "doctor/independence.rs"]
 mod independence;
+#[path = "doctor/kept.rs"]
+mod kept;
 #[path = "doctor/observations.rs"]
 mod observations;
 #[path = "show_list_storage/fixture.rs"]

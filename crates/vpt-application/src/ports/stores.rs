@@ -6,7 +6,26 @@ use vpt_domain::time::FileTime;
 pub enum StoreError {
     Escape(PathBuf),
     Changed(PathBuf),
+    EditKept(KeptEdit),
+    UnsafeVolume(PathBuf),
     Io(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeptEdit {
+    pub note: PathBuf,
+    pub kept: PathBuf,
+    pub versions: KeptVersions,
+    pub cause: Option<Box<StoreError>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeptVersions {
+    PublishedAtNote,
+    NewerSaveAtNote,
+    OlderSaveAtNote,
+    EditedNote,
+    NoteMissing,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,4 +61,9 @@ pub trait Stores {
         bytes: &[u8],
     ) -> Result<(), StoreError>;
     fn sync_directory_of(&self, path: &Path) -> Result<(), StoreError>;
+    /// Files vpt set aside beside the note, each holding a version the note no longer holds.
+    fn kept_beside(&self, note: &Path) -> Result<Vec<PathBuf>, StoreError>;
+    /// Moves a kept file back to the note's name, or removes it when that name is taken again.
+    fn return_kept(&self, kept: &Path, note: &Path) -> Result<(), StoreError>;
+    fn remove_kept(&self, kept: &Path) -> Result<(), StoreError>;
 }

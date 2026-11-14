@@ -10,6 +10,7 @@ mod publication;
 mod releases;
 mod retention;
 mod roots;
+pub use publication::kept_files;
 pub use releases::{ReleaseFileError, ReleaseFiles, ReleaseTarget};
 
 mod digest;
@@ -92,6 +93,18 @@ impl Stores for FilesystemStores {
     fn sync_directory_of(&self, path: &Path) -> Result<(), StoreError> {
         let (root, _leaf) = self.owner(path)?;
         root.sync().map_err(|error| store_error(path, error))
+    }
+
+    fn kept_beside(&self, note: &Path) -> Result<Vec<PathBuf>, StoreError> {
+        self.kept_files_beside(note)
+    }
+
+    fn return_kept(&self, kept: &Path, note: &Path) -> Result<(), StoreError> {
+        self.return_kept_file(kept, note)
+    }
+
+    fn remove_kept(&self, kept: &Path) -> Result<(), StoreError> {
+        self.remove_kept_file(kept)
     }
 }
 

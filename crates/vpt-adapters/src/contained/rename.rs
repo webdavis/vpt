@@ -37,4 +37,8 @@ impl RootDir {
             Err(error) => Err(error),
         }
     }
+
+    pub fn rename_swap(&self, first: &Path, second: &Path) -> Result<(), ContainedError> {
+        self.rename(first, second, libc::RENAME_SWAP)
+    }
 }

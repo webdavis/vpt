@@ -2,7 +2,7 @@ use super::{list, show, storage};
 use crate::cli::output::Outcome;
 use std::ffi::OsString;
 use std::os::unix::ffi::OsStringExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use vpt_adapters::{FilesystemStores, MemoryLedger};
 use vpt_application::StorePaths;
 use vpt_application::ports::{
@@ -57,6 +57,15 @@ impl Stores for EmptyStores {
         _expected: Option<Sha256Digest>,
         _bytes: &[u8],
     ) -> Result<(), StoreError> {
+        Ok(())
+    }
+    fn kept_beside(&self, _note: &Path) -> Result<Vec<PathBuf>, StoreError> {
+        Ok(vec![])
+    }
+    fn return_kept(&self, _kept: &Path, _note: &Path) -> Result<(), StoreError> {
+        Ok(())
+    }
+    fn remove_kept(&self, _kept: &Path) -> Result<(), StoreError> {
         Ok(())
     }
     fn sync_directory_of(&self, _path: &Path) -> Result<(), StoreError> {

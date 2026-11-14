@@ -64,7 +64,7 @@ pub use retention_artifact::{
 };
 pub use retention_files::{RetentionCheck, RetentionFiles};
 pub use retention_history::{PreparedRetention, RetentionHistory};
-pub use stores::{RetentionEntries, StoreEntry, StoreError, Stores};
+pub use stores::{KeptEdit, KeptVersions, RetentionEntries, StoreEntry, StoreError, Stores};
 pub use trash::{Trash, TrashError};
 
 pub use transcript::{

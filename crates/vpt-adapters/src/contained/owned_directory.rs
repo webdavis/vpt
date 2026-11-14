@@ -21,6 +21,10 @@ impl RootDir {
         Ok(directory)
     }
 
+    pub(crate) fn unlink_unchecked(&self, path: &Path) -> Result<(), ContainedError> {
+        remove_entry(self, &self.leaf(path)?, false)
+    }
+
     pub(crate) fn remove_owned_directory(&self, directory: &Self) -> Result<(), ContainedError> {
         self.revalidate()?;
         self.leaf(directory.path())?;

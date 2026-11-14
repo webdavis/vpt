@@ -73,6 +73,15 @@ impl Stores for FakeStores {
         Ok(())
     }
 
+    fn kept_beside(&self, _note: &Path) -> Result<Vec<PathBuf>, StoreError> {
+        Ok(vec![])
+    }
+    fn return_kept(&self, _kept: &Path, _note: &Path) -> Result<(), StoreError> {
+        Ok(())
+    }
+    fn remove_kept(&self, _kept: &Path) -> Result<(), StoreError> {
+        Ok(())
+    }
     fn sync_directory_of(&self, path: &Path) -> Result<(), StoreError> {
         if self.sync_fails {
             return Err(StoreError::Io("sync failed".into()));

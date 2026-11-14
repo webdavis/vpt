@@ -1,5 +1,6 @@
 use crate::ports::{DirtyPublication, LedgerError, PublicationJournal, StoreError, Stores};
 use std::path::{Path, PathBuf};
+mod kept;
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct RepairReport {
@@ -45,6 +46,7 @@ pub fn repair_publication<S: Stores>(
     entry: &DirtyPublication,
     render: &impl Fn(&Path) -> Option<Vec<u8>>,
 ) -> Result<bool, RepairError> {
+    kept::settle_kept_versions(stores, entry)?;
     let current = stores
         .digest_of(&entry.target)
         .map_err(RepairError::Stores)?;
