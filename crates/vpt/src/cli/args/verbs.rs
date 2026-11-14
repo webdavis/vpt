@@ -101,6 +101,9 @@ pub(super) enum Command {
     /// Manage the home link.
     #[command(subcommand, after_long_help = examples::DOCS)]
     Symlink(groups::Symlink),
+    /// Print the vpt and helper versions.
+    #[command(after_long_help = examples::VERSION)]
+    Version,
 }
 
 impl Command {
@@ -142,6 +145,7 @@ impl Command {
             Self::Brief(args) => return args.verb(),
             Self::Redact(options) => return options.verb(),
             Self::Symlink(symlink) => symlink.verb(),
+            Self::Version => Verb::Version,
         })
     }
 }
