@@ -1,5 +1,6 @@
+use std::path::Path;
 use vpt_adapters::{ContainedError, OpenError, RootError};
-use vpt_application::ports::{LedgerError, StoreError};
+use vpt_application::ports::{KeptEdit, KeptVersions, LedgerError, StoreError};
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
 pub(crate) fn root_error(error: &RootError) -> ErrorDocument {
@@ -71,7 +72,58 @@ pub(crate) fn store_error(error: StoreError) -> ErrorDocument {
             "pending publication target was modified",
         )
         .rule("publication_target_modified"),
+        StoreError::EditKept(edit) => {
+            ErrorDocument::new(ErrorKind::Refused, kept_message(edit)).rule("publication_edit_kept")
+        }
+        StoreError::UnsafeVolume(note) => ErrorDocument::new(
+            ErrorKind::Refused,
+            format!(
+                "vpt did not publish {}: the disk that holds its folder cannot replace a file \
+                 safely; set this store to a folder on another disk",
+                file_name(&note)
+            ),
+        )
+        .rule("publication_volume_unsafe"),
         StoreError::Io(detail) => ErrorDocument::new(ErrorKind::Store, detail),
+    }
+}
+
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+fn kept_message(edit: KeptEdit) -> String {
+    let (note, kept) = (file_name(&edit.note), file_name(&edit.kept));
+    let both = |versions: &str| {
+        format!(
+            "{note} changed while vpt published it; {versions} beside it as {kept}; keep what you \
+             need in {note}, then delete {kept}"
+        )
+    };
+    let message = match edit.versions {
+        KeptVersions::PublishedAtNote => {
+            both("it holds vpt's new version and the version vpt replaced is kept")
+        }
+        KeptVersions::NewerSaveAtNote => {
+            both("it holds your newer save and your older save is kept")
+        }
+        KeptVersions::OlderSaveAtNote => {
+            both("it holds your older save and your newer save is kept")
+        }
+        KeptVersions::EditedNote => both("it holds an edited version and another version is kept"),
+        KeptVersions::NoteMissing => format!(
+            "{note} changed while vpt published it and is now missing; its last version is kept \
+             beside it as {kept}; rename {kept} to {note}"
+        ),
+    };
+    match edit.cause {
+        Some(cause) => format!(
+            "{message}; vpt could not put it back: {}",
+            store_error(*cause).message
+        ),
+        None => message,
     }
 }
 

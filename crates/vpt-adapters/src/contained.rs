@@ -1,17 +1,21 @@
 mod clone;
 mod directory;
 mod file;
+mod link;
 mod owned_directory;
 mod private_log;
 mod private_state;
 mod rename;
+mod volume;
 
+pub use link::Placement;
 pub use private_log::{
     AppendEffects, AppendFailure, AppendReceipt, AppendSync, EventLog, LogError, LogInspection,
     LogRefusal, TailRepair,
 };
 pub use private_state::PrivateStateError;
 pub(crate) use private_state::effective_user;
+pub use volume::RenameSupport;
 
 use std::ffi::CString;
 use std::fs::File;

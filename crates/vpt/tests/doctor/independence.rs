@@ -156,6 +156,28 @@ fn staged_files_are_reported_without_cleanup() {
 }
 
 #[test]
+fn versions_kept_beside_notes_are_listed_by_name() {
+    let sandbox = configured("doctor-kept");
+    let transcripts = sandbox.path().join("home/.vpt/transcripts");
+    std::fs::create_dir_all(&transcripts).unwrap();
+    std::fs::write(
+        transcripts.join(".note.md.vpt-kept-41-2"),
+        b"private-note-canary",
+    )
+    .unwrap();
+    std::fs::write(transcripts.join(".note.md.vpt-41-3"), b"staged").unwrap();
+    let before = snapshot(&sandbox);
+    let checks = run_json(&sandbox, 3);
+    assert_eq!(check(&checks, "kept_edits")["ok"], false);
+    assert_eq!(
+        detail(&checks, "kept_edits"),
+        "1 version vpt kept beside notes: transcripts/.note.md.vpt-kept-41-2; keep what you \
+         need in each note, then delete the kept file"
+    );
+    assert_eq!(snapshot(&sandbox), before);
+}
+
+#[test]
 fn doctor_does_not_refresh_titles_or_run_hooks() {
     let sandbox = configured("doctor-observation-only");
     let title = sandbox.path().join("voice-memos/CloudRecordings.db");

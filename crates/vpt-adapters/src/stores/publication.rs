@@ -1,17 +1,28 @@
 use super::{FilesystemStores, Stores, io, store_error};
-use crate::contained::{ContainedError, RootDir};
+use crate::contained::{ContainedError, Placement, RenameSupport, RootDir};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use vpt_application::ports::StoreError;
 use vpt_domain::digest::Sha256Digest;
+mod displaced;
+mod kept;
+mod kept_list;
+mod place;
+mod replace;
+mod restore;
 mod staged;
+pub use kept_list::kept_files;
 
 #[derive(Clone, Copy)]
 enum Checkpoint {
     Staged,
     Checked,
+    Displaced,
+    Hashed,
+    Linked,
+    SwapBack,
     Renamed,
 }
 
@@ -44,7 +55,8 @@ impl FilesystemStores {
         expected: Option<Sha256Digest>,
         bytes: &[u8],
     ) -> Result<(), StoreError> {
-        self.publish_with(target, expected, bytes, |_| Ok(()))
+        let support = self.owner(target)?.0.rename_support();
+        self.publish_with(target, expected, bytes, support, |_| Ok(()))
     }
 
     fn publish_with(
@@ -52,9 +64,13 @@ impl FilesystemStores {
         target: &Path,
         expected: Option<Sha256Digest>,
         bytes: &[u8],
+        support: RenameSupport,
         mut checkpoint: impl FnMut(Checkpoint) -> Result<(), StoreError>,
     ) -> Result<(), StoreError> {
         let (root, leaf) = self.owner(target)?;
+        if !support.places_exclusively() {
+            return Err(StoreError::UnsafeVolume(target.to_path_buf()));
+        }
         self.check_previous(target, expected)?;
         let name = leaf
             .file_name()
@@ -68,16 +84,27 @@ impl FilesystemStores {
         self.check_previous(target, expected)?;
         staged::validate(root, &temporary, &file, bytes)?;
         checkpoint(Checkpoint::Checked)?;
-        if expected.is_none() {
-            if !root
-                .rename_exclusive(&temporary, &leaf)
-                .map_err(|error| store_error(target, error))?
-            {
-                return Err(StoreError::Changed(target.to_path_buf()));
+        match expected {
+            None => {
+                let placement =
+                    place::place_exclusive(root, support, &temporary, &leaf, &mut checkpoint)?;
+                if placement == Placement::Occupied {
+                    return Err(StoreError::Changed(target.to_path_buf()));
+                }
             }
-        } else {
-            root.rename_over(&temporary, &leaf)
-                .map_err(|error| store_error(target, error))?;
+            Some(expected) => replace::Replacement {
+                stores: self,
+                root,
+                support,
+                target,
+                name,
+                note: &leaf,
+                staged: &temporary,
+                file: &file,
+                bytes,
+                expected,
+            }
+            .run(&mut checkpoint)?,
         }
         checkpoint(Checkpoint::Renamed)?;
         root.sync().map_err(|error| store_error(target, error))?;

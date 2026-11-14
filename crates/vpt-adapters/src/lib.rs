@@ -60,7 +60,7 @@ pub use ledger::{
     prepare_brief_artifact, prepare_occasion,
 };
 pub use lock::{LockError, WriteLock};
-pub use stores::{BUFFER, FilesystemStores, digest_open};
+pub use stores::{BUFFER, FilesystemStores, digest_open, kept_files};
 pub use stores::{ReleaseFileError, ReleaseFiles, ReleaseTarget};
 pub use symlink::{
     LinkState, SymlinkError, deploy as deploy_symlink, inspect as inspect_symlink,

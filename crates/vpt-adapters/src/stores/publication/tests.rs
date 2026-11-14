@@ -1,6 +1,38 @@
 use super::*;
 use crate::stores::tests::{entries, store};
 use std::{fs, fs::hard_link, os::unix::fs::symlink};
+use vpt_application::ports::{KeptEdit, KeptVersions};
+mod crashes;
+mod recovery;
+mod staging_link;
+mod swap_window;
+mod unreadable;
+mod unsafe_volume;
+mod volumes;
+
+const SWAP: RenameSupport = RenameSupport {
+    swap: true,
+    exclusive: true,
+    hard_links: true,
+};
+
+fn publish_swapping(
+    stores: &FilesystemStores,
+    target: &Path,
+    expected: Option<Sha256Digest>,
+    bytes: &[u8],
+    checkpoint: impl FnMut(Checkpoint) -> Result<(), StoreError>,
+) -> Result<(), StoreError> {
+    stores.publish_with(target, expected, bytes, SWAP, checkpoint)
+}
+
+fn kept_file(root: &Path) -> PathBuf {
+    let name = entries(root)
+        .into_iter()
+        .find(|name| name.starts_with(".note.md.vpt-kept-"))
+        .unwrap();
+    root.join(name)
+}
 
 #[test]
 fn a_new_target_after_the_final_check_is_never_replaced() {
@@ -9,7 +41,7 @@ fn a_new_target_after_the_final_check_is_never_replaced() {
         let target = root.join("note.md");
         let outside = temp.path().join("outside");
         fs::write(&outside, b"external").unwrap();
-        let result = stores.publish_with(&target, None, b"intended", |point| {
+        let result = publish_swapping(&stores, &target, None, b"intended", |point| {
             if matches!(point, Checkpoint::Checked) {
                 match kind {
                     "file" => fs::write(&target, b"operator").unwrap(),
@@ -34,7 +66,8 @@ fn existing_target_edits_during_staging_are_preserved() {
     let (_temp, root, stores) = store();
     let target = root.join("note.md");
     fs::write(&target, b"old").unwrap();
-    let result = stores.publish_with(
+    let result = publish_swapping(
+        &stores,
         &target,
         Some(stores.digest_bytes(b"old")),
         b"intended",
@@ -57,7 +90,8 @@ fn changed_or_replaced_staged_bytes_are_never_published() {
         fs::write(&target, b"old").unwrap();
         let outside = temp.path().join("outside");
         fs::write(&outside, b"external").unwrap();
-        let result = stores.publish_with(
+        let result = publish_swapping(
+            &stores,
             &target,
             Some(stores.digest_bytes(b"old")),
             b"intended",
@@ -100,7 +134,8 @@ fn root_replacement_during_staging_preserves_both_original_and_replacement_targe
     let target = root.join("note.md");
     let held = temp.path().join("held");
     fs::write(&target, b"old").unwrap();
-    let result = stores.publish_with(
+    let result = publish_swapping(
+        &stores,
         &target,
         Some(stores.digest_bytes(b"old")),
         b"intended",
@@ -122,7 +157,7 @@ fn root_replacement_during_staging_preserves_both_original_and_replacement_targe
 fn changes_after_rename_are_preserved_and_reported_as_incomplete() {
     let (_temp, root, stores) = store();
     let target = root.join("note.md");
-    let result = stores.publish_with(&target, None, b"intended", |point| {
+    let result = publish_swapping(&stores, &target, None, b"intended", |point| {
         if matches!(point, Checkpoint::Renamed) {
             fs::write(&target, b"operator").unwrap();
         }
@@ -152,4 +187,56 @@ fn temporary_name_collisions_have_a_bounded_attempt_count_and_preserve_occupants
     for name in entries(&root) {
         assert_eq!(fs::read(root.join(name)).unwrap(), b"occupant");
     }
+}
+
+fn editor_save(target: &Path, bytes: &[u8]) {
+    let saved = target.with_file_name("editor-save");
+    fs::write(&saved, bytes).unwrap();
+    fs::rename(saved, target).unwrap();
+}
+
+#[test]
+fn an_unchanged_existing_target_is_replaced_without_leftovers() {
+    let (_temp, root, stores) = store();
+    let target = root.join("note.md");
+    fs::write(&target, b"old").unwrap();
+    let result = stores.publish(&target, Some(stores.digest_bytes(b"old")), b"intended");
+    assert_eq!(result, Ok(()));
+    assert_eq!(fs::read(&target).unwrap(), b"intended");
+    assert_eq!(entries(&root), ["note.md"]);
+}
+
+#[test]
+fn an_editor_save_after_the_final_check_is_kept_and_reported() {
+    let (_temp, root, stores) = store();
+    let target = root.join("note.md");
+    fs::write(&target, b"old").unwrap();
+    let result = publish_swapping(
+        &stores,
+        &target,
+        Some(stores.digest_bytes(b"old")),
+        b"intended",
+        |point| {
+            if matches!(point, Checkpoint::Checked) {
+                editor_save(&target, b"operator");
+            }
+            Ok(())
+        },
+    );
+    assert_eq!(result, Err(StoreError::Changed(target.clone())));
+    assert_eq!(fs::read(&target).unwrap(), b"operator");
+    assert_eq!(entries(&root), ["note.md"]);
+}
+
+#[test]
+fn a_hard_linked_existing_target_is_replaced_and_the_other_link_keeps_the_old_bytes() {
+    let (_temp, root, stores) = store();
+    let target = root.join("note.md");
+    fs::write(&target, b"old").unwrap();
+    hard_link(&target, root.join("alias")).unwrap();
+    let result = stores.publish(&target, Some(stores.digest_bytes(b"old")), b"intended");
+    assert_eq!(result, Ok(()));
+    assert_eq!(fs::read(&target).unwrap(), b"intended");
+    assert_eq!(fs::read(root.join("alias")).unwrap(), b"old");
+    assert_eq!(entries(&root), ["alias", "note.md"]);
 }

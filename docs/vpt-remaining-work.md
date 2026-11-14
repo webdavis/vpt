@@ -821,13 +821,28 @@ Product sources: specification sections 3.1, 3.5, 9, 10, 11, and 13.
   stdin/stdout/stderr, output overflow, shared deadlines, the one-second termination grace, exact
   child reaping, and held descendant pipes. Command cases cover interrupted engine/agent runs and
   all three signals during manual/upcoming context collection. Evidence is in the ingestion report.
-- [ ] Extend durable publication to every new artifact, retaining committed render state and expected
+- [x] Extend durable publication to every new artifact, retaining committed render state and expected
   previous/intended digests. Repair interrupted publication only when the destination still matches
   the recorded state; preserve operator changes and refuse foreign replacement content.
   The store adapter now receives the expected digest, rechecks after staging, and publishes expected-
   absent targets with exclusive rename. Staged identity/content checks and post-sync digest checks
-  preserve detected changes and pending journal entries. Existing-file and temporary-name changes
-  after the last check remain open race conditions; this is not yet atomic compare-and-replace.
+  preserve detected changes and pending journal entries. vpt asks the volume for its rename
+  capabilities before it replaces a note. With an atomic swap, the staged file takes a kept name and
+  is swapped with the note. Without one, the note moves to a kept name first, and vpt's file is
+  placed with an exclusive rename or a hard link. A volume with neither, or one that cannot be
+  asked, is refused as `publication_volume_unsafe` before anything changes. The displaced note is
+  hashed and checked again just before removal; an edited or unreadable version goes back to the
+  note or stays at `.<note>.vpt-kept-<pid>-<n>`, refused as `publication_edit_kept`. Recovery
+  settles kept files that hold vpt's own bytes (the intended or the expected previous version, or
+  a copy of the note) without reporting them: it puts the previous version back when the note is
+  missing and removes the rest. It keeps the publication pending while any other kept file exists,
+  and `vpt doctor` lists only those.
+  Two write losses remain. A write through a descriptor held on the old note can be lost in the
+  instant between the final check and the unlink; a deliberate race lost about one write in ten.
+  A writer that keeps the old file open and writes after the unlink loses that write under any
+  replace by rename. Without a swap, the note is briefly absent while it is aside. A same-user
+  process that replaces vpt's empty placeholder kept name in the instant before the note moves
+  onto it, on a volume without exclusive rename, loses that file.
 - [x] Preserve private configuration/state permissions and the strengthened database/path protection
   throughout new commands. Existing shared folders are never made private by changing permissions;
   unsafe existing configuration folders are refused, and newly created private folders are allowed.

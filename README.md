@@ -286,6 +286,8 @@ contents, permissions, and ignore files unchanged. A check that passes but needs
 recording yet, the Voice Memos `Recordings` folder does not exist, and doctor reports that as a notice:
 the folder appears after the first recording, and `vpt import` works without it. A folder that exists
 but cannot be read, for example because the privacy system refuses access, still fails.
+`kept_edits` fails while any store holds a version vpt kept beside a note, and lists each kept file
+by store and name.
 
 ## Note writing
 
@@ -313,7 +315,23 @@ vault contents and permissions unchanged.
 
 The ledger saves note bytes, full/content digests, managed tags, and publication intent together.
 Startup recovery publishes the saved bytes; stage success and journal removal commit together after
-publication. Explicit regeneration of an expired transcript or analysis note retains saved operator edits. Engine
+publication. vpt never overwrites a note it has not hashed. It moves the old note aside first,
+with an atomic swap where the volume supports one, and puts it back when it was edited. A disk that
+offers neither an exclusive rename nor hard links cannot replace a file safely, so vpt refuses with
+`publication_volume_unsafe` before it changes anything; set that store to a folder on another disk.
+When two versions remain, vpt keeps one beside the note in a hidden file named
+`.<note name>.vpt-kept-<number>-<number>` and refuses with `publication_edit_kept`. The message
+names both files, says which version each holds, and gives the reason when vpt could not put a
+version back. When the note is missing, it tells you to rename the kept file to the note's name.
+The publication stays pending, and every later run repeats the refusal, until the kept file is
+deleted. When a crash leaves only vpt's own versions aside, the next run puts the note back or
+removes them, finishes the publication, and asks nothing of you. `vpt doctor` lists under
+`kept_edits` every kept file that holds a version of yours.
+Two kinds of write can still be lost. First, an editor that writes through a file it already holds
+open can lose that write in the instant between vpt's last check and the removal of the old note; a
+deliberate race lost about one write in ten. Second, an editor that keeps the old file open and
+writes after the removal loses that write, as it would under any replace by rename.
+Explicit regeneration of an expired transcript or analysis note retains saved operator edits. Engine
 provenance is saved with accepted text, so new two-engine transcriptions retain both engines after
 raw-output removal. Older accepted state without checker metadata remains readable.
 
