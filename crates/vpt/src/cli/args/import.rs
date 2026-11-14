@@ -3,6 +3,7 @@ use vpt_domain::time::UtcInstant;
 
 #[derive(Debug, PartialEq, Eq, clap::Args)]
 pub(crate) struct Options {
+    /// The audio or video file.
     pub file: PathBuf,
     /// The recording's title.
     #[arg(long, allow_hyphen_values = true)]

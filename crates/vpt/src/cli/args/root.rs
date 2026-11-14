@@ -1,19 +1,24 @@
-use super::{PathBuf, verbs::Command};
+use super::{PathBuf, examples, verbs::Command};
 
 /// Voice Processing Tool: archive, transcribe and analyze voice recordings.
 #[derive(clap::Parser)]
-#[command(name = "vpt")]
+#[command(
+    name = "vpt",
+    arg_required_else_help = true,
+    after_long_help = examples::DOCS
+)]
 pub(super) struct Cli {
-    #[command(flatten)]
-    pub global: Global,
     /// Print the vpt and helper versions.
     #[arg(long)]
     pub version: bool,
+    #[command(flatten)]
+    pub global: Global,
     #[command(subcommand)]
     pub command: Option<Command>,
 }
 
 #[derive(clap::Args)]
+#[command(next_help_heading = "Global options")]
 pub(super) struct Global {
     /// Print the result as JSON.
     #[arg(long, global = true, conflicts_with_all = ["toon", "yaml"])]

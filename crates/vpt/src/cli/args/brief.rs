@@ -19,6 +19,7 @@ const MANUAL: [&str; 2] = ["id", "upcoming"];
 
 #[derive(clap::Args)]
 pub(super) struct Args {
+    /// The saved occasion id.
     #[arg(
         value_name = "OCCASION_ID",
         value_parser = occasion_id,

@@ -8,6 +8,7 @@ use vpt_domain::review::ReviewAction;
         .requires("resolve")
 ))]
 pub(super) struct Args {
+    /// The recording id.
     id: String,
     /// The flag to resolve, with one of --confirm, --correct or --dismiss.
     #[arg(long, value_name = "FLAG", requires = "resolution")]

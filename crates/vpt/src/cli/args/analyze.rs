@@ -9,6 +9,7 @@ pub(crate) enum Scope {
 
 #[derive(clap::Args)]
 pub(super) struct Args {
+    /// The recording id.
     #[arg(
         required_unless_present_any = ["all", "stdin"],
         conflicts_with_all = ["all", "stdin"]

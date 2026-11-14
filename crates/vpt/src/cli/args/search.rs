@@ -2,6 +2,7 @@ use super::values;
 
 #[derive(Debug, PartialEq, Eq, clap::Args)]
 pub struct Options {
+    /// The words to find.
     #[arg(value_name = "WORD", required = true)]
     pub words: Vec<String>,
     /// Print at most this many matches.
