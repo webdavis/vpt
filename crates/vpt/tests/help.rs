@@ -28,6 +28,7 @@ const COMMANDS: &[&str] = &[
     "redact",
     "symlink deploy",
     "symlink verify",
+    "version",
 ];
 
 fn help(sandbox: &Sandbox, args: &[&str]) -> String {

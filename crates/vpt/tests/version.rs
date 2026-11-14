@@ -181,3 +181,15 @@ fn unreadable_existing_configuration_keeps_version_success_without_path_fallback
         serde_json::from_str(&stdout(&output)).expect("one JSON document");
     assert!(document["helper_version"].is_null());
 }
+
+#[test]
+fn the_version_command_prints_what_the_version_flag_prints() {
+    let sandbox = Sandbox::new("version-command");
+    for format in [None, Some("--json")] {
+        let command = run(sandbox.vpt().arg("version").args(format));
+        let flag = run(sandbox.vpt().arg("--version").args(format));
+        assert_eq!(command.status.code(), Some(0), "{format:?}");
+        assert_eq!(stdout(&command), stdout(&flag), "{format:?}");
+        assert_eq!(stderr(&command), "", "{format:?}");
+    }
+}

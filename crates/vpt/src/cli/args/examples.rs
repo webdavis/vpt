@@ -88,3 +88,4 @@ pub(super) const SYMLINK_DEPLOY: &str =
     examples!["vpt symlink deploy", "vpt symlink deploy --json"];
 pub(super) const SYMLINK_VERIFY: &str =
     examples!["vpt symlink verify", "vpt symlink verify --json"];
+pub(super) const VERSION: &str = examples!["vpt version", "vpt version --json"];

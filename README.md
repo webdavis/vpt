@@ -1,7 +1,7 @@
 # vpt
 
-The Voice Processing Tool is under construction. Implemented commands include `vpt --version`,
-`vpt --version --json`, and `vpt setup`. The macOS helper provides version reporting, Trash,
+The Voice Processing Tool is under construction. Implemented commands include `vpt version`
+(or `vpt --version`), `vpt version --json`, and `vpt setup`. The macOS helper provides version reporting, Trash,
 and Apple speech transcription. Feature completion is tracked in
 [the remaining-work roadmap](docs/vpt-remaining-work.md).
 The design is [the approved specification](docs/superpowers/specs/2026-09-20-vpt-design.md).
