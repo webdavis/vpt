@@ -14,7 +14,7 @@ pub(super) fn propose(sandbox: &Sandbox, actions: &str) {
     fs::write(sandbox.path().join("captured.proposal"), proposal).unwrap();
 }
 
-fn spoken() -> (Sandbox, RecordingRecord) {
+pub(super) fn spoken() -> (Sandbox, RecordingRecord) {
     let (sandbox, mut rows) = note::configured_saying(&[7], "um private words tomorrow");
     (sandbox, rows.remove(0))
 }
@@ -54,7 +54,7 @@ pub(super) fn sent(log: &std::path::Path) -> Vec<Vec<String>> {
         .collect()
 }
 
-fn note_path(sandbox: &Sandbox, id: &vpt_domain::identity::RecordingId) -> String {
+pub(super) fn note_path(sandbox: &Sandbox, id: &vpt_domain::identity::RecordingId) -> String {
     let note = ledger(sandbox)
         .note_path(id, NoteStage::Analysis)
         .unwrap()
