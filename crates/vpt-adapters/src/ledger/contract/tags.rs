@@ -249,6 +249,7 @@ macro_rules! cases {
         $case!(tag_renames_are_remembered_and_the_latest_rename_of_a_name_wins);
         $case!(learned_tags_are_remembered_until_forgotten);
         $case!(an_action_is_pending_until_settled_and_again_only_when_its_digest_changes);
+        $case!(a_dropped_action_awaits_withdrawal_only_when_attempted_and_named);
     };
 }
 pub(crate) use cases;

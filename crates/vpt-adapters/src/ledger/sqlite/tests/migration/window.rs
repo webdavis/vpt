@@ -88,7 +88,7 @@ pub(super) fn run(root: &crate::RootDir) {
     assert_eq!(upgraded.pending_exports().unwrap(), history);
     upgraded
         .read(|connection| {
-            assert_eq!(version(connection), 18);
+            assert_eq!(version(connection), 19);
             assert_eq!(
                 connection
                     .query_row("SELECT open_flags FROM recordings", [], |row| row

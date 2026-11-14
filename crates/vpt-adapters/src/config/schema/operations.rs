@@ -26,10 +26,16 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "runs once for each new or changed analysis action; see the README for its placeholders; empty sends nothing",
     ),
     key(
+        "actions.withdraw_command",
+        Kind::Argv,
+        "[]",
+        "runs once for each tried action that a redo published while it is set dropped; takes {id} and {recording}; empty withdraws nothing",
+    ),
+    key(
         "actions.final_exit_codes",
         Kind::ExitCodes,
         "[]",
-        "exit codes of the actions command that mean the action is refused and is never sent again",
+        "exit codes of the actions or withdraw command that mean the action or withdrawal is refused and is never tried again",
     ),
     key(
         "import.extract_command",

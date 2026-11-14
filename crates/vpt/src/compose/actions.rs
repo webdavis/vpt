@@ -3,6 +3,7 @@ mod counts;
 mod queue;
 mod report;
 mod resend;
+mod withdraw;
 use super::errors::ledger_error;
 pub(crate) use counts::Counts;
 pub(crate) use queue::queue;
@@ -23,29 +24,46 @@ pub(crate) struct Delivery<'a, E> {
 }
 
 impl<E: EventSink> Delivery<'_, E> {
-    /// Sends the queued actions of one recording, or of every recording, and counts the outcomes.
-    /// Resending refused actions first makes that scope's refused actions pending again.
+    /// Sends the queued actions of one recording, or of every recording, then runs the withdraw
+    /// command for the ones awaiting withdrawal, and counts the outcomes. Resending refused
+    /// actions first makes that scope's refused actions pending again.
     pub(crate) fn send(
         &mut self,
         only: Option<&RecordingId>,
         resend_refused: bool,
     ) -> Result<Counts, Box<ErrorDocument>> {
-        let mut total = Counts::default();
+        let mut total = Counts::start(self.settings);
         if self.settings.actions_command.is_empty() {
             return Ok(total);
         }
         if resend_refused {
             resend::refused(self, only)?;
         }
+        let in_scope = |queued: &QueuedAction| only.is_none_or(|only| *only == queued.recording);
         let mut pending = self.ledger.pending_actions().map_err(error)?;
-        pending.retain(|queued| only.is_none_or(|only| *only == queued.recording));
-        while let Some(first) = pending.first() {
-            let recording = first.recording.clone();
-            let (mine, rest) = pending
-                .into_iter()
-                .partition(|queued| queued.recording == recording);
-            pending = rest;
-            total += self.recording(&recording, &mine)?;
+        pending.retain(in_scope);
+        let mut withdrawing = Vec::new();
+        if total.withdrawn.is_some() {
+            withdrawing = self.ledger.withdrawing_actions().map_err(error)?;
+            withdrawing.retain(in_scope);
+        }
+        let mut recordings: Vec<_> = pending
+            .iter()
+            .chain(&withdrawing)
+            .map(|queued| queued.recording.clone())
+            .collect();
+        recordings.sort_by(|a, b| a.as_str().cmp(b.as_str()));
+        recordings.dedup();
+        for recording in recordings {
+            let of_recording = |actions: &[QueuedAction]| -> Vec<QueuedAction> {
+                actions
+                    .iter()
+                    .filter(|queued| queued.recording == recording)
+                    .cloned()
+                    .collect()
+            };
+            let mine = of_recording(&pending);
+            total += self.recording(&recording, &mine, &of_recording(&withdrawing))?;
         }
         Ok(total)
     }
@@ -54,8 +72,9 @@ impl<E: EventSink> Delivery<'_, E> {
         &mut self,
         recording: &RecordingId,
         pending: &[QueuedAction],
+        withdrawing: &[QueuedAction],
     ) -> Result<Counts, Box<ErrorDocument>> {
-        let mut counts = Counts::default();
+        let mut counts = Counts::start(self.settings);
         let Some(accepted) = self.ledger.accepted_proposal(recording).map_err(error)? else {
             return Ok(counts);
         };
@@ -82,6 +101,7 @@ impl<E: EventSink> Delivery<'_, E> {
                 note: path.as_deref().unwrap_or_default(),
                 link: &link,
             };
+            self.commit_change(Some(recording), ActionChange::Attempt(queued.clone()))?;
             let outcome = send_action(self.settings, &send);
             let refused = match outcome {
                 SendOutcome::Failed => {
@@ -107,6 +127,7 @@ impl<E: EventSink> Delivery<'_, E> {
                 },
             )?;
         }
+        self.withdraw(recording, withdrawing, &mut counts)?;
         report::commit(self, recording, note, counts)?;
         Ok(counts)
     }

@@ -30,6 +30,7 @@ pub enum EventDetail {
         sent: u32,
         failed: u32,
         refused: u32,
+        withdrawn: Option<u32>,
     },
 }
 
@@ -65,8 +66,10 @@ impl Event {
                 sent,
                 failed,
                 refused,
+                withdrawn,
             } => {
-                format!("{sent} sent, {failed} failed, {refused} refused")
+                let withdrawn = withdrawn.map_or_else(String::new, |n| format!(", {n} withdrawn"));
+                format!("{sent} sent, {failed} failed, {refused} refused{withdrawn}")
             }
         }
     }

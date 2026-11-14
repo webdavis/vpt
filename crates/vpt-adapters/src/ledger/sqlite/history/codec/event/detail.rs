@@ -32,8 +32,13 @@ pub(super) fn encode(value: EventDetail) -> Value {
             sent,
             failed,
             refused,
+            withdrawn,
         } => {
-            json!({"tag":"actions","sent":sent,"failed":failed,"refused":refused})
+            let mut detail = json!({"tag":"actions","sent":sent,"failed":failed,"refused":refused});
+            if let Some(withdrawn) = withdrawn {
+                detail["withdrawn"] = json!(withdrawn);
+            }
+            detail
         }
     }
 }
@@ -89,6 +94,10 @@ pub(super) fn decode(value: &Value) -> Result<EventDetail, LedgerError> {
             sent: count(value, "sent")?,
             failed: count(value, "failed")?,
             refused: count(value, "refused")?,
+            withdrawn: value
+                .get("withdrawn")
+                .map(|_| count(value, "withdrawn"))
+                .transpose()?,
         }),
         _ => Err(corrupt()),
     }

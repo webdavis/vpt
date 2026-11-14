@@ -64,6 +64,12 @@ mod tag_defaults;
 mod tag_placeholders;
 #[path = "analyze/tag_renames.rs"]
 mod tag_renames;
+#[path = "analyze/withdraw.rs"]
+mod withdraw;
+#[path = "analyze/withdraw_scope.rs"]
+mod withdraw_scope;
+#[path = "analyze/withdraw_upgrade.rs"]
+mod withdraw_upgrade;
 #[path = "analyze/workflow.rs"]
 mod workflow;
 use std::{fs, time::Duration};

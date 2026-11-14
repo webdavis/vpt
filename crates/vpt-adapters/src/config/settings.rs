@@ -70,6 +70,7 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         report_command: strings(table, "report.command")?,
         alert_command: strings(table, "alert.command")?,
         actions_command: strings(table, "actions.command")?,
+        actions_withdraw_command: actions::withdraw_command(table)?,
         actions_final_exit_codes: actions::final_exit_codes(table)?,
         actions_owner_words: actions::owner_words(table),
         actions_env: actions::env(table),

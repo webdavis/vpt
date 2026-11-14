@@ -107,7 +107,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
             assert!(connection.is_autocommit());
             assert_eq!(version(connection), 1);
             migrations::migrate(connection, || Ok(()))?;
-            assert_eq!(version(connection), 18);
+            assert_eq!(version(connection), 19);
             assert_eq!(connection.query_row("SELECT count(*) FROM dirty_publications", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
             assert_eq!(connection.query_row("SELECT count(*) FROM retention_intents WHERE completed_at IS NULL", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
             assert_eq!(connection.query_row("SELECT count(*) FROM seen WHERE path = '/vm/Recordings/v1.m4a'", [], |row| row.get::<_, u32>(0)).unwrap(), 1);
@@ -169,7 +169,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                     },
                     2
                 );
-                assert_eq!(version(connection), 18);
+                assert_eq!(version(connection), 19);
                 assert_eq!(tables(connection).len(), 28);
                 if scenario == "ledger_migration_rollback" {
                     Err(injected.clone())
@@ -188,7 +188,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
                 assert_eq!(version(connection), 0);
             } else {
                 result.unwrap();
-                assert_eq!(migrations::current(connection).unwrap(), 18);
+                assert_eq!(migrations::current(connection).unwrap(), 19);
                 assert_eq!(tables(connection).len(), 28);
                 migrations::migrate(connection, || Ok(())).unwrap();
                 assert_eq!(tables(connection).len(), 28);

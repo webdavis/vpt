@@ -1065,8 +1065,17 @@ sends every recording's. Exit 0 marks the action sent and an exit code in `[acti
 final_exit_codes` marks it refused, each with a work step; any other outcome leaves it pending and
 adds a warning. `[actions.env]` maps environment variable names (`[A-Za-z_][A-Za-z0-9_]*`) to
 non-empty secret values without NUL that are added to the command's inherited environment, unexpanded
-and never shown; a bad entry refuses with exit 2 naming only the key. A dropped action is neither sent
-nor withdrawn. An empty command records and sends
+and never shown; a bad entry refuses with exit 2 naming only the key. A dropped action is not sent
+again. Schema 19 rebuilds `action_sends` with an `attempted` flag, set in its own work step before
+the command runs and backfilled to 1 for every earlier row, and a `withdrawing` state. Publishing
+names the ids the previous accepted proposal held and the new one drops, only while `[actions]
+withdraw_command` is set; each such row that was attempted becomes `withdrawing` and each that was
+not is deleted, and other rows stay. A redo that holds a `withdrawing` id again makes it pending.
+`withdraw_command`, allowed only with `command` and refusing any placeholder but `{id}` and
+`{recording}`, runs in the same pass for each `withdrawing` row; exit 0 or a final exit code deletes
+the row in a work step, and any other outcome keeps it for the next run.
+Withdrawals count as `withdrawn`, or as `failed` or `refused`, and the `withdrawn` count appears only
+when the withdraw command is set. An empty command records and sends
 nothing.
 
 ### 8.2 verify-note
@@ -1697,7 +1706,8 @@ canary-secret test.
 | `alert.command`                      | string list    | `[]`                                                                      | optional failure or review-needed command; receives `vpt.event/1` JSON on stdin; empty means logs only |
 | `alert.aggregate_after`              | int            | `3`                                                                       | recordings needing review in one run before one aggregate alert                                              |
 | `actions.command`                    | string list    | `[]`                                                                      | run once per new or changed analysis action with its placeholders; empty sends nothing |
-| `actions.final_exit_codes`         | int list       | `[]`                                                                      | exit codes meaning the action is refused for good; other failures are retried |
+| `actions.withdraw_command`          | string list    | `[]`                                                                      | run once per tried action that a redo published while it is set dropped, with `{id}` and `{recording}`; needs `actions.command` |
+| `actions.final_exit_codes`         | int list       | `[]`                                                                      | exit codes meaning the action or its withdrawal is refused for good; other failures are retried |
 | `actions.env.<NAME>`                 | string, secret | none                                                                      | added to the action command's environment; never shown |
 | `actions.owner_words.<kind>`         | string         | none                                                                      | `me`, `other` or `unknown`: the word `{owner_word}` gives that kind; `""` makes it absent |
 | `retention.enabled`                  | bool           | `false`                                                                   | the opt-in retention run                                                                                     |

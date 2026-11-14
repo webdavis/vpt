@@ -1,12 +1,7 @@
-use super::super::{ActionSend, SendOutcome, send_within};
+use super::super::{SendOutcome, run_within};
 use crate::config::{from_table, load_text};
 use std::path::Path;
 use std::time::{Duration, Instant};
-use vpt_domain::{
-    grounding::GroundedClaim,
-    identity::RecordingId,
-    proposal::{CheckedAction, CheckedClaim, Claim},
-};
 
 #[test]
 fn a_command_past_its_deadline_fails_even_when_every_kill_code_is_final() {
@@ -18,31 +13,14 @@ fn a_command_past_its_deadline_fails_even_when_every_kill_code_is_final() {
         Path::new("/u"),
     )
     .unwrap();
-    let action = CheckedAction {
-        claim: CheckedClaim {
-            claim: Claim {
-                text: "call the bank".into(),
-                source_references: vec![],
-            },
-            grounding: GroundedClaim {
-                sources: vec![],
-                finding: None,
-                inherited_flags: vec![],
-            },
-        },
-        owner: None,
-        due: None,
-    };
-    let recording = RecordingId::parse("2026-08-24T144736-4f3ab19c02de").unwrap();
-    let send = ActionSend {
-        recording: &recording,
-        action: &action,
-        id: "2026-08-24T144736-4f3ab19c02de#1",
-        note: "",
-        link: "",
-    };
+    let values = [("{text}", "call the bank")];
     let started = Instant::now();
-    let outcome = send_within(&settings, &send, Duration::from_millis(200));
+    let outcome = run_within(
+        &settings,
+        &settings.actions_command,
+        &values,
+        Duration::from_millis(200),
+    );
     assert_eq!(outcome, SendOutcome::Failed);
     assert!(started.elapsed() < Duration::from_secs(10));
 }

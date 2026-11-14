@@ -15,7 +15,7 @@ pub(super) fn commit<E: EventSink>(
     note: Option<PathBuf>,
     counts: Counts,
 ) -> Result<(), Box<ErrorDocument>> {
-    if counts == Counts::default() {
+    if counts.is_empty() {
         return Ok(());
     }
     let at = SystemClock.now();
@@ -24,6 +24,7 @@ pub(super) fn commit<E: EventSink>(
         sent: counts.sent,
         failed: counts.failed,
         refused: counts.refused,
+        withdrawn: counts.withdrawn,
     };
     if counts.failed + counts.refused > 0 {
         event.state = EventState::Failed;
