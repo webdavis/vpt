@@ -33,3 +33,5 @@ mod collection_tests;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod usage_tests;

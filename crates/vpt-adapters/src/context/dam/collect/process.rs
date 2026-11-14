@@ -1,7 +1,10 @@
 use super::*;
 use crate::spawn::Status;
 
-pub(super) fn output(result: Result<Outcome, SpawnError>) -> Result<Vec<u8>, Failure> {
+pub(super) fn output(
+    result: Result<Outcome, SpawnError>,
+    sent: &[String],
+) -> Result<Vec<u8>, Failure> {
     let outcome = result.map_err(|error| match error {
         SpawnError::NotFound(_) => Failure::Unavailable,
         SpawnError::Io(_) => Failure::Io,
@@ -13,7 +16,7 @@ pub(super) fn output(result: Result<Outcome, SpawnError>) -> Result<Vec<u8>, Fai
             Some("no_such_remote") => return Err(Failure::UnknownRemote),
             _ => return Err(Failure::Exit),
         },
-        Status::Exited(2) => return Err(Failure::Usage),
+        Status::Exited(2) => return Err(usage::failure(&outcome.stderr, sent)),
         Status::DeadlineExceeded => return Err(Failure::Deadline),
         Status::Interrupted => return Err(Failure::Interrupted),
         _ => return Err(Failure::Exit),
