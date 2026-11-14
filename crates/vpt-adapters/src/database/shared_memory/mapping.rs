@@ -25,8 +25,8 @@ impl Region {
         let length = offset
             .checked_add(SHM_REGION_BYTES)
             .ok_or_else(|| invalid("mapping length"))?;
-        // SAFETY: the retained regular file is provisioned through this region; aligned is page-aligned.
         let protection = libc::PROT_READ | if writable { libc::PROT_WRITE } else { 0 };
+        // SAFETY: the retained regular file is provisioned through this region; aligned is page-aligned.
         let pointer = unsafe {
             libc::mmap(
                 std::ptr::null_mut(),

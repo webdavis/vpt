@@ -57,8 +57,8 @@ impl Callbacks {
 
 impl Drop for Callbacks {
     fn drop(&mut self) {
-        // SAFETY: closing once consumes the owned state before the registration drops.
         assert_eq!(
+            // SAFETY: closing once consumes the owned state before the registration drops.
             unsafe { (*self.file.base.pMethods).xClose.unwrap()(&mut self.file.base) },
             SQLITE_OK
         );
@@ -124,8 +124,8 @@ pub(super) fn run(scenario: &str, root: RootDir) {
         return;
     }
     if scenario == "shm_callback_null" {
-        // SAFETY: a deliberately null required output is refused without dereferencing it.
         assert_eq!(
+            // SAFETY: a deliberately null required output is refused without dereferencing it.
             unsafe {
                 (*writer.file.base.pMethods).xShmMap.unwrap()(
                     &mut writer.file.base,
@@ -216,8 +216,8 @@ pub(super) fn run(scenario: &str, root: RootDir) {
         }
         "shm_callback_persistent" => {
             let mut persistent = 1;
-            // SAFETY: file control receives a valid mutable integer.
             assert_eq!(
+                // SAFETY: file control receives a valid mutable integer.
                 unsafe {
                     (*writer.file.base.pMethods).xFileControl.unwrap()(
                         &mut writer.file.base,

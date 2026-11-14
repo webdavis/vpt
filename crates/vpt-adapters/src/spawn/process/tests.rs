@@ -122,8 +122,8 @@ impl OwnedLeader {
         assert_eq!(status.code(), Some(3));
         // SAFETY: this initialized observation cannot consume or reacquire the recorded child.
         let mut info = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
-        // SAFETY: WNOWAIT is only an observation after successful exact reaping.
         assert_eq!(
+            // SAFETY: WNOWAIT is only an observation after successful exact reaping.
             unsafe {
                 libc::waitid(
                     libc::P_PID,

@@ -98,8 +98,9 @@ pub(super) fn ensure_group_gone(pid: i32) {
         Some(libc::ESRCH),
         "owned group probe failed unexpectedly"
     );
-    // SAFETY: initialized storage receives a non-consuming numeric PID observation.
+    // SAFETY: siginfo_t is a plain C struct for which all-zero bytes are valid.
     let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+    // SAFETY: initialized storage receives a non-consuming numeric PID observation.
     let observed = unsafe {
         libc::waitid(
             libc::P_PID,

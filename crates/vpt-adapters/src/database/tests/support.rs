@@ -61,8 +61,8 @@ pub(crate) fn snapshot(path: &Path) -> Vec<Snapshot> {
 
 fn metadata(file: &File) -> libc::stat {
     let mut stat = std::mem::MaybeUninit::uninit();
-    // SAFETY: stat is writable output and file retains the descriptor.
     assert_eq!(
+        // SAFETY: stat is writable output and file retains the descriptor.
         unsafe { libc::fstat(file.as_raw_fd(), stat.as_mut_ptr()) },
         0
     );
@@ -125,8 +125,8 @@ fn directory(file: &File, path: &Path, result: &mut Vec<Snapshot>) {
 
 fn child(directory: &File, name: &CString, path: &Path, result: &mut Vec<Snapshot>) {
     let mut stat = std::mem::MaybeUninit::uninit();
-    // SAFETY: the retained directory anchors this no-follow metadata lookup.
     assert_eq!(
+        // SAFETY: the retained directory anchors this no-follow metadata lookup.
         unsafe {
             libc::fstatat(
                 directory.as_raw_fd(),

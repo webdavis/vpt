@@ -162,8 +162,8 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
             let result = migrations::migrate(connection, || {
                 entered.set(true);
                 assert!(!connection.is_autocommit());
-                // SAFETY: the borrowed connection retains this live SQLite handle.
                 assert_eq!(
+                    // SAFETY: the borrowed connection retains this live SQLite handle.
                     unsafe {
                         rusqlite::ffi::sqlite3_txn_state(connection.handle(), std::ptr::null())
                     },

@@ -15,8 +15,8 @@ pub(in crate::database::tests) fn ready() {
 }
 
 fn native(path: &Path) -> rusqlite::Connection {
-    // SAFETY: SQLite owns the registration and the name is a static C string.
     assert!(
+        // SAFETY: SQLite owns the registration and the name is a static C string.
         !unsafe { rusqlite::ffi::sqlite3_vfs_find(c"unix-posix".as_ptr()) }.is_null(),
         "bundled SQLite must register the POSIX record-lock reference filesystem"
     );

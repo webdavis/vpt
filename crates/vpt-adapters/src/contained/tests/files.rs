@@ -10,8 +10,8 @@ fn stat_judges_the_leaf_itself_and_regular_refuses_a_link() {
     fixture
         .set_times(fs::FileTimes::new().set_modified(modified))
         .expect("fixture time");
-    // SAFETY: fixture owns a live regular-file descriptor; UF_HIDDEN is a mutable fixture flag.
     assert_eq!(
+        // SAFETY: fixture owns a live regular-file descriptor; UF_HIDDEN is a mutable fixture flag.
         unsafe { libc::fchflags(fixture.as_raw_fd(), libc::UF_HIDDEN) },
         0
     );
@@ -81,8 +81,8 @@ fn open_file_refuses_a_link_and_a_directory_at_the_leaf() {
         fs::read(root.path().join("plain.m4a")).expect("updated"),
         b"Rytes"
     );
-    // SAFETY: the owned file descriptor remains open throughout fcntl.
     assert_ne!(
+        // SAFETY: the owned file descriptor remains open throughout fcntl.
         unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETFD) } & libc::FD_CLOEXEC,
         0
     );

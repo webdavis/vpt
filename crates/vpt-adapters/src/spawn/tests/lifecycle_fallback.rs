@@ -59,8 +59,8 @@ fn finish(
     let status = child.wait().expect("reap exact fallback fixture");
     // SAFETY: this initialized observation cannot consume or reacquire the recorded child.
     let mut info = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
-    // SAFETY: WNOWAIT is observational after the completed exact-child wait.
     assert_eq!(
+        // SAFETY: WNOWAIT is observational after the completed exact-child wait.
         unsafe {
             libc::waitid(
                 libc::P_PID,

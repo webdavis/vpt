@@ -89,8 +89,8 @@ fn each_policy_creates_and_removes_only_its_writable_roles() {
                 let mut file = result.expect("create writable role");
                 assert_eq!(file.metadata().unwrap().mode() & 0o777, 0o600);
                 assert_eq!(file.metadata().unwrap().nlink(), 1);
-                // SAFETY: file owns the live descriptor inspected by fcntl.
                 assert_ne!(
+                    // SAFETY: file owns the live descriptor inspected by fcntl.
                     unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETFD) } & libc::FD_CLOEXEC,
                     0
                 );

@@ -94,8 +94,8 @@ fn check_signal(signal: libc::c_int) {
 fn assert_released(pid: libc::pid_t) {
     // SAFETY: zero initialization provides valid waitid output storage.
     let mut info = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
-    // SAFETY: WNOWAIT only observes the former child number after exact reaping.
     assert_eq!(
+        // SAFETY: WNOWAIT only observes the former child number after exact reaping.
         unsafe {
             libc::waitid(
                 libc::P_PID,
@@ -152,16 +152,16 @@ fn prepare_signal(signal: libc::c_int) {
     action.sa_sigaction = libc::SIG_DFL;
     // SAFETY: the mask is owned initialized storage.
     assert_eq!(unsafe { libc::sigemptyset(&mut action.sa_mask) }, 0);
-    // SAFETY: this post-exec fixture owns its process-local signal disposition.
     assert_eq!(
+        // SAFETY: this post-exec fixture owns its process-local signal disposition.
         unsafe { libc::sigaction(signal, &action, std::ptr::null_mut()) },
         0
     );
     let mut selected = action.sa_mask;
     // SAFETY: selection is one validated fixture signal in owned mask storage.
     assert_eq!(unsafe { libc::sigaddset(&mut selected, signal) }, 0);
-    // SAFETY: this changes only the fixture thread's selected signal mask.
     assert_eq!(
+        // SAFETY: this changes only the fixture thread's selected signal mask.
         unsafe { libc::pthread_sigmask(libc::SIG_UNBLOCK, &selected, std::ptr::null_mut()) },
         0
     );

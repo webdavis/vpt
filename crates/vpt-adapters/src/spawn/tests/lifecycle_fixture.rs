@@ -194,8 +194,8 @@ fn assert_reaped(pid: libc::pid_t) {
     assert!(pid > 1, "exact owned child identifier");
     // SAFETY: this numeric observation cannot consume or reacquire a child.
     let mut info = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
-    // SAFETY: WNOWAIT observes the recorded identifier without reaping it.
     assert_eq!(
+        // SAFETY: WNOWAIT observes the recorded identifier without reaping it.
         unsafe {
             libc::waitid(
                 libc::P_PID,

@@ -18,6 +18,7 @@ pub(super) unsafe extern "C" fn open(
         file.base.pMethods = ptr::null();
         file.state = ptr::null_mut();
     }
+    // SAFETY: SQLite passes back the table registered with this pinned State, which outlives it.
     let Some(state) = (unsafe { from_vfs(vfs) }) else {
         return SQLITE_CANTOPEN;
     };
@@ -89,6 +90,7 @@ pub(super) unsafe extern "C" fn delete(
     name: *const c_char,
     sync: i32,
 ) -> i32 {
+    // SAFETY: SQLite passes back the table registered with this pinned State, which outlives it.
     let Some(state) = (unsafe { from_vfs(vfs) }) else {
         return SQLITE_IOERR_DELETE;
     };
@@ -112,6 +114,7 @@ pub(super) unsafe extern "C" fn access(
     flags: i32,
     output: *mut i32,
 ) -> i32 {
+    // SAFETY: SQLite passes back the table registered with this pinned State, which outlives it.
     let Some(state) = (unsafe { from_vfs(vfs) }) else {
         return SQLITE_IOERR_ACCESS;
     };
@@ -138,6 +141,7 @@ pub(super) unsafe extern "C" fn access(
                 flags != SQLITE_ACCESS_READWRITE || writable
             }
         });
+        // SAFETY: output was checked non-null and SQLite's xAccess contract makes it writable.
         unsafe {
             *output = i32::from(exists);
         }
@@ -151,6 +155,7 @@ pub(super) unsafe extern "C" fn full_pathname(
     length: i32,
     output: *mut c_char,
 ) -> i32 {
+    // SAFETY: SQLite passes back the table registered with this pinned State, which outlives it.
     let Some(state) = (unsafe { from_vfs(vfs) }) else {
         return SQLITE_CANTOPEN;
     };
@@ -169,6 +174,7 @@ pub(super) unsafe extern "C" fn full_pathname(
         {
             return Err(invalid("pathname length"));
         }
+        // SAFETY: SQLite's output holds length bytes, checked above to fit our separate name.
         unsafe {
             ptr::copy_nonoverlapping(bytes.as_ptr().cast(), output, bytes.len());
         }
