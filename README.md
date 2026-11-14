@@ -374,8 +374,11 @@ occasions, and cancelled events are left out.
 `context.type` defaults to `none`, so a user without dam gets no context collection and no change
 in behavior. With `context.type = dam`, a `dam` that is not on `PATH` fails the calendar and task
 halves with the detail `dam was not found; install dam or set context.dam.command`. A `dam` too old
-to have `dam agenda` rejects the command line, and the calendar half fails with the detail
-`dam rejected the command line; dam agenda needs a newer dam`.
+to have `dam agenda`, or a flag vpt passes, rejects the command line. When dam names a subcommand or
+flag that vpt passed as unknown, the calendar half fails with the detail `dam rejected the command
+line; it lacks a subcommand or flag that vpt passes, so it needs a newer dam`. Any other rejected
+command line fails with `dam rejected the command line that vpt sent, and not for a missing
+subcommand or flag`.
 
 Set `context.dam.max_age` to bound how old dam's calendar data may be. Name your own dam remote in
 each value; for a remote called `work`, write `max_age = ["work=15m"]` under `[context.dam]`. Each

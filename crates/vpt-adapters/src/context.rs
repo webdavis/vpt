@@ -8,6 +8,7 @@ pub enum Failure {
     Io,
     Exit,
     Usage,
+    Rejected,
     Deadline,
     Interrupted,
     Capacity,
@@ -25,7 +26,12 @@ impl Failure {
             Self::Unavailable => "dam was not found; install dam or set context.dam.command",
             Self::Io => "context program I/O failed",
             Self::Exit => "context program failed",
-            Self::Usage => "dam rejected the command line; dam agenda needs a newer dam",
+            Self::Usage => {
+                "dam rejected the command line; it lacks a subcommand or flag that vpt passes, so it needs a newer dam"
+            }
+            Self::Rejected => {
+                "dam rejected the command line that vpt sent, and not for a missing subcommand or flag"
+            }
             Self::Deadline => "context collection deadline exceeded",
             Self::Interrupted => "context collection interrupted",
             Self::Capacity => "context collection exceeds capacity",

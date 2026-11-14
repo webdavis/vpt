@@ -1,6 +1,7 @@
 mod calendar;
 mod finish;
 mod process;
+mod usage;
 use super::*;
 use crate::spawn::{Outcome, SpawnError};
 use std::time::{Duration, Instant};
@@ -23,7 +24,7 @@ pub(super) fn run(
             .ok_or(Failure::Deadline)?;
         let mut argv = command.to_vec();
         argv.extend_from_slice(args);
-        let bytes = process::output(runner(&argv, remaining));
+        let bytes = process::output(runner(&argv, remaining), args);
         if !matches!(&bytes, Err(Failure::Interrupted)) && now() >= deadline {
             return Err(Failure::Deadline);
         }

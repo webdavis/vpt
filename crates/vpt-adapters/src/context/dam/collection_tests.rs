@@ -3,7 +3,7 @@ use std::{fs, os::unix::fs::PermissionsExt};
 use vpt_application::ports::ContextWindow;
 use vpt_domain::{brief::ContextStatus, occasion::time::OccasionTime};
 
-fn fixture(body: &str) -> (tempfile::TempDir, Vec<String>) {
+pub(super) fn fixture(body: &str) -> (tempfile::TempDir, Vec<String>) {
     let dir = tempfile::tempdir().unwrap();
     let script = dir.path().join("collector");
     fs::write(&script, format!("#!/bin/sh\n{body}\n")).unwrap();
@@ -215,7 +215,8 @@ fn malformed_max_age_refuses_before_spawning() {
 
 #[test]
 fn a_missing_dam_or_one_without_agenda_fails_the_calendar_naming_what_is_missing() {
-    let (dir, mut command) = fixture("printf 'error: unrecognized subcommand' >&2; exit 2");
+    let (dir, mut command) =
+        fixture("printf \"error: unrecognized subcommand 'agenda'\" >&2; exit 2");
     let rejected = DamContext {
         command: &command,
         max_age: &[],
@@ -230,7 +231,7 @@ fn a_missing_dam_or_one_without_agenda_fails_the_calendar_naming_what_is_missing
     .collect(&request(&["calendar/".into()], &["work/".into()]))
     .unwrap();
     for (snapshot, words) in [
-        (rejected, ["dam agenda", "newer dam"]),
+        (rejected, ["subcommand or flag", "newer dam"]),
         (missing, ["dam", "context.dam.command"]),
     ] {
         let detail = snapshot.status.calendar.detail().unwrap().to_owned();
