@@ -1,3 +1,4 @@
+mod actions;
 mod analysis;
 mod brief;
 mod context;
@@ -69,27 +70,9 @@ pub fn from_table(table: &Table, home_dir: &Path) -> Result<Settings, ConfigErro
         report_command: strings(table, "report.command")?,
         alert_command: strings(table, "alert.command")?,
         actions_command: strings(table, "actions.command")?,
-        actions_final_exit_codes: leaf(table, "actions.final_exit_codes")?
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_integer)
-            .filter_map(|code| i32::try_from(code).ok())
-            .collect(),
-        actions_owner_words: get(table, "actions.owner_words")
-            .and_then(Value::as_table)
-            .into_iter()
-            .flatten()
-            .filter_map(|(kind, word)| Some((kind.clone(), word.as_str()?.to_owned())))
-            .collect(),
-        actions_env: vpt_application::SecretEnv(
-            get(table, "actions.env")
-                .and_then(Value::as_table)
-                .into_iter()
-                .flatten()
-                .filter_map(|(name, value)| Some((name.clone(), value.as_str()?.to_owned())))
-                .collect(),
-        ),
+        actions_final_exit_codes: actions::final_exit_codes(table)?,
+        actions_owner_words: actions::owner_words(table),
+        actions_env: actions::env(table),
         import_extract_command: strings(table, "import.extract_command")?,
         alert_aggregate_after: small(table, "alert.aggregate_after")?,
         retention: retention::from_table(table)?,
