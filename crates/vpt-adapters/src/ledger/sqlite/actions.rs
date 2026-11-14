@@ -78,5 +78,15 @@ pub(super) fn apply(connection: &Connection, delta: &WorkDelta) -> Result<(), Le
                 Err(conflict())
             }
         }
+        ActionChange::ResendRefused(recording) => {
+            connection
+                .execute(
+                    "UPDATE action_sends SET state = 'pending'
+                     WHERE state = 'refused' AND (?1 IS NULL OR recording = ?1)",
+                    params![recording.as_ref().map(RecordingId::as_str)],
+                )
+                .map_err(map)?;
+            Ok(())
+        }
     }
 }

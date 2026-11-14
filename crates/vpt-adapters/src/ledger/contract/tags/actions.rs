@@ -71,4 +71,13 @@ pub(crate) fn an_action_is_pending_until_settled_and_again_only_when_its_digest_
         assert!(!committed(ActionChange::Queue(invalid)));
     }
     assert_eq!(pending(), [("c".into(), '1')]);
+    assert!(committed(ActionChange::ResendRefused(Some(record(82).id))));
+    assert_eq!(pending(), [("c".into(), '1')]);
+    assert!(committed(ActionChange::ResendRefused(Some(
+        recording.clone()
+    ))));
+    assert_eq!(pending(), [("b".into(), '1'), ("c".into(), '1')]);
+    assert!(committed(settle("b", '1', true)));
+    assert!(committed(ActionChange::ResendRefused(None)));
+    assert_eq!(pending(), [("b".into(), '1'), ("c".into(), '1')]);
 }

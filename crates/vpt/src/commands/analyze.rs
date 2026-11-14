@@ -26,23 +26,29 @@ pub(crate) fn run(
     config: Option<&Path>,
     id: &str,
     dry: bool,
+    resend_refused: bool,
 ) -> Outcome {
-    execute(environment, config, id, dry).unwrap_or_else(|error| Outcome::Failure(*error))
+    execute(environment, config, id, dry, resend_refused)
+        .unwrap_or_else(|error| Outcome::Failure(*error))
 }
 fn execute(
     environment: &Environment,
     config: Option<&Path>,
     id: &str,
     dry: bool,
+    resend_refused: bool,
 ) -> Result<Outcome, Box<ErrorDocument>> {
     let id = RecordingId::parse(id).map_err(|_| errors::usage("invalid recording id"))?;
     let (settings, roots) = configured(environment, config)?;
+    if resend_refused {
+        crate::compose::actions::require_command(&settings)?;
+    }
     let ledger = crate::compose::RuntimeLedger::read_only(&roots.state_dir)?;
     let input = observe::inputs(&ledger, &id)?;
     if dry {
         return observe::plan(input, &settings, &roots);
     }
-    mutation::run(&id, &settings, &roots)
+    mutation::run(&id, &settings, &roots, resend_refused)
 }
 
 fn configured(

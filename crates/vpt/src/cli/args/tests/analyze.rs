@@ -6,10 +6,21 @@ fn analysis_accepts_only_its_identity_and_observational_option() {
         parsed("analyze memo --dry-run --json").unwrap().verb,
         Verb::Analyze {
             id: "memo".into(),
-            dry_run: true
+            dry_run: true,
+            resend_refused: false
+        }
+    );
+    assert_eq!(
+        parsed("analyze memo --resend-refused").unwrap().verb,
+        Verb::Analyze {
+            id: "memo".into(),
+            dry_run: false,
+            resend_refused: true
         }
     );
     for input in [
+        "analyze --all --resend-refused",
+        "analyze --stdin --resend-refused",
         "analyze",
         "analyze one two",
         "analyze memo --language en",

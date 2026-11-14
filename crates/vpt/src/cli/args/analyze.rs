@@ -12,6 +12,7 @@ pub(super) fn parse(words: &mut Vec<String>) -> Result<Verb, UsageError> {
     let dry_run = take_flag(words, "--dry-run");
     let all = take_flag(words, "--all");
     let stdin = take_flag(words, "--stdin");
+    let resend_refused = take_flag(words, "--resend-refused");
     let since = take_value(words, "--since")?
         .map(|value| {
             OccasionTime::parse(&value)
@@ -28,7 +29,11 @@ pub(super) fn parse(words: &mut Vec<String>) -> Result<Verb, UsageError> {
             return Ok(Verb::Analyze {
                 id: take_positional(words, "<id>")?,
                 dry_run,
+                resend_refused,
             });
+        }
+        _ if resend_refused => {
+            return Err(UsageError("--resend-refused takes one <id>".into()));
         }
         (true, false) => Scope::All { since },
         (false, true) => Scope::Stdin,

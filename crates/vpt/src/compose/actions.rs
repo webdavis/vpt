@@ -1,5 +1,7 @@
 mod report;
+mod resend;
 use super::{errors::ledger_error, history::commit};
+pub(crate) use resend::require_command;
 use std::collections::BTreeSet;
 use vpt_adapters::{
     ActionSend, SendOutcome, SqliteLedger, SystemClock, action_digest, note_link, send_action,
@@ -78,13 +80,18 @@ pub(crate) struct Delivery<'a, E> {
 
 impl<E: EventSink> Delivery<'_, E> {
     /// Sends the queued actions of one recording, or of every recording, and counts the outcomes.
+    /// Resending refused actions first makes that scope's refused actions pending again.
     pub(crate) fn send(
         &mut self,
         only: Option<&RecordingId>,
+        resend_refused: bool,
     ) -> Result<Counts, Box<ErrorDocument>> {
         let mut total = Counts::default();
         if self.settings.actions_command.is_empty() {
             return Ok(total);
+        }
+        if resend_refused {
+            resend::refused(self, only)?;
         }
         let mut pending = self.ledger.pending_actions().map_err(error)?;
         pending.retain(|queued| only.is_none_or(|only| *only == queued.recording));

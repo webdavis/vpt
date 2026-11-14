@@ -17,6 +17,7 @@ pub(super) fn check(change: &ActionChange) -> Result<(), LedgerError> {
                 })
         }
         ActionChange::Settle { action, .. } => valid(action),
+        ActionChange::ResendRefused(_) => true,
     };
     ok.then_some(())
         .ok_or_else(|| LedgerError::Conflict("invalid action send".into()))

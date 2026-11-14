@@ -40,6 +40,8 @@ mod mentions;
 mod observations;
 #[path = "pipeline/output.rs"]
 mod output;
+#[path = "pipeline/resend_refused.rs"]
+mod resend_refused;
 #[path = "pipeline/state_paths.rs"]
 mod state_paths;
 mod support;
