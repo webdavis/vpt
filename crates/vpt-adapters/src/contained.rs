@@ -1,5 +1,7 @@
 mod clone;
+mod descriptor;
 mod directory;
+mod error;
 mod file;
 mod link;
 mod owned_directory;
@@ -8,6 +10,8 @@ mod private_state;
 mod rename;
 mod volume;
 
+pub use error::ContainedError;
+use error::{escape, io};
 pub use link::Placement;
 pub use private_log::{
     AppendEffects, AppendFailure, AppendReceipt, AppendSync, EventLog, LogError, LogInspection,
@@ -17,26 +21,13 @@ pub use private_state::PrivateStateError;
 pub(crate) use private_state::effective_user;
 pub use volume::RenameSupport;
 
+use descriptor::opened;
 use std::ffi::CString;
 use std::fs::File;
-use std::os::fd::{AsFd, BorrowedFd, FromRawFd};
+use std::os::fd::{AsFd, BorrowedFd};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ContainedError {
-    Escape {
-        root: PathBuf,
-        path: PathBuf,
-    },
-    NotRegular(PathBuf),
-    NotADirectory(PathBuf),
-    Io {
-        path: PathBuf,
-        kind: std::io::ErrorKind,
-    },
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Access {
@@ -70,40 +61,9 @@ pub struct RootDir {
 
 const NO_FOLLOW: libc::c_int = libc::O_NOFOLLOW | libc::O_CLOEXEC;
 
-fn escape(root: &Path, path: &Path) -> ContainedError {
-    ContainedError::Escape {
-        root: root.into(),
-        path: path.into(),
-    }
-}
-
-fn io(path: &Path, error: std::io::Error) -> ContainedError {
-    ContainedError::Io {
-        path: path.into(),
-        kind: error.kind(),
-    }
-}
-
 fn c_string(path: &Path) -> Result<CString, ContainedError> {
     CString::new(path.as_os_str().as_bytes())
         .map_err(|_| io(path, std::io::ErrorKind::InvalidInput.into()))
-}
-
-fn opened(fd: libc::c_int, path: &Path, directory: bool) -> Result<File, ContainedError> {
-    if fd >= 0 {
-        // SAFETY: each caller passes a fresh successful open/openat result, transferring ownership.
-        return Ok(unsafe { File::from_raw_fd(fd) });
-    }
-    let error = std::io::Error::last_os_error();
-    match error.raw_os_error() {
-        Some(libc::ELOOP | libc::ENOTDIR) if directory => {
-            Err(ContainedError::NotADirectory(path.into()))
-        }
-        Some(libc::ELOOP | libc::EISDIR | libc::ENXIO) if !directory => {
-            Err(ContainedError::NotRegular(path.into()))
-        }
-        _ => Err(io(path, error)),
-    }
 }
 
 pub fn leaf_below(root: &Path, path: &Path) -> Result<PathBuf, ContainedError> {
@@ -121,12 +81,8 @@ pub fn leaf_below(root: &Path, path: &Path) -> Result<PathBuf, ContainedError> {
 
 impl RootDir {
     pub fn open(path: &Path) -> Result<Self, ContainedError> {
-        let name = c_string(path)?;
-        let flags = libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW_ANY | libc::O_CLOEXEC;
-        // SAFETY: name is NUL-terminated and live for the call; these flags need no mode argument.
-        let fd = unsafe { libc::open(name.as_ptr(), flags) };
         Ok(Self {
-            file: opened(fd, path, true)?,
+            file: descriptor::open_directory(path)?,
             path: path.into(),
         })
     }
