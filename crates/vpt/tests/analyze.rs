@@ -2,6 +2,8 @@
 #![allow(dead_code, reason = "shared CLI fixtures")]
 #[path = "analyze/actions.rs"]
 mod actions;
+#[path = "analyze/actions_crash.rs"]
+mod actions_crash;
 #[path = "analyze/actions_env.rs"]
 mod actions_env;
 #[path = "analyze/actions_link.rs"]
