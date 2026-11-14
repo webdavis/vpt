@@ -55,16 +55,20 @@ Product sources: specification sections 4, 5, 8.7, and 9.
   Separate CLI runs verify default-four/configured-two thresholds, one alert across further retries,
   unchanged dry-run state, and clearing deferrals after a repaired file becomes stable. Adapter
   faults cover changed-during-read/staged failures and atomic seen/history/event persistence.
-- [ ] Complete descriptor-based staging and publication: derive capture time, duration, full digest,
+- [x] Complete descriptor-based staging and publication: derive capture time, duration, full digest,
   and identity from staged bytes; retain private file permissions; publish without replacing an
   existing archive; and save the recording only after the archive and directory are durable.
   Cross-volume copies preserve the same behavior and report that the archive is not copy-on-write.
   Container inspection now rehashes its retained descriptor and requires the staged size/digest to
-  match. Publication now carries that inspected descriptor and the staged size/digest through file
-  sync and exclusive rename. It verifies the retained file before and after file sync and verifies
-  the final archive after directory sync. Detected changes preserve the files and refuse recording
-  rows; file sync uses the inspected descriptor. Replacement between the final pre-rename check and
-  rename remains an open boundary, so this row remains unchecked.
+  match. Publication verifies the retained descriptor before and after file sync, then places the
+  archive as a clone of that descriptor, so replacing the staging name cannot publish a foreign
+  file. A volume that cannot clone falls back to the exclusive rename. The clone is synced, the
+  directory is synced, the archive is verified by name, and only then is the staging file removed.
+  Every failure after a clone keeps the staging file; a failed removal saves the recording and
+  logs the leftover as cleanup pending.
+  Content rewritten in place through another open descriptor after the last check is detected by
+  the digest check after placement, not prevented, because macOS has no compare-and-swap on file
+  content.
 - [x] Complete duplicate handling across source renames and time-zone changes. Reuse the identity and
   pinned paths for a known digest, update the source association, and report already-ingested work
   without creating another recording.

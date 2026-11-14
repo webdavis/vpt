@@ -19,7 +19,7 @@ fn pre_rename_sync_failure_keeps_stage_and_target_absent() {
 }
 
 #[test]
-fn post_rename_directory_sync_failure_is_placed_unsynced() {
+fn directory_sync_failure_after_placement_is_placed_unsynced_and_keeps_the_stage() {
     let (_temp, audio, root) = audio();
     let staged = write(&root, ".vpt-staging-post.m4a", b"staged");
     let target = audio.join("id.m4a");
@@ -30,13 +30,12 @@ fn post_rename_directory_sync_failure_is_placed_unsynced() {
         |_, _| Ok(()),
         |_| {
             assert_eq!(std::fs::read(&target).expect("target"), b"staged");
-            assert!(!staged.exists());
             Err(ArchiveError::Sync("directory fault".into()))
         },
     );
     assert_eq!(result, Err(ArchiveError::PlacedUnsynced(target.clone())));
     assert_eq!(std::fs::read(&target).expect("target"), b"staged");
-    assert!(!staged.exists());
+    assert_eq!(std::fs::read(&staged).expect("staged"), b"staged");
 }
 
 #[test]

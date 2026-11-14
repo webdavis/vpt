@@ -1,6 +1,8 @@
+mod after_placement;
 mod boundaries;
 mod durability;
 mod placement;
+mod substitution;
 
 use super::*;
 use crate::archive::ClonefileArchive;
@@ -55,11 +57,11 @@ fn exclusive_with<F, D>(
     root: &RootDir,
     path: &Path,
     target: &str,
-    sync_file: F,
+    mut sync_file: F,
     sync_directory: D,
 ) -> Result<Published, ArchiveError>
 where
-    F: FnOnce(&RootDir, &Path) -> Result<(), ArchiveError>,
+    F: FnMut(&RootDir, &File) -> Result<(), ArchiveError>,
     D: FnOnce(&RootDir) -> Result<(), ArchiveError>,
 {
     let (staged, handle) = prepared(root, path)?;
@@ -68,7 +70,29 @@ where
         &staged,
         &handle,
         target,
-        |_| sync_file(root, path),
+        |file| sync_file(root, file),
         sync_directory,
+        crate::archive::placement::place,
+    )
+}
+
+fn exclusive_placing<P>(
+    root: &RootDir,
+    path: &Path,
+    target: &str,
+    place: P,
+) -> Result<Published, ArchiveError>
+where
+    P: FnOnce(&RootDir, &File, &Path, &Path) -> Result<Placement, ContainedError>,
+{
+    let (staged, handle) = prepared(root, path)?;
+    super::exclusive_with(
+        root,
+        &staged,
+        &handle,
+        target,
+        sync_open,
+        sync_directory,
+        place,
     )
 }

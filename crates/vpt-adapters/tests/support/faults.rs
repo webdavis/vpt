@@ -187,6 +187,7 @@ pub enum ArchiveFault {
     ChangedBeforeExistingSync,
     ReplacedAfterOpen,
     PlacedUnsynced,
+    StagingLeft,
 }
 
 pub struct FaultArchive {
@@ -308,6 +309,11 @@ impl Archive for FaultArchive {
             && let Published::Placed(path) = &result
         {
             return Err(ArchiveError::PlacedUnsynced(path.clone()));
+        }
+        if self.fault == ArchiveFault::StagingLeft
+            && let Published::Placed(path) = result
+        {
+            return Ok(Published::PlacedLeavingStage(path));
         }
         Ok(result)
     }

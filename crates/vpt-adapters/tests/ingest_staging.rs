@@ -95,3 +95,35 @@ fn refuses_changed_staging(fault: ArchiveFault) {
     let history = parts.ledger.recovery_view().unwrap();
     assert_eq!(history.records.iter().filter(|record| matches!(&record.fact, HistoryFact::Event(event) if event.kind == EventKind::IngestFailed)).count(), 1);
 }
+
+#[test]
+fn a_staging_file_left_after_publication_still_saves_the_recording() {
+    let fixture = Fixture::new();
+    fixture.add_recording("a.m4a", &m4a(CAPTURED, 1, b"audio"));
+    let mut parts = fixture.parts();
+    let archive = FaultArchive {
+        base: parts.archive,
+        fault: ArchiveFault::StagingLeft,
+    };
+    let report = Ingest {
+        recorder: &parts.store,
+        archive: &archive,
+        ledger: &parts.ledger,
+        clock: &parts.clock,
+        trash: &parts.trash,
+        sink: &mut parts.sink,
+        settings: &parts.settings,
+    }
+    .run(&Mode::default())
+    .expect("the archived recording is saved");
+    assert_eq!(report.ingested.len(), 1);
+    assert_eq!(parts.ledger.recordings().unwrap().len(), 1);
+    assert_eq!(archive.archived().unwrap().len(), 1);
+    assert!(parts.trash.attempted.borrow().is_empty());
+    assert!(
+        report
+            .log
+            .iter()
+            .any(|line| line.contains("staged cleanup pending"))
+    );
+}

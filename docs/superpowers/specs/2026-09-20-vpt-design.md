@@ -491,10 +491,13 @@ publishes nothing.
 ### 5.3 Cloning and duplicates
 
 Publication syncs the completed staging file to disk (on the clone path and the byte-copy path alike),
-moves it to `<id>.m4a` in one step that never replaces an existing target, and syncs the archive
-directory before the recording and seen rows commit, so a committed ingestion always has its archive on
-disk. A sync that fails is exit 1 and never records an ingestion. An existing `<id>.m4a` is a refusal
-naming the path, and that refusal is the duplicate guard between two racing sweeps, which needs no lock
+publishes it at `<id>.m4a` as a clone of the verified open file (an exclusive rename on a volume that
+cannot clone) in one step that never replaces an existing target, and syncs the archive directory
+before the recording and seen rows commit, so a committed ingestion always has its archive on disk.
+After a clone, any failure keeps the staging file. A staging file that cannot be removed once the
+archive is verified is logged as cleanup pending, `vpt doctor` lists it, and the recording is saved. A
+sync that fails is exit 1 and never records an ingestion. An existing `<id>.m4a` is a refusal naming
+the path, and that refusal is the duplicate guard between two racing sweeps, which needs no lock
 beyond the one every mutating command holds. The plan verifies the exclusive-rename primitive available
 on the platform before choosing it. On that refusal vpt verifies the existing archive: its full digest
 must equal the staged digest and its container must validate. It then syncs the verified archive and its
