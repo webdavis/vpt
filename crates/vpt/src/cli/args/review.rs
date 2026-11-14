@@ -1,31 +1,42 @@
-use super::*;
+use super::{Verb, text::PrivateText};
 use vpt_domain::review::ReviewAction;
 
-pub(super) fn parse(
-    words: &mut Vec<String>,
-    correction: Option<text::PrivateText>,
-) -> Result<Verb, UsageError> {
-    let flag = take_value(words, "--resolve")?;
-    let confirm = take_flag(words, "--confirm");
-    let dismiss = take_flag(words, "--dismiss");
-    let actions = usize::from(confirm) + usize::from(dismiss) + usize::from(correction.is_some());
-    let id = take_positional(words, "<id>")?;
-    if actions == 0 && flag.is_none() {
-        return Ok(Verb::Review { id });
+#[derive(clap::Args)]
+#[command(group(
+    clap::ArgGroup::new("resolution")
+        .args(["confirm", "correct", "dismiss"])
+        .requires("resolve")
+))]
+pub(super) struct Args {
+    id: String,
+    /// The flag to resolve, with one of --confirm, --correct or --dismiss.
+    #[arg(long, value_name = "FLAG", requires = "resolution")]
+    resolve: Option<String>,
+    /// Accept the flagged text as it is.
+    #[arg(long)]
+    confirm: bool,
+    /// Replace the flagged text with this text.
+    #[arg(long, value_name = "TEXT", allow_hyphen_values = true)]
+    correct: Option<PrivateText>,
+    /// Dismiss the flag.
+    #[arg(long)]
+    dismiss: bool,
+}
+
+impl Args {
+    pub(super) fn verb(self) -> Verb {
+        let Some(flag) = self.resolve else {
+            return Verb::Review { id: self.id };
+        };
+        let action = match self.correct {
+            Some(text) => ReviewAction::Correct(text.as_str().into()),
+            None if self.confirm => ReviewAction::Confirm,
+            None => ReviewAction::Dismiss,
+        };
+        Verb::ReviewResolve {
+            id: self.id,
+            flag,
+            action,
+        }
     }
-    if actions != 1 || flag.is_none() {
-        return Err(UsageError(
-            "resolution needs --resolve and exactly one of --confirm, --correct, --dismiss".into(),
-        ));
-    }
-    let action = match correction {
-        Some(text) => ReviewAction::Correct(text.as_str().into()),
-        None if confirm => ReviewAction::Confirm,
-        None => ReviewAction::Dismiss,
-    };
-    Ok(Verb::ReviewResolve {
-        id,
-        flag: flag.unwrap(),
-        action,
-    })
 }

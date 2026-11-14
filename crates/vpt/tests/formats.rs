@@ -116,7 +116,7 @@ fn a_usage_error_is_one_document_in_the_chosen_format() {
         assert_eq!((code, on_stdout), (Some(2), false), "{flag}");
         assert_eq!(error["schema"], "vpt.error/1", "{flag}");
         assert_eq!(error["error"]["kind"], "usage", "{flag}");
-        assert_eq!(error["error"]["message"], "<id> is required", "{flag}");
+        assert_eq!(error["error"]["message"], "<ID> is required", "{flag}");
     }
 }
 
@@ -132,11 +132,10 @@ fn two_format_flags_are_refused_in_plain_text_with_the_usage() {
         assert_eq!(output.status.code(), Some(2), "{pair:?}");
         assert_eq!(stdout(&output), "", "{pair:?}");
         let text = stderr(&output);
-        assert!(
-            text.starts_with(&format!("vpt: {} conflicts with {}\n", pair[1], pair[0])),
-            "{text}"
-        );
-        assert!(text.contains("usage: vpt [--json|--toon|--yaml]"), "{text}");
+        let first = text.lines().next().unwrap_or_default();
+        assert!(first.contains("cannot be used with"), "{text}");
+        assert!(pair.iter().all(|flag| first.contains(flag)), "{text}");
+        assert!(text.contains("vpt help"), "{text}");
     }
 }
 

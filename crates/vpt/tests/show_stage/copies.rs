@@ -194,7 +194,7 @@ fn the_handoff_verb_and_its_configuration_key_are_unknown() {
         &["handoff", id.as_str(), "--stage", "released", "--json"],
     );
     assert_eq!(verb.status.code(), Some(2));
-    assert_eq!(error(&verb)["error"]["message"], "unknown verb handoff");
+    assert_eq!(error(&verb)["error"]["message"], "unknown command");
     fixture::write_config(&sandbox, "[handoff]\nallow_private = true\n");
     let key = show(&sandbox, id.as_str(), "transcript");
     assert_eq!(key.status.code(), Some(2), "{}", stderr(&key));

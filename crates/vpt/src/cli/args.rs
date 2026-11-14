@@ -1,152 +1,53 @@
 pub(crate) mod analyze;
 pub(crate) mod brief;
 mod confirm;
+mod groups;
 pub(crate) mod import;
-mod options;
+mod invocation;
 pub(crate) mod redact;
 mod review;
+mod root;
 pub(crate) mod search;
 mod show;
 mod text;
+mod usage;
+mod values;
 mod verbs;
 use super::format::Format;
-use options::{require_values, take_flag, take_format, take_positional, take_value};
+pub use invocation::{Invocation, Verb};
 use std::ffi::OsString;
 use std::path::PathBuf;
-use verbs::parse_verb;
-
-pub const USAGE: &str = "usage: vpt [--json|--toon|--yaml] [--progress] [--config <file>] <verb>\n\
-verbs: run [--dry-run] [--resend-refused] | setup [--force] | doctor | ingest [--dry-run] [--once <path>] |\n\
-       import <file> [--title <text>] [--captured-at <RFC3339>] | show <id> [--stage released|transcript|analysis|brief] [--redact] |\n\
-       transcribe <id> [--language <tag>] [--dry-run] | review <id> [--resolve <flag> --confirm|--correct <text>|--dismiss] | confirm --term <text> | confirm <id> --tag <tag>|--reject-tag <tag>|--relation <kind>:<target> |\n\
-       tag rename <old> <new> [--dry-run] |\n\
-       analyze <id> [--dry-run] [--resend-refused] | analyze --all [--since <RFC3339>] [--dry-run] | analyze --stdin [--dry-run] |\n\
-       path <id> --stage transcript|analysis | note write <id> | verify-note <path> --recording <id> | occasions | path --occasion <id> --stage brief | list [--stage <stage>] | search <word>... [--limit <n>] | storage | retention run [--dry-run] |\n\
-       brief <occasion-id> [--dry-run] [--explain] | brief --title <title> --at <RFC3339> [--duration-minutes <n>] [--participant <name>]... [--tag <tag>]... | brief --upcoming |\n\
-       redact <id> [--stage transcript|analysis] [--to <dir>] [--title <title>] | symlink deploy | symlink verify | --version\n";
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Verb {
-    Brief(brief::Options),
-    Redact(redact::Options),
-    Import(import::Options),
-    Occasions,
-    OccasionPath {
-        id: String,
-        stage: String,
-    },
-    Analyze {
-        id: String,
-        dry_run: bool,
-        resend_refused: bool,
-    },
-    AnalyzeBatch {
-        scope: analyze::Scope,
-        dry_run: bool,
-    },
-    VerifyNote {
-        path: PathBuf,
-        recording: String,
-    },
-    Run {
-        dry_run: bool,
-        resend_refused: bool,
-    },
-    ReviewResolve {
-        id: String,
-        flag: String,
-        action: vpt_domain::review::ReviewAction,
-    },
-    ConfirmTerm {
-        term: text::PrivateText,
-    },
-    ConfirmRelation {
-        id: String,
-        relation: text::PrivateText,
-    },
-    ConfirmTag {
-        id: String,
-        tag: text::PrivateText,
-        action: vpt_domain::tags::Action,
-    },
-    TagRename {
-        old: text::PrivateText,
-        new: text::PrivateText,
-        dry_run: bool,
-    },
-    Version,
-    Path {
-        id: String,
-        stage: String,
-    },
-    Setup {
-        force: bool,
-    },
-    Doctor,
-    NoteWrite {
-        id: String,
-    },
-    Transcribe {
-        id: String,
-        language: Option<String>,
-        dry_run: bool,
-    },
-    Ingest {
-        dry_run: bool,
-        once: Option<PathBuf>,
-    },
-    Show {
-        id: String,
-        stage: Option<vpt_domain::copy::Kind>,
-        redact: bool,
-    },
-    Search(search::Options),
-    Review {
-        id: String,
-    },
-    List {
-        stage: Option<String>,
-    },
-    Storage,
-    RetentionRun {
-        dry_run: bool,
-    },
-    SymlinkDeploy,
-    SymlinkVerify,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Invocation {
-    pub verb: Verb,
-    pub format: Option<Format>,
-    pub config: Option<PathBuf>,
-    pub progress: bool,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct UsageError(pub String);
+pub use usage::UsageError;
 
 pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, UsageError> {
-    let mut words: Vec<String> = args
+    let words: Vec<String> = args
         .into_iter()
-        .skip(1)
         .map(|word| {
             word.into_string()
-                .map_err(|_| UsageError("arguments must be valid UTF-8".into()))
+                .map_err(|_| UsageError::new("arguments must be valid UTF-8"))
         })
         .collect::<Result<_, _>>()?;
-    let text = text::take(&mut words)?;
-    require_values(&words)?;
-    let invocation = Invocation {
-        config: take_value(&mut words, "--config")?.map(PathBuf::from),
-        format: take_format(&mut words)?,
-        progress: take_flag(&mut words, "--progress"),
-        verb: parse_verb(&mut words, text)?,
+    let cli = match <root::Cli as clap::Parser>::try_parse_from(words) {
+        Ok(cli) => cli,
+        Err(error) => return usage::from_clap(&error),
     };
-    if let Some(extra) = words.first() {
-        return Err(UsageError(format!("unexpected argument {extra}")));
-    }
-    Ok(invocation)
+    let global = cli.global;
+    let format = Format::FLAGS
+        .into_iter()
+        .zip([global.json, global.toon, global.yaml])
+        .find_map(|((_, format), named)| named.then_some(format));
+    let verb = match (cli.command, cli.version) {
+        (Some(_), true) => return Err(UsageError::new("--version takes no command")),
+        (Some(command), false) => command.verb().map_err(UsageError::new)?,
+        (None, true) => Verb::Version,
+        (None, false) => return Err(UsageError::new("a command is required")),
+    };
+    Ok(Invocation {
+        verb,
+        format,
+        config: global.config,
+        progress: global.progress,
+    })
 }
 
 #[cfg(test)]

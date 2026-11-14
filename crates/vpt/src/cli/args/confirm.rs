@@ -1,37 +1,42 @@
-use super::*;
+use super::{Verb, text::PrivateText};
 use vpt_domain::tags::Action;
 
-pub(super) fn parse(words: &mut Vec<String>, mut text: text::Values) -> Result<Verb, UsageError> {
-    if text.tags.len() > 1 {
-        return Err(UsageError("--tag may only appear once".into()));
+#[derive(clap::Args)]
+#[command(group(
+    clap::ArgGroup::new("confirmation")
+        .required(true)
+        .args(["term", "tag", "reject_tag", "relation"])
+))]
+pub(super) struct Args {
+    #[arg(required_unless_present = "term", conflicts_with = "term")]
+    id: Option<String>,
+    /// Add a confirmed term; takes no recording id.
+    #[arg(long, allow_hyphen_values = true)]
+    term: Option<PrivateText>,
+    /// Confirm a proposed tag of the recording.
+    #[arg(long, allow_hyphen_values = true)]
+    tag: Option<PrivateText>,
+    /// Reject a proposed tag of the recording.
+    #[arg(long, allow_hyphen_values = true)]
+    reject_tag: Option<PrivateText>,
+    /// Confirm a relation of the recording, as <kind>:<target>.
+    #[arg(long, allow_hyphen_values = true)]
+    relation: Option<PrivateText>,
+}
+
+impl Args {
+    pub(super) fn verb(self) -> Verb {
+        if let Some(term) = self.term {
+            return Verb::ConfirmTerm { term };
+        }
+        let id = self.id.unwrap_or_default();
+        if let Some(relation) = self.relation {
+            return Verb::ConfirmRelation { id, relation };
+        }
+        let (tag, action) = match (self.tag, self.reject_tag) {
+            (Some(tag), _) => (tag, Action::Confirm),
+            (None, tag) => (tag.unwrap_or_else(|| String::new().into()), Action::Reject),
+        };
+        Verb::ConfirmTag { id, tag, action }
     }
-    if usize::from(text.term.is_some())
-        + usize::from(!text.tags.is_empty())
-        + usize::from(text.reject_tag.is_some())
-        + usize::from(text.relation.is_some())
-        != 1
-    {
-        return Err(UsageError(
-            "confirm requires exactly one of --term, --tag, --reject-tag, --relation".into(),
-        ));
-    }
-    if let Some(term) = text.term {
-        return Ok(Verb::ConfirmTerm { term });
-    }
-    if let Some(relation) = text.relation {
-        return Ok(Verb::ConfirmRelation {
-            id: take_positional(words, "<id>")?,
-            relation,
-        });
-    }
-    let (tag, action) = match (text.tags.pop(), text.reject_tag) {
-        (Some(tag), _) => (tag, Action::Confirm),
-        (_, Some(tag)) => (tag, Action::Reject),
-        _ => unreachable!("one confirmation action was checked"),
-    };
-    Ok(Verb::ConfirmTag {
-        id: take_positional(words, "<id>")?,
-        tag,
-        action,
-    })
 }

@@ -17,7 +17,12 @@ pub fn run() -> ! {
     let args: Vec<_> = std::env::args_os().collect();
     let named: Vec<_> = Format::FLAGS
         .into_iter()
-        .filter(|(flag, _)| args.iter().skip(1).any(|word| word == flag))
+        .filter(|(flag, _)| {
+            args.iter()
+                .skip(1)
+                .take_while(|word| *word != "--")
+                .any(|word| word == flag)
+        })
         .collect();
     let format = match named.as_slice() {
         [(_, format)] => Some(*format),
@@ -26,7 +31,9 @@ pub fn run() -> ! {
     let code = match parse(args) {
         Ok(invocation) => dispatch::run(&invocation),
         Err(error) => emit(
-            Outcome::ParseFailure(ErrorDocument::new(ErrorKind::Usage, error.0)),
+            Outcome::ParseFailure(
+                ErrorDocument::new(ErrorKind::Usage, error.message).diagnostics(error.tips),
+            ),
             format,
         ),
     };

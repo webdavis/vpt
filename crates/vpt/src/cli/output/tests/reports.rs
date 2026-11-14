@@ -149,7 +149,7 @@ fn parse_failure_preserves_human_help_and_diagnostics() {
         String::from_utf8(err).unwrap(),
         format!(
             "vpt: bad verb\nvpt: safe diagnostic\n{}",
-            crate::cli::args::USAGE
+            crate::cli::output::USAGE_HINT
         )
     );
     assert!(out.is_empty());
