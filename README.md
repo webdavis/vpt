@@ -531,9 +531,9 @@ command = [
 ```
 
 An account manager can go in front of the harness, so that the argument list starts with it. For
-example, `"clauth", "start", "<profile>", "-p", ...` in place of `"claude", "-p", ...` ran the same way and
-pins the call to one account. vpt has no defaults for any such tool, so the account belongs in the
-user's own configuration.
+example, `"<account-manager>", "start", "<profile>", "-p", ...` in place of `"claude", "-p", ...` pins
+the call to one account when that tool passes the remaining arguments on to the harness. vpt has no
+defaults for any such tool, so the account belongs in the user's own configuration.
 
 `codex exec` prints only the final message on standard output and appends standard input to the
 prompt. Its `--output-schema` takes a file; copy
