@@ -4,6 +4,8 @@
 mod actions;
 #[path = "analyze/actions_env.rs"]
 mod actions_env;
+#[path = "analyze/actions_link.rs"]
+mod actions_link;
 #[path = "analyze/batch.rs"]
 mod batch;
 #[path = "analyze/batch_input.rs"]
