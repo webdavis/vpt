@@ -126,8 +126,10 @@ or changing files.
 
 `[engines.whisply] hf_token` holds a Hugging Face access token. When it is set, Whisply runs with
 `-a` to annotate speakers, and vpt passes the token in the `HF_TOKEN` environment variable, never in
-the argument list. Whisply uses the token to download the gated pyannote diarization model from
-Hugging Face and diarizes locally. vpt reads the configuration only when the file is private
+the argument list. Whisply uses the token to download two gated models from Hugging Face,
+`pyannote/speaker-diarization-3.1` and `pyannote/segmentation-3.0`, and diarizes locally. Hugging Face
+refuses the download until the account that owns the token has accepted the terms on both model
+pages, so accept them before the first run. vpt reads the configuration only when the file is private
 (0600), and no output, event, note or engine document repeats the token.
 
 Without a token, nothing changes: Whisply gets no `-a`, no `HF_TOKEN`, and vpt prints no extra
@@ -136,7 +138,7 @@ never shows labels. With a token set, `vpt doctor` reads `speaker labels on` for
 and says `token set but whisply is not selected, so no speaker labels` otherwise; a selected Whisply
 that is not installed fails the engines check as before. When Whisply exits unsuccessfully while asked
 for speakers, as one without speaker annotation does on `-a`, the failure says so and names the
-diarization model the token must grant. As main engine that fails the transcription; as checker the
+two models whose terms the token's account must have accepted. As main engine that fails the transcription; as checker the
 main transcript is kept with a `single-engine` flag and the same message in its engine diagnostics.
 
 Speaker labels number speakers in order of first appearance: each transcript paragraph reads
