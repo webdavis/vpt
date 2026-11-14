@@ -54,6 +54,10 @@ pub fn note_link(note: &Path, profile: NoteProfile) -> String {
 }
 
 pub fn send_action(settings: &Settings, send: &ActionSend<'_>) -> SendOutcome {
+    send_within(settings, send, DEADLINE)
+}
+
+fn send_within(settings: &Settings, send: &ActionSend<'_>, deadline: Duration) -> SendOutcome {
     let fields = Fields::of(send.action);
     let owner_word = settings
         .actions_owner_words
@@ -91,7 +95,7 @@ pub fn send_action(settings: &Settings, send: &ActionSend<'_>) -> SendOutcome {
         .iter()
         .map(|(name, value)| (name.as_str(), value.as_str()))
         .collect();
-    match spawn::run_with_env(&argv, &[], DEADLINE, OUTPUT_LIMIT, &env)
+    match spawn::run_with_env(&argv, &[], deadline, OUTPUT_LIMIT, &env)
         .map(|outcome| outcome.status)
     {
         Ok(Status::Exited(0)) => SendOutcome::Sent,

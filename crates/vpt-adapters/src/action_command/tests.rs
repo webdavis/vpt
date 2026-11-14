@@ -1,5 +1,7 @@
 use super::expand::{OPTIONAL, expand};
 
+mod deadline;
+
 fn run(command: &[&str], values: &[(&str, &str)]) -> Vec<String> {
     let command: Vec<String> = command.iter().map(|argument| (*argument).into()).collect();
     expand(&command, values, OPTIONAL).unwrap()
