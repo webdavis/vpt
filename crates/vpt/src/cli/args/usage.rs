@@ -101,5 +101,9 @@ fn without_value(error: &clap::Error) -> UsageError {
     let reason = std::error::Error::source(error)
         .map(|reason| format!(": {reason}"))
         .unwrap_or_default();
-    UsageError::new(format!("invalid value for '{arg}'{reason}"))
+    let expected = match error.get(ContextKind::ValidValue) {
+        Some(ContextValue::Strings(values)) => format!(": expected one of {}", values.join(", ")),
+        _ => String::new(),
+    };
+    UsageError::new(format!("invalid value for '{arg}'{reason}{expected}"))
 }

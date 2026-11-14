@@ -1,10 +1,12 @@
 pub(crate) mod analyze;
 pub(crate) mod brief;
+mod completion;
 mod confirm;
 mod examples;
 mod groups;
 pub(crate) mod import;
 mod invocation;
+mod pipeline;
 pub(crate) mod redact;
 mod review;
 mod root;

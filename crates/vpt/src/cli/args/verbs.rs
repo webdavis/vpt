@@ -1,19 +1,13 @@
 use super::{
-    PathBuf, Verb, analyze, brief, confirm, examples, groups, import, redact, review, search, show,
+    PathBuf, Verb, analyze, brief, completion, confirm, examples, groups, import, pipeline, redact,
+    review, search, show,
 };
 
 #[derive(clap::Subcommand)]
 pub(super) enum Command {
     /// Ingest, transcribe, publish and analyze every new recording.
     #[command(after_long_help = examples::RUN)]
-    Run {
-        /// Show what would happen without changing anything.
-        #[arg(long)]
-        dry_run: bool,
-        /// Send actions the action command refused before.
-        #[arg(long)]
-        resend_refused: bool,
-    },
+    Run(pipeline::Run),
     /// Choose the main engine and create the private directories.
     #[command(after_long_help = examples::SETUP)]
     Setup {
@@ -42,16 +36,7 @@ pub(super) enum Command {
     Show(show::Args),
     /// Transcribe one recording with the main engine.
     #[command(after_long_help = examples::TRANSCRIBE)]
-    Transcribe {
-        /// The recording id.
-        id: String,
-        /// Language tag for the engine, such as fr-CA.
-        #[arg(long)]
-        language: Option<String>,
-        /// Show what would happen without changing anything.
-        #[arg(long)]
-        dry_run: bool,
-    },
+    Transcribe(pipeline::Transcribe),
     /// List a transcript's open review flags, or resolve one.
     #[command(after_long_help = examples::REVIEW)]
     Review(review::Args),
@@ -104,32 +89,21 @@ pub(super) enum Command {
     /// Print the vpt and helper versions.
     #[command(after_long_help = examples::VERSION)]
     Version,
+    /// Print a shell completion script.
+    #[command(after_long_help = examples::COMPLETION)]
+    Completion(completion::Completion),
 }
 
 impl Command {
     pub(super) fn verb(self) -> Result<Verb, String> {
         Ok(match self {
-            Self::Run {
-                dry_run,
-                resend_refused,
-            } => Verb::Run {
-                dry_run,
-                resend_refused,
-            },
+            Self::Run(run) => run.verb(),
             Self::Setup { force } => Verb::Setup { force },
             Self::Doctor => Verb::Doctor,
             Self::Ingest { dry_run, once } => Verb::Ingest { dry_run, once },
             Self::Import(options) => return options.verb(),
             Self::Show(args) => return args.verb(),
-            Self::Transcribe {
-                id,
-                language,
-                dry_run,
-            } => Verb::Transcribe {
-                id,
-                language,
-                dry_run,
-            },
+            Self::Transcribe(transcribe) => transcribe.verb(),
             Self::Review(args) => args.verb(),
             Self::Confirm(args) => args.verb(),
             Self::Tag(tag) => tag.verb(),
@@ -146,6 +120,7 @@ impl Command {
             Self::Redact(options) => return options.verb(),
             Self::Symlink(symlink) => symlink.verb(),
             Self::Version => Verb::Version,
+            Self::Completion(completion) => completion.verb(),
         })
     }
 }

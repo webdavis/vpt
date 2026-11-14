@@ -89,3 +89,8 @@ pub(super) const SYMLINK_DEPLOY: &str =
 pub(super) const SYMLINK_VERIFY: &str =
     examples!["vpt symlink verify", "vpt symlink verify --json"];
 pub(super) const VERSION: &str = examples!["vpt version", "vpt version --json"];
+pub(super) const COMPLETION: &str = examples![
+    "vpt completion zsh > \"${fpath[1]}/_vpt\"",
+    "vpt completion bash > ~/.local/share/bash-completion/completions/vpt",
+    "vpt completion fish > ~/.config/fish/completions/vpt.fish",
+];
