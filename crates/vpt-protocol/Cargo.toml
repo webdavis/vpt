@@ -3,6 +3,9 @@ name = "vpt-protocol"
 version = "0.1.0"
 edition = "2024"
 
+[lints]
+workspace = true
+
 [dependencies]
 vpt-domain = { path = "../vpt-domain" }
 serde = { version = "1.0.229", features = ["derive"] }
