@@ -6,6 +6,14 @@ and Apple speech transcription. Feature completion is tracked in
 [the remaining-work roadmap](docs/vpt-remaining-work.md).
 The design is [the approved specification](docs/superpowers/specs/2026-09-20-vpt-design.md).
 
+## Command line
+
+A flag takes its value as `--flag value` or `--flag=value`, and `--` ends the flags, so
+`vpt search -- --force` searches for `--force`. A mistyped command or flag is refused with exit 2
+and a tip naming the closest match; under `--json`, `--toon` or `--yaml` the tip is in the error
+document's `diagnostics`. A usage error names only vpt's own commands, flags and values, never a word
+you typed, so private text stays out of it.
+
 ## Build
 
 `cargo build --locked` builds `target/debug/vpt`. The helper requires Xcode and Swift 6.

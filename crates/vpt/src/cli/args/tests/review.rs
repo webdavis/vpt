@@ -113,6 +113,6 @@ fn review_resolution_requires_one_flag_and_one_action_without_exposing_correctio
         ],
     ] {
         let error = parse(std::iter::once("vpt").chain(words).map(OsString::from)).unwrap_err();
-        assert!(!error.0.contains("Private canary"));
+        assert!(!format!("{error:?}").contains("Private canary"));
     }
 }

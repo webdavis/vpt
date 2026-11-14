@@ -23,6 +23,6 @@ fn relation_confirmation_requires_one_action_and_one_recording() {
         "show memo --relation related:Private",
     ] {
         let error = parsed(input).unwrap_err();
-        assert!(!error.0.contains("Private"));
+        assert!(!format!("{error:?}").contains("Private"));
     }
 }

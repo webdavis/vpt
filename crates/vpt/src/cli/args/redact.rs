@@ -1,44 +1,36 @@
-use super::*;
+use super::{PathBuf, Verb, text::PrivateText};
 use vpt_domain::{identity::RecordingId, note::NoteStage};
-#[derive(Debug, PartialEq, Eq)]
+
+#[derive(Debug, PartialEq, Eq, clap::Args)]
 pub(crate) struct Options {
+    #[arg(value_parser = recording_id)]
     pub id: RecordingId,
+    /// The stage to release: transcript or analysis.
+    #[arg(long, default_value = "transcript", value_parser = stage)]
     pub stage: NoteStage,
+    /// Write the released copy into this directory.
+    #[arg(long = "to", value_name = "DIR")]
     pub destination: Option<PathBuf>,
-    pub title: Option<text::PrivateText>,
+    /// The released copy's title.
+    #[arg(long, allow_hyphen_values = true)]
+    pub title: Option<PrivateText>,
 }
-pub(super) fn parse(words: &mut Vec<String>, text: text::Values) -> Result<Verb, UsageError> {
-    if text.term.is_some()
-        || text.correction.is_some()
-        || text.reject_tag.is_some()
-        || text.relation.is_some()
-        || !text.tags.is_empty()
-        || !text.participants.is_empty()
-    {
-        return Err(UsageError("invalid redact option".into()));
+
+fn recording_id(text: &str) -> Result<RecordingId, String> {
+    RecordingId::parse(text).map_err(|_| "invalid recording id".into())
+}
+
+fn stage(text: &str) -> Result<NoteStage, String> {
+    NoteStage::parse(text).ok_or_else(|| "must be transcript or analysis".into())
+}
+
+impl Options {
+    pub(super) fn verb(self) -> Result<Verb, String> {
+        if self.title.as_ref().is_some_and(|t| {
+            t.as_str().trim().is_empty() || t.as_str().len() > 65_536 || t.as_str().contains('\0')
+        }) {
+            return Err("invalid --title".into());
+        }
+        Ok(Verb::Redact(self))
     }
-    if text.title.as_ref().is_some_and(|t| {
-        t.as_str().trim().is_empty() || t.as_str().len() > 65_536 || t.as_str().contains('\0')
-    }) {
-        return Err(UsageError("invalid --title".into()));
-    }
-    let stage = take_value(words, "--stage")?
-        .map(|s| {
-            NoteStage::parse(&s)
-                .ok_or_else(|| UsageError("redact --stage must be transcript or analysis".into()))
-        })
-        .transpose()?
-        .unwrap_or(NoteStage::Transcript);
-    let destination = take_value(words, "--to")?.map(PathBuf::from);
-    let id = RecordingId::parse(&take_positional(words, "<id>")?)
-        .map_err(|_| UsageError("invalid recording id".into()))?;
-    if !words.is_empty() {
-        return Err(UsageError("unexpected redact argument".into()));
-    }
-    Ok(Verb::Redact(Options {
-        id,
-        stage,
-        destination,
-        title: text.title,
-    }))
 }

@@ -3,12 +3,20 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 mod analyze;
 mod confirm;
+mod privacy;
 mod relation;
 mod verify;
 
 fn parsed(line: &str) -> Result<Invocation, UsageError> {
     parse(std::iter::once(OsString::from("vpt")).chain(line.split(' ').map(OsString::from)))
 }
+
+fn refused(line: &str) -> String {
+    parsed(line).expect_err(line).message
+}
+
+const UNKNOWN_FLAG: &str =
+    "unknown flag, or a value that starts with '-'; put '--' before such a value";
 
 #[test]
 fn json_and_config_are_global_flags_in_any_position() {
@@ -26,10 +34,9 @@ fn json_and_config_are_global_flags_in_any_position() {
 
 #[test]
 fn an_unknown_verb_is_a_usage_error_naming_it() {
-    assert_eq!(
-        parsed("transcode"),
-        Err(UsageError("unknown verb transcode".into()))
-    );
+    let error = parsed("transcode").unwrap_err();
+    assert_eq!(error.message, "unknown command");
+    assert_eq!(error.tips, ["tip: did you mean 'transcribe'?"]);
 }
 
 #[test]
@@ -51,17 +58,14 @@ fn review_accepts_global_options_and_requires_exactly_one_identity() {
 
 #[test]
 fn a_trailing_unknown_argument_is_refused() {
-    assert_eq!(
-        parsed("doctor --loud"),
-        Err(UsageError("unexpected argument --loud".into()))
-    );
+    assert_eq!(refused("doctor --loud"), UNKNOWN_FLAG);
 }
 
 #[test]
 fn a_value_flag_without_a_value_is_refused() {
     assert_eq!(
-        parsed("ingest --once"),
-        Err(UsageError("--once needs a value".into()))
+        refused("ingest --once"),
+        "a value is required for '--once <PATH>'"
     );
 }
 
@@ -121,33 +125,36 @@ fn every_stage_one_verb_decodes_its_arguments() {
 #[test]
 fn missing_positionals_subcommands_and_flag_values_are_refused() {
     assert_eq!(
-        parse([OsString::from("vpt")]),
-        Err(UsageError("a verb is required".into()))
+        parse([OsString::from("vpt"), OsString::from("--json")]),
+        Err(UsageError::new("a command is required"))
     );
     for (line, message) in [
-        ("show", "<id> is required"),
-        ("show --force", "<id> is required"),
-        ("retention", "run is required"),
-        ("retention erase", "unknown retention subcommand erase"),
-        ("symlink", "deploy|verify is required"),
-        ("symlink erase", "unknown symlink subcommand erase"),
-        ("--config --json doctor", "--config needs a value"),
-        ("list --stage --force", "--stage needs a value"),
+        ("show", "<ID> is required"),
+        ("show --force", UNKNOWN_FLAG),
+        ("retention erase", "unknown command"),
+        ("symlink erase", "unknown command"),
+        (
+            "--config --json doctor",
+            "a value is required for '--config <FILE>'",
+        ),
+        ("list --stage --force", UNKNOWN_FLAG),
+        ("--version doctor", "--version takes no command"),
     ] {
-        assert_eq!(parsed(line), Err(UsageError(message.into())));
+        assert_eq!(refused(line), message, "{line}");
     }
 }
 
 #[test]
 fn global_flags_cannot_fill_missing_value_slots() {
     for (line, flag) in [
-        ("ingest --once --json memo.m4a", "--once"),
-        ("list --stage --json extract", "--stage"),
-        ("ingest --once --config c.toml memo.m4a", "--once"),
+        ("ingest --once --json memo.m4a", "--once <PATH>"),
+        ("list --stage --json extract", "--stage <STAGE>"),
+        ("ingest --once --config c.toml memo.m4a", "--once <PATH>"),
     ] {
         assert_eq!(
-            parsed(line),
-            Err(UsageError(format!("{flag} needs a value")))
+            refused(line),
+            format!("a value is required for '{flag}'"),
+            "{line}"
         );
     }
 }
@@ -164,7 +171,7 @@ fn non_utf8_paths_are_refused_without_substitution() {
         ];
         assert_eq!(
             parse(args),
-            Err(UsageError("arguments must be valid UTF-8".into()))
+            Err(UsageError::new("arguments must be valid UTF-8"))
         );
     }
 }

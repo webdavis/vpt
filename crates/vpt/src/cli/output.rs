@@ -2,6 +2,8 @@ use super::format::Format;
 use std::io::Write;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 
+pub(crate) const USAGE_HINT: &str = "Run 'vpt help <command>' for usage.\n";
+
 pub(crate) enum Outcome {
     Success {
         document: serde_json::Value,
@@ -94,12 +96,21 @@ fn failure_text(error: &ErrorDocument, format: Option<Format>, parser_help: bool
         text.push_str(&format!("vpt: {diagnostic}\n"));
     }
     if parser_help {
-        text.push_str(super::args::USAGE);
+        text.push_str(USAGE_HINT);
     }
     text
 }
 
 impl Outcome {
+    pub(crate) fn printed(human: String) -> Self {
+        Self::Success {
+            document: serde_json::Value::Null,
+            human,
+            completed: vec![],
+            diagnostics: vec![],
+        }
+    }
+
     pub(crate) fn add_completed(&mut self, ids: impl IntoIterator<Item = String>) {
         let completed = match self {
             Self::Success { completed, .. } => completed,
