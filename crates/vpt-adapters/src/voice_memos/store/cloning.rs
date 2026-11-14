@@ -1,8 +1,6 @@
 use crate::{ContainedError, RootDir};
-use std::ffi::CStr;
 use std::fs::File;
 use std::io::{self, Write};
-use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::fs::FileExt;
 use std::path::Path;
 use vpt_application::ports::{CloneError, CloneKind};
@@ -23,7 +21,7 @@ pub(super) fn clone_into_with(
     directory: &Path,
     identity: (u64, u64),
     name: &str,
-    clone: impl FnOnce(&File, &RootDir, &CStr) -> io::Result<()>,
+    clone: impl FnOnce(&File, &RootDir, &Path) -> io::Result<()>,
 ) -> Result<CloneKind, CloneError> {
     let root = RootDir::open(directory).map_err(|error| path_error(directory, error))?;
     if root
@@ -34,7 +32,7 @@ pub(super) fn clone_into_with(
         return Err(CloneError::Escape(directory.into()));
     }
     let target = root
-        .c_name(Path::new(name))
+        .leaf(Path::new(name))
         .map_err(|error| path_error(&directory.join(name), error))?;
     match clone(source, &root, &target) {
         Ok(()) => Ok(CloneKind::CopyOnWrite),
@@ -45,21 +43,8 @@ pub(super) fn clone_into_with(
     }
 }
 
-fn native_clone(source: &File, directory: &RootDir, name: &CStr) -> io::Result<()> {
-    // SAFETY: both owners retain their descriptors and the checked leaf is NUL-terminated.
-    let result = unsafe {
-        libc::fclonefileat(
-            source.as_raw_fd(),
-            directory.as_fd().as_raw_fd(),
-            name.as_ptr(),
-            0,
-        )
-    };
-    if result == 0 {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
+fn native_clone(source: &File, directory: &RootDir, leaf: &Path) -> io::Result<()> {
+    directory.clone_file(source, leaf)
 }
 
 pub(super) fn byte_copy(
