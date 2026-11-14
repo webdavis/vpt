@@ -50,16 +50,7 @@ impl RootDir {
         mode: u32,
     ) -> Result<File, ContainedError> {
         let name = self.c_name(leaf)?;
-        // SAFETY: the retained descriptor and NUL-terminated name stay live; variadic mode is promoted.
-        let fd = unsafe {
-            libc::openat(
-                self.file.as_raw_fd(),
-                name.as_ptr(),
-                flags,
-                mode as libc::c_uint,
-            )
-        };
-        opened(fd, leaf, flags & libc::O_DIRECTORY != 0)
+        open_relative(self.as_fd(), &name, flags, mode, leaf)
     }
 
     fn named_stat(&self, path: &Path) -> Result<libc::stat, ContainedError> {

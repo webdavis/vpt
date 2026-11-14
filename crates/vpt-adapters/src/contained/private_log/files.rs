@@ -1,8 +1,9 @@
 use super::{LogError, LogRefusal, RootDir};
+use crate::contained::descriptor::open_at;
 use crate::contained::private_state::effective_user;
 use std::fs::File;
 use std::io::ErrorKind;
-use std::os::fd::{AsRawFd, FromRawFd};
+use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
 pub(super) fn acquire(root: &RootDir, creation_mode: u32) -> Result<File, LogError> {
@@ -27,26 +28,15 @@ pub(super) fn acquire(root: &RootDir, creation_mode: u32) -> Result<File, LogErr
     } else {
         flags | libc::O_CREAT | libc::O_EXCL
     };
-    // SAFETY: root retains the directory; the fixed name and promoted creation mode are valid.
-    let descriptor = unsafe {
-        libc::openat(
-            root.file.as_raw_fd(),
-            c"events.jsonl".as_ptr(),
-            flags,
-            creation_mode as libc::c_uint,
-        )
-    };
-    if descriptor < 0 {
-        let error = std::io::Error::last_os_error();
-        return Err(match error.raw_os_error() {
-            Some(libc::ELOOP | libc::EISDIR | libc::ENXIO) => {
-                LogError::Unsafe(LogRefusal::NotRegular)
-            }
-            _ => LogError::Io(error.kind()),
-        });
-    }
-    // SAFETY: a successful openat returned one fresh descriptor, now owned by this File.
-    let file = unsafe { File::from_raw_fd(descriptor) };
+    let file =
+        open_at(root.as_fd(), c"events.jsonl", flags, creation_mode).map_err(
+            |error| match error.raw_os_error() {
+                Some(libc::ELOOP | libc::EISDIR | libc::ENXIO) => {
+                    LogError::Unsafe(LogRefusal::NotRegular)
+                }
+                _ => LogError::Io(error.kind()),
+            },
+        )?;
     if !existing {
         let mode = file
             .metadata()

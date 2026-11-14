@@ -21,7 +21,7 @@ pub use private_state::PrivateStateError;
 pub(crate) use private_state::effective_user;
 pub use volume::RenameSupport;
 
-use descriptor::opened;
+use descriptor::open_relative;
 use std::ffi::CString;
 use std::fs::File;
 use std::os::fd::{AsFd, BorrowedFd};
