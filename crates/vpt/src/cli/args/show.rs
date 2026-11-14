@@ -3,6 +3,7 @@ use vpt_domain::copy::Kind;
 
 #[derive(clap::Args)]
 pub(super) struct Args {
+    /// The recording id.
     id: String,
     /// One stage's text: released, transcript, analysis or brief.
     #[arg(long)]

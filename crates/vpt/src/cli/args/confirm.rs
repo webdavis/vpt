@@ -8,6 +8,7 @@ use vpt_domain::tags::Action;
         .args(["term", "tag", "reject_tag", "relation"])
 ))]
 pub(super) struct Args {
+    /// The recording id.
     #[arg(required_unless_present = "term", conflicts_with = "term")]
     id: Option<String>,
     /// Add a confirmed term; takes no recording id.

@@ -8,6 +8,11 @@ The design is [the approved specification](docs/superpowers/specs/2026-09-20-vpt
 
 ## Command line
 
+`vpt` alone or `vpt help` lists the commands. `vpt help <command>` and `vpt <command> --help` show
+one command's flags and examples and end with a link to this section; `-h` shows the flags alone. A
+group such as `vpt tag` alone shows its subcommands.
+Help prints on stdout and exits 0.
+
 A flag takes its value as `--flag value` or `--flag=value`, and `--` ends the flags, so
 `vpt search -- --force` searches for `--force`. A mistyped command or flag is refused with exit 2
 and a tip naming the closest match; under `--json`, `--toon` or `--yaml` the tip is in the error

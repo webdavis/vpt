@@ -1,10 +1,13 @@
-use super::{PathBuf, Verb, text::PrivateText};
+use super::{PathBuf, Verb, examples, text::PrivateText};
 
 #[derive(clap::Subcommand)]
 pub(super) enum Tag {
     /// Rename one tag everywhere vpt owns it.
+    #[command(after_long_help = examples::TAG_RENAME)]
     Rename {
+        /// The tag to rename.
         old: PrivateText,
+        /// Its new name.
         new: PrivateText,
         /// Show what would change without changing anything.
         #[arg(long)]
@@ -15,12 +18,17 @@ pub(super) enum Tag {
 #[derive(clap::Subcommand)]
 pub(super) enum Note {
     /// Write the transcript and analysis notes of one recording.
-    Write { id: String },
+    #[command(after_long_help = examples::NOTE_WRITE)]
+    Write {
+        /// The recording id.
+        id: String,
+    },
 }
 
 #[derive(clap::Subcommand)]
 pub(super) enum Retention {
     /// Apply the configured retention.
+    #[command(after_long_help = examples::RETENTION_RUN)]
     Run {
         /// Show what would be removed without removing anything.
         #[arg(long)]
@@ -31,13 +39,16 @@ pub(super) enum Retention {
 #[derive(clap::Subcommand)]
 pub(super) enum Symlink {
     /// Create the home link the configuration names.
+    #[command(after_long_help = examples::SYMLINK_DEPLOY)]
     Deploy,
     /// Check that the home link points where the configuration says.
+    #[command(after_long_help = examples::SYMLINK_VERIFY)]
     Verify,
 }
 
 #[derive(clap::Args)]
 pub(super) struct Path {
+    /// The recording id.
     #[arg(required_unless_present = "occasion", conflicts_with = "occasion")]
     id: Option<String>,
     /// The stage: transcript or analysis, or brief with --occasion.
@@ -50,6 +61,7 @@ pub(super) struct Path {
 
 #[derive(clap::Args)]
 pub(super) struct VerifyNote {
+    /// The note file.
     path: PathBuf,
     /// The recording the note belongs to.
     #[arg(long)]

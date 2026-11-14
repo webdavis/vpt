@@ -1,6 +1,7 @@
 pub(crate) mod analyze;
 pub(crate) mod brief;
 mod confirm;
+mod examples;
 mod groups;
 pub(crate) mod import;
 mod invocation;

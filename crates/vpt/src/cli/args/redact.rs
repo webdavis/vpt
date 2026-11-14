@@ -3,6 +3,7 @@ use vpt_domain::{identity::RecordingId, note::NoteStage};
 
 #[derive(Debug, PartialEq, Eq, clap::Args)]
 pub(crate) struct Options {
+    /// The recording id.
     #[arg(value_parser = recording_id)]
     pub id: RecordingId,
     /// The stage to release: transcript or analysis.
