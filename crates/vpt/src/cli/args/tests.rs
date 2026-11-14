@@ -223,11 +223,19 @@ mod review;
 fn run_accepts_dry_run_and_global_flags_but_no_recording_or_once() {
     assert_eq!(
         parsed("run --dry-run --json").unwrap().verb,
-        Verb::Run { dry_run: true }
+        Verb::Run {
+            dry_run: true,
+            resend_refused: false
+        }
     );
     assert_eq!(
-        parsed("--config settings.toml run").unwrap().verb,
-        Verb::Run { dry_run: false }
+        parsed("--config settings.toml run --resend-refused")
+            .unwrap()
+            .verb,
+        Verb::Run {
+            dry_run: false,
+            resend_refused: true
+        }
     );
     for line in [
         "run memo",

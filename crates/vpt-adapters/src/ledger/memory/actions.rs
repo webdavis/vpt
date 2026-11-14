@@ -61,6 +61,17 @@ pub(super) fn apply(state: &mut State, delta: &WorkDelta) -> Result<(), LedgerEr
                 SendState::Sent
             };
         }
+        ActionChange::ResendRefused(recording) => {
+            for (saved, send) in &mut state.action_sends {
+                if *send == SendState::Refused
+                    && recording
+                        .as_ref()
+                        .is_none_or(|only| *only == saved.recording)
+                {
+                    *send = SendState::Pending;
+                }
+            }
+        }
     }
     Ok(())
 }

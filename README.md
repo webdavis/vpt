@@ -170,7 +170,7 @@ successful work. Failed publication emits no review alert. Retranscription leave
 
 ## Pipeline
 
-`vpt run [--dry-run] [--json|--toon|--yaml]` composes ingestion, transcription, note publication, stale-finding
+`vpt run [--dry-run] [--resend-refused] [--json|--toon|--yaml]` composes ingestion, transcription, note publication, stale-finding
 verification, configured analysis, and optional automatic redaction.
 It resumes pending or failed work in capture order, retries previously disabled incomplete stages,
 and preserves successful transcription and expired notes. Changed readability/profile settings refresh
@@ -411,7 +411,7 @@ Requested briefs emit no automatic notification.
 
 ## Analysis
 
-`vpt analyze <id> [--dry-run] [--json|--toon|--yaml]` uses the configured `[analysis] command` argument list.
+`vpt analyze <id> [--dry-run] [--resend-refused] [--json|--toon|--yaml]` uses the configured `[analysis] command` argument list.
 An empty command disables analysis and explicit invocation returns a configuration error. No model
 vendor is built in. The command receives `{transcript}`, `{id}`, `{language}`, `{captured_at}`,
 `{known_tags}`, and `{refused_tags}` substitutions and exact rendered transcript content on stdin; the
@@ -666,6 +666,15 @@ warning `configured action command refused an action`. Any other failure, includ
 the list or a run past 30 seconds, leaves the analysis in place, adds the warning `configured action
 command failed`, and the action is tried again later: `vpt run` sends every recording's waiting actions
 and `vpt analyze <id>` sends that recording's. With the default empty list every failure is retried.
+A final code may come from a rule you wrote in your own tool. vpt keeps no reason for a refusal; the
+tool's own output or log holds it.
+
+After you change the rule, `--resend-refused` sends the refused actions again once.
+`vpt analyze <id> --resend-refused` sends that recording's refused actions without running the
+analysis command, and `vpt run --resend-refused` sends every recording's refused actions with the
+rest of the run. Each refused action goes through the command once more and is counted as usual. If
+the command refuses it again, it stays refused. Without `[actions] command` the flag is refused with
+exit 2. With `--dry-run` it sends nothing and changes nothing.
 A send counts once the command exits 0. If vpt stops between that exit and saving the result, the
 next run sends the action again, so the command must accept a repeat. Dry runs send nothing.
 

@@ -74,15 +74,25 @@ impl Report {
     }
 }
 
-pub(crate) fn run(environment: &Environment, config: Option<&Path>, dry_run: bool) -> Outcome {
-    execute(environment, config, dry_run).unwrap_or_else(|error| Outcome::Failure(*error))
+pub(crate) fn run(
+    environment: &Environment,
+    config: Option<&Path>,
+    dry_run: bool,
+    resend_refused: bool,
+) -> Outcome {
+    execute(environment, config, dry_run, resend_refused)
+        .unwrap_or_else(|error| Outcome::Failure(*error))
 }
 fn execute(
     environment: &Environment,
     config: Option<&Path>,
     dry_run: bool,
+    resend_refused: bool,
 ) -> Result<Outcome, Box<ErrorDocument>> {
     let settings = settings_from(environment, config)?;
+    if resend_refused {
+        crate::compose::actions::require_command(&settings)?;
+    }
     settings
         .engines
         .select(None)
@@ -100,6 +110,6 @@ fn execute(
     if dry_run {
         observe::run(&settings, &roots)
     } else {
-        mutation::run(&settings, &roots)
+        mutation::run(&settings, &roots, resend_refused)
     }
 }
