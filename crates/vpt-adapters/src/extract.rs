@@ -21,10 +21,11 @@ pub fn extract_audio(command: &[String], input: &Path) -> Result<Extracted, Extr
     if command.is_empty() {
         return Err(ExtractError::NotConfigured);
     }
+    let failed = |error: std::io::Error| ExtractError::Failed(error.kind().to_string());
     let directory = tempfile::Builder::new()
         .prefix("vpt-import-")
-        .tempdir()
-        .map_err(|error| ExtractError::Failed(error.kind().to_string()))?;
+        .tempdir_in(std::env::temp_dir().canonicalize().map_err(failed)?)
+        .map_err(failed)?;
     let path = directory.path().join("audio.m4a");
     let (Some(input), Some(output)) = (input.to_str(), path.to_str()) else {
         return Err(ExtractError::Failed("path is not UTF-8".into()));

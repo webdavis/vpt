@@ -154,6 +154,24 @@ fn other_files_are_converted_and_importing_twice_keeps_one_recording() {
 }
 
 #[test]
+fn conversion_succeeds_when_the_temp_directory_sits_behind_a_symlink() {
+    let sandbox = configured("");
+    let script = fake_extractor(&sandbox, &m4a(MPEG4_ZERO, 5, b"converted"));
+    let mut config = std::fs::read_to_string(sandbox.config_path()).unwrap();
+    config.push_str(&format!("[import]\nextract_command = [{script:?}]\n"));
+    std::fs::write(sandbox.config_path(), config).unwrap();
+    let linked_temp = sandbox.path().join("linked-tmp");
+    std::os::unix::fs::symlink(sandbox.path().join("tmp"), &linked_temp).unwrap();
+    let source = file(&sandbox, "call.wav", b"RIFF wave", None);
+    let output =
+        run(sandbox
+            .vpt()
+            .env("TMPDIR", &linked_temp)
+            .args(["--json", "import", path(&source)]));
+    assert_eq!(json(&output)["ingested"][0]["title"], "call");
+}
+
+#[test]
 fn a_missing_or_failing_extractor_is_refused() {
     let sandbox = configured("");
     let source = file(&sandbox, "call.wav", b"RIFF wave", None);
