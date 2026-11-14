@@ -159,8 +159,8 @@ fn readonly(root: RootDir) {
         .with_connection::<_, DatabaseError>(|connection| {
             connection.execute_batch("CREATE TABLE item(value); INSERT INTO item VALUES(7)")?;
             let mut persistent = -1i32;
-            // SAFETY: this test queries the live main file's integer control.
             assert_eq!(
+                // SAFETY: this test queries the live main file's integer control.
                 unsafe {
                     sqlite3_file_control(
                         connection.handle(),

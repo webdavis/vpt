@@ -18,8 +18,9 @@ struct SignalRecord {
 }
 
 fn terminal(pid: i32) -> Result<Option<(i32, i32)>, i32> {
-    // SAFETY: initialized storage receives a non-consuming observation of this exact child.
+    // SAFETY: siginfo_t is a plain C struct for which all-zero bytes are valid.
     let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+    // SAFETY: initialized storage receives a non-consuming observation of this exact child.
     let result = unsafe {
         libc::waitid(
             libc::P_PID,

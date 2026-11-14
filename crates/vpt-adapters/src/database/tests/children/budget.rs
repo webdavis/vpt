@@ -16,8 +16,8 @@ fn monotonic() -> Duration {
         tv_sec: 0,
         tv_nsec: 0,
     };
-    // SAFETY: this fixture supplies initialized writable storage for the monotonic clock.
     assert_eq!(
+        // SAFETY: this fixture supplies initialized writable storage for the monotonic clock.
         unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut time) },
         0
     );
@@ -145,8 +145,8 @@ pub(super) fn finite_child(scenario: &str, directory: &Path) -> ! {
         .unwrap()
         .parse()
         .unwrap();
-    // SAFETY: this owned finite fixture changes only its own termination disposition.
     assert_ne!(
+        // SAFETY: this owned finite fixture changes only its own termination disposition.
         unsafe { libc::signal(libc::SIGTERM, libc::SIG_IGN) },
         libc::SIG_ERR
     );

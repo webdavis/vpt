@@ -211,7 +211,7 @@ fn watchdog_terminates_the_hanging_group_and_reaps_its_child() {
         .split_whitespace()
         .map(|pid| pid.parse::<i32>().expect("pid"))
     {
-        // Signal zero checks only the fixture processes recorded in this sandbox.
+        // SAFETY: signal zero sends nothing; it only probes the pids recorded in this sandbox.
         assert_eq!(unsafe { libc::kill(pid, 0) }, -1, "process {pid} survived");
         assert_eq!(
             std::io::Error::last_os_error().raw_os_error(),
@@ -254,6 +254,7 @@ fn watchdog_kills_a_direct_child_that_ignores_term() {
         .expect("ready pid")
         .parse::<i32>()
         .expect("pid");
+    // SAFETY: signal zero sends nothing; it only probes the group recorded by this fixture.
     assert_eq!(unsafe { libc::killpg(pid, 0) }, -1, "owned group survived");
     assert_eq!(
         std::io::Error::last_os_error().raw_os_error(),
@@ -295,8 +296,8 @@ fn watchdog_parent_reaps_its_same_group_descendant() {
     );
     let reaped = std::fs::read_to_string(sandbox.path().join("reaped")).expect("reaping record");
     assert_eq!(reaped.trim(), format!("{child} 15"));
-    // Signal zero checks only the group recorded by this owned fixture.
     assert_eq!(
+        // SAFETY: signal zero sends nothing; it only probes the group this fixture recorded.
         unsafe { libc::killpg(group, 0) },
         -1,
         "owned group survived"

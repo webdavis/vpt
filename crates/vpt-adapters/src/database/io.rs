@@ -45,6 +45,8 @@ pub(super) static METHODS: sqlite3_io_methods = sqlite3_io_methods {
     xUnfetch: None,
 };
 
+/// # Safety
+/// `file` must be null or a header that xOpen initialized and no other call is using.
 unsafe fn run(
     file: *mut sqlite3_file,
     failure: i32,
@@ -54,6 +56,7 @@ unsafe fn run(
     let Some(file) = (unsafe { file.cast::<FileHandle>().as_mut() }) else {
         return failure;
     };
+    // SAFETY: state is null or the unique Box xOpen installed, which only xClose frees.
     let Some(owned) = (unsafe { file.state.as_mut() }) else {
         return failure;
     };
@@ -76,6 +79,7 @@ unsafe extern "C" fn close(file: *mut sqlite3_file) -> i32 {
     }
     // SAFETY: the pointer is the unique Box installed by xOpen and was removed exactly once.
     let owned = unsafe { Box::from_raw(pointer) };
+    // SAFETY: Database retains this pinned registration until every file has closed.
     let Some(registration) = (unsafe { owned.registration.as_ref() }) else {
         return SQLITE_IOERR_CLOSE;
     };

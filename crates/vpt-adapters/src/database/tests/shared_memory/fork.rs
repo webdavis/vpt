@@ -35,8 +35,8 @@ fn a_forked_child_cannot_change_shared_memory_after_the_owner_unmaps() {
     };
     let settled = ctime();
     drop(writer);
-    // SAFETY: child is this test's own unreaped process.
     assert_eq!(
+        // SAFETY: child is this test's own unreaped process.
         unsafe { libc::waitpid(child, std::ptr::null_mut(), 0) },
         child
     );

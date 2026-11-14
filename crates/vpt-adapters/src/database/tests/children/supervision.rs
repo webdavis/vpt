@@ -97,8 +97,9 @@ fn a_direct_participant_stalled_before_sql_is_terminated_and_reaped() {
 
 pub(super) fn assert_reaped(pid: u32) {
     let pid = i32::try_from(pid).unwrap();
-    // SAFETY: initialized storage receives a non-consuming numeric PID observation.
+    // SAFETY: siginfo_t is a plain C struct for which all-zero bytes are valid.
     let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+    // SAFETY: initialized storage receives a non-consuming numeric PID observation.
     let observed = unsafe {
         libc::waitid(
             libc::P_PID,

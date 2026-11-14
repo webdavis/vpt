@@ -88,8 +88,8 @@ fn public_environment_wrapper_delivers_exact_arguments_and_input_with_owned_envi
     assert!(outcome.group > 1);
     // SAFETY: a zeroed status is valid output storage for waitid.
     let mut info = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
-    // SAFETY: WNOWAIT only observes this completed wrapper's former child number.
     assert_eq!(
+        // SAFETY: WNOWAIT only observes this completed wrapper's former child number.
         unsafe {
             libc::waitid(
                 libc::P_PID,

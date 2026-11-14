@@ -67,6 +67,8 @@ impl State {
     }
 }
 
+/// # Safety
+/// `vfs` must be null or a table whose pAppData is null or a State that outlives `'a`.
 pub(super) unsafe fn from_vfs<'a>(vfs: *mut sqlite3_vfs) -> Option<&'a State> {
     // SAFETY: SQLite passes the registered table; its pAppData points at pinned State until close.
     unsafe { vfs.as_ref()?.pAppData.cast::<State>().as_ref() }

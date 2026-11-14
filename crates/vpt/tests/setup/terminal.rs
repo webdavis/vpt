@@ -30,8 +30,8 @@ pub fn run_command(sandbox: &Sandbox, answer: Answer<'_>, path: &str, args: &[&s
         .open("/dev/ptmx")
         .expect("owned pty master");
     let fd = master.as_raw_fd();
-    // SAFETY: fd is a live pseudoterminal master and name has 128 writable bytes.
     let mut name = [0i8; 128];
+    // SAFETY: fd is a live pseudoterminal master and name has 128 writable bytes.
     unsafe {
         assert_eq!(libc::grantpt(fd), 0, "grantpt");
         assert_eq!(libc::unlockpt(fd), 0, "unlockpt");

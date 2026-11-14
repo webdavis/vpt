@@ -93,8 +93,9 @@ impl ProcessGroup {
     pub(super) fn observe(&mut self) -> io::Result<Option<ExitStatus>> {
         let pid = self.child.id();
         self.identity.observe_with(|| {
-            // SAFETY: zeroed storage receives this owned child's status without reaping it.
+            // SAFETY: siginfo_t is a plain C struct for which all-zero bytes are valid.
             let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+            // SAFETY: zeroed storage receives this owned child's status without reaping it.
             let result = unsafe {
                 libc::waitid(
                     libc::P_PID,

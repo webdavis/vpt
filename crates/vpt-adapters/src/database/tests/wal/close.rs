@@ -36,8 +36,8 @@ pub(super) fn policy(root: &RootDir) {
                 "commit-triggered automatic checkpoints remain enabled"
             );
             let mut persistent = -1i32;
-            // SAFETY: this test queries the live main file into valid integer storage.
             assert_eq!(
+                // SAFETY: this test queries the live main file into valid integer storage.
                 unsafe {
                     sqlite3_file_control(
                         connection.handle(),

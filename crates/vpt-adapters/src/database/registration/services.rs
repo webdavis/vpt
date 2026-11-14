@@ -7,6 +7,7 @@ pub(super) unsafe extern "C" fn randomness(
     length: i32,
     output: *mut c_char,
 ) -> i32 {
+    // SAFETY: SQLite passes back the table registered with this pinned State, which outlives it.
     let Some(state) = (unsafe { from_vfs(vfs) }) else {
         return 0;
     };
@@ -17,11 +18,13 @@ pub(super) unsafe extern "C" fn randomness(
         // SAFETY: the retained native table owns this path-free service; SQLite owns output storage.
         let callback =
             unsafe { (*state.native).xRandomness }.ok_or_else(|| invalid("randomness service"))?;
+        // SAFETY: the native service gets its own table and SQLite's length-byte output.
         Ok(unsafe { callback(state.native, length, output) })
     })
 }
 
 pub(super) unsafe extern "C" fn sleep(vfs: *mut sqlite3_vfs, microseconds: i32) -> i32 {
+    // SAFETY: SQLite passes back the table registered with this pinned State, which outlives it.
     let Some(state) = (unsafe { from_vfs(vfs) }) else {
         return 0;
     };
@@ -31,11 +34,13 @@ pub(super) unsafe extern "C" fn sleep(vfs: *mut sqlite3_vfs, microseconds: i32) 
         }
         // SAFETY: the retained native table owns this path-free service.
         let callback = unsafe { (*state.native).xSleep }.ok_or_else(|| invalid("sleep service"))?;
+        // SAFETY: the native service gets its own table and no pointer.
         Ok(unsafe { callback(state.native, microseconds) })
     })
 }
 
 pub(super) unsafe extern "C" fn time(vfs: *mut sqlite3_vfs, output: *mut f64) -> i32 {
+    // SAFETY: SQLite passes back the table registered with this pinned State, which outlives it.
     let Some(state) = (unsafe { from_vfs(vfs) }) else {
         return SQLITE_ERROR;
     };
@@ -46,6 +51,7 @@ pub(super) unsafe extern "C" fn time(vfs: *mut sqlite3_vfs, output: *mut f64) ->
         // SAFETY: the retained native table owns this path-free service; SQLite owns output storage.
         let callback =
             unsafe { (*state.native).xCurrentTime }.ok_or_else(|| invalid("time service"))?;
+        // SAFETY: the native clock gets its own table and SQLite's non-null output storage.
         let code = unsafe { callback(state.native, output) };
         if code != SQLITE_OK {
             return Err(super::super::sqlite_error(code));
@@ -55,6 +61,7 @@ pub(super) unsafe extern "C" fn time(vfs: *mut sqlite3_vfs, output: *mut f64) ->
 }
 
 pub(super) unsafe extern "C" fn time_int64(vfs: *mut sqlite3_vfs, output: *mut i64) -> i32 {
+    // SAFETY: SQLite passes back the table registered with this pinned State, which outlives it.
     let Some(state) = (unsafe { from_vfs(vfs) }) else {
         return SQLITE_ERROR;
     };
@@ -65,6 +72,7 @@ pub(super) unsafe extern "C" fn time_int64(vfs: *mut sqlite3_vfs, output: *mut i
         // SAFETY: the retained native table owns this path-free service; SQLite owns output storage.
         let callback =
             unsafe { (*state.native).xCurrentTimeInt64 }.ok_or_else(|| invalid("time service"))?;
+        // SAFETY: the native clock gets its own table and SQLite's non-null output storage.
         let code = unsafe { callback(state.native, output) };
         if code != SQLITE_OK {
             return Err(super::super::sqlite_error(code));

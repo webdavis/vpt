@@ -30,6 +30,7 @@ impl Registration {
         if unsafe { sqlite3_threadsafe() } == 0 {
             return Err(invalid("SQLite threading"));
         }
+        // SAFETY: sqlite3_initialize takes no pointer and is safe to repeat in a threadsafe build.
         let code = unsafe { sqlite3_initialize() };
         if code != SQLITE_OK {
             return Err(sqlite_error(code));
