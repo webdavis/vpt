@@ -25,6 +25,13 @@ pub enum SendOutcome {
     Refused,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WithdrawOutcome {
+    Withdrawn,
+    Failed,
+    Refused,
+}
+
 pub fn action_digest(action: &CheckedAction) -> String {
     let fields = Fields::of(action);
     let mut bytes = Vec::new();
@@ -54,10 +61,6 @@ pub fn note_link(note: &Path, profile: NoteProfile) -> String {
 }
 
 pub fn send_action(settings: &Settings, send: &ActionSend<'_>) -> SendOutcome {
-    send_within(settings, send, DEADLINE)
-}
-
-fn send_within(settings: &Settings, send: &ActionSend<'_>, deadline: Duration) -> SendOutcome {
     let fields = Fields::of(send.action);
     let owner_word = settings
         .actions_owner_words
@@ -86,7 +89,29 @@ fn send_within(settings: &Settings, send: &ActionSend<'_>, deadline: Duration) -
         ("{note}", send.note),
         ("{link}", send.link),
     ];
-    let Some(argv) = expand::expand(&settings.actions_command, &values, expand::OPTIONAL) else {
+    run(settings, &settings.actions_command, &values)
+}
+
+pub fn withdraw_action(settings: &Settings, recording: &RecordingId, id: &str) -> WithdrawOutcome {
+    let values = [("{id}", id), ("{recording}", recording.as_str())];
+    match run(settings, &settings.actions_withdraw_command, &values) {
+        SendOutcome::Sent => WithdrawOutcome::Withdrawn,
+        SendOutcome::Failed => WithdrawOutcome::Failed,
+        SendOutcome::Refused => WithdrawOutcome::Refused,
+    }
+}
+
+fn run(settings: &Settings, command: &[String], values: &[(&str, &str)]) -> SendOutcome {
+    run_within(settings, command, values, DEADLINE)
+}
+
+fn run_within(
+    settings: &Settings,
+    command: &[String],
+    values: &[(&str, &str)],
+    deadline: Duration,
+) -> SendOutcome {
+    let Some(argv) = expand::expand(command, values, expand::OPTIONAL) else {
         return SendOutcome::Failed;
     };
     let env: Vec<_> = settings

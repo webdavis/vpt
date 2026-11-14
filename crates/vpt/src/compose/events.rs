@@ -35,6 +35,8 @@ pub(crate) fn warning_text(warning: SinkWarning) -> &'static str {
         SinkWarning::HookFailed => "configured notification command failed",
         SinkWarning::ActionFailed => "configured action command failed",
         SinkWarning::ActionRefused => "configured action command refused an action",
+        SinkWarning::WithdrawFailed => "configured withdraw command failed",
+        SinkWarning::WithdrawRefused => "configured withdraw command refused a withdrawal",
     }
 }
 

@@ -34,6 +34,7 @@ pub struct Settings {
     pub report_command: Vec<String>,
     pub alert_command: Vec<String>,
     pub actions_command: Vec<String>,
+    pub actions_withdraw_command: Vec<String>,
     pub actions_final_exit_codes: Vec<i32>,
     pub actions_env: SecretEnv,
     pub actions_owner_words: Vec<(String, String)>,

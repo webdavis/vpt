@@ -8,12 +8,30 @@ use vpt_domain::{
     proposal::{CheckedProposal, action_ids},
 };
 
+/// `dropped` names the ids the previous proposal held and this one does not, and only while the
+/// withdraw command is set, so a drop published earlier is never withdrawn.
 pub(crate) fn queue(
     settings: &Settings,
     recording: &RecordingId,
+    previous: Option<&CheckedProposal>,
     proposal: &CheckedProposal,
 ) -> Option<ActionChange> {
-    (!settings.actions_command.is_empty()).then(|| ActionChange::Queue(queued(recording, proposal)))
+    if settings.actions_command.is_empty() {
+        return None;
+    }
+    let actions = queued(recording, proposal);
+    let dropped = previous
+        .filter(|_| !settings.actions_withdraw_command.is_empty())
+        .map(|previous| action_ids(recording, &previous.actions))
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|id| actions.iter().all(|action| action.id != *id))
+        .collect();
+    Some(ActionChange::Queue {
+        recording: recording.clone(),
+        actions,
+        dropped,
+    })
 }
 
 pub(super) fn queued(recording: &RecordingId, proposal: &CheckedProposal) -> Vec<QueuedAction> {

@@ -676,7 +676,54 @@ Publishing an analysis records each action's id and a digest of its text, owner 
 the ledger, with the analysis itself, then runs the command for each action that is new or whose
 digest changed. A redo that leaves an action unchanged sends nothing. A changed action is sent again
 under the same id, so the command must treat a repeated id as an update to the item it already holds.
-An action a redo drops is not sent and not withdrawn; vpt has no delete call.
+An action a redo drops is not sent again. Without `withdraw_command` it is not withdrawn either, so
+the item stays in your tool.
+
+`[actions] withdraw_command` is a second argument list, empty by default, that withdraws from your
+tool the actions a redo drops. It may be set only together with `command`; otherwise vpt refuses the
+configuration with exit 2. Only `{id}` and `{recording}` expand in it, because vpt keeps no copy of
+a sent action's text, owner or due date. Any other placeholder, such as `{text}`, refuses the
+configuration with exit 2. It runs under the same rules as `command`: no shell, nothing on standard
+input, `[actions.env]` in its environment and a 30 second limit.
+
+```toml
+[actions]
+command = ["todo-tool", "add", "--id", "{id}", "--", "{text}"]
+withdraw_command = ["todo-tool", "remove", "--id", "{id}"]
+```
+
+The withdraw command must name the item the same way the send command did. If `command` passes a
+value besides `{id}` that your tool uses to scope its ids, such as a session or namespace, then
+`withdraw_command` must pass the same value. Otherwise neither command may pass one.
+
+vpt withdraws an action only when a redo published while `withdraw_command` is set drops it, so
+setting the command does not withdraw actions that earlier redos dropped. The withdrawal runs in the
+same pass as the sends, after them. vpt records that it is about to send an action before it runs
+`command`, so the action counts as reaching your tool even when its send then failed, timed out, was
+refused or was cut short because vpt stopped: your tool may have stored it first. The withdraw
+command can therefore receive an id your tool never stored, and it must treat an unknown id as
+already withdrawn and exit 0. A dropped action that vpt never tried to send is forgotten without
+running the command. Actions saved by an earlier version of vpt count as tried, because that version
+did not record whether an action still waiting to be sent had reached your tool.
+
+Exit 0 withdraws the action and vpt forgets it, whatever the command printed: it is never withdrawn
+twice, and if a later analysis holds the same id again, vpt sends it as a new action. An exit code
+in `final_exit_codes` means the tool refused the withdrawal for good. vpt forgets the action as well,
+counts it as refused and adds the warning `configured withdraw command refused a withdrawal`;
+`--resend-refused` does not try it again. Any other outcome adds the warning `configured withdraw
+command failed`, counts it as failed, and the next run tries again. If `withdraw_command` is unset
+while withdrawals wait, they wait until it is set again. If a redo holds the id again before the
+withdrawal succeeds, vpt sends the action again instead. As with sends, if vpt stops between the
+command's exit and saving the result, the next run withdraws the action again, so the command must
+accept a repeat. Dry runs withdraw nothing.
+
+An id comes from the action's start time and its order within that second, so when a redo drops the
+first of two actions that start in the same second, the second action takes the first one's id. Your
+tool then gets an update to the first item, which now holds the second action, and a withdrawal of
+the second id.
+
+vpt does not know what happened to the item in your tool after it was sent: whether you accepted it,
+edited it or completed it. The withdraw command decides what withdrawing such an item means.
 
 A command that exits with a code in `final_exit_codes` has refused the action for good. The action
 is recorded as refused, counted, and not sent again until a redo changes it, and the run adds the
@@ -696,14 +743,16 @@ exit 2. With `--dry-run` it sends nothing and changes nothing.
 A send counts once the command exits 0. If vpt stops between that exit and saving the result, the
 next run sends the action again, so the command must accept a repeat. Dry runs send nothing.
 
-When the command is set, the result of `vpt analyze <id>` and of `vpt run` carries `"actions": {"sent",
-"failed", "refused"}` counts. The result of `vpt analyze --all` and `--stdin` carries the same counts,
-summed over the recordings it analyzed. Each recording whose actions vpt tried to send logs one `actions_sent`
-report with the `recording`, `paths.note` and a `detail` such as `3 sent, 1 failed, 0 refused`, in
-state `failed` when any send failed or was refused and `done` otherwise, and invokes the configured
-report command. Only analyses published while the command is set are recorded, so setting it does not
-send earlier analyses' actions. The action text reaches only the command, never `events.jsonl` or
-vpt's output.
+When the command is set, the result of `vpt analyze <id>` and of `vpt run` carries `"actions":
+{"sent", "failed", "refused"}` counts, and a `"withdrawn"` count as well when `withdraw_command` is
+set. The failed and refused counts include withdrawals. The result of `vpt analyze --all` and
+`--stdin` carries the same counts, summed over the recordings it analyzed. Each recording whose
+actions vpt tried to send or withdraw logs one `actions_sent` report with the `recording`,
+`paths.note` and a `detail` such as `3 sent, 1 failed, 0 refused`, or `3 sent, 1 failed, 0 refused,
+2 withdrawn` when `withdraw_command` is set, in state `failed` when any send or withdrawal failed or
+was refused and `done` otherwise, and invokes the configured report command. Only analyses published
+while the command is set are recorded, so setting it does not send earlier analyses' actions. The
+action text reaches only the command, never `events.jsonl` or vpt's output.
 
 ## Note verification
 

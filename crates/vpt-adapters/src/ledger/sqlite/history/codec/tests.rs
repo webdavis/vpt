@@ -11,6 +11,7 @@ use vpt_domain::run::{
 use vpt_domain::sweep::DeferralReason;
 use vpt_domain::time::UtcInstant;
 
+mod action_counts;
 mod analysis_state;
 mod brief_event;
 mod deferral;

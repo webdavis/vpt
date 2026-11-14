@@ -89,6 +89,8 @@ pub enum SinkWarning {
     HookFailed,
     ActionFailed,
     ActionRefused,
+    WithdrawFailed,
+    WithdrawRefused,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -166,7 +166,7 @@ fn read_only_version_fourteen_inventory_and_journal_remain_observational() {
     drop(observer);
     assert_eq!(crate::database::snapshot(root.path()), bytes);
     let migrated = SqliteLedger::open(&root).unwrap();
-    assert_eq!(migrated.schema_version().unwrap(), 18);
+    assert_eq!(migrated.schema_version().unwrap(), 19);
     assert_eq!(migrated.retention_artifacts().unwrap(), before);
     assert_eq!(migrated.pending_intents().unwrap(), pending);
 }

@@ -45,7 +45,7 @@ struct State {
     tags: Vec<(RecordingId, Vec<vpt_domain::tags::Tag>)>,
     tag_renames: Vec<vpt_application::ports::TagRename>,
     learned_tags: std::collections::BTreeSet<String>,
-    action_sends: Vec<(vpt_application::ports::QueuedAction, actions::SendState)>,
+    action_sends: Vec<actions::Saved>,
     vocabulary: Vec<vpt_application::ports::VocabularyPublication>,
     notes: Vec<vpt_application::ports::NoteArtifact>,
     flags: Vec<(RecordingId, vpt_domain::review::ReviewFlag)>,

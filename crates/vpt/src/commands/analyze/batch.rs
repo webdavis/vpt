@@ -59,7 +59,7 @@ fn execute(
             .into_iter()
             .map(|candidate| candidate.map_or_else(Entry::Failed, Entry::Planned))
             .collect();
-        return Ok(output::report(entries, true, false));
+        return Ok(output::report(entries, true, None));
     }
     let state = crate::compose::mutation::state(&roots)?;
     let _lock = crate::compose::mutation::lock(&state)?;
@@ -74,7 +74,7 @@ fn execute(
     Ok(output::report(
         entries,
         false,
-        !settings.actions_command.is_empty(),
+        (!settings.actions_command.is_empty()).then(|| Counts::start(&settings)),
     ))
 }
 
