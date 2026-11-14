@@ -2,7 +2,7 @@ use super::batch::{bulk_agent, calls, propose};
 use super::*;
 use serde_json::{Value, json};
 
-fn piped(sandbox: &Sandbox, input: &str, extra: &[&str]) -> std::process::Output {
+pub(super) fn piped(sandbox: &Sandbox, input: &str, extra: &[&str]) -> std::process::Output {
     let path = sandbox.path().join("stdin.txt");
     fs::write(&path, input).unwrap();
     support::run_with_budget(

@@ -6,6 +6,8 @@ mod actions;
 mod actions_env;
 #[path = "analyze/batch.rs"]
 mod batch;
+#[path = "analyze/batch_actions.rs"]
+mod batch_actions;
 #[path = "analyze/batch_input.rs"]
 mod batch_input;
 #[path = "analyze/captured_at.rs"]
