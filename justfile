@@ -2,7 +2,7 @@ fmt:
   cargo fmt --all -- --check
 
 clippy:
-  cargo clippy --locked --workspace --all-targets --features dev-tools -- -D warnings -D clippy::undocumented_unsafe_blocks
+  cargo clippy --locked --workspace --all-targets --features dev-tools -- -D warnings
 
 test:
   TMPDIR="$(cd "${TMPDIR:-/tmp}" && pwd -P)/" cargo test --locked --workspace --no-fail-fast --features dev-tools

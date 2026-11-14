@@ -8,3 +8,6 @@ members = [
   "crates/vpt-domain",
   "crates/vpt-protocol",
 ]
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
