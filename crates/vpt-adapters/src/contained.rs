@@ -1,3 +1,4 @@
+mod clone;
 mod directory;
 mod file;
 mod owned_directory;

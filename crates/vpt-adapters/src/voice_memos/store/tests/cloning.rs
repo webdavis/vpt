@@ -127,7 +127,7 @@ pub(super) fn exdev(f: &Fixture) {
                 |_, directory, name| {
                     calls += 1;
                     assert_eq!(directory.identity().unwrap(), f.identity());
-                    assert_eq!(name.to_bytes(), b"copy.m4a");
+                    assert_eq!(name, f.audio.join("copy.m4a"));
                     Err(io::Error::from_raw_os_error(libc::EXDEV))
                 }
             ),
