@@ -151,7 +151,7 @@ fn memory_sweeps_all_later_stores_with_durable_intents() {
 }
 #[test]
 fn sqlite_sweeps_all_later_stores_with_durable_intents() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     sweep(&SqliteLedger::open(&root).unwrap());
 }
@@ -161,7 +161,7 @@ fn memory_later_store_dry_run_is_observational() {
 }
 #[test]
 fn sqlite_later_store_dry_run_is_observational() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     dry_run(&SqliteLedger::open(&root).unwrap());
 }
@@ -171,7 +171,7 @@ fn memory_recovers_absent_and_unchanged_later_artifacts() {
 }
 #[test]
 fn sqlite_recovers_absent_and_unchanged_later_artifacts() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     recovery(&SqliteLedger::open(&root).unwrap(), false);
 }

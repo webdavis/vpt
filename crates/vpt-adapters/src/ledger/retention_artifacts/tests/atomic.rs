@@ -7,7 +7,7 @@ fn sqlite_later_expiration_rolls_back_marker_stage_journal_and_history_together(
         "BEFORE UPDATE OF completed_at ON retention_intents",
         "BEFORE INSERT ON history_records WHEN json_extract(NEW.fact, '$.tag')='work'",
     ] {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let root = RootDir::open(temp.path()).unwrap();
         let ledger = SqliteLedger::open(&root).unwrap();
         inventory(&ledger);
@@ -83,7 +83,7 @@ fn sqlite_later_expiration_rolls_back_marker_stage_journal_and_history_together(
 
 #[test]
 fn sqlite_inventory_refuses_expiration_that_no_longer_matches_owned_metadata() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let ledger = SqliteLedger::open(&root).unwrap();
     expiration::lifecycle(&ledger);

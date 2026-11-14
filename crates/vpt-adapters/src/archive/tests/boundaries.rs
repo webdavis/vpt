@@ -23,7 +23,7 @@ fn archive_lists_only_regular_archived_and_staging_files() {
 
 #[test]
 fn absent_read_only_archive_stays_absent_and_refuses_stage_before_clone() {
-    let temp = tempfile::tempdir().expect("temp");
+    let temp = crate::test_temp::tempdir().expect("temp");
     let audio = temp
         .path()
         .canonicalize()

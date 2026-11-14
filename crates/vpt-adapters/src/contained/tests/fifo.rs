@@ -31,7 +31,7 @@ fn opening_a_fifo_returns_not_regular_without_a_writer() {
         }
         return;
     }
-    let temp = tempfile::tempdir().expect("owned fixture");
+    let temp = crate::test_temp::tempdir().expect("owned fixture");
     let path = temp.path().canonicalize().expect("canonical");
     let fifo = CString::new(path.join("fifo").as_os_str().as_bytes()).expect("name");
     // SAFETY: fifo is an owned, NUL-terminated pathname that outlives mkfifo.

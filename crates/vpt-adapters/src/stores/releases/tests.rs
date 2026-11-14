@@ -4,7 +4,7 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 use vpt_application::StorePaths;
 
 fn fixture() -> (tempfile::TempDir, Roots) {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let base = temp.path().canonicalize().unwrap();
     let roots = Roots {
         home: base.join("home"),

@@ -24,7 +24,7 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
-        let temp = tempfile::tempdir().expect("owned event fixture");
+        let temp = crate::test_temp::tempdir().expect("owned event fixture");
         let path = temp.path().canonicalize().expect("canonical fixture");
         fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).expect("private fixture");
         Self {

@@ -3,7 +3,7 @@ use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
 fn root() -> (tempfile::TempDir, RootDir) {
-    let temp = tempfile::tempdir().expect("owned state");
+    let temp = crate::test_temp::tempdir().expect("owned state");
     let path = temp.path().canonicalize().expect("canonical state");
     fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).expect("private");
     let root = RootDir::open(&path).expect("retained state");
@@ -54,7 +54,7 @@ fn state_owner_must_match_the_effective_identity() {
 
 #[test]
 fn retained_state_rejects_a_replacement_directory() {
-    let temp = tempfile::tempdir().expect("owned fixture");
+    let temp = crate::test_temp::tempdir().expect("owned fixture");
     let base = temp.path().canonicalize().expect("canonical base");
     let path = base.join("state");
     fs::create_dir(&path).expect("state");

@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use vpt_application::ports::Archive;
 
 fn audio() -> (tempfile::TempDir, PathBuf, RootDir) {
-    let temp = tempfile::tempdir().expect("temp");
+    let temp = crate::test_temp::tempdir().expect("temp");
     let path = temp.path().canonicalize().expect("canonical").join("audio");
     std::fs::create_dir(&path).expect("audio");
     let root = RootDir::open(&path).expect("root");

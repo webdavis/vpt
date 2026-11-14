@@ -5,7 +5,7 @@ use vpt_application::engines::{EngineConfig, EngineKind};
 
 #[test]
 fn external_engine_kinds_run_without_probing_an_absent_apple_helper() {
-    let fixture = tempfile::tempdir().unwrap();
+    let fixture = crate::test_temp::tempdir().unwrap();
     let audio = fixture.path().join("archive.m4a");
     let outputs = fixture.path().join("outputs");
     fs::write(&audio, b"archived").unwrap();

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use vpt_application::ports::RecorderStore;
 
 fn fixture(bytes: &[u8]) -> (tempfile::TempDir, PathBuf, crate::VoiceMemosStore, File) {
-    let temp = tempfile::tempdir().expect("temp");
+    let temp = crate::test_temp::tempdir().expect("temp");
     let base = temp.path().canonicalize().expect("canonical");
     let recordings = base.join("Recordings");
     let audio = base.join("audio");

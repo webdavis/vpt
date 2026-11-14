@@ -8,7 +8,7 @@ use std::{
 
 #[test]
 fn appends_one_normalized_line_and_preserves_existing_bytes() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("known-terms.txt");
     let original = "  Straße  \r\nNew\tYork\nAnn,";
     fs::write(&path, original).unwrap();
@@ -35,7 +35,7 @@ fn appends_one_normalized_line_and_preserves_existing_bytes() {
 
 #[test]
 fn duplicate_whole_terms_preserve_spelling_bytes_and_mtime() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     fs::write(&path, " Straße \r\nNew\tYork\nAnn,\n").unwrap();
     let original = fs::read(&path).unwrap();
@@ -55,7 +55,7 @@ fn duplicate_whole_terms_preserve_spelling_bytes_and_mtime() {
 
 #[test]
 fn planning_missing_parents_is_observational_and_publication_creates_private_directories() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     fs::set_permissions(temp.path(), fs::Permissions::from_mode(0o755)).unwrap();
     let path = temp.path().join("new/config/terms");
     let update = prepare(&path, "Alice").unwrap();
@@ -80,7 +80,7 @@ fn planning_missing_parents_is_observational_and_publication_creates_private_dir
 #[test]
 fn changed_deleted_and_newly_created_targets_are_preserved() {
     for scenario in 0..3 {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let path = temp.path().join("terms");
         if scenario != 2 {
             fs::write(&path, "Before\n").unwrap();
@@ -106,7 +106,7 @@ fn changed_deleted_and_newly_created_targets_are_preserved() {
 
 #[test]
 fn paths_redirected_after_planning_are_refused_without_following_them() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     fs::create_dir(temp.path().join("parent")).unwrap();
     fs::create_dir(temp.path().join("outside")).unwrap();
     let path = temp.path().join("parent/terms");
@@ -123,7 +123,7 @@ fn paths_redirected_after_planning_are_refused_without_following_them() {
 
 #[test]
 fn invalid_terms_and_unsafe_existing_lists_leave_no_artifacts() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     for term in [
         "".into(),

@@ -58,7 +58,7 @@ fn accepts_a_valid_command_document_without_fabricating_confidence() {
 
 #[test]
 fn placeholders_are_single_pass_and_preserve_argument_boundaries() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = crate::test_temp::tempdir().unwrap();
     let audio = directory
         .path()
         .join("with spaces {language} {out_dir}.m4a");
@@ -108,7 +108,7 @@ fn command_status_and_deadline_are_typed_failures() {
 
 #[test]
 fn output_past_the_limit_is_refused_even_after_a_valid_document() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = crate::test_temp::tempdir().unwrap();
     let audio = directory.path().join("oversized");
     let mut content = document().into_bytes();
     content.resize(16_777_217, b' ');

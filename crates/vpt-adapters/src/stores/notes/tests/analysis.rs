@@ -16,7 +16,7 @@ use vpt_domain::{
 fn first_analysis_prepares_both_notes_and_findings_without_publishing() {
     for profile in ["portable", "obsidian"] {
         for style in ["markdown", "wiki"] {
-            let temp = tempfile::tempdir().unwrap();
+            let temp = crate::test_temp::tempdir().unwrap();
             let root = temp.path();
             let mut settings = crate::config::from_table(
                 &crate::config::load_text(&format!(

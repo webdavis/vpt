@@ -4,6 +4,8 @@ mod compose;
 mod dispatch;
 mod doctor;
 mod documents;
+#[cfg(test)]
+mod test_temp;
 
 use cli::args::parse;
 use cli::format::Format;

@@ -30,6 +30,8 @@ pub mod proposal;
 mod spawn;
 mod stores;
 mod symlink;
+#[cfg(test)]
+mod test_temp;
 pub use analysis::CommandAgent;
 mod action_command;
 pub use action_command::{ActionSend, SendOutcome, action_digest, note_link, send_action};

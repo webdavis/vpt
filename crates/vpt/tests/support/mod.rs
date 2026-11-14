@@ -50,9 +50,14 @@ pub struct Sandbox {
 
 impl Sandbox {
     pub fn new(name: &str) -> Self {
+        // vpt refuses a root behind a symlink, and the platform temp directory may sit behind one.
         let root = tempfile::Builder::new()
             .prefix(&format!("vpt-{name}-"))
-            .tempdir()
+            .tempdir_in(
+                std::env::temp_dir()
+                    .canonicalize()
+                    .expect("resolved temp directory"),
+            )
             .expect("sandbox");
         for leaf in [
             "home",

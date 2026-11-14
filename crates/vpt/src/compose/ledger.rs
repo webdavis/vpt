@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn read_only_runtime_returns_empty_memory_without_creating_absent_state() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let absent = RuntimeLedger::read_only(&temp.path().join("absent")).unwrap();
         assert_eq!(absent.recordings(), Ok(vec![]));
         let id = RecordingId::parse("2026-08-24T144736-4f3ab19c02de").unwrap();
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn read_only_runtime_refuses_mutating_trait_calls() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let ledger = RuntimeLedger::read_only(&temp.path().join("absent")).unwrap();
         assert_eq!(
             ledger.commit(&LedgerCommit::default()),
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn read_only_runtime_delegates_to_existing_sqlite() {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let root = RootDir::open(temp.path()).unwrap();
         let ledger = SqliteLedger::open(&root).unwrap();
         let digest = Sha256Digest([0x21; 32]);

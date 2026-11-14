@@ -4,7 +4,7 @@ use super::*;
 fn saved_publication_inputs_resume_before_or_after_the_file_was_replaced() {
     for exists in [false, true] {
         for published in [false, true] {
-            let temp = tempfile::tempdir().unwrap();
+            let temp = crate::test_temp::tempdir().unwrap();
             let path = temp.path().join("terms");
             if exists {
                 fs::write(&path, "Before\n").unwrap();
@@ -26,7 +26,7 @@ fn saved_publication_inputs_resume_before_or_after_the_file_was_replaced() {
 
 #[test]
 fn saved_publication_recovery_preserves_operator_edits() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     fs::write(&path, "Before\n").unwrap();
     let update = prepare(&path, "After").unwrap();
@@ -41,7 +41,7 @@ fn saved_publication_recovery_preserves_operator_edits() {
 
 #[test]
 fn saved_publication_bytes_must_match_the_intended_digest_and_document_limits() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("missing/terms");
     let update = prepare(&path, "After").unwrap();
     let entry = update.publication(UtcInstant { secs: 30 });

@@ -3,7 +3,7 @@ use std::{fs, os::unix::fs::symlink};
 
 #[test]
 fn reads_whole_lines_with_punctuation_and_unicode_intact() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms.txt");
     fs::write(&path, "  New York  \r\nStraße\nAnn,\n\n").unwrap();
     assert_eq!(read(&path).unwrap(), ["New York", "Straße", "Ann,"]);
@@ -11,7 +11,7 @@ fn reads_whole_lines_with_punctuation_and_unicode_intact() {
 
 #[test]
 fn missing_file_or_parent_is_observationally_empty() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     assert!(read(&temp.path().join("missing")).unwrap().is_empty());
     assert!(read(&temp.path().join("missing/terms")).unwrap().is_empty());
     assert_eq!(fs::read_dir(temp.path()).unwrap().count(), 0);
@@ -19,7 +19,7 @@ fn missing_file_or_parent_is_observationally_empty() {
 
 #[test]
 fn redirects_relative_paths_and_nonregular_files_are_refused() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     fs::write(temp.path().join("real"), "secret").unwrap();
     symlink(temp.path().join("real"), temp.path().join("link")).unwrap();
     assert!(read(&temp.path().join("link")).is_err());
@@ -33,7 +33,7 @@ fn redirects_relative_paths_and_nonregular_files_are_refused() {
 
 #[test]
 fn oversized_invalid_utf8_and_control_characters_are_refused() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let path = temp.path().join("terms");
     for bytes in [vec![0xff], b"canary\0private".to_vec()] {
         fs::write(&path, bytes).unwrap();

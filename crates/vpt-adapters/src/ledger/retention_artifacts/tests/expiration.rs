@@ -128,7 +128,7 @@ fn memory_expiration_keeps_owned_metadata_and_original_times_for_every_later_sto
 
 #[test]
 fn sqlite_expiration_keeps_owned_metadata_and_original_times_after_reopen() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let ledger = SqliteLedger::open(&root).unwrap();
     lifecycle(&ledger);

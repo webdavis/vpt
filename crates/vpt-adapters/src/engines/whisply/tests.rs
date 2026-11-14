@@ -15,7 +15,7 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
-        let directory = tempfile::tempdir().unwrap();
+        let directory = crate::test_temp::tempdir().unwrap();
         let audio = directory.path().join("archive.m4a");
         let output = directory.path().join("outputs");
         fs::write(&audio, b"archived-bytes").unwrap();

@@ -4,7 +4,7 @@ use super::*;
 use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 
 fn fixture() -> (tempfile::TempDir, PathBuf, FilesystemStores) {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = temp.path().join("notes");
     std::fs::create_dir(&root).unwrap();
     let stores = FilesystemStores::open(std::slice::from_ref(&root)).unwrap();

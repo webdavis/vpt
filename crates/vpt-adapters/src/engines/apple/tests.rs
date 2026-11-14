@@ -39,7 +39,7 @@ printf '%s' '{"schema":"vpt.engine/1","engine":{"name":"apple","tool":"vpt-macos
 
 #[test]
 fn calls_version_then_transcribe_with_exact_audio_and_regional_locale() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = crate::test_temp::tempdir().unwrap();
     let adapter = helper(directory.path(), "1.0.0", VALID);
     let output = adapter.transcribe(&request(&config("apple"))).unwrap();
     assert_eq!(output.transcript.engine.name, "apple");
@@ -49,7 +49,7 @@ fn calls_version_then_transcribe_with_exact_audio_and_regional_locale() {
 
 #[test]
 fn an_apple_alias_is_named_consistently_in_domain_and_saved_document() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = crate::test_temp::tempdir().unwrap();
     let adapter = helper(directory.path(), "1.0.0", VALID);
     let output = adapter
         .transcribe(&request(&config("local-apple")))
@@ -61,7 +61,7 @@ fn an_apple_alias_is_named_consistently_in_domain_and_saved_document() {
 
 #[test]
 fn mismatched_helper_major_is_refused_before_speech_is_started() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = crate::test_temp::tempdir().unwrap();
     let adapter = helper(directory.path(), "2.0.0", "exit 9");
     assert_eq!(
         adapter.transcribe(&request(&config("apple"))).unwrap_err(),
@@ -90,7 +90,7 @@ fn helper_availability_messages_are_mapped_without_returning_child_text() {
         ),
         ("private-canary", EngineFailure::Exited(1)),
     ] {
-        let directory = tempfile::tempdir().unwrap();
+        let directory = crate::test_temp::tempdir().unwrap();
         let adapter = helper(
             directory.path(),
             "1.0.0",

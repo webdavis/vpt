@@ -5,7 +5,7 @@ use std::os::unix::fs::PermissionsExt;
 mod publication;
 
 pub(super) fn store() -> (tempfile::TempDir, PathBuf, FilesystemStores) {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = temp.path().join("store");
     std::fs::create_dir(&root).unwrap();
     let stores = FilesystemStores::open(std::slice::from_ref(&root)).unwrap();
@@ -160,7 +160,7 @@ fn direct_publish_refuses_symlink_target_before_creating_temporary() {
 
 #[test]
 fn read_only_open_keeps_missing_root_absent_and_refuses_link() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let missing = temp.path().join("missing");
     let stores = FilesystemStores::open_read_only(std::slice::from_ref(&missing)).unwrap();
     assert!(stores.roots.is_empty());

@@ -26,7 +26,7 @@ pub(super) struct Fixture {
 impl Fixture {
     pub fn new() -> Self {
         Self {
-            root: tempfile::tempdir().expect("owned root"),
+            root: crate::test_temp::tempdir().expect("owned root"),
             started: Instant::now(),
             group: Cell::new(0),
             peer: Cell::new(0),

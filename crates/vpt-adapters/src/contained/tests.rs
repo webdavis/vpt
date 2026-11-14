@@ -8,7 +8,7 @@ mod fifo;
 mod files;
 
 fn root() -> (tempfile::TempDir, RootDir) {
-    let temp = tempfile::tempdir().expect("owned fixture");
+    let temp = crate::test_temp::tempdir().expect("owned fixture");
     let path = temp.path().canonicalize().expect("canonical");
     fs::write(path.join("plain.m4a"), b"bytes").expect("plain");
     fs::create_dir(path.join("sub")).expect("sub");
@@ -20,7 +20,7 @@ fn root() -> (tempfile::TempDir, RootDir) {
 
 #[test]
 fn a_bare_name_or_the_root_joined_with_it_is_the_one_accepted_shape() {
-    let temp = tempfile::tempdir().expect("temp");
+    let temp = crate::test_temp::tempdir().expect("temp");
     let path = temp.path().canonicalize().expect("canonical");
     let expected = path.join("plain.m4a");
     assert_eq!(

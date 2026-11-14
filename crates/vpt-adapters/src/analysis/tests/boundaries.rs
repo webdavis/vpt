@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn a_complete_proposal_at_the_output_limit_is_accepted_but_overflow_is_refused() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = crate::test_temp::tempdir().unwrap();
     let path = directory.path().join("proposal");
     let mut bytes = document().into_bytes();
     bytes.resize(1_048_576, b' ');
@@ -50,7 +50,7 @@ fn invalid_documents_and_versions_are_typed_without_exposing_child_output() {
 
 #[test]
 fn disabled_invalid_and_oversized_requests_never_start_the_command() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = crate::test_temp::tempdir().unwrap();
     let marker = directory.path().join("must-not-exist");
     let id = id();
     assert_eq!(

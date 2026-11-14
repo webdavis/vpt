@@ -16,7 +16,7 @@ pub(super) const ROLES: [(FileRole, &str); 4] = [
 ];
 
 pub(crate) fn root() -> (tempfile::TempDir, RootDir) {
-    let temp = tempfile::tempdir().expect("owned temp");
+    let temp = crate::test_temp::tempdir().expect("owned temp");
     let path = temp
         .path()
         .canonicalize()

@@ -35,7 +35,7 @@ fn saved(id: i64, new: NewIntent) -> RetentionIntent {
 
 #[test]
 fn empty_runtime_retention_is_observational_and_refuses_both_writes() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let state = temp.path().join("absent");
     let runtime = RuntimeLedger::read_only(&state).unwrap();
     let new = intent(temp.path(), 1);
@@ -58,7 +58,7 @@ fn empty_runtime_retention_is_observational_and_refuses_both_writes() {
 
 #[test]
 fn read_only_runtime_retention_keeps_fields_order_and_refuses_both_writes() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let ledger = SqliteLedger::open(&root).unwrap();
     let first = intent(temp.path(), 2);
@@ -79,7 +79,7 @@ fn read_only_runtime_retention_keeps_fields_order_and_refuses_both_writes() {
 
 #[test]
 fn writable_runtime_retention_records_durable_intent_with_every_field() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let runtime = RuntimeLedger::Sqlite(SqliteLedger::open(&root).unwrap());
     let new = intent(temp.path(), 5);
@@ -92,7 +92,7 @@ fn writable_runtime_retention_records_durable_intent_with_every_field() {
 
 #[test]
 fn writable_runtime_retention_completes_only_the_selected_intent() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let root = RootDir::open(temp.path()).unwrap();
     let ledger = SqliteLedger::open(&root).unwrap();
     let first_id = ledger.record_intent(&intent(temp.path(), 6)).unwrap();
@@ -112,7 +112,7 @@ fn writable_runtime_retention_completes_only_the_selected_intent() {
 
 #[test]
 fn runtime_retention_preserves_root_replacement_refusal() {
-    let temp = tempfile::tempdir().unwrap();
+    let temp = crate::test_temp::tempdir().unwrap();
     let state = temp.path().join("state");
     std::fs::create_dir(&state).unwrap();
     let root = RootDir::open(&state).unwrap();

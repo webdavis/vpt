@@ -4,7 +4,7 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 
 #[test]
 fn creates_a_private_directory_exclusively_and_preserves_existing_occupants() {
-    let fixture = tempfile::tempdir().unwrap();
+    let fixture = crate::test_temp::tempdir().unwrap();
     let parent = RootDir::open(fixture.path()).unwrap();
     let directory = parent.create_owned_directory("work").unwrap();
     assert_eq!(
@@ -22,8 +22,8 @@ fn creates_a_private_directory_exclusively_and_preserves_existing_occupants() {
 
 #[test]
 fn removes_owned_temporary_contents_without_following_links() {
-    let fixture = tempfile::tempdir().unwrap();
-    let outside = tempfile::tempdir().unwrap();
+    let fixture = crate::test_temp::tempdir().unwrap();
+    let outside = crate::test_temp::tempdir().unwrap();
     fs::write(outside.path().join("canary"), b"original").unwrap();
     let parent = RootDir::open(fixture.path()).unwrap();
     let directory = parent.subdirectory("work").unwrap();
@@ -46,7 +46,7 @@ fn removes_owned_temporary_contents_without_following_links() {
 
 #[test]
 fn refuses_cleanup_after_the_owned_directory_is_replaced() {
-    let fixture = tempfile::tempdir().unwrap();
+    let fixture = crate::test_temp::tempdir().unwrap();
     let parent = RootDir::open(fixture.path()).unwrap();
     let directory = parent.subdirectory("work").unwrap();
     fs::rename(directory.path(), fixture.path().join("original-work")).unwrap();
@@ -62,7 +62,7 @@ fn refuses_cleanup_after_the_owned_directory_is_replaced() {
 
 #[test]
 fn temporary_cleanup_stops_at_its_entry_and_depth_budgets() {
-    let fixture = tempfile::tempdir().unwrap();
+    let fixture = crate::test_temp::tempdir().unwrap();
     let parent = RootDir::open(fixture.path()).unwrap();
     let directory = parent.create_owned_directory("work").unwrap();
     fs::write(directory.path().join("one"), b"temporary").unwrap();

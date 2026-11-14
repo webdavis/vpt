@@ -9,7 +9,7 @@ mod vault;
 mod vocabulary;
 
 fn fixture() -> tempfile::TempDir {
-    let temp = tempfile::tempdir().expect("owned fixture");
+    let temp = crate::test_temp::tempdir().expect("owned fixture");
     fs::create_dir_all(temp.path().join("voice-memos/Recordings")).expect("source");
     fs::write(temp.path().join("voice-memos/CloudRecordings.db"), b"live").expect("database");
     fs::create_dir(temp.path().join("cfg")).expect("config");

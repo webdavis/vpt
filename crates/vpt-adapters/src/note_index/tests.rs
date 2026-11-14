@@ -10,7 +10,7 @@ fn write(root: &Path, name: &str, text: &str) -> PathBuf {
 
 #[test]
 fn recursively_indexes_external_names_aliases_and_tags_without_writing() {
-    let temporary = tempfile::tempdir().unwrap();
+    let temporary = crate::test_temp::tempdir().unwrap();
     let root = temporary.path();
     let path = write(
         root,
@@ -43,7 +43,7 @@ fn recursively_indexes_external_names_aliases_and_tags_without_writing() {
 
 #[test]
 fn symlink_files_directories_and_cycles_are_not_followed() {
-    let temporary = tempfile::tempdir().unwrap();
+    let temporary = crate::test_temp::tempdir().unwrap();
     let root = temporary.path().join("vault");
     fs::create_dir(&root).unwrap();
     let outside = write(
@@ -64,7 +64,7 @@ fn symlink_files_directories_and_cycles_are_not_followed() {
 
 #[test]
 fn overlapping_roots_and_duplicate_aliases_do_not_create_false_ambiguity() {
-    let temporary = tempfile::tempdir().unwrap();
+    let temporary = crate::test_temp::tempdir().unwrap();
     let root = temporary.path();
     let first = write(
         root,
@@ -83,7 +83,7 @@ fn overlapping_roots_and_duplicate_aliases_do_not_create_false_ambiguity() {
 
 #[test]
 fn malformed_metadata_keeps_the_filename_and_reports_only_a_safe_diagnostic() {
-    let temporary = tempfile::tempdir().unwrap();
+    let temporary = crate::test_temp::tempdir().unwrap();
     let path = write(
         temporary.path(),
         "Broken.md",
@@ -104,7 +104,7 @@ fn malformed_metadata_keeps_the_filename_and_reports_only_a_safe_diagnostic() {
 
 #[test]
 fn entry_read_depth_and_retained_metadata_limits_are_enforced() {
-    let temporary = tempfile::tempdir().unwrap();
+    let temporary = crate::test_temp::tempdir().unwrap();
     let root = temporary.path();
     write(root, "nested/Note.md", "---\naliases: [Alias]\n---\nBody\n");
     for limits in [
@@ -131,7 +131,7 @@ fn entry_read_depth_and_retained_metadata_limits_are_enforced() {
 
 #[test]
 fn configured_paths_consume_capacity_even_when_the_index_is_empty() {
-    let temporary = tempfile::tempdir().unwrap();
+    let temporary = crate::test_temp::tempdir().unwrap();
     assert!(
         Index::read_with(
             &[temporary.path().to_path_buf()],
@@ -146,7 +146,7 @@ fn configured_paths_consume_capacity_even_when_the_index_is_empty() {
 
 #[test]
 fn empty_aliases_still_consume_retained_metadata_capacity() {
-    let temporary = tempfile::tempdir().unwrap();
+    let temporary = crate::test_temp::tempdir().unwrap();
     write(
         temporary.path(),
         "Note.md",

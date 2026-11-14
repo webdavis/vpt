@@ -84,7 +84,7 @@ fn memory_refuses_mismatched_or_pending_artifacts_without_completion() {
 #[test]
 fn sqlite_refuses_mismatched_or_pending_artifacts_without_completion() {
     for variant in 0..5 {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = crate::test_temp::tempdir().unwrap();
         let root = RootDir::open(temp.path()).unwrap();
         refuse(&SqliteLedger::open(&root).unwrap(), variant);
     }
