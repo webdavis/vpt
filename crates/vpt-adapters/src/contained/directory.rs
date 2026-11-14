@@ -53,9 +53,8 @@ impl RootDir {
 
     fn scan_names(&self, strict: bool, maximum: usize) -> Result<Vec<String>, ContainedError> {
         let flags = libc::O_RDONLY | libc::O_DIRECTORY | NO_FOLLOW;
-        // SAFETY: the retained descriptor is live; dot opens that directory with an independent offset.
-        let fd = unsafe { libc::openat(self.file.as_raw_fd(), c".".as_ptr(), flags) };
-        let file = opened(fd, &self.path, true)?;
+        // Opening dot gives the stream its own offset instead of sharing the retained descriptor's.
+        let file = open_relative(self.as_fd(), c".", flags, 0, &self.path)?;
         // SAFETY: file owns a fresh directory descriptor; ownership transfers only on success.
         let stream = unsafe { libc::fdopendir(file.as_raw_fd()) };
         let stream =
