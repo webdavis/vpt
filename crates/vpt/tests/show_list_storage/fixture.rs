@@ -128,8 +128,22 @@ pub(super) struct SnapshotEntry {
     mode: u32,
     mtime: i64,
     mtime_nanos: i64,
-    bytes: Vec<u8>,
+    bytes: Contents,
     link_target: Option<PathBuf>,
+}
+
+/// Prints file contents as a length and hash, so a failed snapshot comparison stays short enough
+/// for the CI log to keep it.
+#[derive(PartialEq, Eq)]
+struct Contents(Vec<u8>);
+
+impl std::fmt::Debug for Contents {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        self.0.hash(&mut hasher);
+        write!(formatter, "{} bytes {:016x}", self.0.len(), hasher.finish())
+    }
 }
 
 #[allow(
@@ -198,7 +212,7 @@ pub(super) fn snapshot(sandbox: &Sandbox) -> Vec<SnapshotEntry> {
             mode: metadata.permissions().mode() & 0o777,
             mtime: metadata.mtime(),
             mtime_nanos: metadata.mtime_nsec(),
-            bytes,
+            bytes: Contents(bytes),
             link_target,
         });
         if metadata.is_dir() {
