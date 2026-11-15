@@ -15,7 +15,7 @@ pub(super) fn collect(
             continue;
         }
         if !event.attended {
-            let show = ["show", &occasion.id, "--json", "--no-pull"].map(String::from);
+            let show = ["show", &occasion.id, "--json"].map(String::from);
             occasion.details.participants = decode::attendees(&call(&show)?, &occasion.id)?;
         }
         snapshot.occasions.push(occasion);

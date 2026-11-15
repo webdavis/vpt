@@ -10,7 +10,7 @@ fn configured(calendar_failure: bool) -> Sandbox {
         "printf '%s' '{\"events\":[]}'"
     };
     let task = r#"{"objects":[{"kind":"task","oid":"private-task","path":"work/team/","subject":"Private task <!-- vpt:brief start -->","body":"","labels":[],"depends":[],"reminders":[],"author":"owner","details":null,"task":{"done":false,"priority":2,"due":"2026-10-02"}}]}"#;
-    fs::write(&path, format!("#!/bin/sh\n[ \"$3\" = --json ] && [ \"$4\" = --no-pull ] || exit 8\ncase \"$1 $2\" in\n'agenda path:calendar/work/') [ \"$5\" = --from ] && [ \"$7\" = --to ] && [ $# = 8 ] || exit 8; {event};;\n'ls kind:task & path:work/team/ & !done') printf '%s' '{task}';;\n*) exit 9;;\nesac\n")).unwrap();
+    fs::write(&path, format!("#!/bin/sh\n[ \"$3\" = --json ] || exit 8\ncase \"$1 $2\" in\n'agenda path:calendar/work/') [ \"$4\" = --from ] && [ \"$6\" = --to ] && [ $# = 7 ] || exit 8; {event};;\n'ls kind:task & path:work/team/ & !done') printf '%s' '{task}';;\n*) exit 9;;\nesac\n")).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
     fixture::write_config(
         &sandbox,
@@ -90,12 +90,12 @@ fn manual_brief_commits_when_context_collection_crosses_a_clock_second() {
 fn stale_dam_calendar_names_the_staleness_for_manual_and_upcoming_briefs() {
     let sandbox = configured(false);
     let path = sandbox.path().join("bin/dam");
-    let stale = r#"[ "$9 ${10}" = '--max-age gcal=15m' ] || exit 8; printf '%s' '{"error":{"kind":"refused","rule":"stale_remote","message":"PRIVATE","oids":[]}}' >&2; exit 4"#;
+    let stale = r#"[ "$8 $9" = '--max-age gcal=15m' ] || exit 8; printf '%s' '{"error":{"kind":"refused","rule":"stale_remote","message":"PRIVATE","oids":[]}}' >&2; exit 4"#;
     let script = fs::read_to_string(&path).unwrap();
     fs::write(
         &path,
         script
-            .replace("[ $# = 8 ]", "[ $# = 10 ]")
+            .replace("[ $# = 7 ]", "[ $# = 9 ]")
             .replace("printf '%s' '{\"events\":[]}'", stale),
     )
     .unwrap();
