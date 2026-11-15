@@ -20,6 +20,8 @@ mod named;
 mod observations;
 #[path = "show_list_storage/fixture.rs"]
 mod observations_fixture;
+#[path = "doctor/schema.rs"]
+mod schema;
 #[path = "doctor/source.rs"]
 mod source;
 #[path = "doctor/speakers.rs"]
