@@ -2,19 +2,11 @@ use super::checks::Context;
 use super::parts::{available, fix, not_tested};
 use crate::report::Row;
 use crate::style::Verdict;
-use std::collections::BTreeSet;
-use vpt_application::engines::{EngineKind, EngineSettings};
-
-pub(super) fn selected(settings: &EngineSettings) -> BTreeSet<&String> {
-    std::iter::once(&settings.pair)
-        .chain(settings.by_language.values())
-        .flat_map(|pair| std::iter::once(&pair.main).chain(pair.checker.iter()))
-        .collect()
-}
+use vpt_application::engines::EngineKind;
 
 pub(super) fn rows(context: &Context) -> Vec<Row> {
     let settings = &context.settings.engines;
-    let selected = selected(settings);
+    let selected = settings.selected();
     settings
         .definitions
         .iter()

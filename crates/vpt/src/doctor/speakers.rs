@@ -1,5 +1,4 @@
 use super::checks::Context;
-use super::engines::selected;
 use super::parts::{not_configured, not_tested};
 use crate::report::Row;
 use crate::style::Verdict;
@@ -7,7 +6,7 @@ use vpt_application::engines::EngineKind;
 
 pub(super) fn rows(context: &Context) -> Vec<Row> {
     let settings = &context.settings.engines;
-    let selected = selected(settings);
+    let selected = settings.selected();
     let best = settings
         .definitions
         .iter()
