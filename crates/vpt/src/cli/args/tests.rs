@@ -75,7 +75,7 @@ fn every_stage_one_verb_decodes_its_arguments() {
         ("--version", Verb::Version),
         ("setup", Verb::Setup { force: false }),
         ("setup --force", Verb::Setup { force: true }),
-        ("doctor", Verb::Doctor),
+        ("doctor", Verb::Doctor { checks: vec![] }),
         (
             "ingest",
             Verb::Ingest {
@@ -119,7 +119,7 @@ fn every_stage_one_verb_decodes_its_arguments() {
     let invocation = parsed("--config c.toml --json doctor").expect("global flags first");
     assert_eq!(invocation.format, Some(Format::Json));
     assert_eq!(invocation.config, Some("c.toml".into()));
-    assert_eq!(invocation.verb, Verb::Doctor);
+    assert_eq!(invocation.verb, Verb::Doctor { checks: vec![] });
 }
 
 #[test]

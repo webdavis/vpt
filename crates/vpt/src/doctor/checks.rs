@@ -5,6 +5,16 @@ use std::path::{Path, PathBuf};
 use vpt_adapters::config::{RootError, Roots, resolve};
 use vpt_application::Settings;
 
+pub(crate) const NAMES: [&str; 7] = [
+    "config",
+    "stores",
+    "ledger",
+    "recordings",
+    "helper",
+    "engines",
+    "leftovers",
+];
+
 const SKIPPED: &str = "the configuration did not load; see `vpt doctor config`";
 
 pub(super) struct Context {
@@ -48,14 +58,22 @@ const AFTER_CONFIG: [(&str, &str, Probe); 6] = [
     ),
 ];
 
-pub(super) fn run(environment: &Environment, config: Option<&Path>) -> Vec<Check> {
+pub(super) fn run(
+    environment: &Environment,
+    config: Option<&Path>,
+    wanted: &[String],
+) -> Vec<Check> {
+    let wanted = |name: &str| wanted.is_empty() || wanted.iter().any(|named| named == name);
     let loaded = load(environment, config);
-    let mut checks = vec![Check {
-        name: "config",
-        blurb: "the configuration file",
-        rows: config_rows(&loaded),
-        skipped: None,
-    }];
+    let mut checks = Vec::new();
+    if wanted("config") || loaded.is_err() {
+        checks.push(Check {
+            name: "config",
+            blurb: "the configuration file",
+            rows: config_rows(&loaded),
+            skipped: None,
+        });
+    }
     let context = loaded.ok().map(|(selected, settings)| {
         let config_dir = selected
             .parent()
@@ -67,7 +85,7 @@ pub(super) fn run(environment: &Environment, config: Option<&Path>) -> Vec<Check
             helper: OnceCell::new(),
         }
     });
-    for (name, blurb, probe) in AFTER_CONFIG {
+    for (name, blurb, probe) in AFTER_CONFIG.into_iter().filter(|(name, ..)| wanted(name)) {
         checks.push(match &context {
             Some(context) => Check {
                 name,

@@ -10,6 +10,8 @@ mod human;
 mod independence;
 #[path = "doctor/kept.rs"]
 mod kept;
+#[path = "doctor/named.rs"]
+mod named;
 #[path = "doctor/observations.rs"]
 mod observations;
 #[path = "show_list_storage/fixture.rs"]

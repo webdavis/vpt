@@ -58,7 +58,9 @@ pub enum Verb {
     Setup {
         force: bool,
     },
-    Doctor,
+    Doctor {
+        checks: Vec<String>,
+    },
     NoteWrite {
         id: String,
     },

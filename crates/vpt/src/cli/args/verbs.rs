@@ -15,9 +15,13 @@ pub(super) enum Command {
         #[arg(long)]
         force: bool,
     },
-    /// Check the configuration, stores, engines and helper.
+    /// Read this machine and report what needs attention, contacting nothing.
     #[command(after_long_help = examples::DOCTOR)]
-    Doctor,
+    Doctor {
+        /// Run only these checks.
+        #[arg(value_name = "CHECK", value_parser = clap::builder::PossibleValuesParser::new(crate::doctor::NAMES))]
+        checks: Vec<String>,
+    },
     /// Archive new Voice Memos recordings.
     #[command(after_long_help = examples::INGEST)]
     Ingest {
@@ -99,7 +103,7 @@ impl Command {
         Ok(match self {
             Self::Run(run) => run.verb(),
             Self::Setup { force } => Verb::Setup { force },
-            Self::Doctor => Verb::Doctor,
+            Self::Doctor { checks } => Verb::Doctor { checks },
             Self::Ingest { dry_run, once } => Verb::Ingest { dry_run, once },
             Self::Import(options) => return options.verb(),
             Self::Show(args) => return args.verb(),

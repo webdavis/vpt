@@ -10,8 +10,9 @@ mod stores;
 
 use crate::cli::output::Outcome;
 use crate::compose::Environment;
+pub(crate) use checks::NAMES;
 use std::path::Path;
 
-pub(crate) fn run(environment: &Environment, config: Option<&Path>) -> Outcome {
-    report::outcome(&checks::run(environment, config))
+pub(crate) fn run(environment: &Environment, config: Option<&Path>, wanted: &[String]) -> Outcome {
+    report::outcome(&checks::run(environment, config, wanted))
 }
