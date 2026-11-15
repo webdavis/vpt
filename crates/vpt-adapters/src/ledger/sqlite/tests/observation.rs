@@ -157,13 +157,11 @@ fn populated(scenario: &str, root: &RootDir) {
     }
     drop(seed(root));
     if scenario == "ledger_observe_readonly" {
-        for leaf in ["vpt.db", "vpt.db-wal", "vpt.db-shm"] {
-            std::fs::set_permissions(
-                root.path().join(leaf),
-                std::fs::Permissions::from_mode(0o644),
-            )
-            .unwrap();
-        }
+        std::fs::set_permissions(
+            root.path().join("vpt.db"),
+            std::fs::Permissions::from_mode(0o644),
+        )
+        .unwrap();
     }
     let before = snapshot(root.path());
     let observed = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();

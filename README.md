@@ -72,6 +72,13 @@ command raises once, and the tokens of its last 10,000 writes. Each machine reco
 made in a marker under `markers/` in the default state folder, `$XDG_STATE_HOME/vpt` or
 `~/.local/state/vpt`, which stays on the machine wherever `home.state_dir` points.
 
+vpt opens `vpt.db` through SQLite's own file access. It creates the ledger with mode `0600`, sets an
+existing `vpt.db`, `vpt.db-wal` or `vpt.db-shm` back to `0600` when a writing command opens it, and
+refuses any of them, or `vpt.db-journal`, that is a symbolic link or has a second hard link. A writing
+command refuses to go on when the state folder or one of those files is replaced while it runs. A
+read-only command refuses a ledger whose `vpt.db-wal` is missing while `vpt.db` is in WAL mode, or whose
+non-empty `vpt.db-wal` has no `vpt.db-shm` beside it, rather than create the missing file.
+
 Before a writing command changes anything, it compares the ledger with this machine's marker and
 refuses with exit 3 when this machine's last write is not in it:
 

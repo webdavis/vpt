@@ -1,5 +1,5 @@
+use super::error::DatabaseError;
 use super::{COPY_DIRECTORY, DATABASE, SIDE_FILES, files, lease::CopyLease};
-use crate::database::DatabaseError;
 use crate::{Access, ContainedError, RootDir};
 use std::fs::{File, Permissions};
 use std::io::{ErrorKind, Seek, SeekFrom};
@@ -48,10 +48,7 @@ fn companion(source: &RootDir, name: &str) -> Result<Option<File>, ContainedErro
 }
 
 fn overwrite(mut target: &File, source: Option<&File>) -> Result<(), DatabaseError> {
-    let failed = |error: std::io::Error| DatabaseError::Io {
-        operation: "title copy",
-        kind: error.kind(),
-    };
+    let failed = |_| DatabaseError::Unavailable;
     target
         .set_permissions(Permissions::from_mode(0o600))
         .map_err(failed)?;

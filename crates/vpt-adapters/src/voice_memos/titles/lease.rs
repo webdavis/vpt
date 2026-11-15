@@ -1,5 +1,5 @@
+use super::error::DatabaseError;
 use super::{DATABASE, files};
-use crate::database::DatabaseError;
 use crate::record_lock::{LockKind, set_record_lock};
 use crate::{Access, RootDir};
 use std::fs::File;
@@ -46,23 +46,20 @@ impl CopyLease {
                 }
                 Err(error) if error.kind() == ErrorKind::WouldBlock => {
                     if started.elapsed() >= timeout {
-                        return Err(busy());
+                        return Err(DatabaseError::Busy);
                     }
                     std::thread::sleep(
                         Duration::from_millis(1).min(timeout.saturating_sub(started.elapsed())),
                     );
                 }
-                Err(error) => return Err(locking(error)),
+                Err(_) => return Err(DatabaseError::Unavailable),
             }
         }
     }
 
     pub(super) fn downgrade(&mut self) -> Result<(), DatabaseError> {
         self.revalidate()?;
-        set_record_lock(&self.file, 0, 1, LockKind::Shared).map_err(|error| match error.kind() {
-            ErrorKind::WouldBlock => busy(),
-            _ => locking(error),
-        })
+        set_record_lock(&self.file, 0, 1, LockKind::Shared).map_err(|_| DatabaseError::Unavailable)
     }
 
     pub(super) fn file(&self) -> &File {
@@ -75,17 +72,5 @@ impl CopyLease {
 
     pub(super) fn root(&self) -> &RootDir {
         &self.root
-    }
-}
-
-fn busy() -> DatabaseError {
-    rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), None)
-        .into()
-}
-
-fn locking(error: std::io::Error) -> DatabaseError {
-    DatabaseError::Io {
-        operation: "record lock",
-        kind: error.kind(),
     }
 }

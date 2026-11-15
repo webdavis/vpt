@@ -6,7 +6,8 @@ complete user-facing capability remains unfinished; some of its supporting code 
 
 The detailed product specification is
 [VPT design](superpowers/specs/2026-09-20-vpt-design.md). Its database protection requirements are
-extended by [database containment](superpowers/specs/2026-09-22-vpt-database-containment-design.md).
+extended by [database containment](superpowers/specs/2026-09-22-vpt-database-containment-design.md),
+since withdrawn.
 The feature list below incorporates the later logging, recovery, notification, and standalone-product
 decisions.
 

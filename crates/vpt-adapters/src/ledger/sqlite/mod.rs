@@ -25,7 +25,7 @@ mod verification;
 mod vocabulary;
 mod wal_lifetime;
 
-use crate::database::AccessPolicy;
+use crate::sqlite_open::Mode;
 use crate::{ContainedError, RootDir};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -59,7 +59,7 @@ pub struct SqliteLedger {
     state: RootDir,
     path: PathBuf,
     busy: Duration,
-    policy: AccessPolicy,
+    mode: Mode,
     wal_lifetime: Option<wal_lifetime::WalIndexLifetime>,
 }
 
@@ -78,7 +78,7 @@ impl SqliteLedger {
             state: state.try_clone()?,
             path: state.path().join(DATABASE),
             busy,
-            policy: AccessPolicy::WritableLedger,
+            mode: Mode::Writable,
             wal_lifetime: None,
         };
         ledger.wal_lifetime = Some(wal_lifetime::WalIndexLifetime::initialize(&ledger)?);
@@ -103,16 +103,10 @@ impl SqliteLedger {
             path: state.path().join(DATABASE),
             state,
             busy: Self::BUSY_TIMEOUT,
-            policy: AccessPolicy::ObservationalLedger,
+            mode: Mode::ReadOnly,
             wal_lifetime: None,
         };
-        let version = ledger.read(|connection| {
-            let version = migrations::current(connection)?;
-            if version != 0 {
-                connection::companions(&ledger.state)?;
-            }
-            Ok(version)
-        })?;
+        let version = ledger.read(migrations::current)?;
         Ok((version != 0).then_some(ledger))
     }
 
@@ -124,19 +118,26 @@ impl SqliteLedger {
         self.read(migrations::current)
     }
 
-    fn open_connection(&self) -> Result<crate::database::Database, LedgerError> {
-        let retained = self
-            .wal_lifetime
+    fn retained(&self) -> Option<&connection::Identity> {
+        self.wal_lifetime
             .as_ref()
-            .map(wal_lifetime::WalIndexLifetime::connection);
-        connection::open(&self.state, self.busy, self.policy, retained)
+            .map(wal_lifetime::WalIndexLifetime::identity)
+    }
+
+    fn open_connection(&self) -> Result<rusqlite::Connection, LedgerError> {
+        connection::open(&self.state, self.busy, self.mode, self.retained())
+    }
+
+    fn close_connection(&self, connection: rusqlite::Connection) -> Result<(), LedgerError> {
+        connection::close(connection)
+            .and_then(|()| connection::verify(&self.state, self.retained()).map(|_| ()))
     }
 
     pub(crate) fn transaction<T>(
         &self,
         operation: impl FnOnce(&rusqlite::Transaction<'_>) -> Result<T, LedgerError>,
     ) -> Result<T, LedgerError> {
-        if self.policy != AccessPolicy::WritableLedger {
+        if self.mode != Mode::Writable {
             return Err(LedgerError::Io("read-only ledger".into()));
         }
         self.read(|connection| {
@@ -160,17 +161,17 @@ impl SqliteLedger {
         let reading = tests::schema_diagnostics::start("repo.read.start");
         #[cfg(test)]
         let opening = tests::schema_diagnostics::start("db.open.start");
-        let mut owner = self.open_connection()?;
+        let owner = self.open_connection()?;
         #[cfg(test)]
         tests::schema_diagnostics::end(opening, "db.open.end");
         #[cfg(test)]
         let operating = tests::schema_diagnostics::start("db.operation.start");
-        let result = owner.with_connection(operation);
+        let result = operation(&owner);
         #[cfg(test)]
         tests::schema_diagnostics::end(operating, "db.operation.end");
         #[cfg(test)]
         let closing = tests::schema_diagnostics::start("db.close.start");
-        let closed = owner.try_close().map_err(Into::into);
+        let closed = self.close_connection(owner);
         #[cfg(test)]
         tests::schema_diagnostics::end(closing, "db.close.end");
         let result = error::finish(result, closed);

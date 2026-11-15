@@ -81,7 +81,11 @@ fn linked(leaf: &str) {
     seed_seen(&sandbox, false);
     let path = sandbox.path().join("state/vpt").join(leaf);
     let held = sandbox.path().join("held-leaf");
-    std::fs::rename(&path, &held).unwrap();
+    if path.exists() {
+        std::fs::rename(&path, &held).unwrap();
+    } else {
+        std::fs::write(&held, b"").unwrap();
+    }
     std::os::unix::fs::symlink(&held, &path).unwrap();
     let before = snapshot(&sandbox);
     let document = run_json(&sandbox, 1);

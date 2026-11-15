@@ -84,6 +84,6 @@ fn child() {
             io::stdin().read_line(&mut command).unwrap();
             panic!("stall fixture unexpectedly received input");
         }
-        _ => crate::database::tests::run_scenario(&scenario, root),
+        _ => panic!("unknown owned child scenario"),
     }
 }

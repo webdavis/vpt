@@ -1,12 +1,14 @@
 mod copying;
+mod error;
 mod files;
 mod lease;
 mod query;
 
-use crate::database::{AccessPolicy, Database, DatabaseError};
+use crate::sqlite_open::{self, Mode};
 use crate::{ContainedError, RootDir};
+use error::DatabaseError;
 use lease::CopyLease;
-use std::cell::RefCell;
+use rusqlite::Connection;
 use std::path::Path;
 use std::time::Duration;
 use vpt_application::ports::TitleLookup;
@@ -17,7 +19,7 @@ const SIDE_FILES: [&str; 3] = [DATABASE, "CloudRecordings.db-wal", "CloudRecordi
 const TIMEOUT: Duration = Duration::from_secs(5);
 
 pub struct TitleCopy {
-    database: Option<RefCell<Database>>,
+    database: Option<Connection>,
     table: Option<String>,
     lease: Option<CopyLease>,
 }
@@ -41,11 +43,7 @@ impl TitleCopy {
     ) -> Result<Self, ContainedError> {
         Self::outcome((|| {
             let lease = copying::refresh(container, state, timeout)?;
-            Self::open_copy(
-                lease.root().try_clone()?,
-                AccessPolicy::RefreshedTitleCopy,
-                lease,
-            )
+            Self::open_copy(Mode::ReadOnlyOwnIndex, lease)
         })())
     }
 
@@ -54,7 +52,7 @@ impl TitleCopy {
             let state = RootDir::open(state_dir)?;
             let root = state.open_subdirectory(COPY_DIRECTORY)?;
             let lease = CopyLease::read(&root, TIMEOUT)?;
-            Self::open_copy(root, AccessPolicy::ExistingTitleCopy, lease)
+            Self::open_copy(Mode::ReadOnly, lease)
         })())
     }
 
@@ -78,34 +76,21 @@ impl TitleCopy {
         }
     }
 
-    fn open_copy(
-        root: RootDir,
-        policy: AccessPolicy,
-        lease: CopyLease,
-    ) -> Result<Self, DatabaseError> {
+    fn open_copy(mode: Mode, mut lease: CopyLease) -> Result<Self, DatabaseError> {
         lease.revalidate()?;
-        files::validate(&root)?;
-        let database = Database::open(root, Path::new(DATABASE), policy, TIMEOUT)?;
-        let mut copy = Self {
-            database: Some(RefCell::new(database)),
-            table: None,
-            lease: Some(lease),
-        };
-        copy.table = copy
-            .database
-            .as_mut()
-            .unwrap()
-            .get_mut()
-            .with_connection::<_, DatabaseError>(|connection| {
-                query::table(connection).map_err(Into::into)
-            })?;
-        if copy.table.is_none() {
+        files::validate(lease.root())?;
+        let database = sqlite_open::open(&lease.root().path().join(DATABASE), mode, TIMEOUT)?;
+        let Some(table) = query::table(&database)? else {
             return Ok(Self::unavailable());
+        };
+        if mode == Mode::ReadOnlyOwnIndex {
+            lease.downgrade()?;
         }
-        if policy == AccessPolicy::RefreshedTitleCopy {
-            copy.lease.as_mut().unwrap().downgrade()?;
-        }
-        Ok(copy)
+        Ok(Self {
+            database: Some(database),
+            table: Some(table),
+            lease: Some(lease),
+        })
     }
 
     pub fn title(&self, file_name: &str) -> TitleLookup {
@@ -116,11 +101,7 @@ impl TitleCopy {
         let result = (|| {
             lease.revalidate()?;
             files::validate(lease.root())?;
-            database
-                .borrow_mut()
-                .with_connection::<_, DatabaseError>(|connection| {
-                    query::title(connection, table, file_name).map_err(Into::into)
-                })
+            query::title(database, table, file_name).map_err(DatabaseError::from)
         })();
         match result {
             Ok(Some(title)) if !title.trim().is_empty() => TitleLookup::Titled(title),

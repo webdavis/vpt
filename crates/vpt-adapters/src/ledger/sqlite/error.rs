@@ -1,5 +1,4 @@
 use crate::ContainedError;
-use crate::database::DatabaseError;
 use rusqlite::ErrorCode;
 use vpt_application::ports::LedgerError;
 
@@ -26,16 +25,6 @@ pub(super) fn contained(error: ContainedError) -> LedgerError {
         | ContainedError::NotADirectory(path) => LedgerError::PathEscape(path),
         ContainedError::Io { path, kind } => {
             LedgerError::Io(format!("{kind:?} at {}", path.display()))
-        }
-    }
-}
-
-impl From<DatabaseError> for LedgerError {
-    fn from(error: DatabaseError) -> Self {
-        match error {
-            DatabaseError::Contained(error) => contained(error),
-            DatabaseError::Sqlite(error) => map(error),
-            DatabaseError::Io { operation, kind } => Self::Io(format!("{operation}: {kind:?}")),
         }
     }
 }

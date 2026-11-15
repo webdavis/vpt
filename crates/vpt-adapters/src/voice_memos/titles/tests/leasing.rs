@@ -1,7 +1,7 @@
 use super::fixture::{Fixture, titled, unchanged};
 use super::*;
-use crate::database::DatabaseError;
 use crate::test_support::snapshot;
+use crate::voice_memos::titles::error::DatabaseError;
 use crate::voice_memos::titles::lease::CopyLease;
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
@@ -22,8 +22,7 @@ fn copy(root: &RootDir) -> RootDir {
 
 fn busy<T>(result: Result<T, DatabaseError>) {
     assert!(
-        matches!(result, Err(DatabaseError::Sqlite(rusqlite::Error::SqliteFailure(code, _)))
-        if code.code == rusqlite::ErrorCode::DatabaseBusy),
+        matches!(result, Err(DatabaseError::Busy)),
         "lease contention must be Busy"
     );
 }
