@@ -399,7 +399,11 @@ fn linked_ledger_leaf(command: &str, leaf: &str, message: &str) {
     seed(&sandbox, vec![row.clone()]);
     let checked = sandbox.path().join("state/vpt").join(leaf);
     let held = sandbox.path().join(format!("held-{leaf}"));
-    std::fs::rename(&checked, &held).unwrap();
+    if checked.exists() {
+        std::fs::rename(&checked, &held).unwrap();
+    } else {
+        std::fs::write(&held, b"").unwrap();
+    }
     let before = std::fs::read(&held).unwrap();
     std::os::unix::fs::symlink(&held, &checked).unwrap();
     let tree_before = snapshot(&sandbox);

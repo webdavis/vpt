@@ -1,10 +1,14 @@
-use super::{SqliteLedger, connection, error, migrations};
-use crate::database::{AccessPolicy, Database};
+use super::connection::{self, Identity};
+use super::{SqliteLedger, error, migrations};
+use rusqlite::Connection;
 use std::fmt;
 use vpt_application::ports::LedgerError;
 
+/// Keeps one connection open for the ledger's life, so SQLite keeps the write-ahead log and its
+/// index between the connections each operation opens and closes.
 pub(super) struct WalIndexLifetime {
-    connection: Database,
+    _connection: Connection,
+    identity: Identity,
 }
 
 impl fmt::Debug for WalIndexLifetime {
@@ -16,35 +20,31 @@ impl fmt::Debug for WalIndexLifetime {
 }
 
 impl WalIndexLifetime {
-    pub(super) fn connection(&self) -> &Database {
-        &self.connection
+    pub(super) fn identity(&self) -> &Identity {
+        &self.identity
     }
 
     pub(super) fn initialize(ledger: &SqliteLedger) -> Result<Self, LedgerError> {
-        let mut owner = connection::open(&ledger.state, ledger.busy, ledger.policy, None)?;
-        let initialized = owner.with_connection(|connection| {
-            migrations::migrate(connection, || {
-                ledger.state.revalidate().map_err(error::contained)
-            })
+        connection::verify(&ledger.state, None)?;
+        connection::private(&ledger.state)?;
+        let owner = connection::open(&ledger.state, ledger.busy, ledger.mode, None)?;
+        let initialized = migrations::migrate(&owner, || {
+            ledger.state.revalidate().map_err(error::contained)
         });
         let retained = initialized.and_then(|()| Self::retain(ledger));
-        error::finish(retained, owner.try_close().map_err(Into::into))
+        error::finish(retained, connection::close(owner))
     }
 
     fn retain(ledger: &SqliteLedger) -> Result<Self, LedgerError> {
-        // Keep SQLite's WAL lifetime locks while per-operation connections still close normally.
-        // The completed read holds no transaction or WAL read mark between operations.
-        let mut connection = connection::open(
-            &ledger.state,
-            ledger.busy,
-            AccessPolicy::ObservationalLedger,
-            None,
-        )?;
+        let retained = connection::open(&ledger.state, ledger.busy, ledger.mode, None)?;
         let initialized =
-            connection.with_connection(|connection| migrations::current(connection).map(|_| ()));
+            migrations::current(&retained).and_then(|_| connection::verify(&ledger.state, None));
         match initialized {
-            Ok(()) => Ok(Self { connection }),
-            Err(error) => error::finish(Err(error), connection.try_close().map_err(Into::into)),
+            Ok(identity) => Ok(Self {
+                _connection: retained,
+                identity,
+            }),
+            Err(error) => error::finish(Err(error), connection::close(retained)),
         }
     }
 }

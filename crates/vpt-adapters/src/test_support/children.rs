@@ -33,15 +33,6 @@ pub(crate) struct ChildGuard {
     deadline: Instant,
 }
 
-pub(crate) fn child(scenario: &str, directory: &Path) -> io::Result<ChildGuard> {
-    spawn(
-        scenario,
-        directory,
-        std::env::var_os("VPT_TEST_ROOT_PID"),
-        Instant::now(),
-    )
-}
-
 pub(crate) fn child_for_root(
     scenario: &str,
     directory: &Path,

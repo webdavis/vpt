@@ -1,5 +1,5 @@
 use super::{SqliteLedger, error, map};
-use crate::database::AccessPolicy;
+use crate::sqlite_open::Mode;
 use rusqlite::{Transaction, TransactionBehavior};
 mod baseline;
 mod codec;
@@ -30,26 +30,25 @@ impl SqliteLedger {
         after_commit: impl FnOnce(),
         close_result: impl FnOnce(Result<(), LedgerError>) -> Result<(), LedgerError>,
     ) -> HistoryWrite<T> {
-        if self.policy != AccessPolicy::WritableLedger {
+        if self.mode != Mode::Writable {
             return HistoryWrite::Unconfirmed(LedgerError::Io("read-only ledger".into()));
         }
-        let mut owner = match self.open_connection() {
+        let owner = match self.open_connection() {
             Ok(owner) => owner,
             Err(error) => return HistoryWrite::Unconfirmed(error),
         };
         let mut committed = None;
-        let result = owner.with_connection(|connection| {
+        let result = (|| {
             let transaction =
-                Transaction::new_unchecked(connection, TransactionBehavior::Immediate)
-                    .map_err(map)?;
+                Transaction::new_unchecked(&owner, TransactionBehavior::Immediate).map_err(map)?;
             let receipt = operation(&transaction)?;
             self.state.revalidate().map_err(error::contained)?;
             transaction.commit().map_err(map)?;
             committed = Some(receipt);
             after_commit();
             Ok(())
-        });
-        let closed = close_result(owner.try_close().map_err(Into::into));
+        })();
+        let closed = close_result(self.close_connection(owner));
         let finished = error::finish(result, closed);
         match (finished, committed) {
             (Ok(()), Some(receipt)) => HistoryWrite::Committed(receipt),

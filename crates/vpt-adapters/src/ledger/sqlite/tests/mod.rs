@@ -1,17 +1,19 @@
 mod boundary;
 mod contract;
 mod identity;
+mod main_format;
 mod migration;
 mod observation;
 mod peers;
 mod retention;
 mod schema;
 pub(crate) mod schema_diagnostics;
+mod side_files;
 mod wal_lifetime;
 
 use super::{SqliteLedger, error, map};
 use crate::RootDir;
-use crate::database::{AccessPolicy, Database};
+use crate::sqlite_open::{self, Mode};
 use crate::test_support::{ChildGuard, child_for_root, root, turn};
 use rusqlite::Connection;
 use std::path::Path;
@@ -55,19 +57,17 @@ pub(super) fn supervised_prepared(scenario: &str, prepare: impl FnOnce(&RootDir)
     finish(child_for_root(scenario, temp.path(), std::process::id(), started).unwrap());
 }
 
+pub(in crate::ledger::sqlite) fn writable(root: &RootDir) -> Connection {
+    sqlite_open::open(&root.path().join("vpt.db"), Mode::Writable, Duration::ZERO).unwrap()
+}
+
 fn database<T>(
     root: &RootDir,
     operation: impl FnOnce(&Connection) -> Result<T, LedgerError>,
 ) -> Result<T, LedgerError> {
-    let mut owner = Database::open(
-        root.try_clone().unwrap(),
-        Path::new("vpt.db"),
-        AccessPolicy::WritableLedger,
-        Duration::ZERO,
-    )
-    .unwrap();
-    let result = owner.with_connection(operation);
-    error::finish(result, owner.try_close().map_err(LedgerError::from))
+    let connection = writable(root);
+    let result = operation(&connection);
+    error::finish(result, connection.close().map_err(|(_, error)| map(error)))
 }
 
 fn version(connection: &Connection) -> u32 {

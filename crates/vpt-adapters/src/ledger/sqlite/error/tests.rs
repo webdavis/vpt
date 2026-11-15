@@ -1,6 +1,5 @@
-use super::{finish, map};
+use super::{contained, finish, map};
 use crate::ContainedError;
-use crate::database::DatabaseError;
 use rusqlite::ffi::*;
 use std::io::ErrorKind;
 use std::path::PathBuf;
@@ -58,56 +57,6 @@ fn other_sqlite_errors_never_include_their_payload() {
 }
 
 #[test]
-fn typed_containment_keeps_the_refused_path() {
-    let path = PathBuf::from("owned-state/vpt.db");
-    for contained in [
-        ContainedError::Escape {
-            root: "owned-state".into(),
-            path: path.clone(),
-        },
-        ContainedError::NotRegular(path.clone()),
-        ContainedError::NotADirectory(path.clone()),
-    ] {
-        assert_eq!(
-            LedgerError::from(DatabaseError::Contained(contained)),
-            LedgerError::PathEscape(path.clone())
-        );
-    }
-}
-
-#[test]
-fn typed_sqlite_failure_keeps_its_classification() {
-    assert_eq!(
-        LedgerError::from(DatabaseError::Sqlite(sqlite(SQLITE_LOCKED, "private"))),
-        LedgerError::Busy
-    );
-}
-
-#[test]
-fn typed_storage_failure_reports_only_its_operation_and_kind() {
-    let error = LedgerError::from(DatabaseError::Io {
-        operation: "file sync",
-        kind: ErrorKind::PermissionDenied,
-    });
-    assert!(
-        matches!(&error, LedgerError::Io(message) if message.contains("file sync") && message.contains("PermissionDenied")),
-        "{error:?}"
-    );
-}
-
-#[test]
-fn an_ordinary_contained_io_error_is_not_path_escape() {
-    let error = LedgerError::from(DatabaseError::Contained(ContainedError::Io {
-        path: "owned-state/vpt.db".into(),
-        kind: ErrorKind::NotFound,
-    }));
-    assert!(
-        matches!(&error, LedgerError::Io(message) if message.contains("owned-state/vpt.db") && message.contains("NotFound")),
-        "{error:?}"
-    );
-}
-
-#[test]
 fn close_containment_takes_precedence_over_operation_failure() {
     let closed = LedgerError::PathEscape("owned-state".into());
     assert_eq!(
@@ -130,4 +79,31 @@ fn close_failure_replaces_an_operation_success() {
     let closed = LedgerError::Io("close".into());
     assert_eq!(finish(Ok(7), Ok(())).unwrap(), 7);
     assert_eq!(finish(Ok(7), Err(closed.clone())), Err(closed));
+}
+
+#[test]
+fn typed_containment_keeps_the_refused_path() {
+    let path = PathBuf::from("owned-state/vpt.db");
+    for error in [
+        ContainedError::Escape {
+            root: "owned-state".into(),
+            path: path.clone(),
+        },
+        ContainedError::NotRegular(path.clone()),
+        ContainedError::NotADirectory(path.clone()),
+    ] {
+        assert_eq!(contained(error), LedgerError::PathEscape(path.clone()));
+    }
+}
+
+#[test]
+fn an_ordinary_contained_io_error_is_not_path_escape() {
+    let error = contained(ContainedError::Io {
+        path: "owned-state/vpt.db".into(),
+        kind: ErrorKind::NotFound,
+    });
+    assert!(
+        matches!(&error, LedgerError::Io(message) if message.contains("owned-state/vpt.db") && message.contains("NotFound")),
+        "{error:?}"
+    );
 }

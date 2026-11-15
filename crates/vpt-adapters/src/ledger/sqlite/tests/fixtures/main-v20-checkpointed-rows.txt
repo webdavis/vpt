@@ -1,0 +1,37 @@
+table action_sends
+table artifact_expirations
+table dirty_publications
+Text("alpha")|Null|Text("first")|Integer(1)
+Text("beta")|Null|Text("second")|Integer(2)
+table engine_outputs
+table flags
+table history_export_failures
+table history_export_restarts
+table history_identity
+Integer(1)|Blob([240, 71, 150, 78, 55, 170, 239, 253, 122, 114, 9, 21, 216, 161, 61, 104])|Null|Null|Null|Null
+table history_records
+table history_runs
+table known_term_publications
+table learned_tags
+table ledger_identity
+Integer(1)|Text("bd69c5d3d9ab3994368d8ffb4cad0ad8")|Integer(2)
+table ledger_writes
+Integer(1)|Text("62db96c39e79cd287489dea6bbe96a71")
+Integer(2)|Text("d9b57d0962e0725fb6077bd6324eb27f")
+table mention_ambiguities
+table occasions
+table owned_briefs
+table owned_notes
+table proposals
+table recordings
+table relations
+table release_completions
+table release_payloads
+table releases
+table retention_intents
+table seen
+table sqlite_sequence
+table tag_renames
+table tags
+table transcripts
+table verified_artifacts

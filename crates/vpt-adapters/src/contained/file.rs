@@ -53,7 +53,7 @@ impl RootDir {
         open_relative(self.as_fd(), &name, flags, mode, leaf)
     }
 
-    fn named_stat(&self, path: &Path) -> Result<libc::stat, ContainedError> {
+    pub(super) fn named_stat(&self, path: &Path) -> Result<libc::stat, ContainedError> {
         let leaf = self.leaf(path)?;
         let name = self.c_name(&leaf)?;
         let mut raw = std::mem::MaybeUninit::<libc::stat>::uninit();

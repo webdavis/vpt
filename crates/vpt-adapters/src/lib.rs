@@ -6,7 +6,6 @@ pub use clock::SystemClock;
 pub mod config;
 mod contained;
 pub mod context;
-mod database;
 mod engines;
 mod events;
 mod extract;
@@ -29,6 +28,7 @@ mod prompt;
 pub mod proposal;
 mod record_lock;
 mod spawn;
+mod sqlite_open;
 mod stores;
 mod symlink;
 #[cfg(test)]

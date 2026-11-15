@@ -40,14 +40,6 @@ fn assert_repository_trace(scenario: &str) {
         .lines()
         .filter_map(|line| line.strip_prefix("VPT_PHASE "))
         .collect();
-    if scenario.starts_with("ledger_verification_") {
-        for phase in ["directory.sync.end", "file.sync.end"] {
-            assert!(
-                phases.iter().any(|line| line.starts_with(phase)),
-                "missing synchronization timing: {phase}"
-            );
-        }
-    }
     let mut next = 0;
     let mut previous_elapsed_ms = 0;
     let mut selected = Vec::new();

@@ -1,6 +1,7 @@
 mod boundaries;
 mod copies;
 mod fixture;
+mod held;
 mod leasing;
 mod peers;
 mod queries;
@@ -54,6 +55,7 @@ pub(crate) fn run_scenario(scenario: &str, root: RootDir, ready: fn()) {
         "title_lease_owner" => leasing::owner(&root),
         "title_lease_replaced" => leasing::replaced(&root),
         "title_convenience" => boundaries::convenience(&root),
+        s if s.starts_with("title_held_") => held::run(s, &root, ready),
         "title_peer_seed" | "title_peer_reader" | "title_peer_busy" | "title_peer_refresh" => {
             peers::participant(scenario, &root, ready)
         }

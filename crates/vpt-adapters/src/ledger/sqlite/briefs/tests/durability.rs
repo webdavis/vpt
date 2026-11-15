@@ -97,14 +97,8 @@ fn migration(root: &crate::RootDir, ledger: SqliteLedger, row: &OccasionRecord) 
     assert_eq!(observer.schema_version().unwrap(), 12);
     drop(observer);
     assert_eq!(crate::test_support::snapshot(root.path()), before);
-    let mut db = crate::database::Database::open(
-        root.try_clone().unwrap(),
-        std::path::Path::new("vpt.db"),
-        crate::database::AccessPolicy::WritableLedger,
-        std::time::Duration::ZERO,
-    )
-    .unwrap();
-    db.with_connection(|c| -> Result<(), LedgerError> {
+    let db = crate::ledger::sqlite::tests::writable(root);
+    (|c: &rusqlite::Connection| -> Result<(), LedgerError> {
         assert!(
             migrations::migrate(c, || Err(LedgerError::Io(
                 "injected migration failure".into()
@@ -121,7 +115,7 @@ fn migration(root: &crate::RootDir, ledger: SqliteLedger, row: &OccasionRecord) 
             .map_err(map)?;
         assert_eq!(tables, 0);
         Ok(())
-    })
+    })(&db)
     .unwrap();
     drop(db);
     let upgraded = SqliteLedger::open(root).unwrap();
