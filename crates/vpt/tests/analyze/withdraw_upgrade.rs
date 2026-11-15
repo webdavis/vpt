@@ -18,10 +18,13 @@ fn rewrite_as_schema_eighteen(sandbox: &Sandbox, id: &str) {
              UPDATE action_sends SET state = 'pending' WHERE id = '{id}@00:00#3';
              UPDATE action_sends SET state = 'refused' WHERE id = (
                  SELECT min(id) FROM action_sends WHERE id NOT IN ('{id}#1', '{id}@00:00#3'));
+             DROP TABLE ledger_writes;
+             DROP TABLE ledger_identity;
              PRAGMA user_version=18;"
         ))
         .unwrap();
     fixture::preserve_wal(&connection);
+    std::fs::remove_dir_all(sandbox.path().join("state/vpt/markers")).unwrap();
 }
 
 fn states(sandbox: &Sandbox) -> (i64, Vec<String>) {
@@ -62,7 +65,7 @@ fn a_schema_eighteen_ledger_withdraws_its_dropped_sent_and_pending_actions_once(
     assert_eq!(ids, [format!("{id}#1"), format!("{id}@00:00#3")]);
     assert_eq!(
         states(&sandbox),
-        (19, vec!["refused".into(), "sent".into()])
+        (20, vec!["refused".into(), "sent".into()])
     );
     assert_eq!(analyze(&sandbox, &id)["actions"], counts(0, 0, 0, 0));
     assert_eq!(attempts(&withdrawn), 2);

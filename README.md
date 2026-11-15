@@ -62,6 +62,29 @@ report the path as usable and create nothing. VPT checks overlaps from the neare
 so it refuses a path with `..` below a missing folder, a dangling symlink, a symlink that appears
 where a folder is about to be created, or a file where a folder belongs.
 
+## A ledger on more than one machine
+
+The ledger, `vpt.db` in `home.state_dir`, may sit in any folder you own, a folder a sync service
+manages included. Each ledger carries a random database id, a write counter that every writing
+command raises once, and the tokens of its last 10,000 writes. Each machine records the last write it
+made in a marker under `markers/` in the default state folder, `$XDG_STATE_HOME/vpt` or
+`~/.local/state/vpt`, which stays on the machine wherever `home.state_dir` points.
+
+Before a writing command changes anything, it compares the ledger with this machine's marker and
+refuses with exit 3 when this machine's last write is not in it:
+
+| Rule | What happened |
+| --- | --- |
+| `ledger_replaced` | the ledger is missing or is another ledger |
+| `ledger_behind` | the ledger is older than the one this machine last wrote |
+| `ledger_diverged` | another machine wrote it from an older copy, and this machine's last write is gone |
+
+The message names the folder, points at `vpt ledger show` and ends with `vpt ledger accept`. A
+higher counter that still holds this machine's last write is another machine's later write and is
+accepted. A machine with no marker, a deleted marker, or a changed `home.state_dir` path counts as
+a new machine. A write lost on a machine that never runs vpt again goes unnoticed, and nothing merges
+two histories.
+
 ## Apple speech helper
 
 `vpt-macos transcribe <audio-path> --locale en-US` emits a `vpt.engine/1` transcript with word
