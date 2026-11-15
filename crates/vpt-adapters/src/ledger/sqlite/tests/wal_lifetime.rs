@@ -1,5 +1,5 @@
 use super::{seed, supervised};
-use crate::database::{LockKind, set_record_lock};
+use crate::record_lock::{LockKind, set_record_lock};
 use crate::{Access, RootDir, SqliteLedger};
 use std::os::unix::fs::FileExt;
 use std::path::Path;
