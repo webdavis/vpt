@@ -49,7 +49,7 @@ pub(crate) fn run(scenario: &str, root: &crate::RootDir) {
             Some(accepted.clone())
         );
         drop(reopened);
-        let snapshot = crate::database::snapshot(root.path());
+        let snapshot = crate::test_support::snapshot(root.path());
         let observer = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
         assert_eq!(
             observer.accepted_proposal(&accepted.recording).unwrap(),
@@ -68,7 +68,7 @@ pub(crate) fn run(scenario: &str, root: &crate::RootDir) {
             Some(accepted.clone())
         );
         drop(observer);
-        assert_eq!(crate::database::snapshot(root.path()), snapshot);
+        assert_eq!(crate::test_support::snapshot(root.path()), snapshot);
     } else {
         let body = crate::ledger::proposal::codec::encode(&accepted).unwrap();
         for sql in [

@@ -56,7 +56,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) -> bool {
     let run = seed(&ledger);
     committed(ledger.commit_step(run, &ambiguity_delta(), &facts()));
     drop(ledger);
-    let before = crate::database::snapshot(root.path());
+    let before = crate::test_support::snapshot(root.path());
     let ledger = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
     assert_eq!(ledger.mention_ambiguities(&id).unwrap(), [ambiguity()]);
     assert_eq!(
@@ -68,7 +68,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) -> bool {
         [ambiguity()]
     );
     drop(ledger);
-    assert_eq!(crate::database::snapshot(root.path()), before);
+    assert_eq!(crate::test_support::snapshot(root.path()), before);
     true
 }
 fn corrupt(ledger: &SqliteLedger, index: usize) {

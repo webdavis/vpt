@@ -1,6 +1,6 @@
 use super::fixture::{Fixture, titled, unchanged};
 use super::*;
-use crate::database::{child_for_root, snapshot, test_root};
+use crate::test_support::{child_for_root, root, snapshot};
 use std::process::Output;
 use std::time::Instant;
 
@@ -15,7 +15,7 @@ fn success(output: &Output) {
 
 #[test]
 fn separate_process_reader_blocks_refresh_until_it_closes() {
-    let (temp, _root) = test_root();
+    let (temp, _root) = root();
     let spawn =
         |scenario| child_for_root(scenario, temp.path(), std::process::id(), Instant::now());
     let seeded = spawn("title_peer_seed").unwrap().finish().unwrap();
@@ -61,7 +61,7 @@ pub(super) fn participant(scenario: &str, root: &RootDir, ready: fn()) {
                     .unwrap();
             assert_eq!(copy.title("a.m4a"), TitleLookup::Unavailable);
             assert!(started.elapsed() >= Duration::from_millis(20));
-            assert!(started.elapsed() < crate::database::WATCHDOG);
+            assert!(started.elapsed() < crate::test_support::WATCHDOG);
             unchanged(&before, &snapshot(root.path()));
         }
         "title_peer_refresh" => {

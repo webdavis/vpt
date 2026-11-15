@@ -6,11 +6,11 @@ mod peers;
 mod queries;
 
 use super::*;
-use crate::database::{child_for_root, test_root};
+use crate::test_support::{child_for_root, root};
 use std::time::Instant;
 
 fn bounded(scenario: &str) {
-    let (temp, _root) = test_root();
+    let (temp, _root) = root();
     let child = child_for_root(scenario, temp.path(), std::process::id(), Instant::now())
         .expect("owned title child");
     let output = child.finish().expect("bounded title child");

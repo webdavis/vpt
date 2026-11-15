@@ -1,5 +1,5 @@
 use super::{CLEANUP_BOUND, WATCHDOG, child_for_root};
-use crate::database::tests::support::root;
+use crate::test_support::root;
 use std::io;
 use std::time::{Duration, Instant};
 

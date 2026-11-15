@@ -1,7 +1,7 @@
 use super::fixture::{Fixture, titled, unchanged};
 use super::*;
 use crate::VoiceMemosStore;
-use crate::database::snapshot;
+use crate::test_support::snapshot;
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use vpt_application::ports::RecorderStore;

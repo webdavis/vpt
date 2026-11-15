@@ -75,11 +75,11 @@ pub(super) fn run(scenario: &str, root: &RootDir) -> bool {
     } else {
         committed(ledger.commit_step(run, &delta(), &facts()));
         drop(ledger);
-        let before = crate::database::snapshot(root.path());
+        let before = crate::test_support::snapshot(root.path());
         let observer = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
         assert_eq!(observer.relations(&id).unwrap(), values());
         drop(observer);
-        assert_eq!(crate::database::snapshot(root.path()), before);
+        assert_eq!(crate::test_support::snapshot(root.path()), before);
         let ledger = SqliteLedger::open(root).unwrap();
         let mut delta = delta();
         let change = delta.relations.as_mut().unwrap();

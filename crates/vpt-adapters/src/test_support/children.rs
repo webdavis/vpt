@@ -2,7 +2,7 @@ mod budget;
 mod capture;
 mod identity;
 mod process;
-pub(super) mod scenarios;
+pub(crate) mod scenarios;
 mod supervision;
 mod turn;
 
@@ -33,11 +33,11 @@ pub(crate) struct ChildGuard {
     deadline: Instant,
 }
 
-pub(super) fn child(scenario: &str, directory: &Path) -> io::Result<ChildGuard> {
+pub(crate) fn child(scenario: &str, directory: &Path) -> io::Result<ChildGuard> {
     spawn(
         scenario,
         directory,
-        std::env::var_os("VPT_DATABASE_ROOT_PID"),
+        std::env::var_os("VPT_TEST_ROOT_PID"),
         Instant::now(),
     )
 }
@@ -86,7 +86,7 @@ fn spawn_with_signal(
     command
         .args([
             "--exact",
-            "database::tests::children::scenarios::database_child",
+            "test_support::children::scenarios::child",
             "--nocapture",
         ])
         .stdin(Stdio::piped())
@@ -100,10 +100,10 @@ fn spawn_with_signal(
         .env("XDG_STATE_HOME", directory.join("xdg-state"))
         .env("VPT_CONFIG", directory.join("config/vpt.toml"))
         .env("PATH", directory.join("bin"))
-        .env("VPT_DATABASE_SCENARIO", scenario)
-        .env("VPT_DATABASE_ROOT", &directory);
+        .env("VPT_TEST_SCENARIO", scenario)
+        .env("VPT_TEST_ROOT", &directory);
     if let Some(root_pid) = root_pid {
-        command.env("VPT_DATABASE_ROOT_PID", root_pid);
+        command.env("VPT_TEST_ROOT_PID", root_pid);
     }
     // SAFETY: the pre-exec closure uses raw process syscalls and stack-owned values.
     unsafe {

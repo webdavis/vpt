@@ -1,6 +1,6 @@
 use super::super::{OpenError, SCHEMA_VERSION, SqliteLedger};
 use super::{database, seed, seed_uncheckpointed, supervised};
-use crate::{RootDir, database::snapshot};
+use crate::{RootDir, test_support::snapshot};
 use std::os::unix::fs::PermissionsExt;
 use vpt_application::ports::LedgerError;
 

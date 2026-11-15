@@ -1,6 +1,7 @@
 use super::fixture::{Fixture, titled, unchanged};
 use super::*;
-use crate::database::{DatabaseError, snapshot};
+use crate::database::DatabaseError;
+use crate::test_support::snapshot;
 use crate::voice_memos::titles::lease::CopyLease;
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
@@ -39,7 +40,7 @@ pub(super) fn shared(root: &RootDir) {
     let started = Instant::now();
     busy(CopyLease::refresh(&copy, SHORT));
     assert!(started.elapsed() >= SHORT);
-    assert!(started.elapsed() < crate::database::WATCHDOG);
+    assert!(started.elapsed() < crate::test_support::WATCHDOG);
     unchanged(&before, &snapshot(root.path()));
     drop((reader, other));
     assert!(CopyLease::refresh(&copy, SHORT).is_ok());

@@ -11,7 +11,8 @@ mod wal_lifetime;
 
 use super::{SqliteLedger, error, map};
 use crate::RootDir;
-use crate::database::{AccessPolicy, ChildGuard, Database, child_for_root, root, turn};
+use crate::database::{AccessPolicy, Database};
+use crate::test_support::{ChildGuard, child_for_root, root, turn};
 use rusqlite::Connection;
 use std::path::Path;
 use std::time::{Duration, Instant};

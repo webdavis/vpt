@@ -1,6 +1,6 @@
 use super::*;
 use crate::RootDir;
-use crate::database::root;
+use crate::test_support::root;
 
 #[cfg(unix)]
 #[test]

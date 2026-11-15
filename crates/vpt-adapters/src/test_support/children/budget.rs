@@ -1,7 +1,7 @@
 use super::identity::terminal;
 use super::supervision::assert_reaped;
 use super::{CLEANUP_BOUND, ChildGuard, WATCHDOG, process, spawn_with_signal};
-use crate::database::tests::support::root;
+use crate::test_support::root;
 use std::io::{self, Write};
 use std::path::Path;
 use std::sync::mpsc::{self, Receiver};

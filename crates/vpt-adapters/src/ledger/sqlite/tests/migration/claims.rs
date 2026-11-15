@@ -28,7 +28,7 @@ pub(super) fn run(root: &crate::RootDir) {
             .map_err(map)
     })
     .unwrap();
-    let bytes = crate::database::snapshot(root.path());
+    let bytes = crate::test_support::snapshot(root.path());
     let observer = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
     let stale = observer
         .review_snapshot(&change.recording)
@@ -38,7 +38,7 @@ pub(super) fn run(root: &crate::RootDir) {
     assert!(stale.verified_claims.is_empty());
     assert_eq!(stale.stale_findings.len(), 1);
     drop(observer);
-    assert_eq!(crate::database::snapshot(root.path()), bytes);
+    assert_eq!(crate::test_support::snapshot(root.path()), bytes);
     database(root,|connection| {
         let error = LedgerError::Io("injected claim migration failure".into());
         assert_eq!(migrations::migrate(connection,||Err(error.clone())),Err(error));

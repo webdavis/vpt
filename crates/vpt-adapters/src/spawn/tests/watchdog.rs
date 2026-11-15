@@ -13,9 +13,9 @@ use std::time::{Duration, Instant};
 /// Lets a fixture child end itself a full second after the parent's deadline, so a stalled
 /// parent still reaches its deadline first.
 pub(super) const FALLBACK: Duration =
-    crate::database::WATCHDOG.saturating_add(Duration::from_secs(1));
+    crate::test_support::WATCHDOG.saturating_add(Duration::from_secs(1));
 pub(super) const WATCHDOG: Duration =
-    crate::database::WATCHDOG.saturating_add(Duration::from_secs(2));
+    crate::test_support::WATCHDOG.saturating_add(Duration::from_secs(2));
 
 pub(super) struct Registration {
     stop: Option<mpsc::Sender<()>>,

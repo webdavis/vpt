@@ -5,7 +5,7 @@ mod handles;
 mod listing;
 
 use super::*;
-use crate::database::{child_for_root, snapshot, test_root};
+use crate::test_support::{child_for_root, root, snapshot};
 use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -65,7 +65,7 @@ impl Fixture {
 }
 
 fn bounded(scenario: &str) {
-    let (temp, _root) = test_root();
+    let (temp, _root) = root();
     let child = child_for_root(scenario, temp.path(), std::process::id(), Instant::now())
         .expect("root-owned recorder child");
     let output = child.finish().expect("bounded recorder child");

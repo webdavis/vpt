@@ -92,9 +92,4 @@ impl DatabaseError {
 }
 
 #[cfg(test)]
-mod tests;
-
-#[cfg(test)]
-pub(crate) use tests::support::{root, snapshot};
-#[cfg(test)]
-pub(crate) use tests::{CLEANUP_BOUND, ChildGuard, WATCHDOG, child_for_root, test_root, turn};
+pub(crate) mod tests;

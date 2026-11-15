@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn held_lock_excludes_another_process() {
-    let (temp, _state) = test_root();
+    let (temp, _state) = root();
     let started = Instant::now();
     let mut holder = child("lock_hold", temp.path(), started);
     holder.ready().expect("holder acquired lock");

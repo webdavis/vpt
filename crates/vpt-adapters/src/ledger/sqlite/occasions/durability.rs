@@ -44,13 +44,13 @@ pub(super) fn run(scenario: &str, root: &crate::RootDir) -> bool {
             })
             .unwrap();
         drop(ledger);
-        let bytes = crate::database::snapshot(root.path());
+        let bytes = crate::test_support::snapshot(root.path());
         let observer = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
         assert_eq!(observer.schema_version().unwrap(), 11);
         assert!(matches!(observer.occasions(), Err(LedgerError::Corrupt(_))));
         assert_eq!(observer.pending_exports().unwrap(), history);
         drop(observer);
-        assert_eq!(crate::database::snapshot(root.path()), bytes);
+        assert_eq!(crate::test_support::snapshot(root.path()), bytes);
         let mut db = crate::database::Database::open(
             root.try_clone().unwrap(),
             std::path::Path::new("vpt.db"),
