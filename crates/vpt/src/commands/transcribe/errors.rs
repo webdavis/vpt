@@ -58,24 +58,22 @@ pub(crate) fn engine(error: TranscriptionError) -> Box<ErrorDocument> {
 }
 
 pub(crate) fn attempt(failure: &vpt_application::transcribe::AttemptFailure) -> String {
+    format!("{}: {}", failure.engine, cause(&failure.cause))
+}
+
+pub(crate) fn cause(cause: &vpt_application::ports::EngineFailure) -> String {
     use vpt_application::ports::EngineFailure;
-    match &failure.cause {
-        EngineFailure::WorkspaceCleanup(path) => format!(
-            "{}: temporary engine files retained at {:?}",
-            failure.engine, path
-        ),
-        EngineFailure::MissingSpeechAssets => format!(
-            "{}: required Apple speech assets are not installed",
-            failure.engine
-        ),
-        EngineFailure::Unavailable => format!(
-            "{}: engine executable or helper is unavailable",
-            failure.engine
-        ),
+    match cause {
+        EngineFailure::WorkspaceCleanup(path) => {
+            format!("temporary engine files retained at {path:?}")
+        }
+        EngineFailure::MissingSpeechAssets => {
+            "required Apple speech assets are not installed".into()
+        }
+        EngineFailure::Unavailable => "engine executable or helper is unavailable".into(),
         EngineFailure::SpeakerAnnotation(code) => format!(
-            "{}: whisply exited {code} when asked for speaker annotation (-a); it may lack speaker annotation, or the Hugging Face account behind the token may not have accepted the terms of pyannote/speaker-diarization-3.1 and pyannote/segmentation-3.0",
-            failure.engine
+            "whisply exited {code} when asked for speaker annotation (-a); it may lack speaker annotation, or the Hugging Face account behind the token may not have accepted the terms of pyannote/speaker-diarization-3.1 and pyannote/segmentation-3.0"
         ),
-        cause => format!("{}: {cause:?}", failure.engine),
+        cause => format!("{cause:?}"),
     }
 }

@@ -5,6 +5,7 @@ mod dispatch;
 mod doctor;
 mod documents;
 mod report;
+mod self_test;
 mod style;
 #[cfg(test)]
 mod test_temp;

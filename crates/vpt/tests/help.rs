@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "run",
     "setup",
     "doctor",
+    "test",
     "ingest",
     "import",
     "show",

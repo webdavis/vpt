@@ -28,6 +28,8 @@ mod prompt;
 pub mod proposal;
 mod record_lock;
 mod spawn;
+mod speech;
+pub use speech::{Clip, SpeechError, speak};
 mod sqlite_open;
 mod stores;
 mod symlink;

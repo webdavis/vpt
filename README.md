@@ -376,7 +376,7 @@ named, so doctor exits 1.
 
 Doctor never runs a part to see whether it works. Each configured part ends with a `test` row,
 `not tested`, whose advice names the command that tries it for real, such as `vpt test engines`.
-`vpt test` is not built yet. A part that is not configured is one `not_run` row naming the config
+`vpt test` has only the `engines` part so far; until the others arrive, it refuses their names. A part that is not configured is one `not_run` row naming the config
 key that turns it on; that is not an issue. A configured part whose program is missing is an issue.
 Where a part sends data off the machine when it runs, its row says so.
 
@@ -409,6 +409,38 @@ not exist; doctor reports that as `ok`, and `vpt import` works without it. A fol
 cannot be read, for example because the privacy system refuses access, is an issue. `kept_edits` is an
 issue while any store holds a version vpt kept beside a note, and lists each kept file by store and
 name.
+
+## vpt test
+
+`vpt test [part ...] [--json|--toon|--yaml]` makes each part do its real job once and reports. The
+only part so far is `engines`. Name parts to test only those, as in `vpt test engines`. An unknown
+name is refused with exit 2 and the list of valid names. Bare `vpt test` tests every configured part.
+A named part with nothing to test is refused with exit 2. In a bare run it is a `not_run` row, and a
+run that tests nothing exits 1. The configuration must load; otherwise vpt prints the configuration
+error and exits 2.
+
+`engines` runs macOS `say`, found on `PATH`, to speak a fixed made-up English sentence into a clip
+in a new private temporary folder. Each selected engine (the main engine, the checker and every
+language override) then transcribes that clip through the same checked path `vpt transcribe` uses,
+with the language `en-US`. A row is `ok` when the engine returns a valid engine document whose text
+holds at least two thirds of the sentence's distinct words, ignoring case and punctuation. Otherwise
+it is an issue, with the reason and what to do. Each row says how many words were heard and how
+many seconds the engine took. An engine that only a language override selects still runs on the
+English clip, and its row names that language. When `say` is missing or fails, the `clip` row is an
+issue and no engine runs.
+
+Nothing is kept. vpt writes nothing to the ledger, the archive, the notes or any store, and it
+removes the temporary folder at the end, also when an engine fails.
+
+| Part | What leaves the machine |
+| --- | --- |
+| `engines` | Nothing for Apple, whisply or a command engine declared local. A command engine declared remote receives the made-up clip, and its row says so. Anything an engine does on its own, such as downloading a model on first use, happens as it does in `vpt transcribe`. |
+
+The report has the same form as doctor's: the version line, a heading per part, rows marked `✓`,
+`⚠`, `✗` or `·`, advice after `→`, and "Needs attention". It goes to standard output. vpt exits 1
+when any row is an issue and 0 otherwise. `--json`, `--toon` and `--yaml` print the same fields as
+doctor, with `command` set to `test`. A program can run `vpt test engines --json`, read each
+engine row's `result` and `detail`, and act on its `advice`.
 
 ## Note writing
 

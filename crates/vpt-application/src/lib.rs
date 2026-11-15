@@ -1,3 +1,4 @@
+pub mod engine_trial;
 pub mod engines;
 mod ingest;
 mod inventory;

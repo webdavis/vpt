@@ -6,6 +6,7 @@ pub(super) fn run(args: &[String]) -> i32 {
     match args.first().map(String::as_str) {
         Some("--version") => version(args),
         Some("trash") => trash(args.get(1)),
+        Some("transcribe") => transcribe(),
         Some("command-sink") => command_sink(&args[1..]),
         Some("process-exchange") => super::exchange::run(&args[1..]),
         _ => 2,
@@ -61,6 +62,16 @@ fn log(document: Value) -> io::Result<()> {
         .open(path)?;
     serde_json::to_writer(&mut file, &document)?;
     writeln!(file)
+}
+
+fn transcribe() -> i32 {
+    let Some(document) = std::env::var_os("VPT_FAKE_DOCUMENT") else {
+        return 2;
+    };
+    match std::fs::read(document) {
+        Ok(bytes) if io::stdout().lock().write_all(&bytes).is_ok() => 0,
+        _ => 1,
+    }
 }
 
 fn trash(path: Option<&String>) -> i32 {
