@@ -102,6 +102,31 @@ pub struct Invocation {
     pub progress: bool,
 }
 
+impl Verb {
+    /// True for a command that reads the ledger and writes nothing; writing commands check the
+    /// ledger when they take the write lock.
+    pub fn reads_ledger_only(&self) -> bool {
+        match self {
+            Self::Occasions
+            | Self::OccasionPath { .. }
+            | Self::Path { .. }
+            | Self::Show { .. }
+            | Self::Search(_)
+            | Self::Review { .. }
+            | Self::List { .. } => true,
+            Self::Analyze { dry_run, .. }
+            | Self::AnalyzeBatch { dry_run, .. }
+            | Self::Run { dry_run, .. }
+            | Self::Transcribe { dry_run, .. }
+            | Self::Ingest { dry_run, .. }
+            | Self::TagRename { dry_run, .. }
+            | Self::RetentionRun { dry_run } => *dry_run,
+            Self::Brief(options) => options.dry_run || options.explain,
+            _ => false,
+        }
+    }
+}
+
 impl Invocation {
     pub(super) fn print(text: String) -> Self {
         Self {

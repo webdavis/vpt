@@ -30,7 +30,12 @@ pub fn run() -> ! {
         _ => None,
     };
     let code = match parse(args) {
-        Ok(invocation) => dispatch::run(&invocation),
+        Ok(invocation) => {
+            if invocation.verb.reads_ledger_only() {
+                compose::ledger_identity::warn(invocation.config.as_deref());
+            }
+            dispatch::run(&invocation)
+        }
         Err(error) => emit(
             Outcome::ParseFailure(
                 ErrorDocument::new(ErrorKind::Usage, error.message).diagnostics(error.tips),

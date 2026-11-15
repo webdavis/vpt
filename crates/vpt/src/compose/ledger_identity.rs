@@ -1,5 +1,6 @@
 use super::errors::{ledger_error, open_error, root_error};
 use super::{Environment, config_error};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use vpt_adapters::config::planned_directory;
 use vpt_adapters::{MarkerError, Markers, RootDir, SqliteLedger};
@@ -67,6 +68,23 @@ pub(crate) fn claim(state: &RootDir, markers: &Markers) -> Result<(), Box<ErrorD
         .map_err(|error| Box::new(ledger_error(error)))?;
     drop(ledger);
     markers.write(state.path(), &mark).map_err(marker_error)
+}
+
+/// Prints the finding as one line on standard error, so standard output stays as it would be. A
+/// failure here is left for the command itself to report.
+pub(crate) fn warn(config: Option<&Path>) {
+    let environment = Environment::from_process();
+    let Ok((observed, _)) = configured(&environment, config) else {
+        return;
+    };
+    if let Some(finding) = observed.finding() {
+        let line = format!(
+            "vpt: warning: {}: {}",
+            rule(finding),
+            message(&observed.folder, finding)
+        );
+        let _ = writeln!(std::io::stderr().lock(), "{line}");
+    }
 }
 
 pub(crate) fn rule(finding: Finding) -> &'static str {

@@ -6,6 +6,8 @@ mod accept;
 mod accepted;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
+#[path = "ledger_identity/read_only.rs"]
+mod read_only;
 #[path = "ledger_identity/refusals.rs"]
 mod refusals;
 #[path = "ledger_identity/show.rs"]
