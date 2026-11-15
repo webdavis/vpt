@@ -2,6 +2,7 @@ use super::report::{Check, Row};
 use crate::compose::{Environment, settings_from};
 use std::cell::OnceCell;
 use std::path::{Path, PathBuf};
+use vpt_adapters::Markers;
 use vpt_adapters::config::{RootError, Roots, resolve};
 use vpt_application::Settings;
 
@@ -24,6 +25,7 @@ const SKIPPED: &str = "the configuration did not load; see `vpt doctor config`";
 pub(super) struct Context {
     pub(super) settings: Settings,
     pub(super) roots: Result<Roots, RootError>,
+    pub(super) markers: Option<Markers>,
     helper: OnceCell<Row>,
 }
 
@@ -105,6 +107,7 @@ pub(super) fn run(
             .unwrap_or(Path::new("."));
         Context {
             roots: resolve(&settings, config_dir),
+            markers: crate::compose::ledger_identity::markers(environment).ok(),
             settings,
             helper: OnceCell::new(),
         }

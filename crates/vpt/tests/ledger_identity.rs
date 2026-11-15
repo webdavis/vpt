@@ -4,6 +4,8 @@
 mod accept;
 #[path = "ledger_identity/accepted.rs"]
 mod accepted;
+#[path = "ledger_identity/doctor.rs"]
+mod doctor;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
 #[path = "ledger_identity/read_only.rs"]

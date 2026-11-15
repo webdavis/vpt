@@ -5,8 +5,10 @@ use vpt_adapters::config::planned_directory;
 use vpt_application::ports::{LedgerError, RecordingLedger, SeenRow};
 
 pub(super) fn rows(context: &Context) -> Vec<Row> {
-    let opened = planned_directory(&context.settings.state_dir, "home.state_dir")
-        .map_err(|error| errors::root_error(&error).message)
+    let folder = planned_directory(&context.settings.state_dir, "home.state_dir")
+        .map_err(|error| errors::root_error(&error).message);
+    let opened = folder
+        .clone()
         .and_then(|path| RuntimeLedger::read_only(&path).map_err(|error| error.message));
     let ledger = match opened {
         Ok(ledger) => ledger,
@@ -34,7 +36,14 @@ pub(super) fn rows(context: &Context) -> Vec<Row> {
             },
         ),
     };
-    vec![database, schema, source_gone(ledger.seen_all())]
+    let mut rows = vec![database, schema, source_gone(ledger.seen_all())];
+    if let Ok(folder) = &folder {
+        rows.extend(super::ledger_identity::rows(
+            folder,
+            context.markers.as_ref(),
+        ));
+    }
+    rows
 }
 
 fn source_gone(rows: Result<Vec<SeenRow>, LedgerError>) -> Row {

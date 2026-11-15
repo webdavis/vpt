@@ -96,19 +96,21 @@ pub(crate) fn rule(finding: Finding) -> &'static str {
 }
 
 pub(crate) fn message(folder: &Path, finding: Finding) -> String {
-    let happened = match finding {
+    format!("{}: {}; {ADVICE}", folder.display(), happened(finding))
+}
+
+pub(crate) const ADVICE: &str =
+    "`vpt ledger show` lists the facts; if this ledger is the one to keep, run: vpt ledger accept";
+
+pub(crate) fn happened(finding: Finding) -> &'static str {
+    match finding {
         Finding::Replaced => "this ledger is missing or is not the one this machine last wrote",
         Finding::Behind => "this ledger is older than the one this machine last wrote",
         Finding::Diverged => {
             "another machine wrote this ledger from an older copy, and this machine's last write \
              is gone"
         }
-    };
-    format!(
-        "{}: {happened}; `vpt ledger show` lists the facts; if this ledger is the one to keep, \
-         run: vpt ledger accept",
-        folder.display()
-    )
+    }
 }
 
 pub(crate) fn marker_error(error: MarkerError) -> Box<ErrorDocument> {
