@@ -1,5 +1,6 @@
 mod boundary;
 mod contract;
+mod identity;
 mod migration;
 mod observation;
 mod peers;

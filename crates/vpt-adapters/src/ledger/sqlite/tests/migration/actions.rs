@@ -9,7 +9,7 @@ fn version_seventeen_upgrade_adds_an_empty_action_send_table() {
         .execute_batch("DROP TABLE action_sends; PRAGMA user_version=17;")
         .unwrap();
     migrations::migrate(&connection, || Ok(())).unwrap();
-    assert_eq!(migrations::current(&connection).unwrap(), 19);
+    assert_eq!(migrations::current(&connection).unwrap(), 20);
     assert_eq!(
         connection
             .query_row("SELECT count(*) FROM action_sends", [], |row| row
@@ -37,7 +37,7 @@ fn version_eighteen_upgrade_counts_every_saved_action_as_attempted() {
         ))
         .unwrap();
     migrations::migrate(&connection, || Ok(())).unwrap();
-    assert_eq!(migrations::current(&connection).unwrap(), 19);
+    assert_eq!(migrations::current(&connection).unwrap(), 20);
     let mut statement = connection
         .prepare("SELECT id, attempted, state FROM action_sends ORDER BY id")
         .unwrap();

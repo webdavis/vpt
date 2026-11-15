@@ -7,6 +7,7 @@ mod error;
 mod expirations;
 mod flags;
 mod history;
+mod identity;
 mod journal;
 mod migrations;
 mod notes;

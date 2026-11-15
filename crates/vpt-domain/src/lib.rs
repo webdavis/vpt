@@ -10,6 +10,7 @@ pub mod grounding;
 pub mod history;
 pub mod identity;
 pub mod layout;
+pub mod ledger_identity;
 pub mod normalize;
 pub mod note;
 pub mod occasion;
