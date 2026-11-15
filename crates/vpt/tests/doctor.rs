@@ -22,6 +22,8 @@ mod source;
 mod speakers;
 #[path = "doctor/state_dir.rs"]
 mod state_dir;
+#[path = "doctor/summary.rs"]
+mod summary;
 #[allow(
     dead_code,
     reason = "shared integration support serves other test targets"
