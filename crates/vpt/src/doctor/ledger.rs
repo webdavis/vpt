@@ -1,6 +1,8 @@
 use super::checks::Context;
 use super::report::Row;
 use crate::compose::{RuntimeLedger, errors};
+use crate::style::Verdict;
+use vpt_adapters::SCHEMA_VERSION;
 use vpt_adapters::config::planned_directory;
 use vpt_application::ports::{LedgerError, RecordingLedger, SeenRow};
 
@@ -30,10 +32,7 @@ pub(super) fn rows(context: &Context) -> Vec<Row> {
                 "database",
                 format!("opens read-only at {}", sqlite.database_path().display()),
             ),
-            match sqlite.schema_version() {
-                Ok(version) => Row::ok("schema", version.to_string()),
-                Err(error) => Row::issue("schema", errors::ledger_error(error).message),
-            },
+            schema(sqlite.schema_version()),
         ),
     };
     let mut rows = vec![database, schema, source_gone(ledger.seen_all())];
@@ -44,6 +43,19 @@ pub(super) fn rows(context: &Context) -> Vec<Row> {
         ));
     }
     rows
+}
+
+fn schema(version: Result<u32, LedgerError>) -> Row {
+    match version {
+        Ok(version) if version < SCHEMA_VERSION => Row::new(
+            "schema",
+            Verdict::Warning,
+            format!("{version}, older than {SCHEMA_VERSION}"),
+        )
+        .advice("the next writing command, such as `vpt run`, upgrades it"),
+        Ok(version) => Row::ok("schema", version.to_string()),
+        Err(error) => Row::issue("schema", errors::ledger_error(error).message),
+    }
 }
 
 fn source_gone(rows: Result<Vec<SeenRow>, LedgerError>) -> Row {
