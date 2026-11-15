@@ -26,7 +26,7 @@ pub(crate) fn run(scenario: &str, state: RootDir, ready: fn()) {
                 "contended lock did not wait"
             );
             assert!(
-                started.elapsed() < crate::database::WATCHDOG,
+                started.elapsed() < crate::test_support::WATCHDOG,
                 "contended lock exceeded its short wait"
             );
         }

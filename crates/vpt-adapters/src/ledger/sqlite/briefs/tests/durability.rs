@@ -91,12 +91,12 @@ fn migration(root: &crate::RootDir, ledger: SqliteLedger, row: &OccasionRecord) 
         c.execute_batch("DROP TABLE owned_briefs; UPDATE occasions SET brief_path='/briefs/legacy.md',pack='Private legacy pack',briefed_at=3; PRAGMA user_version=12;").map_err(map)
     }).unwrap();
     drop(ledger);
-    let before = crate::database::snapshot(root.path());
+    let before = crate::test_support::snapshot(root.path());
     let observer = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
     assert!(observer.brief(&row.id).unwrap().is_none());
     assert_eq!(observer.schema_version().unwrap(), 12);
     drop(observer);
-    assert_eq!(crate::database::snapshot(root.path()), before);
+    assert_eq!(crate::test_support::snapshot(root.path()), before);
     let mut db = crate::database::Database::open(
         root.try_clone().unwrap(),
         std::path::Path::new("vpt.db"),

@@ -27,12 +27,12 @@ pub(super) fn run(root: &crate::RootDir) {
             .map_err(map)
     })
     .unwrap();
-    let before = crate::database::snapshot(root.path());
+    let before = crate::test_support::snapshot(root.path());
     let observer = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
     assert!(observer.mention_ambiguities(&id).unwrap().is_empty());
     assert_eq!(observer.relations(&id).unwrap(), relations);
     drop(observer);
-    assert_eq!(crate::database::snapshot(root.path()), before);
+    assert_eq!(crate::test_support::snapshot(root.path()), before);
     database(root, |connection| {
         let error = LedgerError::Io("relation migration fixture".into());
         assert_eq!(migrations::migrate(connection, || Err(error.clone())), Err(error));

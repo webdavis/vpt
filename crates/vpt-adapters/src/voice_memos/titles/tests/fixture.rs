@@ -1,5 +1,5 @@
 use super::*;
-use crate::database::snapshot;
+use crate::test_support::snapshot;
 use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;

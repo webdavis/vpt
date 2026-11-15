@@ -1,14 +1,22 @@
-pub(super) mod children;
 mod failures;
 mod files;
 mod locks;
 mod owner;
+mod scenarios;
 mod shared_memory;
-pub(super) mod support;
 mod wal;
 
-pub(crate) use children::{CLEANUP_BOUND, ChildGuard, WATCHDOG, child_for_root, turn};
+use crate::test_support::children;
+pub(crate) use scenarios::run_scenario;
 
-pub(crate) fn test_root() -> (tempfile::TempDir, crate::RootDir) {
-    support::root()
+pub(super) mod support {
+    use super::super::FileRole;
+    pub(crate) use crate::test_support::{root, snapshot};
+
+    pub(crate) const ROLES: [(FileRole, &str); 4] = [
+        (FileRole::Database, "vpt.db"),
+        (FileRole::Journal, "vpt.db-journal"),
+        (FileRole::Wal, "vpt.db-wal"),
+        (FileRole::SharedMemory, "vpt.db-shm"),
+    ];
 }

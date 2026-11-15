@@ -1,7 +1,7 @@
 mod status;
 
 use super::{ChildGuard, spawn_with_signal};
-use crate::database::tests::support::root;
+use crate::test_support::root;
 use std::io;
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};

@@ -53,14 +53,14 @@ fn opening_a_fifo_returns_not_regular_without_a_writer() {
     let outcome = loop {
         match child.0.try_wait().expect("child status") {
             Some(status) => break Some(status),
-            None if started.elapsed() < crate::database::WATCHDOG => std::thread::yield_now(),
+            None if started.elapsed() < crate::test_support::WATCHDOG => std::thread::yield_now(),
             None => break None,
         }
     };
     drop(child);
     let elapsed = started.elapsed();
     assert!(
-        elapsed < crate::database::WATCHDOG.saturating_add(Duration::from_millis(500)),
+        elapsed < crate::test_support::WATCHDOG.saturating_add(Duration::from_millis(500)),
         "FIFO test exceeded its cleanup bound: {elapsed:?}"
     );
     assert!(

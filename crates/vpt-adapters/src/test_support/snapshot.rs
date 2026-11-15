@@ -1,4 +1,3 @@
-use super::super::FileRole;
 use crate::RootDir;
 use std::ffi::{CStr, CString, OsStr};
 use std::fs::{self, File};
@@ -7,13 +6,6 @@ use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
-
-pub(super) const ROLES: [(FileRole, &str); 4] = [
-    (FileRole::Database, "vpt.db"),
-    (FileRole::Journal, "vpt.db-journal"),
-    (FileRole::Wal, "vpt.db-wal"),
-    (FileRole::SharedMemory, "vpt.db-shm"),
-];
 
 pub(crate) fn root() -> (tempfile::TempDir, RootDir) {
     let temp = crate::test_temp::tempdir().expect("owned temp");

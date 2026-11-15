@@ -158,13 +158,13 @@ fn read_only_version_fourteen_inventory_and_journal_remain_observational() {
         })
         .unwrap();
     drop(ledger);
-    let bytes = crate::database::snapshot(root.path());
+    let bytes = crate::test_support::snapshot(root.path());
     let observer = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
     assert_eq!(observer.retention_artifacts().unwrap(), before);
     assert_eq!(observer.pending_intents().unwrap(), pending);
     assert_eq!(observer.schema_version().unwrap(), 14);
     drop(observer);
-    assert_eq!(crate::database::snapshot(root.path()), bytes);
+    assert_eq!(crate::test_support::snapshot(root.path()), bytes);
     let migrated = SqliteLedger::open(&root).unwrap();
     assert_eq!(migrated.schema_version().unwrap(), 20);
     assert_eq!(migrated.retention_artifacts().unwrap(), before);

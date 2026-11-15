@@ -80,7 +80,7 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
         if scenario.contains("_replace_") {
             std::fs::copy(&held, &path).unwrap();
         }
-        let mut before = crate::database::snapshot(root.path());
+        let mut before = crate::test_support::snapshot(root.path());
         assert_eq!(
             ledger.schema_version(),
             Err(LedgerError::PathEscape(path.clone()))
@@ -90,11 +90,11 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
             HistoryWrite::Unconfirmed(LedgerError::PathEscape(path)),
         );
         assert!(
-            crate::database::snapshot(root.path()) == before,
+            crate::test_support::snapshot(root.path()) == before,
             "refusal before drop changed database files"
         );
         drop(ledger);
-        let mut after = crate::database::snapshot(root.path());
+        let mut after = crate::test_support::snapshot(root.path());
         let mapped = if role == "shm" {
             held
         } else {

@@ -34,7 +34,7 @@ pub(super) fn reopen(root: &RootDir) {
     let reopened = SqliteLedger::open(root).unwrap();
     assert_eq!(reopened.review_snapshot(&record(81).id).unwrap(), before);
     drop(reopened);
-    let snapshot = crate::database::snapshot(root.path());
+    let snapshot = crate::test_support::snapshot(root.path());
     let reader = SqliteLedger::open_read_only(root.path()).unwrap().unwrap();
     assert_eq!(reader.review_snapshot(&record(81).id).unwrap(), before);
     assert_eq!(
@@ -42,5 +42,5 @@ pub(super) fn reopen(root: &RootDir) {
         before.unwrap()
     );
     drop(reader);
-    assert_eq!(crate::database::snapshot(root.path()), snapshot);
+    assert_eq!(crate::test_support::snapshot(root.path()), snapshot);
 }

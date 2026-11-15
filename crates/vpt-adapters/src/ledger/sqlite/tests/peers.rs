@@ -1,7 +1,7 @@
 use super::super::SqliteLedger;
 use super::{finish, map, seed, seed_uncheckpointed};
 use crate::RootDir;
-use crate::database::{child_for_root, root, snapshot};
+use crate::test_support::{child_for_root, root, snapshot};
 use rusqlite::Connection;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -60,7 +60,7 @@ pub(super) fn run(scenario: &str, root: &RootDir, ready: fn(), native: fn(&Path)
             });
             assert_eq!(result, Err(LedgerError::Busy));
             assert!(started.elapsed() >= Duration::from_millis(40));
-            assert!(started.elapsed() < crate::database::WATCHDOG);
+            assert!(started.elapsed() < crate::test_support::WATCHDOG);
         }
         "ledger_peer_holder" | "ledger_peer_live_writer" => {
             if scenario == "ledger_peer_live_writer" {

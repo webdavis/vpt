@@ -21,7 +21,7 @@ fn assert_repository_trace(scenario: &str) {
     let started = Instant::now();
     let child = super::child_for_root(scenario, temp.path(), std::process::id(), started).unwrap();
     let output = child.finish().expect("bounded ledger trace child");
-    assert!(started.elapsed() < crate::database::CLEANUP_BOUND);
+    assert!(started.elapsed() < crate::test_support::CLEANUP_BOUND);
     assert!(
         output.status.success(),
         "owned trace child failed: {}",
@@ -118,7 +118,7 @@ static ORIGIN: OnceLock<Option<Instant>> = OnceLock::new();
 
 pub(crate) fn start(phase: &'static str) -> Option<Instant> {
     let origin = ORIGIN.get_or_init(|| {
-        std::env::var("VPT_DATABASE_SCENARIO")
+        std::env::var("VPT_TEST_SCENARIO")
             .is_ok_and(|scenario| {
                 scenario.starts_with("ledger_contract_")
                     || scenario.starts_with("ledger_verification_")

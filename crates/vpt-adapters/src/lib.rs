@@ -31,6 +31,8 @@ mod spawn;
 mod stores;
 mod symlink;
 #[cfg(test)]
+mod test_support;
+#[cfg(test)]
 mod test_temp;
 pub use analysis::CommandAgent;
 mod action_command;

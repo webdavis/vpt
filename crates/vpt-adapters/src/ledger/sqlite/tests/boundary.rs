@@ -1,6 +1,6 @@
 use super::super::{OpenError, SqliteLedger};
 use super::{database, map, seed, supervised};
-use crate::{ContainedError, RootDir, database::snapshot};
+use crate::{ContainedError, RootDir, test_support::snapshot};
 use std::os::unix::fs::symlink;
 use vpt_application::ports::LedgerError;
 

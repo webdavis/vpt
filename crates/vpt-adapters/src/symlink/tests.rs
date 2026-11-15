@@ -3,7 +3,7 @@ mod inspect;
 mod verify;
 
 use super::{LinkState, SymlinkError};
-use crate::database::snapshot;
+use crate::test_support::snapshot;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
