@@ -151,3 +151,16 @@ fn a_token_on_an_unselected_whisply_says_no_labels_will_come() {
         "unused, available, local, token set but whisply is not selected, so no speaker labels"
     );
 }
+
+#[test]
+fn engines_end_with_a_not_tested_row_naming_the_test_command() {
+    let sandbox = configured("doctor-engine-not-tested");
+    let document = run_json(&sandbox, 0);
+    let rows = check(&document, "engines")["rows"].as_array().unwrap();
+    let last = rows.last().unwrap();
+    assert_eq!(last["name"], "test");
+    assert_eq!(last["result"], "not_run");
+    assert_eq!(last["detail"], "not tested");
+    assert_eq!(last["advice"], "run `vpt test engines`");
+    assert_eq!(check(&document, "engines")["result"], "ok");
+}

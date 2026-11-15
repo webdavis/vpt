@@ -300,7 +300,7 @@ for its version. It leaves vault contents, permissions, links and ignore files u
 | `ledger` | `database` (opened read-only), `schema`, `source_gone` (recordings whose source file is gone) |
 | `recordings` | `folder`, the Voice Memos folder; one row per Apple subfolder with its entry count |
 | `helper` | `vpt-macos`, its version, or how to install it |
-| `engines` | one row per configured engine: selected or unused, available or not, local or remote |
+| `engines` | one row per configured engine: selected or unused, available or not, local or remote; `test` |
 | `leftovers` | `staged_audio` waiting for the Trash; `kept_edits`, versions vpt kept beside a note |
 
 Name checks to run only those, as in `vpt doctor helper engines`. An unknown name is refused with
@@ -308,6 +308,10 @@ exit 2 and the list of valid names. Each row is `ok`, `warning`, `issue` or `not
 its worst row. A check that cannot run because the configuration did not load is `not_run` with no
 rows, and its advice says so. The `config` check is then shown with its issue even when it was not
 named, so doctor exits 1.
+
+Doctor never runs a part to see whether it works. Each configured part ends with a `test` row,
+`not tested`, whose advice names the command that tries it for real, such as `vpt test engines`.
+`vpt test` is not built yet.
 
 The report goes to standard output. The first line is vpt's version. Each check opens with a heading,
 its name and what it reads after `──`; each row is `name: detail` marked `✓`, `⚠`, `✗` or `·`, with
