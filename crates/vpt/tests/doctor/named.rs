@@ -1,7 +1,7 @@
 use crate::fixture::{CHECKS, check, configured, names, report, row};
 use crate::support::{run, stderr, stdout};
 
-const VALID: &str = "expected one of config, stores, ledger, recordings, helper, engines, speakers, summary, leftovers";
+const VALID: &str = "expected one of config, stores, ledger, recordings, helper, engines, speakers, summary, actions, leftovers";
 
 #[test]
 fn named_checks_run_alone_in_display_order_once_each() {

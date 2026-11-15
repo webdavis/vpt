@@ -1,3 +1,5 @@
+#[path = "doctor/actions.rs"]
+mod actions;
 #[path = "doctor/active_writer.rs"]
 mod active_writer;
 #[path = "doctor/engines.rs"]

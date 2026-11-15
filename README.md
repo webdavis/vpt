@@ -303,6 +303,7 @@ for its version. It leaves vault contents, permissions, links and ignore files u
 | `engines` | one row per configured engine: selected or unused, available or not, local or remote; `test` |
 | `speakers` | `token`, whether a Hugging Face token is set; `whisply`, whether that engine is selected; `test` |
 | `summary` | `command`, the analysis command: configured or not, available or not; `test` |
+| `actions` | `command` and `withdraw_command`: configured or not, available or not; `env`, the names of the variables set for them, never their values; `test` |
 | `leftovers` | `staged_audio` waiting for the Trash; `kept_edits`, versions vpt kept beside a note |
 
 Name checks to run only those, as in `vpt doctor helper engines`. An unknown name is refused with
@@ -320,7 +321,9 @@ Where a part sends data off the machine when it runs, its row says so.
 Speaker labels need a Hugging Face token on a whisply engine that the default pair or a language
 override selects. The token is never shown. A token on a whisply engine nothing selects is a warning,
 since no labels come from it. The summary command receives the full transcript, so whatever it calls
-sees it.
+sees it. The action commands send each follow-up and each withdrawal to whatever they call. Until a
+withdraw command is set, the `test` advice for actions asks for one first, so a test never leaves a
+follow-up behind.
 
 The report goes to standard output. The first line is vpt's version. Each check opens with a heading,
 its name and what it reads after `──`; each row is `name: detail` marked `✓`, `⚠`, `✗` or `·`, with
