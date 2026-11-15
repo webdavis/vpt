@@ -1,6 +1,7 @@
-use super::errors::{ledger_error, open_error};
+use super::errors::{ledger_error, open_error, root_error};
 use super::{Environment, config_error};
 use std::path::{Path, PathBuf};
+use vpt_adapters::config::planned_directory;
 use vpt_adapters::{MarkerError, Markers, RootDir, SqliteLedger};
 use vpt_domain::ledger_identity::{Finding, LedgerIdentity, WriteMark};
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
@@ -25,6 +26,17 @@ pub(crate) fn markers(environment: &Environment) -> Result<Markers, Box<ErrorDoc
         None => PathBuf::from(default),
     };
     Ok(Markers::new(folder.join("markers")))
+}
+
+pub(crate) fn configured(
+    environment: &Environment,
+    config: Option<&Path>,
+) -> Result<(Observed, Markers), Box<ErrorDocument>> {
+    let settings = super::settings_from(environment, config)?;
+    let folder = planned_directory(&settings.state_dir, "home.state_dir")
+        .map_err(|error| Box::new(root_error(&error)))?;
+    let markers = markers(environment)?;
+    Ok((observe(&folder, &markers)?, markers))
 }
 
 pub(crate) fn observe(folder: &Path, markers: &Markers) -> Result<Observed, Box<ErrorDocument>> {
@@ -65,7 +77,7 @@ pub(crate) fn rule(finding: Finding) -> &'static str {
     }
 }
 
-fn message(folder: &Path, finding: Finding) -> String {
+pub(crate) fn message(folder: &Path, finding: Finding) -> String {
     let happened = match finding {
         Finding::Replaced => "this ledger is missing or is not the one this machine last wrote",
         Finding::Behind => "this ledger is older than the one this machine last wrote",

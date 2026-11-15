@@ -108,6 +108,11 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             invocation.config.as_deref(),
             checks,
         ),
+        Verb::Ledger(action) => commands::ledger::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            action,
+        ),
         Verb::Version => commands::version::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),

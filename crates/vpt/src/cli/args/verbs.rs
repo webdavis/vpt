@@ -1,6 +1,6 @@
 use super::{
-    PathBuf, Verb, analyze, brief, completion, confirm, examples, groups, import, pipeline, redact,
-    review, search, show,
+    PathBuf, Verb, analyze, brief, completion, confirm, examples, groups, import, ledger, pipeline,
+    redact, review, search, show,
 };
 
 #[derive(clap::Subcommand)]
@@ -90,6 +90,9 @@ pub(super) enum Command {
     /// Manage the home link.
     #[command(subcommand, after_long_help = examples::DOCS)]
     Symlink(groups::Symlink),
+    /// See whether the ledger is the one this machine last wrote, and accept it.
+    #[command(subcommand, after_long_help = examples::DOCS)]
+    Ledger(ledger::Action),
     /// Print the vpt and helper versions.
     #[command(after_long_help = examples::VERSION)]
     Version,
@@ -123,6 +126,7 @@ impl Command {
             Self::Brief(args) => return args.verb(),
             Self::Redact(options) => return options.verb(),
             Self::Symlink(symlink) => symlink.verb(),
+            Self::Ledger(action) => Verb::Ledger(action),
             Self::Version => Verb::Version,
             Self::Completion(completion) => completion.verb(),
         })

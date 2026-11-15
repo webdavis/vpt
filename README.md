@@ -85,6 +85,18 @@ accepted. A machine with no marker, a deleted marker, or a changed `home.state_d
 a new machine. A write lost on a machine that never runs vpt again goes unnoticed, and nothing merges
 two histories.
 
+`vpt ledger show [--json|--toon|--yaml]` prints the folder, the database id, the write counter, the
+recording count, this machine's last write and the finding, if any; it writes nothing. Its document
+holds `folder`, `database` (`id`, `write_counter`, `recordings`, or `null` before the first write),
+`this_machine` (`database_id`, `write_counter`, `write_token`, or `null`) and `finding` (`rule` and
+`message`, or `null`). The error document carries the rule; the counters are in this document.
+
+`vpt ledger accept` trusts the ledger as it is now, for example after you restore a backup on
+purpose: it rewrites this machine's marker from the ledger, so the next writing command builds on
+it. `--preview` prints the same facts as `vpt ledger show` and changes nothing. With nothing to
+accept, both are refused with exit 2, so a script cannot run accept as a habit. `vpt ledger` alone
+shows help.
+
 ## Apple speech helper
 
 `vpt-macos transcribe <audio-path> --locale en-US` emits a `vpt.engine/1` transcript with word
