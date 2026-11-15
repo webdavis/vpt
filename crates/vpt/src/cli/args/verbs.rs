@@ -24,6 +24,9 @@ pub(super) enum Command {
         /// Run only these checks.
         #[arg(value_name = "CHECK", value_parser = clap::builder::PossibleValuesParser::new(crate::doctor::NAMES))]
         checks: Vec<String>,
+        /// Create what is missing: the starter configuration, private folders and the home link.
+        #[arg(long)]
+        fix: bool,
     },
     /// Archive new Voice Memos recordings.
     #[command(after_long_help = examples::INGEST)]
@@ -109,7 +112,7 @@ impl Command {
         Ok(match self {
             Self::Run(run) => run.verb(),
             Self::Setup { overwrite, engine } => Verb::Setup { overwrite, engine },
-            Self::Doctor { checks } => Verb::Doctor { checks },
+            Self::Doctor { checks, fix } => Verb::Doctor { checks, fix },
             Self::Ingest { dry_run, once } => Verb::Ingest { dry_run, once },
             Self::Import(options) => return options.verb(),
             Self::Show(args) => return args.verb(),

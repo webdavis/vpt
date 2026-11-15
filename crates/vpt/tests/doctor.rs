@@ -6,6 +6,10 @@ mod active_writer;
 mod calendar;
 #[path = "doctor/engines.rs"]
 mod engines;
+#[path = "doctor/fix.rs"]
+mod fix;
+#[path = "doctor/fix_leaves.rs"]
+mod fix_leaves;
 #[path = "doctor/fixture.rs"]
 mod fixture;
 #[path = "doctor/human.rs"]

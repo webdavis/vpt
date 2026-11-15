@@ -88,7 +88,7 @@ impl Check {
     }
 }
 
-pub(super) fn outcome(checks: &[Check]) -> Outcome {
+pub(super) fn outcome(checks: &[Check], fixed: Option<Vec<Value>>) -> Outcome {
     let attention: Vec<(&Check, &Row)> = [Verdict::Issue, Verdict::Warning]
         .into_iter()
         .flat_map(|wanted| {
@@ -108,12 +108,13 @@ pub(super) fn outcome(checks: &[Check]) -> Outcome {
                 "detail": row.detail, "advice": row.advice})
         })
         .collect();
-    let document = document(
-        "doctor",
-        json!({"version": env!("CARGO_PKG_VERSION"),
-            "checks": checks.iter().map(Check::json).collect::<Vec<_>>(),
-            "needs_attention": needs_attention}),
-    );
+    let mut body = json!({"version": env!("CARGO_PKG_VERSION"),
+        "checks": checks.iter().map(Check::json).collect::<Vec<_>>(),
+        "needs_attention": needs_attention});
+    if let Some(fixed) = fixed {
+        body["fixed"] = Value::Array(fixed);
+    }
+    let document = document("doctor", body);
     let entries: Vec<(Verdict, String)> = attention
         .iter()
         .map(|(check, row)| {
