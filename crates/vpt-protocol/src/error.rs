@@ -1,4 +1,3 @@
-use serde::Serialize;
 use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,15 +35,6 @@ impl ErrorKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-pub struct Check {
-    pub name: String,
-    pub ok: bool,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub notice: bool,
-    pub detail: String,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorDocument {
     /// Execution status for run history; omitted from the public error document.
@@ -54,7 +44,6 @@ pub struct ErrorDocument {
     pub message: String,
     pub ids: Vec<String>,
     pub completed: Vec<String>,
-    pub checks: Option<Vec<Check>>,
     pub diagnostics: Vec<String>,
 }
 
@@ -67,7 +56,6 @@ impl ErrorDocument {
             message: message.into(),
             ids: vec![],
             completed: vec![],
-            checks: None,
             diagnostics: vec![],
         }
     }
@@ -81,10 +69,6 @@ impl ErrorDocument {
     }
     pub fn completed(mut self, completed: Vec<String>) -> Self {
         self.completed = completed;
-        self
-    }
-    pub fn checks(mut self, checks: Vec<Check>) -> Self {
-        self.checks = Some(checks);
         self
     }
     pub fn diagnostics(mut self, diagnostics: Vec<String>) -> Self {
@@ -104,26 +88,6 @@ impl ErrorDocument {
         error.insert("message".into(), self.message.clone().into());
         error.insert("ids".into(), self.ids.clone().into());
         error.insert("completed".into(), self.completed.clone().into());
-        if let Some(checks) = &self.checks {
-            error.insert(
-                "checks".into(),
-                Value::Array(
-                    checks
-                        .iter()
-                        .map(|check| {
-                            let mut fields = serde_json::Map::new();
-                            fields.insert("name".into(), check.name.clone().into());
-                            fields.insert("ok".into(), check.ok.into());
-                            if check.notice {
-                                fields.insert("notice".into(), true.into());
-                            }
-                            fields.insert("detail".into(), check.detail.clone().into());
-                            Value::Object(fields)
-                        })
-                        .collect(),
-                ),
-            );
-        }
         if !self.diagnostics.is_empty() {
             error.insert("diagnostics".into(), self.diagnostics.clone().into());
         }

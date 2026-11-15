@@ -51,42 +51,6 @@ fn a_non_refusal_has_a_null_rule() {
 }
 
 #[test]
-fn checks_appear_only_when_given() {
-    let plain = ErrorDocument::new(ErrorKind::Refused, "checks failed").rule("doctor_checks");
-    assert!(plain.to_json()["error"].get("checks").is_none());
-    let json = plain
-        .checks(vec![
-            Check {
-                name: "helper".into(),
-                ok: false,
-                notice: false,
-                detail: "absent".into(),
-            },
-            Check {
-                name: "config".into(),
-                ok: true,
-                notice: false,
-                detail: "valid".into(),
-            },
-            Check {
-                name: "recordings_dir".into(),
-                ok: true,
-                notice: true,
-                detail: "absent".into(),
-            },
-        ])
-        .to_json();
-    assert_eq!(
-        json["error"]["checks"],
-        json!([
-            {"name": "helper", "ok": false, "detail": "absent"},
-            {"name": "config", "ok": true, "detail": "valid"},
-            {"name": "recordings_dir", "ok": true, "notice": true, "detail": "absent"}
-        ])
-    );
-}
-
-#[test]
 fn diagnostics_are_retained_inside_the_one_error_document_when_present() {
     let plain = ErrorDocument::new(ErrorKind::Store, "read failed");
     assert!(plain.to_json()["error"].get("diagnostics").is_none());
