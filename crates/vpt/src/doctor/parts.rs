@@ -10,6 +10,14 @@ pub(super) fn not_configured(name: &str, key: &str) -> Row {
     Row::not_run(name, format!("not configured; set `{key}` in the config"))
 }
 
+pub(super) fn command(name: &str, command: &[String], key: &str, reach: &str) -> Row {
+    if available(command) {
+        Row::ok(name, format!("configured, available; {reach}"))
+    } else {
+        Row::issue(name, format!("configured, unavailable; {reach}")).advice(fix(key))
+    }
+}
+
 pub(super) fn fix(key: &str) -> String {
     format!("make its program an executable file, or change `{key}` in the config")
 }

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use vpt_adapters::config::{RootError, Roots, resolve};
 use vpt_application::Settings;
 
-pub(crate) const NAMES: [&str; 8] = [
+pub(crate) const NAMES: [&str; 9] = [
     "config",
     "stores",
     "ledger",
@@ -13,6 +13,7 @@ pub(crate) const NAMES: [&str; 8] = [
     "helper",
     "engines",
     "speakers",
+    "summary",
     "leftovers",
 ];
 
@@ -33,7 +34,7 @@ impl Context {
 
 type Probe = fn(&Context) -> Vec<Row>;
 
-const AFTER_CONFIG: [(&str, &str, Probe); 7] = [
+const AFTER_CONFIG: [(&str, &str, Probe); 8] = [
     ("stores", "where vpt keeps its files", super::stores::rows),
     (
         "ledger",
@@ -56,6 +57,11 @@ const AFTER_CONFIG: [(&str, &str, Probe); 7] = [
         "speakers",
         "speaker labels, which need a Hugging Face token on a selected whisply engine",
         super::speakers::rows,
+    ),
+    (
+        "summary",
+        "the analysis command that writes each summary; no command is run",
+        super::summary::rows,
     ),
     (
         "leftovers",

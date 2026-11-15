@@ -9,6 +9,7 @@ mod source;
 mod speakers;
 mod state_dir;
 mod stores;
+mod summary;
 
 use crate::cli::output::Outcome;
 use crate::compose::Environment;
