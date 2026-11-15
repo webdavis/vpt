@@ -56,7 +56,7 @@ pub enum Verb {
         stage: String,
     },
     Setup {
-        force: bool,
+        overwrite: bool,
     },
     Doctor {
         checks: Vec<String>,

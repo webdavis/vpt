@@ -73,8 +73,8 @@ fn a_value_flag_without_a_value_is_refused() {
 fn every_stage_one_verb_decodes_its_arguments() {
     for (line, verb) in [
         ("--version", Verb::Version),
-        ("setup", Verb::Setup { force: false }),
-        ("setup --force", Verb::Setup { force: true }),
+        ("setup", Verb::Setup { overwrite: false }),
+        ("setup --overwrite", Verb::Setup { overwrite: true }),
         ("doctor", Verb::Doctor { checks: vec![] }),
         (
             "ingest",
@@ -131,6 +131,7 @@ fn missing_positionals_subcommands_and_flag_values_are_refused() {
     for (line, message) in [
         ("show", "<ID> is required"),
         ("show --force", UNKNOWN_FLAG),
+        ("setup --force", UNKNOWN_FLAG),
         ("retention erase", "unknown command"),
         ("symlink erase", "unknown command"),
         (
