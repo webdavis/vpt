@@ -92,6 +92,12 @@ pub(super) const SYMLINK_DEPLOY: &str =
     examples!["vpt symlink deploy", "vpt symlink deploy --json"];
 pub(super) const SYMLINK_VERIFY: &str =
     examples!["vpt symlink verify", "vpt symlink verify --json"];
+pub(super) const LEDGER_SHOW: &str = examples!["vpt ledger show", "vpt ledger show --json"];
+pub(super) const LEDGER_ACCEPT: &str = examples![
+    "vpt ledger accept --preview",
+    "vpt ledger accept",
+    "vpt ledger accept --preview --json",
+];
 pub(super) const VERSION: &str = examples!["vpt version", "vpt version --json"];
 pub(super) const COMPLETION: &str = examples![
     "vpt completion zsh > \"${fpath[1]}/_vpt\"",

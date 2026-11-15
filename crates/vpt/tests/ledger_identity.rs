@@ -1,11 +1,15 @@
 #![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared CLI fixtures")]
+#[path = "ledger_identity/accept.rs"]
+mod accept;
 #[path = "ledger_identity/accepted.rs"]
 mod accepted;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
 #[path = "ledger_identity/refusals.rs"]
 mod refusals;
+#[path = "ledger_identity/show.rs"]
+mod show;
 mod support;
 
 use fixture::write_config;
@@ -70,7 +74,7 @@ pub(crate) fn record(sandbox: &Sandbox, name: &str, captured: i64) {
 
 pub(crate) fn ingest(sandbox: &Sandbox, name: &str, captured: i64) -> Output {
     record(sandbox, name, captured);
-    vpt(sandbox, &["ingest", "--json"])
+    vpt(sandbox, &["ingest"])
 }
 
 pub(crate) fn ingested(sandbox: &Sandbox, name: &str, captured: i64) {

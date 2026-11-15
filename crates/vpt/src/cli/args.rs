@@ -6,6 +6,7 @@ mod examples;
 mod groups;
 pub(crate) mod import;
 mod invocation;
+pub(crate) mod ledger;
 mod pipeline;
 pub(crate) mod redact;
 mod review;
