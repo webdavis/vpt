@@ -79,7 +79,10 @@ refuses with exit 3 when this machine's last write is not in it:
 | `ledger_behind` | the ledger is older than the one this machine last wrote |
 | `ledger_diverged` | another machine wrote it from an older copy, and this machine's last write is gone |
 
-The message names the folder, points at `vpt ledger show` and ends with `vpt ledger accept`. A
+The message names the folder, points at `vpt ledger show` and ends with `vpt ledger accept`.
+Read-only commands, dry runs included, never refuse and write nothing, the marker included: they print
+the same finding as one line on standard error, starting `vpt: warning: <rule>:`, and leave standard
+output as it would be. A
 higher counter that still holds this machine's last write is another machine's later write and is
 accepted. A machine with no marker, a deleted marker, or a changed `home.state_dir` path counts as
 a new machine. A write lost on a machine that never runs vpt again goes unnoticed, and nothing merges
