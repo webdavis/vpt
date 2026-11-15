@@ -13,7 +13,11 @@ macro_rules! examples {
 pub(super) const DOCS: &str = docs!();
 
 pub(super) const RUN: &str = examples!["vpt run", "vpt run --dry-run", "vpt run --json"];
-pub(super) const SETUP: &str = examples!["vpt setup", "vpt setup --overwrite"];
+pub(super) const SETUP: &str = examples![
+    "vpt setup",
+    "vpt setup --engine apple",
+    "vpt setup --overwrite"
+];
 pub(super) const DOCTOR: &str = examples![
     "vpt doctor",
     "vpt doctor helper engines",

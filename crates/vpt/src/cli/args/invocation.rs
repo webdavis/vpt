@@ -57,6 +57,7 @@ pub enum Verb {
     },
     Setup {
         overwrite: bool,
+        engine: Option<String>,
     },
     Doctor {
         checks: Vec<String>,

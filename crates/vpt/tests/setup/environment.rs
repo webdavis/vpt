@@ -18,7 +18,7 @@ fn unrelated_non_utf8_environment_is_ignored() {
         .env(invalid(), "unrelated"));
     assert_eq!(output.status.code(), Some(2));
     assert!(
-        stderr(&output).contains("needs a controlling terminal"),
+        stderr(&output).contains("pass --engine"),
         "{}",
         stderr(&output)
     );

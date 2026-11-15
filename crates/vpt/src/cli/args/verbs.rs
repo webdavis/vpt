@@ -14,6 +14,9 @@ pub(super) enum Command {
         /// Replace an existing configuration file.
         #[arg(long)]
         overwrite: bool,
+        /// Use this main engine instead of asking for it.
+        #[arg(long, value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::commands::setup::ENGINES))]
+        engine: Option<String>,
     },
     /// Read this machine and report what needs attention, contacting nothing.
     #[command(after_long_help = examples::DOCTOR)]
@@ -105,7 +108,7 @@ impl Command {
     pub(super) fn verb(self) -> Result<Verb, String> {
         Ok(match self {
             Self::Run(run) => run.verb(),
-            Self::Setup { overwrite } => Verb::Setup { overwrite },
+            Self::Setup { overwrite, engine } => Verb::Setup { overwrite, engine },
             Self::Doctor { checks } => Verb::Doctor { checks },
             Self::Ingest { dry_run, once } => Verb::Ingest { dry_run, once },
             Self::Import(options) => return options.verb(),

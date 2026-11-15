@@ -1,3 +1,5 @@
+#[path = "setup/engine.rs"]
+mod engine;
 #[path = "setup/environment.rs"]
 mod environment;
 #[path = "setup/source.rs"]
@@ -219,9 +221,11 @@ fn setup_without_a_terminal_exits_2_and_writes_nothing() {
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(stdout(&output), "");
     let error: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("error document");
-    assert_eq!(
-        error["error"]["message"],
-        "vpt setup needs a controlling terminal"
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("pass --engine")
     );
     assert!(!sandbox.config_path().exists());
     assert!(!sandbox.path().join("home/.vpt").exists());

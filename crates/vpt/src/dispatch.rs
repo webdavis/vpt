@@ -117,10 +117,11 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
         ),
-        Verb::Setup { overwrite } => commands::setup::run(
+        Verb::Setup { overwrite, engine } => commands::setup::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
             *overwrite,
+            engine.as_deref(),
         ),
         Verb::SymlinkDeploy => commands::symlink::deploy(
             &compose::Environment::from_process(),

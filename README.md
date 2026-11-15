@@ -51,7 +51,9 @@ stays one JSON object per line. Other verbs and dry runs write no progress lines
 VPT requires the selected configuration file to have mode `0600` and its containing directory to
 have mode `0700`, both owned by the current user. This applies to the default location, `VPT_CONFIG`,
 and `--config`. VPT refuses to read unsafe configuration without changing its permissions.
-`vpt setup` creates private configuration, home, state, and store directories. Existing directories
+`vpt setup` creates private configuration, home, state, and store directories. It asks for the main
+engine at a terminal. `--engine apple` or `--engine whisply` names it instead, so setup runs without a
+terminal; without either, setup exits 2 and names `--engine`. Existing directories
 must already have mode `0700` and be owned by the current user; otherwise setup refuses before
 prompting or writing configuration. It also rechecks each directory before using it. `--overwrite`
 replaces the configuration file; it does not change existing directory permissions.
