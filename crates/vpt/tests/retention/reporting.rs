@@ -74,6 +74,13 @@ fn unsafe_state_is_refused_before_lock_or_history_creation() {
         "refused",
     );
     assert_eq!(result["error"]["rule"], "unsafe_state");
+    assert_eq!(
+        result["error"]["message"],
+        format!(
+            "state directory '{0}' must have mode 0700; run: chmod 700 '{0}'",
+            state.display()
+        )
+    );
     assert_eq!(snapshot(&sandbox), before);
 }
 

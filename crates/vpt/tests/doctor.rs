@@ -14,6 +14,8 @@ mod observations;
 mod observations_fixture;
 #[path = "doctor/source.rs"]
 mod source;
+#[path = "doctor/state_dir.rs"]
+mod state_dir;
 #[allow(
     dead_code,
     reason = "shared integration support serves other test targets"

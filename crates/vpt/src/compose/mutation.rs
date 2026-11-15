@@ -1,4 +1,5 @@
 use super::errors::{contained_error, root_error};
+use std::path::Path;
 use std::time::Duration;
 use vpt_adapters::{LockError, PrivateStateError, RootDir, Roots, WriteLock};
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
@@ -9,17 +10,24 @@ pub(crate) fn state(roots: &Roots) -> Result<RootDir, Box<ErrorDocument>> {
         .map_err(|error| Box::new(root_error(&error)))?;
     let state =
         RootDir::open(&roots.state_dir).map_err(|error| Box::new(contained_error(error)))?;
-    state.validate_private_state().map_err(|error| {
-        Box::new(match error {
-            PrivateStateError::Contained(error) => contained_error(error),
-            PrivateStateError::Owner | PrivateStateError::Mode => ErrorDocument::new(
-                ErrorKind::Refused,
-                "state directory must be owned by the current user with mode 0700",
-            )
-            .rule("unsafe_state"),
-        })
-    })?;
+    state
+        .validate_private_state()
+        .map_err(|error| Box::new(private_state_error(state.path(), error)))?;
     Ok(state)
+}
+
+pub(crate) fn private_state_error(path: &Path, error: PrivateStateError) -> ErrorDocument {
+    let quoted = format!("'{}'", path.to_string_lossy().replace('\'', r"'\''"));
+    let message = match error {
+        PrivateStateError::Contained(error) => return contained_error(error),
+        PrivateStateError::Owner => format!(
+            "state directory {quoted} is owned by another user; it must be owned by the current user with mode 0700"
+        ),
+        PrivateStateError::Mode => {
+            format!("state directory {quoted} must have mode 0700; run: chmod 700 {quoted}")
+        }
+    };
+    ErrorDocument::new(ErrorKind::Refused, message).rule("unsafe_state")
 }
 
 pub(crate) fn lock(state: &RootDir) -> Result<WriteLock, Box<ErrorDocument>> {

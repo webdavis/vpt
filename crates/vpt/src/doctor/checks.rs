@@ -27,7 +27,7 @@ fn unavailable_config(detail: &str) -> Vec<Check> {
     names.extend(StoreKey::all().map(|key| format!("git_tree:{}", key.key_name())));
     names.extend(["helper", "engines", "recordings_dir", "symlink"].map(str::to_owned));
     names.extend(APPLE_SUBDIRECTORIES.map(|name| format!("subdirectory:{name}")));
-    names.extend(["cleanup_pending", "kept_edits", "source_gone"].map(str::to_owned));
+    names.extend(["cleanup_pending", "kept_edits", "state_dir", "source_gone"].map(str::to_owned));
     names
         .into_iter()
         .map(|name| {
@@ -108,6 +108,7 @@ pub(super) fn all(environment: &Environment, config: Option<&Path>) -> Vec<Check
         Ok(roots) => super::kept::inspect(roots, &settings.state_dir),
         Err(_) => check("kept_edits", false, "not run: store roots did not resolve"),
     });
+    checks.push(super::state_dir::inspect(&settings.state_dir));
     checks.push(probes::source_gone(&settings.state_dir));
     checks
 }
