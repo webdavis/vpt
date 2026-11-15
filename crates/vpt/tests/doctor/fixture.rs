@@ -9,13 +9,14 @@ use vpt_domain::time::{FileTime, UtcInstant};
 
 pub(super) use crate::observations_fixture::snapshot;
 
-pub(super) const CHECKS: [&str; 7] = [
+pub(super) const CHECKS: [&str; 8] = [
     "config",
     "stores",
     "ledger",
     "recordings",
     "helper",
     "engines",
+    "speakers",
     "leftovers",
 ];
 
@@ -170,4 +171,19 @@ pub(super) fn seed_seen(sandbox: &Sandbox, gone: bool) -> PathBuf {
         })
         .unwrap();
     path
+}
+
+pub(super) fn tripwire(sandbox: &Sandbox, name: &str) -> PathBuf {
+    let program = sandbox.path().join("bin").join(name);
+    let marker = sandbox.path().join(format!("{name}-ran"));
+    std::fs::write(&program, format!("#!/bin/sh\n/usr/bin/touch {marker:?}\n")).unwrap();
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
+    program
+}
+
+pub(super) fn assert_never_ran(sandbox: &Sandbox, name: &str) {
+    assert!(
+        !sandbox.path().join(format!("{name}-ran")).exists(),
+        "{name} ran"
+    );
 }

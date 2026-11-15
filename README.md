@@ -149,9 +149,9 @@ pages, so accept them before the first run. vpt reads the configuration only whe
 
 Without a token, nothing changes: Whisply gets no `-a`, no `HF_TOKEN`, and vpt prints no extra
 diagnostic. The shipped configuration selects only Apple, so a default setup never runs Whisply and
-never shows labels. With a token set, `vpt doctor` reads `speaker labels on` for a selected Whisply
-and says `token set but whisply is not selected, so no speaker labels` otherwise; a selected Whisply
-that is not installed fails the engines check as before. When Whisply exits unsuccessfully while asked
+never shows labels. `vpt doctor speakers` says whether a token is set and whether Whisply is
+selected, and warns when a token sits on a Whisply that nothing selects; a selected Whisply that is
+not installed fails the engines check. When Whisply exits unsuccessfully while asked
 for speakers, as one without speaker annotation does on `-a`, the failure says so and names the
 two models whose terms the token's account must have accepted. As main engine that fails the transcription; as checker the
 main transcript is kept with a `single-engine` flag and the same message in its engine diagnostics.
@@ -301,6 +301,7 @@ for its version. It leaves vault contents, permissions, links and ignore files u
 | `recordings` | `folder`, the Voice Memos folder; one row per Apple subfolder with its entry count |
 | `helper` | `vpt-macos`, its version, or how to install it |
 | `engines` | one row per configured engine: selected or unused, available or not, local or remote; `test` |
+| `speakers` | `token`, whether a Hugging Face token is set; `whisply`, whether that engine is selected; `test` |
 | `leftovers` | `staged_audio` waiting for the Trash; `kept_edits`, versions vpt kept beside a note |
 
 Name checks to run only those, as in `vpt doctor helper engines`. An unknown name is refused with
@@ -311,7 +312,13 @@ named, so doctor exits 1.
 
 Doctor never runs a part to see whether it works. Each configured part ends with a `test` row,
 `not tested`, whose advice names the command that tries it for real, such as `vpt test engines`.
-`vpt test` is not built yet.
+`vpt test` is not built yet. A part that is not configured is one `not_run` row naming the config
+key that turns it on; that is not an issue. A configured part whose program is missing is an issue.
+Where a part sends data off the machine when it runs, its row says so.
+
+Speaker labels need a Hugging Face token on a whisply engine that the default pair or a language
+override selects. The token is never shown. A token on a whisply engine nothing selects is a warning,
+since no labels come from it.
 
 The report goes to standard output. The first line is vpt's version. Each check opens with a heading,
 its name and what it reads after `──`; each row is `name: detail` marked `✓`, `⚠`, `✗` or `·`, with
@@ -328,8 +335,7 @@ and names the command that fixes the row where one exists.
 Engine availability means an executable program file; doctor never runs it. Apple also needs a
 compatible helper. An unavailable engine that the default pair or a language override selects is an
 issue; an unused one is reported without one. A command engine's locality is labeled as declared
-configuration. A Whisply engine with a token reads `speaker labels on`; the token itself is never
-shown. A store inside a Git tree is a warning for audio, drafts and engine outputs, and is noted for
+configuration. A store inside a Git tree is a warning for audio, drafts and engine outputs, and is noted for
 the others. On a Mac where Voice Memos has not stored a recording yet, the `Recordings` folder does
 not exist; doctor reports that as `ok`, and `vpt import` works without it. A folder that exists but
 cannot be read, for example because the privacy system refuses access, is an issue. `kept_edits` is an

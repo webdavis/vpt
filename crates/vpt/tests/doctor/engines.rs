@@ -121,38 +121,6 @@ fn apple_availability_requires_a_compatible_helper() {
 }
 
 #[test]
-fn a_whisply_token_is_reported_as_set_without_its_value() {
-    let sandbox = configured("doctor-engine-token");
-    let token = "made-up-doctor-fixture-not-a-credential";
-    configure(
-        &sandbox,
-        &format!(
-            "[engines]\nchecker = 'whisply'\n[engines.whisply]\ncommand = ['/bin/sh']\nhf_token = {token:?}\n"
-        ),
-    );
-    let document = run_json(&sandbox, 0);
-    assert_eq!(
-        detail(&document, "engines", "whisply"),
-        "selected, available, local, speaker labels on"
-    );
-    assert!(!document.to_string().contains(token));
-}
-
-#[test]
-fn a_token_on_an_unselected_whisply_says_no_labels_will_come() {
-    let sandbox = configured("doctor-engine-token-unused");
-    configure(
-        &sandbox,
-        "[engines.whisply]\ncommand = ['/bin/sh']\nhf_token = 'made-up-doctor-fixture-not-a-credential'\n",
-    );
-    let document = run_json(&sandbox, 0);
-    assert_eq!(
-        detail(&document, "engines", "whisply"),
-        "unused, available, local, token set but whisply is not selected, so no speaker labels"
-    );
-}
-
-#[test]
 fn engines_end_with_a_not_tested_row_naming_the_test_command() {
     let sandbox = configured("doctor-engine-not-tested");
     let document = run_json(&sandbox, 0);
