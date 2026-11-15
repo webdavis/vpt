@@ -289,7 +289,7 @@ the action's sources only. No stage needs an opt-in. A recording with no accepte
 `vpt storage [--json|--toon|--yaml]` reports current file counts, bytes, and oldest/newest timestamps for all seven
 stores. It works independently of the recording source and ledger.
 
-`vpt doctor [--json|--toon|--yaml]` reads this machine and says what needs attention.
+`vpt doctor [check ...] [--json|--toon|--yaml]` reads this machine and says what needs attention.
 It contacts nothing: no network, no model, no engine. The one program it starts is vpt's own helper,
 for its version. It leaves vault contents, permissions, links and ignore files unchanged.
 
@@ -303,9 +303,11 @@ for its version. It leaves vault contents, permissions, links and ignore files u
 | `engines` | one row per configured engine: selected or unused, available or not, local or remote |
 | `leftovers` | `staged_audio` waiting for the Trash; `kept_edits`, versions vpt kept beside a note |
 
-Each row is `ok`, `warning`, `issue` or `not_run`. A check takes
+Name checks to run only those, as in `vpt doctor helper engines`. An unknown name is refused with
+exit 2 and the list of valid names. Each row is `ok`, `warning`, `issue` or `not_run`. A check takes
 its worst row. A check that cannot run because the configuration did not load is `not_run` with no
-rows, and its advice says so.
+rows, and its advice says so. The `config` check is then shown with its issue even when it was not
+named, so doctor exits 1.
 
 The report goes to standard output. The first line is vpt's version. Each check opens with a heading,
 its name and what it reads after `──`; each row is `name: detail` marked `✓`, `⚠`, `✗` or `·`, with
@@ -366,7 +368,7 @@ names both files, says which version each holds, and gives the reason when vpt c
 version back. When the note is missing, it tells you to rename the kept file to the note's name.
 The publication stays pending, and every later run repeats the refusal, until the kept file is
 deleted. When a crash leaves only vpt's own versions aside, the next run puts the note back or
-removes them, finishes the publication, and asks nothing of you. `vpt doctor` lists under
+removes them, finishes the publication, and asks nothing of you. `vpt doctor leftovers` lists under
 `kept_edits` every kept file that holds a version of yours.
 Two kinds of write can still be lost. First, an editor that writes through a file it already holds
 open can lose that write in the instant between vpt's last check and the removal of the old note; a
