@@ -4,13 +4,21 @@ use serde_json::json;
 use std::path::Path;
 use vpt_adapters::TtyPrompt;
 use vpt_adapters::config::{FilesystemSetupWriter, from_table, load_text, resolve, template};
+use vpt_application::ports::{Prompt, PromptError};
 use vpt_application::{Setup, SetupError, SetupWriter};
 use vpt_domain::layout::StoreKey;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
-pub(crate) fn run(environment: &Environment, config: Option<&Path>, overwrite: bool) -> Outcome {
-    match prepare(environment, config, overwrite) {
+pub(crate) const ENGINES: [&str; 2] = ["apple", "whisply"];
+
+pub(crate) fn run(
+    environment: &Environment,
+    config: Option<&Path>,
+    overwrite: bool,
+    engine: Option<&str>,
+) -> Outcome {
+    match prepare(environment, config, overwrite, engine) {
         Ok(outcome) => outcome,
         Err(error) => Outcome::Failure(error),
     }
@@ -21,6 +29,7 @@ fn prepare(
     environment: &Environment,
     config: Option<&Path>,
     overwrite: bool,
+    engine: Option<&str>,
 ) -> Result<Outcome, ErrorDocument> {
     let selected = match config {
         Some(path) => path.to_path_buf(),
@@ -51,14 +60,19 @@ fn prepare(
         return Err(setup_error(SetupError::Exists(writer.config_path())));
     }
     let setup = Setup {
-        engines: vec!["apple".into(), "whisply".into()],
+        engines: ENGINES.map(String::from).into(),
         render: |engine: &str| template(engine, &state_dir),
         directories,
     };
-    let mut prompt = TtyPrompt::open().map_err(|_| setup_error(SetupError::NoTerminal))?;
-    let outcome = setup
-        .run(&mut prompt, &writer, overwrite)
-        .map_err(setup_error)?;
+    let outcome = match engine {
+        Some(engine) => setup.run(&mut Chosen(engine), &writer, overwrite),
+        None => setup.run(
+            &mut TtyPrompt::open().map_err(|_| setup_error(SetupError::NoTerminal))?,
+            &writer,
+            overwrite,
+        ),
+    }
+    .map_err(setup_error)?;
     Ok(Outcome::Success {
         completed: Vec::new(),
         diagnostics: Vec::new(),
@@ -74,15 +88,28 @@ fn prepare(
     })
 }
 
+struct Chosen<'a>(&'a str);
+
+impl Prompt for Chosen<'_> {
+    fn choose(&mut self, _: &str, options: &[&str], _: usize) -> Result<usize, PromptError> {
+        options
+            .iter()
+            .position(|option| *option == self.0)
+            .ok_or(PromptError::Closed)
+    }
+}
+
 fn config_error(error: impl std::fmt::Debug) -> ErrorDocument {
     ErrorDocument::new(ErrorKind::Config, format!("{error:?}"))
 }
 
 fn setup_error(error: SetupError) -> ErrorDocument {
     match error {
-        SetupError::NoTerminal => {
-            ErrorDocument::new(ErrorKind::Usage, "vpt setup needs a controlling terminal")
-        }
+        SetupError::NoTerminal => ErrorDocument::new(
+            ErrorKind::Usage,
+            "vpt setup needs a terminal to choose the engine; pass --engine apple or --engine \
+             whisply",
+        ),
         SetupError::Exists(path) => ErrorDocument::new(
             ErrorKind::Usage,
             format!("{} exists; pass --overwrite to replace it", path.display()),

@@ -73,8 +73,20 @@ fn a_value_flag_without_a_value_is_refused() {
 fn every_stage_one_verb_decodes_its_arguments() {
     for (line, verb) in [
         ("--version", Verb::Version),
-        ("setup", Verb::Setup { overwrite: false }),
-        ("setup --overwrite", Verb::Setup { overwrite: true }),
+        (
+            "setup",
+            Verb::Setup {
+                overwrite: false,
+                engine: None,
+            },
+        ),
+        (
+            "setup --overwrite --engine whisply",
+            Verb::Setup {
+                overwrite: true,
+                engine: Some("whisply".into()),
+            },
+        ),
         ("doctor", Verb::Doctor { checks: vec![] }),
         (
             "ingest",
