@@ -1,5 +1,5 @@
 use super::super::SqliteLedger;
-use super::{finish, map, seed};
+use super::{finish, map, seed, seed_uncheckpointed};
 use crate::RootDir;
 use crate::database::{child_for_root, root, snapshot};
 use rusqlite::Connection;

@@ -18,7 +18,7 @@ fn a_reader_keeps_one_snapshot_while_a_native_writer_commits() {
 
 pub(super) fn run(scenario: &str, root: &RootDir, ready: fn(), native: fn(&Path) -> Connection) {
     if scenario == "ledger_peer_snapshot_writer" {
-        drop(seed(root));
+        seed_uncheckpointed(root);
         let connection = native(&root.path().join("vpt.db"));
         connection.execute_batch("PRAGMA wal_autocheckpoint=0; INSERT INTO dirty_publications VALUES('snapshot', NULL, 'committed', 1)").unwrap();
         ready();

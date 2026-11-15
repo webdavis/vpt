@@ -32,6 +32,10 @@ fn doctor_preserves_populated_dirty_state() {
 fn missing(companion: &str) {
     let sandbox = configured("doctor-missing-companion");
     seed_seen(&sandbox, false);
+    drop(crate::observations_fixture::uncheckpointed(
+        &sandbox,
+        "UPDATE seen SET size = 2",
+    ));
     let state = sandbox.path().join("state/vpt");
     std::fs::rename(state.join(companion), sandbox.path().join("held-companion")).unwrap();
     let before = snapshot(&sandbox);
