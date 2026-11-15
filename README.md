@@ -335,7 +335,7 @@ for its version. It leaves vault contents, permissions, links and ignore files u
 | --- | --- |
 | `config` | `file`, the configuration file; `version`, its `config_version` |
 | `stores` | `home`, `state_dir` (an issue when the folder exists but is not owned by you with mode 0700; the row gives the `chmod 700` command), `layout` (every folder resolves and no two overlap), one row per store with its Git placement, `vault`, `home_link` |
-| `ledger` | `database` (opened read-only), `schema`, `source_gone` (recordings whose source file is gone) |
+| `ledger` | `database` (opened read-only), `schema`, `source_gone` (recordings whose source file is gone), `identity` (an issue named by its rule when this machine's last write is not in the ledger), `conflict_copies` (a warning when other `vpt*.db` files sit beside `vpt.db`), `synced_folder` (shown when the folder sits inside iCloud Drive, `Library/CloudStorage` or a `Dropbox` folder, judged by path; it says what vpt does about it) |
 | `recordings` | `folder`, the Voice Memos folder; one row per Apple subfolder with its entry count |
 | `helper` | `vpt-macos`, its version, or how to install it |
 | `engines` | one row per configured engine: selected or unused, available or not, local or remote; `test` |
