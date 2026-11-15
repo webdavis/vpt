@@ -26,7 +26,7 @@ fn link_and_target(
     Ok((settings.home, target))
 }
 
-fn describe(error: &SymlinkError, link: &Path, target: &Path) -> String {
+pub(crate) fn describe(error: &SymlinkError, link: &Path, target: &Path) -> String {
     match error {
         SymlinkError::Occupied(what) => format!("{} exists and is {what}", link.display()),
         SymlinkError::TargetParentMissing => {

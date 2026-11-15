@@ -1,7 +1,8 @@
+use super::config;
 use super::report::{Check, Row};
-use crate::compose::{Environment, settings_from};
+use crate::compose::Environment;
 use std::cell::OnceCell;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use vpt_adapters::Markers;
 use vpt_adapters::config::{RootError, Roots, resolve};
 use vpt_application::Settings;
@@ -34,6 +35,10 @@ impl Context {
         self.helper
             .get_or_init(|| super::helper::probe(&self.settings))
     }
+}
+
+pub(super) fn named(wanted: &[String], name: &str) -> bool {
+    wanted.is_empty() || wanted.iter().any(|named| named == name)
 }
 
 type Probe = fn(&Context) -> Vec<Row>;
@@ -89,28 +94,22 @@ pub(super) fn run(
     config: Option<&Path>,
     wanted: &[String],
 ) -> Vec<Check> {
-    let wanted = |name: &str| wanted.is_empty() || wanted.iter().any(|named| named == name);
-    let loaded = load(environment, config);
+    let wanted = |name: &str| named(wanted, name);
+    let loaded = config::load(environment, config);
     let mut checks = Vec::new();
     if wanted("config") || loaded.is_err() {
         checks.push(Check {
             name: "config",
             blurb: "the configuration file",
-            rows: config_rows(&loaded),
+            rows: config::rows(environment, config, &loaded),
             skipped: None,
         });
     }
-    let context = loaded.ok().map(|(selected, settings)| {
-        let config_dir = selected
-            .parent()
-            .filter(|path| !path.as_os_str().is_empty())
-            .unwrap_or(Path::new("."));
-        Context {
-            roots: resolve(&settings, config_dir),
-            markers: crate::compose::ledger_identity::markers(environment).ok(),
-            settings,
-            helper: OnceCell::new(),
-        }
+    let context = loaded.ok().map(|(selected, settings)| Context {
+        roots: resolve(&settings, config::directory(&selected)),
+        markers: crate::compose::ledger_identity::markers(environment).ok(),
+        settings,
+        helper: OnceCell::new(),
     });
     for (name, blurb, probe) in AFTER_CONFIG.into_iter().filter(|(name, ..)| wanted(name)) {
         checks.push(match &context {
@@ -129,26 +128,4 @@ pub(super) fn run(
         });
     }
     checks
-}
-
-fn load(environment: &Environment, config: Option<&Path>) -> Result<(PathBuf, Settings), String> {
-    let selected = config
-        .map(Path::to_path_buf)
-        .map_or_else(|| environment.config_path(), Ok)
-        .map_err(|_| "configuration path is unavailable".to_string())?;
-    let settings = settings_from(environment, Some(&selected)).map_err(|error| error.message)?;
-    Ok((selected, settings))
-}
-
-fn config_rows(loaded: &Result<(PathBuf, Settings), String>) -> Vec<Row> {
-    match loaded {
-        Ok((selected, settings)) => vec![
-            Row::ok("file", selected.display().to_string()),
-            Row::ok(
-                "version",
-                format!("config_version {}", settings.config_version),
-            ),
-        ],
-        Err(message) => vec![Row::issue("file", message).advice("run `vpt setup`")],
-    }
 }

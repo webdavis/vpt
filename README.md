@@ -329,9 +329,23 @@ the action's sources only. No stage needs an opt-in. A recording with no accepte
 `vpt storage [--json|--toon|--yaml]` reports current file counts, bytes, and oldest/newest timestamps for all seven
 stores. It works independently of the recording source and ledger.
 
-`vpt doctor [check ...] [--json|--toon|--yaml]` reads this machine and says what needs attention.
-It contacts nothing: no network, no model, no engine. The one program it starts is vpt's own helper,
-for its version. It leaves vault contents, permissions, links and ignore files unchanged.
+`vpt doctor [check ...] [--fix] [--json|--toon|--yaml]` reads this machine and says what needs
+attention. It contacts nothing: no network, no model, no engine. The one program it starts is vpt's
+own helper, for its version. Without `--fix` it changes nothing on disk.
+
+`--fix` repairs what it can on this machine, and only by creating what is missing: the configuration
+file from the starter text (main engine `apple`, the same text `vpt setup --engine apple` writes), the
+home, state and store folders with mode 0700, and the home link when the config names one and nothing
+is at its path. It never overwrites, deletes, moves or changes the mode of anything that exists, so a
+second run changes nothing. With named checks it repairs only within them: `config` for the file,
+`stores` for the folders and the link. Doctor then checks again and reports the state after the
+repairs; each repaired row's detail starts with `created`, and the exit code follows that state. A
+repair that fails stays an issue with its reason, and the other repairs still run. Under `--json` the
+document gains `fixed`, present only with `--fix`: one `{"check", "name", "detail"}` entry per repair
+made, `[]` when there was nothing to create. `--fix` leaves these for you, and their rows say what to
+do: staged audio waiting for the Trash, note versions vpt kept, the mode of an existing state folder,
+a home link that points elsewhere, and an older ledger schema, which the next writing command
+upgrades. Plain `vpt doctor` already shows what `--fix` would create.
 
 | Check | Rows |
 | --- | --- |

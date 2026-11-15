@@ -103,10 +103,11 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             invocation.config.as_deref(),
             id,
         ),
-        Verb::Doctor { checks } => doctor::run(
+        Verb::Doctor { checks, fix } => doctor::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
             checks,
+            *fix,
         ),
         Verb::Ledger(action) => commands::ledger::run(
             &compose::Environment::from_process(),

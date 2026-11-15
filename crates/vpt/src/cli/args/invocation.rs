@@ -61,6 +61,7 @@ pub enum Verb {
     },
     Doctor {
         checks: Vec<String>,
+        fix: bool,
     },
     Ledger(super::ledger::Action),
     NoteWrite {

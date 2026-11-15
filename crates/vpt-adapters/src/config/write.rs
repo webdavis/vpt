@@ -30,6 +30,12 @@ impl FilesystemSetupWriter {
     }
 }
 
+pub fn create_private_directory(path: &Path) -> Result<(), SetupError> {
+    PlannedDirectory::capture_private(path)?
+        .create()
+        .map(|_| ())
+}
+
 fn io(error: std::io::Error) -> SetupError {
     SetupError::Io(error.kind().to_string())
 }

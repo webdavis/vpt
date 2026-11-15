@@ -21,7 +21,7 @@ pub(super) const SETUP: &str = examples![
 pub(super) const DOCTOR: &str = examples![
     "vpt doctor",
     "vpt doctor helper engines",
-    "vpt doctor --json"
+    "vpt doctor --fix --json"
 ];
 pub(super) const INGEST: &str = examples![
     "vpt ingest",
