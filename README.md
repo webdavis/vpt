@@ -53,8 +53,8 @@ have mode `0700`, both owned by the current user. This applies to the default lo
 and `--config`. VPT refuses to read unsafe configuration without changing its permissions.
 `vpt setup` creates private configuration, home, state, and store directories. Existing directories
 must already have mode `0700` and be owned by the current user; otherwise setup refuses before
-prompting or writing configuration. It also rechecks each directory before using it. `--force`
-allows configuration replacement; it does not change existing directory permissions.
+prompting or writing configuration. It also rechecks each directory before using it. `--overwrite`
+replaces the configuration file; it does not change existing directory permissions.
 
 A configured home, state directory, or store may sit below folders that do not exist yet. Writing
 commands create every missing folder with mode `0700`; `vpt doctor` and other read-only commands

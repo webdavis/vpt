@@ -13,7 +13,7 @@ pub(super) enum Command {
     Setup {
         /// Replace an existing configuration file.
         #[arg(long)]
-        force: bool,
+        overwrite: bool,
     },
     /// Read this machine and report what needs attention, contacting nothing.
     #[command(after_long_help = examples::DOCTOR)]
@@ -105,7 +105,7 @@ impl Command {
     pub(super) fn verb(self) -> Result<Verb, String> {
         Ok(match self {
             Self::Run(run) => run.verb(),
-            Self::Setup { force } => Verb::Setup { force },
+            Self::Setup { overwrite } => Verb::Setup { overwrite },
             Self::Doctor { checks } => Verb::Doctor { checks },
             Self::Ingest { dry_run, once } => Verb::Ingest { dry_run, once },
             Self::Import(options) => return options.verb(),

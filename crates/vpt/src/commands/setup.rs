@@ -9,8 +9,8 @@ use vpt_domain::layout::StoreKey;
 use vpt_protocol::error::{ErrorDocument, ErrorKind};
 use vpt_protocol::result::document;
 
-pub(crate) fn run(environment: &Environment, config: Option<&Path>, force: bool) -> Outcome {
-    match prepare(environment, config, force) {
+pub(crate) fn run(environment: &Environment, config: Option<&Path>, overwrite: bool) -> Outcome {
+    match prepare(environment, config, overwrite) {
         Ok(outcome) => outcome,
         Err(error) => Outcome::Failure(error),
     }
@@ -20,7 +20,7 @@ pub(crate) fn run(environment: &Environment, config: Option<&Path>, force: bool)
 fn prepare(
     environment: &Environment,
     config: Option<&Path>,
-    force: bool,
+    overwrite: bool,
 ) -> Result<Outcome, ErrorDocument> {
     let selected = match config {
         Some(path) => path.to_path_buf(),
@@ -47,7 +47,7 @@ fn prepare(
     );
     let writer = FilesystemSetupWriter::new(roots.config_dir.join(name), &directories)
         .map_err(setup_error)?;
-    if writer.config_exists() && !force {
+    if writer.config_exists() && !overwrite {
         return Err(setup_error(SetupError::Exists(writer.config_path())));
     }
     let setup = Setup {
@@ -57,7 +57,7 @@ fn prepare(
     };
     let mut prompt = TtyPrompt::open().map_err(|_| setup_error(SetupError::NoTerminal))?;
     let outcome = setup
-        .run(&mut prompt, &writer, force)
+        .run(&mut prompt, &writer, overwrite)
         .map_err(setup_error)?;
     Ok(Outcome::Success {
         completed: Vec::new(),
@@ -85,7 +85,7 @@ fn setup_error(error: SetupError) -> ErrorDocument {
         }
         SetupError::Exists(path) => ErrorDocument::new(
             ErrorKind::Usage,
-            format!("{} exists; pass --force to overwrite it", path.display()),
+            format!("{} exists; pass --overwrite to replace it", path.display()),
         ),
         SetupError::PathEscape(path) => ErrorDocument::new(
             ErrorKind::Refused,

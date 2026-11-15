@@ -74,8 +74,8 @@ fn setup_terminal_eof_refuses_without_writing() {
 
 #[cfg(feature = "dev-tools")]
 #[test]
-fn setup_force_replaces_existing_config_with_selected_engine() {
-    let sandbox = Sandbox::new("setup-force");
+fn setup_overwrite_replaces_existing_config_with_selected_engine() {
+    let sandbox = Sandbox::new("setup-overwrite");
     std::fs::create_dir_all(sandbox.config_path().parent().expect("parent")).expect("parent");
     std::fs::set_permissions(
         sandbox.config_path().parent().expect("parent"),
@@ -87,7 +87,7 @@ fn setup_force_replaces_existing_config_with_selected_engine() {
     let output = terminal::run_args(
         &sandbox,
         terminal::Answer::Line(b"2\n"),
-        &["setup", "--force"],
+        &["setup", "--overwrite"],
     );
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let config = std::fs::read_to_string(sandbox.config_path()).expect("config");
@@ -240,7 +240,7 @@ fn setup_refuses_existing_config_before_the_terminal() {
     let output = run(sandbox.vpt().arg("setup"));
     assert_eq!(output.status.code(), Some(2));
     assert!(
-        stderr(&output).contains("exists; pass --force"),
+        stderr(&output).contains("exists; pass --overwrite"),
         "{}",
         stderr(&output)
     );
