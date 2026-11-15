@@ -4,15 +4,15 @@ use serde_json::{Value, json};
 use vpt_protocol::result::document;
 
 #[derive(Clone)]
-pub(super) struct Row {
-    pub(super) name: String,
-    pub(super) verdict: Verdict,
-    pub(super) detail: String,
-    pub(super) advice: Option<String>,
+pub(crate) struct Row {
+    pub(crate) name: String,
+    pub(crate) verdict: Verdict,
+    pub(crate) detail: String,
+    pub(crate) advice: Option<String>,
 }
 
 impl Row {
-    pub(super) fn new(
+    pub(crate) fn new(
         name: impl Into<String>,
         verdict: Verdict,
         detail: impl Into<String>,
@@ -25,19 +25,19 @@ impl Row {
         }
     }
 
-    pub(super) fn ok(name: impl Into<String>, detail: impl Into<String>) -> Self {
+    pub(crate) fn ok(name: impl Into<String>, detail: impl Into<String>) -> Self {
         Self::new(name, Verdict::Ok, detail)
     }
 
-    pub(super) fn issue(name: impl Into<String>, detail: impl Into<String>) -> Self {
+    pub(crate) fn issue(name: impl Into<String>, detail: impl Into<String>) -> Self {
         Self::new(name, Verdict::Issue, detail)
     }
 
-    pub(super) fn not_run(name: impl Into<String>, detail: impl Into<String>) -> Self {
+    pub(crate) fn not_run(name: impl Into<String>, detail: impl Into<String>) -> Self {
         Self::new(name, Verdict::NotRun, detail)
     }
 
-    pub(super) fn advice(mut self, text: impl Into<String>) -> Self {
+    pub(crate) fn advice(mut self, text: impl Into<String>) -> Self {
         self.advice = Some(text.into());
         self
     }
@@ -48,11 +48,11 @@ impl Row {
     }
 }
 
-pub(super) struct Check {
-    pub(super) name: &'static str,
-    pub(super) blurb: &'static str,
-    pub(super) rows: Vec<Row>,
-    pub(super) skipped: Option<&'static str>,
+pub(crate) struct Check {
+    pub(crate) name: &'static str,
+    pub(crate) blurb: &'static str,
+    pub(crate) rows: Vec<Row>,
+    pub(crate) skipped: Option<&'static str>,
 }
 
 impl Check {
@@ -88,7 +88,7 @@ impl Check {
     }
 }
 
-pub(super) fn outcome(checks: &[Check], fixed: Option<Vec<Value>>) -> Outcome {
+pub(crate) fn outcome(command: &str, checks: &[Check], fixed: Option<Vec<Value>>) -> Outcome {
     let attention: Vec<(&Check, &Row)> = [Verdict::Issue, Verdict::Warning]
         .into_iter()
         .flat_map(|wanted| {
@@ -114,7 +114,7 @@ pub(super) fn outcome(checks: &[Check], fixed: Option<Vec<Value>>) -> Outcome {
     if let Some(fixed) = fixed {
         body["fixed"] = Value::Array(fixed);
     }
-    let document = document("doctor", body);
+    let document = document(command, body);
     let entries: Vec<(Verdict, String)> = attention
         .iter()
         .map(|(check, row)| {

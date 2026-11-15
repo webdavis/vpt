@@ -1,6 +1,6 @@
 use super::checks::Context;
-use super::report::Row;
 use crate::compose::errors::contained_error;
+use crate::report::Row;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use vpt_adapters::{APPLE_SUBDIRECTORIES, ContainedError, RootDir, VoiceMemosStore};

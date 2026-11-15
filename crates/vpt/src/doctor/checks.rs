@@ -1,6 +1,6 @@
 use super::config;
-use super::report::{Check, Row};
 use crate::compose::Environment;
+use crate::report::{Check, Row};
 use std::cell::OnceCell;
 use std::path::Path;
 use vpt_adapters::Markers;

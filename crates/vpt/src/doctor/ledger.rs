@@ -1,6 +1,6 @@
 use super::checks::Context;
-use super::report::Row;
 use crate::compose::{RuntimeLedger, errors};
+use crate::report::Row;
 use crate::style::Verdict;
 use vpt_adapters::SCHEMA_VERSION;
 use vpt_adapters::config::planned_directory;

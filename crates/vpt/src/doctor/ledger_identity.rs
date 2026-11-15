@@ -1,5 +1,5 @@
-use super::report::Row;
 use crate::compose::ledger_identity::{ADVICE, happened, observe, rule};
+use crate::report::Row;
 use crate::style::Verdict;
 use std::path::{Component, Path};
 use vpt_adapters::Markers;

@@ -1,5 +1,5 @@
-use super::report::Row;
 use crate::compose::{Environment, settings_from};
+use crate::report::Row;
 use std::path::{Path, PathBuf};
 use vpt_application::Settings;
 

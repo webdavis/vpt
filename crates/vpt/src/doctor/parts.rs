@@ -1,4 +1,4 @@
-use super::report::Row;
+use crate::report::Row;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 

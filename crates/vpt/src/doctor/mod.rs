@@ -9,7 +9,6 @@ mod ledger;
 mod ledger_identity;
 mod leftovers;
 mod parts;
-mod report;
 mod source;
 mod speakers;
 mod state_dir;
@@ -30,5 +29,5 @@ pub(crate) fn run(
     let repairs = fix.then(|| fix::repair(environment, config, wanted));
     let mut checks = checks::run(environment, config, wanted);
     let fixed = repairs.map(|repairs| fix::mark(&mut checks, repairs));
-    report::outcome(&checks, fixed)
+    crate::report::outcome("doctor", &checks, fixed)
 }
