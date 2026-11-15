@@ -20,19 +20,18 @@ fn success() -> Outcome {
     }
 }
 fn failure() -> ErrorDocument {
-    ErrorDocument::new(ErrorKind::Refused, "1 checks failed")
-        .rule("doctor_checks")
-        .checks(vec![vpt_protocol::error::Check {
-            name: "helper".into(),
-            ok: false,
-            notice: false,
-            detail: "absent".into(),
-        }])
+    ErrorDocument::new(ErrorKind::Refused, "refused").rule("some_rule")
 }
-fn report() -> Outcome {
+fn failed_report() -> Outcome {
     Outcome::FailedReport {
         error: failure(),
-        human: "FAIL helper absent\n".into(),
+        human: "FAIL step\n".into(),
+    }
+}
+fn report() -> Outcome {
+    Outcome::Findings {
+        document: json!({"schema":"vpt.result/1","command":"doctor","checks":[]}),
+        human: "  ✗ vpt-macos: absent\n".into(),
     }
 }
 
@@ -61,7 +60,10 @@ fn success_human_uses_only_stdout() {
 #[test]
 fn failed_report_json_is_one_error_document() {
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    assert_eq!(emit_to(report(), Some(Format::Json), &mut out, &mut err), 3);
+    assert_eq!(
+        emit_to(failed_report(), Some(Format::Json), &mut out, &mut err),
+        3
+    );
     assert!(out.is_empty());
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(&err).unwrap(),
@@ -71,14 +73,30 @@ fn failed_report_json_is_one_error_document() {
 }
 
 #[test]
-fn failed_report_human_lists_checks_before_verdict() {
+fn failed_report_human_lists_rows_before_verdict() {
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    assert_eq!(emit_to(report(), None, &mut out, &mut err), 3);
+    assert_eq!(emit_to(failed_report(), None, &mut out, &mut err), 3);
     assert!(out.is_empty());
+    assert_eq!(err, b"FAIL step\nvpt: some_rule: refused\n");
+}
+
+#[test]
+fn findings_json_go_to_stdout_and_exit_one() {
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    assert_eq!(emit_to(report(), Some(Format::Json), &mut out, &mut err), 1);
+    assert!(err.is_empty());
     assert_eq!(
-        err,
-        b"FAIL helper absent\nvpt: doctor_checks: 1 checks failed\n"
+        serde_json::from_slice::<serde_json::Value>(&out).unwrap(),
+        json!({"schema":"vpt.result/1","command":"doctor","checks":[]})
     );
+}
+
+#[test]
+fn findings_human_go_to_stdout_and_exit_one() {
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    assert_eq!(emit_to(report(), None, &mut out, &mut err), 1);
+    assert!(err.is_empty());
+    assert_eq!(String::from_utf8(out).unwrap(), "  ✗ vpt-macos: absent\n");
 }
 
 #[test]
@@ -108,7 +126,7 @@ fn broken_stderr_returns_one_for_every_failure_variant() {
     let mut actual = Vec::new();
     for json_mode in [false, true] {
         for outcome in [
-            report(),
+            failed_report(),
             Outcome::Failure(failure()),
             Outcome::ParseFailure(failure()),
         ] {

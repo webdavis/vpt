@@ -20,7 +20,7 @@ fn an_unknown_verb_under_json_is_an_error_document_on_stderr() {
 #[test]
 fn json_usage_with_broken_stderr_exits_one() {
     let sandbox = Sandbox::new("usage-json-broken-stderr");
-    for verb in ["transcode", "doctor"] {
+    for verb in ["transcode", "list"] {
         let (descriptor, _peer) = broken_output();
         let output = run(sandbox.vpt().args([verb, "--json"]).stderr(descriptor));
         assert_eq!(output.status.code(), Some(1));
@@ -52,7 +52,7 @@ fn unknown_input_with_broken_stderr_exits_one() {
 fn unimplemented_verb_with_broken_stderr_exits_one() {
     let sandbox = Sandbox::new("unimplemented-broken-stderr");
     let (descriptor, _peer) = broken_output();
-    let output = run(sandbox.vpt().arg("doctor").stderr(descriptor));
+    let output = run(sandbox.vpt().arg("list").stderr(descriptor));
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(stdout(&output), "");
 }

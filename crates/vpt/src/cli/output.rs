@@ -17,6 +17,10 @@ pub(crate) enum Outcome {
         error: ErrorDocument,
         human: String,
     },
+    Findings {
+        document: serde_json::Value,
+        human: String,
+    },
 }
 
 pub(crate) fn emit(outcome: Outcome, format: Option<Format>) -> i32 {
@@ -42,6 +46,18 @@ fn emit_to(
                 None => format!("{human}{}", failure_text(&error, None, false)),
             };
             write_failure(&error, &text, stderr)
+        }
+        Outcome::Findings { document, human } => {
+            let report = Outcome::Success {
+                document,
+                human,
+                completed: Vec::new(),
+                diagnostics: Vec::new(),
+            };
+            match emit_to(report, format, stdout, stderr) {
+                0 => 1,
+                code => code,
+            }
         }
         Outcome::Success {
             document,
@@ -117,6 +133,7 @@ impl Outcome {
             Self::Failure(error) | Self::ParseFailure(error) | Self::FailedReport { error, .. } => {
                 &mut error.completed
             }
+            Self::Findings { .. } => return,
         };
         let mut seen: std::collections::HashSet<_> = completed.iter().cloned().collect();
         for id in ids {

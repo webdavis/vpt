@@ -1,17 +1,22 @@
-use crate::fixture::{check, configure, configured, detail, run_json, snapshot};
+use crate::fixture::{
+    advice, check, configure, configured, detail, issues, result, run_json, snapshot,
+};
 use std::os::unix::fs::PermissionsExt;
 
 #[test]
 fn default_engine_posture_reports_local_apple_and_unused_whisply() {
     let sandbox = configured("doctor-engine-default");
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 0);
-    let text = detail(&checks, "engines");
-    assert!(text.contains("apple: selected, available, local"), "{text}");
-    assert!(
-        text.contains("whisply: unused, unavailable, local"),
-        "{text}"
+    let document = run_json(&sandbox, 0);
+    assert_eq!(
+        detail(&document, "engines", "apple"),
+        "selected, available, local"
     );
+    assert_eq!(
+        detail(&document, "engines", "whisply"),
+        "unused, unavailable, local"
+    );
+    assert_eq!(result(&document, "engines", "whisply"), "ok");
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -33,18 +38,15 @@ fn command_locality_is_declared_and_commands_are_never_executed() {
             ),
         );
         let before = snapshot(&sandbox);
-        let checks = run_json(&sandbox, 0);
-        let text = detail(&checks, "engines");
+        let document = run_json(&sandbox, 0);
+        let text = detail(&document, "engines", "custom");
         let posture = if local {
             "declared local"
         } else {
             "declared remote (audio leaves the machine)"
         };
-        assert!(
-            text.contains(&format!("custom: selected, available, {posture}")),
-            "{text}"
-        );
-        assert!(!text.contains("private-"));
+        assert!(text == format!("selected, available, {posture}"), "{text}");
+        assert!(!document.to_string().contains("private-"));
         assert_eq!(snapshot(&sandbox), before);
     }
 }
@@ -57,13 +59,18 @@ fn unavailable_language_override_fails_without_skipping_other_checks() {
         "[engines.by_language.fr-FR]\nmain = 'remote'\n[engines.remote]\nkind = 'command'\ncommand = ['/absent/private-program', 'private-token']\nfamily = 'cloud'\nlocal = false\n",
     );
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 3);
-    assert_eq!(check(&checks, "engines")["ok"], false);
-    assert!(detail(&checks, "engines").contains("remote: selected, unavailable, declared remote"));
-    for name in ["helper", "stores", "vault", "source_gone", "recordings_dir"] {
-        assert_eq!(check(&checks, name)["ok"], true, "{name}");
-    }
-    assert!(!serde_json::to_string(&checks).unwrap().contains("private-"));
+    let document = run_json(&sandbox, 1);
+    assert_eq!(check(&document, "engines")["result"], "issue");
+    assert!(
+        detail(&document, "engines", "remote")
+            .starts_with("selected, unavailable, declared remote")
+    );
+    assert_eq!(
+        advice(&document, "engines", "remote"),
+        "make its program an executable file, or change `engines.remote` in the config"
+    );
+    assert_eq!(issues(&document), ["engines remote"]);
+    assert!(!document.to_string().contains("private-"));
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -88,8 +95,9 @@ fn checker_requires_an_executable_regular_file() {
             ),
         );
         let before = snapshot(&sandbox);
-        let checks = run_json(&sandbox, if kind == "executable" { 0 } else { 3 });
-        assert_eq!(check(&checks, "engines")["ok"], kind == "executable");
+        let document = run_json(&sandbox, if kind == "executable" { 0 } else { 1 });
+        let expected = if kind == "executable" { "ok" } else { "issue" };
+        assert_eq!(result(&document, "engines", "whisply"), expected);
         assert_eq!(snapshot(&sandbox), before);
     }
 }
@@ -104,9 +112,12 @@ fn apple_availability_requires_a_compatible_helper() {
             .env("VPT_FAKE_VERSION", "2.0.0")
             .args(["doctor", "--json"]),
     );
-    let checks = crate::fixture::report(&output, 3);
-    assert_eq!(check(&checks, "engines")["ok"], false);
-    assert!(detail(&checks, "engines").contains("apple: selected, unavailable, local"));
+    let document = crate::fixture::report(&output, 1);
+    assert_eq!(result(&document, "engines", "apple"), "issue");
+    assert_eq!(
+        detail(&document, "engines", "apple"),
+        "selected, unavailable, local"
+    );
 }
 
 #[test]
@@ -119,13 +130,12 @@ fn a_whisply_token_is_reported_as_set_without_its_value() {
             "[engines]\nchecker = 'whisply'\n[engines.whisply]\ncommand = ['/bin/sh']\nhf_token = {token:?}\n"
         ),
     );
-    let checks = run_json(&sandbox, 0);
-    let text = detail(&checks, "engines");
-    assert!(
-        text.contains("whisply: selected, available, local, speaker labels on"),
-        "{text}"
+    let document = run_json(&sandbox, 0);
+    assert_eq!(
+        detail(&document, "engines", "whisply"),
+        "selected, available, local, speaker labels on"
     );
-    assert!(!serde_json::to_string(&checks).unwrap().contains(token));
+    assert!(!document.to_string().contains(token));
 }
 
 #[test]
@@ -135,10 +145,9 @@ fn a_token_on_an_unselected_whisply_says_no_labels_will_come() {
         &sandbox,
         "[engines.whisply]\ncommand = ['/bin/sh']\nhf_token = 'made-up-doctor-fixture-not-a-credential'\n",
     );
-    let checks = run_json(&sandbox, 0);
-    let text = detail(&checks, "engines");
-    assert!(
-        text.contains("whisply: unused, available, local, token set but whisply is not selected, so no speaker labels"),
-        "{text}"
+    let document = run_json(&sandbox, 0);
+    assert_eq!(
+        detail(&document, "engines", "whisply"),
+        "unused, available, local, token set but whisply is not selected, so no speaker labels"
     );
 }

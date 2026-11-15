@@ -1,23 +1,24 @@
-use super::checks::check;
+use super::checks::Context;
+use super::report::Row;
+use crate::style::Verdict;
 use std::collections::BTreeSet;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use vpt_application::engines::{EngineKind, EngineSettings};
-use vpt_protocol::error::Check;
+use vpt_application::engines::EngineKind;
 
-pub(super) fn inspect(settings: &EngineSettings, helper_available: bool) -> Check {
+pub(super) fn rows(context: &Context) -> Vec<Row> {
+    let settings = &context.settings.engines;
     let selected: BTreeSet<_> = std::iter::once(&settings.pair)
         .chain(settings.by_language.values())
         .flat_map(|pair| std::iter::once(&pair.main).chain(pair.checker.iter()))
         .collect();
-    let mut ok = true;
-    let details: Vec<_> = settings
+    settings
         .definitions
         .iter()
         .map(|(name, engine)| {
             let used = selected.contains(name);
             let (available, locality) = match &engine.kind {
-                EngineKind::Apple => (helper_available, "local"),
+                EngineKind::Apple => (context.helper().verdict == Verdict::Ok, "local"),
                 EngineKind::Whisply {
                     command,
                     hf_token: Some(_),
@@ -41,26 +42,23 @@ pub(super) fn inspect(settings: &EngineSettings, helper_available: bool) -> Chec
                     },
                 ),
             };
-            ok &= !used || available;
-            format!(
-                "{name}: {}, {}, {locality}",
+            let detail = format!(
+                "{}, {}, {locality}",
                 if used { "selected" } else { "unused" },
-                if available {
-                    "available"
+                if available { "available" } else { "unavailable" },
+            );
+            if used && !available {
+                let fix = if matches!(engine.kind, EngineKind::Apple) {
+                    "see `vpt doctor helper`".to_string()
                 } else {
-                    "unavailable"
-                },
-            )
+                    format!("make its program an executable file, or change `engines.{name}` in the config")
+                };
+                Row::issue(name.as_str(), detail).advice(fix)
+            } else {
+                Row::ok(name.as_str(), detail)
+            }
         })
-        .collect();
-    check(
-        "engines",
-        ok,
-        format!(
-            "{}; availability checks executable files (Apple also requires a compatible helper); selected includes language overrides",
-            details.join("; ")
-        ),
-    )
+        .collect()
 }
 
 fn available(command: &[String]) -> bool {

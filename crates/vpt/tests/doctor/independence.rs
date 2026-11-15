@@ -1,4 +1,4 @@
-use crate::fixture::{check, configure, configured, detail, run_json, snapshot};
+use crate::fixture::{advice, configure, configured, detail, issues, result, run_json, snapshot};
 
 #[test]
 fn bad_store_preserves_independent_checks() {
@@ -11,20 +11,12 @@ fn bad_store_preserves_independent_checks() {
         ),
     );
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 3);
-    assert_eq!(check(&checks, "stores")["ok"], false);
-    for name in [
-        "helper",
-        "recordings_dir",
-        "git_tree:audio",
-        "symlink",
-        "source_gone",
-    ] {
-        assert_eq!(check(&checks, name)["ok"], true, "{name}");
-    }
+    let document = run_json(&sandbox, 1);
+    assert_eq!(issues(&document), ["stores layout"]);
+    assert_eq!(result(&document, "leftovers", "staged_audio"), "not_run");
     assert_eq!(
-        detail(&checks, "cleanup_pending"),
-        "not run: store roots did not resolve"
+        detail(&document, "leftovers", "staged_audio"),
+        "the store folders did not resolve"
     );
     assert_eq!(snapshot(&sandbox), before);
 }
@@ -45,15 +37,21 @@ fn linked_home(bad_store: bool) {
         );
     }
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, if bad_store { 3 } else { 0 });
+    let document = run_json(&sandbox, if bad_store { 1 } else { 0 });
     for key in ["audio", "drafts", "engine_outputs", "transcripts"] {
-        let name = format!("git_tree:{key}");
-        assert!(detail(&checks, &name).contains(repository.to_str().unwrap()));
+        assert!(detail(&document, "stores", key).contains(repository.to_str().unwrap()));
     }
-    assert!(detail(&checks, "git_tree:audio").contains("confirm the ignore rules exclude audio"));
-    assert!(detail(&checks, "git_tree:drafts").contains("sensitive"));
-    assert!(detail(&checks, "git_tree:engine_outputs").contains("sensitive"));
-    assert!(!detail(&checks, "git_tree:transcripts").contains("sensitive"));
+    assert_eq!(
+        advice(&document, "stores", "audio"),
+        "confirm the ignore rules exclude audio"
+    );
+    for key in ["audio", "drafts", "engine_outputs"] {
+        assert_eq!(result(&document, "stores", key), "warning", "{key}");
+    }
+    assert!(advice(&document, "stores", "drafts").contains("sensitive"));
+    assert!(advice(&document, "stores", "engine_outputs").contains("sensitive"));
+    assert_eq!(result(&document, "stores", "transcripts"), "ok");
+    assert_eq!(advice(&document, "stores", "transcripts"), "");
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -75,10 +73,9 @@ fn one_bad_apple_subdirectory_preserves_other_checks() {
     )
     .unwrap();
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 3);
-    assert_eq!(check(&checks, "subdirectory:Capture")["ok"], false);
-    assert_eq!(check(&checks, "subdirectory:CaptureRecovery")["ok"], true);
-    assert_eq!(check(&checks, "helper")["ok"], true);
+    let document = run_json(&sandbox, 1);
+    assert_eq!(issues(&document), ["recordings Capture"]);
+    assert_eq!(result(&document, "recordings", "CaptureRecovery"), "ok");
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -90,12 +87,9 @@ fn apple_subdirectories_report_real_counts() {
         std::fs::create_dir(&directory).unwrap();
         std::fs::write(directory.join("owned"), b"fixture").unwrap();
     }
-    let checks = run_json(&sandbox, 0);
+    let document = run_json(&sandbox, 0);
     for name in vpt_adapters::APPLE_SUBDIRECTORIES {
-        assert_eq!(
-            detail(&checks, &format!("subdirectory:{name}")),
-            "1 entries"
-        );
+        assert_eq!(detail(&document, "recordings", name), "1 entries");
     }
 }
 
@@ -117,8 +111,9 @@ fn managed_link(correct: bool) {
     );
     std::fs::write(sandbox.config_path(), config).unwrap();
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, if correct { 0 } else { 3 });
-    assert_eq!(check(&checks, "symlink")["ok"], correct);
+    let document = run_json(&sandbox, if correct { 0 } else { 1 });
+    let expected = if correct { "ok" } else { "issue" };
+    assert_eq!(result(&document, "stores", "home_link"), expected);
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -137,8 +132,8 @@ fn unmanaged_home_link_is_reported() {
     let target = sandbox.path().join("target");
     std::fs::create_dir(&target).unwrap();
     std::os::unix::fs::symlink(&target, sandbox.path().join("home/.vpt")).unwrap();
-    let checks = run_json(&sandbox, 0);
-    assert!(detail(&checks, "symlink").starts_with("followed, not managed:"));
+    let document = run_json(&sandbox, 0);
+    assert!(detail(&document, "stores", "home_link").starts_with("followed, not managed:"));
 }
 
 #[test]
@@ -148,10 +143,10 @@ fn staged_files_are_reported_without_cleanup() {
     std::fs::create_dir_all(&audio).unwrap();
     std::fs::write(audio.join(".vpt-staging-owned"), b"private-audio-canary").unwrap();
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 3);
-    assert_eq!(check(&checks, "cleanup_pending")["ok"], false);
-    assert!(detail(&checks, "cleanup_pending").contains(".vpt-staging-owned"));
-    assert!(!detail(&checks, "cleanup_pending").contains("private-audio-canary"));
+    let document = run_json(&sandbox, 1);
+    assert_eq!(result(&document, "leftovers", "staged_audio"), "issue");
+    assert!(detail(&document, "leftovers", "staged_audio").contains(".vpt-staging-owned"));
+    assert!(!document.to_string().contains("private-audio-canary"));
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -167,12 +162,11 @@ fn versions_kept_beside_notes_are_listed_by_name() {
     .unwrap();
     std::fs::write(transcripts.join(".note.md.vpt-41-3"), b"staged").unwrap();
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 3);
-    assert_eq!(check(&checks, "kept_edits")["ok"], false);
+    let document = run_json(&sandbox, 1);
+    assert_eq!(issues(&document), ["leftovers kept_edits"]);
     assert_eq!(
-        detail(&checks, "kept_edits"),
-        "1 version vpt kept beside notes: transcripts/.note.md.vpt-kept-41-2; keep what you \
-         need in each note, then delete the kept file"
+        detail(&document, "leftovers", "kept_edits"),
+        "1 version vpt kept beside notes: transcripts/.note.md.vpt-kept-41-2"
     );
     assert_eq!(snapshot(&sandbox), before);
 }
