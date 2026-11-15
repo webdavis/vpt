@@ -304,6 +304,7 @@ for its version. It leaves vault contents, permissions, links and ignore files u
 | `speakers` | `token`, whether a Hugging Face token is set; `whisply`, whether that engine is selected; `test` |
 | `summary` | `command`, the analysis command: configured or not, available or not; `test` |
 | `actions` | `command` and `withdraw_command`: configured or not, available or not; `env`, the names of the variables set for them, never their values; `test` |
+| `calendar` | `source`, the configured `context.type`; `command`, available or not, for `dam`; `credentials`, which of the three Google keys are set, never their values; `test` |
 | `leftovers` | `staged_audio` waiting for the Trash; `kept_edits`, versions vpt kept beside a note |
 
 Name checks to run only those, as in `vpt doctor helper engines`. An unknown name is refused with
@@ -323,7 +324,8 @@ override selects. The token is never shown. A token on a whisply engine nothing 
 since no labels come from it. The summary command receives the full transcript, so whatever it calls
 sees it. The action commands send each follow-up and each withdrawal to whatever they call. Until a
 withdraw command is set, the `test` advice for actions asks for one first, so a test never leaves a
-follow-up behind.
+follow-up behind. The built-in Google client sends its credentials to Google Calendar when it runs;
+doctor only checks that all three keys are set.
 
 The report goes to standard output. The first line is vpt's version. Each check opens with a heading,
 its name and what it reads after `──`; each row is `name: detail` marked `✓`, `⚠`, `✗` or `·`, with
