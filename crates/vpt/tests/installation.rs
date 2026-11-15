@@ -32,42 +32,49 @@ fn installed_pair_reports_versions_and_missing_helper_has_install_instructions()
             .args(["doctor", "--json"]),
     ));
     assert!(
-        healthy["checks"]
+        healthy["needs_attention"]
             .as_array()
             .unwrap()
             .iter()
-            .all(|check| check["ok"] == true)
+            .all(|entry| entry["result"] != "issue"),
+        "{healthy}"
     );
     let missing = support::run(command(&sandbox).args(["doctor", "--json"]));
-    assert_eq!(missing.status.code(), Some(3));
-    assert!(missing.stdout.is_empty());
-    let error: serde_json::Value = serde_json::from_slice(&missing.stderr).unwrap();
-    assert_eq!(error["schema"], "vpt.error/1");
-    let checks = error["error"]["checks"].as_array().unwrap();
-    let helper = checks
-        .iter()
-        .find(|check| check["name"] == "helper")
-        .unwrap();
-    assert_eq!(helper["ok"], false);
+    assert_eq!(missing.status.code(), Some(1));
+    assert!(missing.stderr.is_empty(), "{}", stderr(&missing));
+    let report: serde_json::Value = serde_json::from_slice(&missing.stdout).unwrap();
+    let row = |check: &str, name: &str| {
+        report["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["name"] == check)
+            .and_then(|entry| entry["rows"].as_array())
+            .and_then(|rows| rows.iter().find(|row| row["name"] == name))
+            .cloned()
+            .unwrap()
+    };
+    let helper = row("helper", "vpt-macos");
+    assert_eq!(helper["result"], "issue");
     for hint in [
         "cargo install --git https://github.com/webdavis/vpt vpt",
         "swift build -c release",
         "copy .build/release/vpt-macos beside vpt",
     ] {
-        assert!(helper["detail"].as_str().unwrap().contains(hint));
+        assert!(helper["advice"].as_str().unwrap().contains(hint));
     }
-    assert_eq!(
-        checks
-            .iter()
-            .find(|check| check["name"] == "engines")
-            .unwrap()["ok"],
-        true
-    );
+    let engines = report["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["name"] == "engines")
+        .unwrap();
+    assert_eq!(engines["result"], "ok");
     let human = support::run(command(&sandbox).arg("doctor"));
-    assert_eq!(human.status.code(), Some(3));
-    assert!(human.stdout.is_empty());
-    assert!(stderr(&human).contains("FAIL helper"));
-    assert!(stderr(&human).contains("swift build -c release"));
+    assert_eq!(human.status.code(), Some(1));
+    let text = support::stdout(&human);
+    assert!(text.contains("  ✗ vpt-macos: "), "{text}");
+    assert!(text.contains("swift build -c release"), "{text}");
     assert_eq!(fixture::snapshot(&sandbox), before);
 }
 

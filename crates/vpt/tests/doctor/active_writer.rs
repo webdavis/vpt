@@ -75,9 +75,9 @@ fn doctor_reads_committed_seen_rows_during_native_write() {
         std::thread::sleep(Duration::from_millis(1));
     }
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 0);
+    let document = run_json(&sandbox, 0);
     assert_eq!(
-        detail(&checks, "source_gone"),
+        detail(&document, "ledger", "source_gone"),
         "0 recordings whose source is gone"
     );
     assert_eq!(snapshot(&sandbox), before);

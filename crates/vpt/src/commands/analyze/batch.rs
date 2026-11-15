@@ -87,7 +87,7 @@ fn redo(
 ) -> Entry {
     let before = snapshot(ledger, &id);
     match mutation::locked(&id, settings, roots, state, false) {
-        Outcome::Success { document, .. } => {
+        Outcome::Success { document, .. } | Outcome::Findings { document, .. } => {
             let after = snapshot(ledger, &id);
             let change = Change {
                 summary_changed: before.summary != after.summary,

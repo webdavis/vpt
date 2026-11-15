@@ -55,24 +55,12 @@ and `--config`. VPT refuses to read unsafe configuration without changing its pe
 must already have mode `0700` and be owned by the current user; otherwise setup refuses before
 prompting or writing configuration. It also rechecks each directory before using it. `--force`
 allows configuration replacement; it does not change existing directory permissions.
-Writing commands refuse a state directory that is not owned by the current user with mode `0700`
-(`unsafe_state`). The refusal names the directory, and when only the mode is wrong it ends with the
-`chmod 700` command that fixes it; vpt never changes the mode itself.
 
 A configured home, state directory, or store may sit below folders that do not exist yet. Writing
 commands create every missing folder with mode `0700`; `vpt doctor` and other read-only commands
 report the path as usable and create nothing. VPT checks overlaps from the nearest existing folder,
 so it refuses a path with `..` below a missing folder, a dangling symlink, a symlink that appears
 where a folder is about to be created, or a file where a folder belongs.
-
-## Ledger files
-
-The ledger is `vpt.db` in the state directory. A writing command works in SQLite's write-ahead log,
-`vpt.db-wal`, and ends by moving every change into `vpt.db` and emptying `vpt.db-wal`. Between
-commands `vpt.db` alone holds the whole ledger: a copy of that one file lists every recording, and
-reading it creates no other file. If a command stops before that last step, or another process is
-reading the ledger at that moment, the changes stay in `vpt.db-wal`. Every command still reads them
-there, and the next writing command moves them.
 
 ## Apple speech helper
 
@@ -301,21 +289,46 @@ the action's sources only. No stage needs an opt-in. A recording with no accepte
 `vpt storage [--json|--toon|--yaml]` reports current file counts, bytes, and oldest/newest timestamps for all seven
 stores. It works independently of the recording source and ledger.
 
-`vpt doctor [--json|--toon|--yaml]` reports engine availability and locality for every configured engine. It checks
-executable files without running arbitrary engine commands; Apple also requires a compatible helper.
-Unavailable engines selected by the default pair or any language override fail the check. Unused
-engine definitions are reported without failing it. Generic commands' locality is explicitly labeled
-as declared configuration. A Whisply engine with a token reads `speaker labels on`; the token itself
-is never shown. Doctor also reports the Obsidian vault and every store's Git placement,
-calling out audio ignore rules and sensitive engine outputs and redaction reports. It leaves vault
-contents, permissions, and ignore files unchanged. A check that passes but needs attention prints as
-`note` and carries `"notice": true`; it never fails doctor. On a Mac where Voice Memos has not stored a
-recording yet, the Voice Memos `Recordings` folder does not exist, and doctor reports that as a notice:
-the folder appears after the first recording, and `vpt import` works without it. A folder that exists
-but cannot be read, for example because the privacy system refuses access, still fails.
-`kept_edits` fails while any store holds a version vpt kept beside a note, and lists each kept file
-by store and name. `state_dir` fails when the state directory exists but is not owned by you with
-mode `0700`, the same condition that makes writing commands refuse it.
+`vpt doctor [--json|--toon|--yaml]` reads this machine and says what needs attention.
+It contacts nothing: no network, no model, no engine. The one program it starts is vpt's own helper,
+for its version. It leaves vault contents, permissions, links and ignore files unchanged.
+
+| Check | Rows |
+| --- | --- |
+| `config` | `file`, the configuration file; `version`, its `config_version` |
+| `stores` | `home`, `state_dir` (an issue when the folder exists but is not owned by you with mode 0700; the row gives the `chmod 700` command), `layout` (every folder resolves and no two overlap), one row per store with its Git placement, `vault`, `home_link` |
+| `ledger` | `database` (opened read-only), `schema`, `source_gone` (recordings whose source file is gone) |
+| `recordings` | `folder`, the Voice Memos folder; one row per Apple subfolder with its entry count |
+| `helper` | `vpt-macos`, its version, or how to install it |
+| `engines` | one row per configured engine: selected or unused, available or not, local or remote |
+| `leftovers` | `staged_audio` waiting for the Trash; `kept_edits`, versions vpt kept beside a note |
+
+Each row is `ok`, `warning`, `issue` or `not_run`. A check takes
+its worst row. A check that cannot run because the configuration did not load is `not_run` with no
+rows, and its advice says so.
+
+The report goes to standard output. The first line is vpt's version. Each check opens with a heading,
+its name and what it reads after `──`; each row is `name: detail` marked `✓`, `⚠`, `✗` or `·`, with
+advice under it after `→`. "Needs attention" closes the report: one count line, then every issue and
+warning numbered, or `✓ nothing needs attention`. Doctor exits 1 when any row is an issue and 0
+otherwise, so warnings alone keep exit 0.
+
+`--json`, `--toon` and `--yaml` print the same values: `schema`, `command`, `version`, `checks` in
+display order (each with `name`, `result`, `detail`, `advice` and `rows`, each row with `name`,
+`result`, `detail` and `advice`), and `needs_attention`, the issues and then the warnings, each with
+its `check`, `name`, `result`, `detail` and `advice`. `advice` is `null` when there is nothing to do,
+and names the command that fixes the row where one exists.
+
+Engine availability means an executable program file; doctor never runs it. Apple also needs a
+compatible helper. An unavailable engine that the default pair or a language override selects is an
+issue; an unused one is reported without one. A command engine's locality is labeled as declared
+configuration. A Whisply engine with a token reads `speaker labels on`; the token itself is never
+shown. A store inside a Git tree is a warning for audio, drafts and engine outputs, and is noted for
+the others. On a Mac where Voice Memos has not stored a recording yet, the `Recordings` folder does
+not exist; doctor reports that as `ok`, and `vpt import` works without it. A folder that exists but
+cannot be read, for example because the privacy system refuses access, is an issue. `kept_edits` is an
+issue while any store holds a version vpt kept beside a note, and lists each kept file by store and
+name.
 
 ## Note writing
 

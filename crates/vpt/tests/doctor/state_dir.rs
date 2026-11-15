@@ -1,4 +1,4 @@
-use crate::fixture::{check, configured, detail, run_json, snapshot};
+use crate::fixture::{configured, detail, result, run_json, snapshot};
 use std::os::unix::fs::PermissionsExt;
 
 #[test]
@@ -8,8 +8,11 @@ fn a_private_state_folder_passes_its_row() {
     std::fs::create_dir(&state).unwrap();
     std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700)).unwrap();
     let checks = run_json(&sandbox, 0);
-    assert_eq!(check(&checks, "state_dir")["ok"], true);
-    assert_eq!(detail(&checks, "state_dir"), state.display().to_string());
+    assert_eq!(result(&checks, "stores", "state_dir"), "ok");
+    assert_eq!(
+        detail(&checks, "stores", "state_dir"),
+        state.display().to_string()
+    );
 }
 
 #[test]
@@ -17,9 +20,9 @@ fn an_absent_state_folder_passes_its_row_and_stays_absent() {
     let sandbox = configured("doctor-state-absent");
     let state = sandbox.path().join("state/vpt");
     let checks = run_json(&sandbox, 0);
-    assert_eq!(check(&checks, "state_dir")["ok"], true);
+    assert_eq!(result(&checks, "stores", "state_dir"), "ok");
     assert_eq!(
-        detail(&checks, "state_dir"),
+        detail(&checks, "stores", "state_dir"),
         format!("{} does not exist yet", state.display())
     );
     assert!(!state.exists());
@@ -32,10 +35,10 @@ fn a_state_folder_with_the_wrong_mode_fails_its_row_with_the_fix_and_keeps_its_m
     std::fs::create_dir(&state).unwrap();
     std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o755)).unwrap();
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 3);
-    assert_eq!(check(&checks, "state_dir")["ok"], false);
+    let checks = run_json(&sandbox, 1);
+    assert_eq!(result(&checks, "stores", "state_dir"), "issue");
     assert_eq!(
-        detail(&checks, "state_dir"),
+        detail(&checks, "stores", "state_dir"),
         format!(
             "state directory '{0}' must have mode 0700; run: chmod 700 '{0}'",
             state.display()

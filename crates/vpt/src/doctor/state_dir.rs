@@ -1,11 +1,10 @@
-use super::checks::check;
+use super::report::Row;
 use crate::compose::{errors, mutation::private_state_error};
 use std::path::Path;
 use vpt_adapters::config::planned_directory;
 use vpt_adapters::{ContainedError, RootDir};
-use vpt_protocol::error::Check;
 
-pub(super) fn inspect(state: &Path) -> Check {
+pub(super) fn row(state: &Path) -> Row {
     let checked = planned_directory(state, "home.state_dir")
         .map_err(|error| errors::root_error(&error).message)
         .and_then(|path| match RootDir::open(&path) {
@@ -20,7 +19,7 @@ pub(super) fn inspect(state: &Path) -> Check {
             Err(error) => Err(errors::contained_error(error).message),
         });
     match checked {
-        Ok(detail) => check("state_dir", true, detail),
-        Err(detail) => check("state_dir", false, detail),
+        Ok(detail) => Row::ok("state_dir", detail),
+        Err(detail) => Row::issue("state_dir", detail),
     }
 }

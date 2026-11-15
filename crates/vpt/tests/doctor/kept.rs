@@ -1,4 +1,4 @@
-use crate::fixture::{check, configured, detail, run_json};
+use crate::fixture::{advice, configured, detail, result, run_json};
 use std::os::unix::fs::PermissionsExt;
 use vpt_adapters::{RootDir, SqliteLedger};
 
@@ -29,12 +29,15 @@ fn vpts_own_leftovers_beside_a_pending_note_are_not_reported_as_edits() {
             ],
         )
         .unwrap();
-    let checks = run_json(&sandbox, 3);
+    let document = run_json(&sandbox, 1);
     drop(connection);
-    assert_eq!(check(&checks, "kept_edits")["ok"], false);
+    assert_eq!(result(&document, "leftovers", "kept_edits"), "issue");
     assert_eq!(
-        detail(&checks, "kept_edits"),
-        "1 version vpt kept beside notes: transcripts/.note.md.vpt-kept-41-3; keep what you \
-         need in each note, then delete the kept file"
+        detail(&document, "leftovers", "kept_edits"),
+        "1 version vpt kept beside notes: transcripts/.note.md.vpt-kept-41-3"
+    );
+    assert_eq!(
+        advice(&document, "leftovers", "kept_edits"),
+        "keep what you need in each note, then delete the kept file"
     );
 }

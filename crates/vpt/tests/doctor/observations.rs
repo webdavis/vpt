@@ -1,4 +1,4 @@
-use crate::fixture::{check, configured, detail, run_json, seed_seen, snapshot};
+use crate::fixture::{check, configured, detail, issues, run_json, seed_seen, snapshot};
 use vpt_adapters::{RootDir, WriteLock};
 use vpt_application::ports::StageStates;
 
@@ -6,15 +6,21 @@ use vpt_application::ports::StageStates;
 fn source_gone_counts_only_marked_rows() {
     let sandbox = configured("doctor-source-gone");
     seed_seen(&sandbox, true);
-    let checks = run_json(&sandbox, 0);
+    let document = run_json(&sandbox, 0);
     assert_eq!(
-        detail(&checks, "source_gone"),
+        detail(&document, "ledger", "source_gone"),
         "1 recordings whose source is gone"
     );
-    seed_seen(&sandbox, false);
-    let checks = run_json(&sandbox, 0);
     assert_eq!(
-        detail(&checks, "source_gone"),
+        detail(&document, "ledger", "schema")
+            .parse::<u32>()
+            .map(|_| ()),
+        Ok(())
+    );
+    seed_seen(&sandbox, false);
+    let document = run_json(&sandbox, 0);
+    assert_eq!(
+        detail(&document, "ledger", "source_gone"),
         "0 recordings whose source is gone"
     );
 }
@@ -39,24 +45,34 @@ fn missing(companion: &str) {
     let state = sandbox.path().join("state/vpt");
     std::fs::rename(state.join(companion), sandbox.path().join("held-companion")).unwrap();
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 3);
-    assert_eq!(check(&checks, "source_gone")["ok"], false);
-    assert_eq!(detail(&checks, "source_gone"), "ledger operation failed");
-    assert!(
-        checks
-            .iter()
-            .filter(|entry| entry["name"] != "source_gone")
-            .all(|entry| entry["ok"] == true)
-    );
+    let document = run_json(&sandbox, 1);
+    assert_eq!(check(&document, "ledger")["result"], "issue");
+    assert_eq!(failing_details(&document), ["ledger operation failed"]);
     assert_eq!(snapshot(&sandbox), before);
 }
 
+fn failing_details(document: &serde_json::Value) -> Vec<String> {
+    assert!(
+        issues(document)
+            .iter()
+            .all(|issue| issue.starts_with("ledger ")),
+        "{document}"
+    );
+    document["needs_attention"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["result"] == "issue")
+        .map(|entry| entry["detail"].as_str().unwrap().to_string())
+        .collect()
+}
+
 #[test]
-fn missing_wal_fails_only_source_gone() {
+fn missing_wal_fails_only_the_ledger() {
     missing("vpt.db-wal");
 }
 #[test]
-fn missing_shm_fails_only_source_gone() {
+fn missing_shm_fails_only_the_ledger() {
     missing("vpt.db-shm");
 }
 
@@ -68,15 +84,10 @@ fn linked(leaf: &str) {
     std::fs::rename(&path, &held).unwrap();
     std::os::unix::fs::symlink(&held, &path).unwrap();
     let before = snapshot(&sandbox);
-    let checks = run_json(&sandbox, 3);
-    assert_eq!(check(&checks, "source_gone")["ok"], false);
-    assert!(detail(&checks, "source_gone").contains("escapes"));
-    assert!(
-        checks
-            .iter()
-            .filter(|entry| entry["name"] != "source_gone")
-            .all(|entry| entry["ok"] == true)
-    );
+    let document = run_json(&sandbox, 1);
+    let failing = failing_details(&document);
+    assert_eq!(failing.len(), 1, "{document}");
+    assert!(failing[0].contains("escapes"), "{document}");
     assert_eq!(snapshot(&sandbox), before);
 }
 

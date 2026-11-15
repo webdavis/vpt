@@ -9,29 +9,14 @@ use vpt_domain::time::{FileTime, UtcInstant};
 
 pub(super) use crate::observations_fixture::snapshot;
 
-pub(super) const NAMES: [&str; 22] = [
+pub(super) const CHECKS: [&str; 7] = [
     "config",
     "stores",
-    "vault",
-    "git_tree:audio",
-    "git_tree:transcripts",
-    "git_tree:analysis",
-    "git_tree:briefs",
-    "git_tree:engine_outputs",
-    "git_tree:drafts",
-    "git_tree:released",
+    "ledger",
+    "recordings",
     "helper",
     "engines",
-    "recordings_dir",
-    "symlink",
-    "subdirectory:Capture",
-    "subdirectory:CaptureRecovery",
-    "subdirectory:CloudRecordings_ckAssets",
-    "subdirectory:EncryptedCloudRecordings",
-    "cleanup_pending",
-    "kept_edits",
-    "state_dir",
-    "source_gone",
+    "leftovers",
 ];
 
 pub(super) fn configured(name: &str) -> Sandbox {
@@ -52,7 +37,7 @@ pub(super) fn configure(sandbox: &Sandbox, extra: &str) {
     );
 }
 
-pub(super) fn run_json(sandbox: &Sandbox, code: i32) -> Vec<Value> {
+pub(super) fn run_json(sandbox: &Sandbox, code: i32) -> Value {
     report(
         &run(sandbox
             .vpt()
@@ -62,51 +47,103 @@ pub(super) fn run_json(sandbox: &Sandbox, code: i32) -> Vec<Value> {
     )
 }
 
-pub(super) fn report(output: &Output, code: i32) -> Vec<Value> {
+pub(super) fn report(output: &Output, code: i32) -> Value {
     assert_eq!(output.status.code(), Some(code), "{}", stderr(output));
-    let text = if code == 0 {
-        assert!(output.stderr.is_empty(), "{}", stderr(output));
-        stdout(output)
-    } else {
-        assert!(output.stdout.is_empty());
-        stderr(output)
-    };
-    let document: Value = serde_json::from_str(&text).unwrap();
-    let body = if code == 0 {
-        &document
-    } else {
-        &document["error"]
-    };
-    let checks = body["checks"].as_array().unwrap().clone();
-    let names: std::collections::BTreeSet<_> = checks
+    assert!(output.stderr.is_empty(), "{}", stderr(output));
+    let document: Value = serde_json::from_str(&stdout(output)).unwrap();
+    assert_eq!(document["schema"], "vpt.result/1");
+    assert_eq!(document["command"], "doctor");
+    assert_eq!(document["version"], env!("CARGO_PKG_VERSION"));
+    let checks = document["checks"].as_array().unwrap();
+    let mut attention = (Vec::new(), Vec::new());
+    for check in checks {
+        let rows = check["rows"].as_array().unwrap();
+        let results: Vec<&str> = rows
+            .iter()
+            .map(|row| row["result"].as_str().unwrap())
+            .collect();
+        let expected = if results.contains(&"issue") {
+            "issue"
+        } else if results.contains(&"warning") {
+            "warning"
+        } else if results.iter().all(|result| *result == "not_run") {
+            "not_run"
+        } else {
+            "ok"
+        };
+        assert_eq!(check["result"], expected, "{check}");
+        for row in rows {
+            let entry = json!({"check": check["name"], "name": row["name"], "result": row["result"],
+                "detail": row["detail"], "advice": row["advice"]});
+            match row["result"].as_str().unwrap() {
+                "issue" => attention.0.push(entry),
+                "warning" => attention.1.push(entry),
+                "ok" | "not_run" => {}
+                other => panic!("unknown result {other}"),
+            }
+        }
+    }
+    assert_eq!(code == 1, !attention.0.is_empty(), "{document}");
+    attention.0.extend(attention.1);
+    assert_eq!(document["needs_attention"], Value::Array(attention.0));
+    document
+}
+
+pub(super) fn names(document: &Value) -> Vec<&str> {
+    document["checks"]
+        .as_array()
+        .unwrap()
         .iter()
         .map(|check| check["name"].as_str().unwrap())
-        .collect();
-    assert_eq!(names, NAMES.into_iter().collect());
-    assert_eq!(checks.len(), NAMES.len());
-    let failed = checks.iter().filter(|check| check["ok"] == false).count();
-    if code == 0 {
-        assert_eq!(failed, 0);
-        assert_eq!(
-            document,
-            json!({"schema":"vpt.result/1","command":"doctor","checks":checks})
-        );
-    } else {
-        assert!(failed > 0);
-        assert_eq!(
-            document,
-            json!({"schema":"vpt.error/1","error":{"kind":"refused","rule":"doctor_checks","message":format!("{failed} checks failed"),"ids":[],"completed":[],"checks":checks}})
-        );
-    }
-    checks
+        .collect()
 }
 
-pub(super) fn check<'a>(checks: &'a [Value], name: &str) -> &'a Value {
-    checks.iter().find(|check| check["name"] == name).unwrap()
+pub(super) fn check<'a>(document: &'a Value, name: &str) -> &'a Value {
+    document["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|check| check["name"] == name)
+        .unwrap_or_else(|| panic!("no check {name}: {document}"))
 }
 
-pub(super) fn detail<'a>(checks: &'a [Value], name: &str) -> &'a str {
-    check(checks, name)["detail"].as_str().unwrap()
+pub(super) fn row<'a>(document: &'a Value, check_name: &str, name: &str) -> &'a Value {
+    check(document, check_name)["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["name"] == name)
+        .unwrap_or_else(|| panic!("no row {check_name} {name}: {document}"))
+}
+
+pub(super) fn result<'a>(document: &'a Value, check_name: &str, name: &str) -> &'a str {
+    row(document, check_name, name)["result"].as_str().unwrap()
+}
+
+pub(super) fn detail<'a>(document: &'a Value, check_name: &str, name: &str) -> &'a str {
+    row(document, check_name, name)["detail"].as_str().unwrap()
+}
+
+pub(super) fn advice<'a>(document: &'a Value, check_name: &str, name: &str) -> &'a str {
+    row(document, check_name, name)["advice"]
+        .as_str()
+        .unwrap_or_default()
+}
+
+pub(super) fn issues(document: &Value) -> Vec<String> {
+    document["needs_attention"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["result"] == "issue")
+        .map(|entry| {
+            format!(
+                "{} {}",
+                entry["check"].as_str().unwrap(),
+                entry["name"].as_str().unwrap()
+            )
+        })
+        .collect()
 }
 
 pub(super) fn seed_seen(sandbox: &Sandbox, gone: bool) -> PathBuf {
