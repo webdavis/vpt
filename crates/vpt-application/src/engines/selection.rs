@@ -1,4 +1,5 @@
 use super::{EngineConfig, EngineSettings};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SelectionError {
@@ -62,6 +63,13 @@ impl EngineSettings {
             main,
             checker,
         })
+    }
+
+    pub fn selected(&self) -> BTreeSet<&String> {
+        std::iter::once(&self.pair)
+            .chain(self.by_language.values())
+            .flat_map(|pair| std::iter::once(&pair.main).chain(pair.checker.iter()))
+            .collect()
     }
 }
 
