@@ -2,7 +2,7 @@ use crate::fixture::{CHECKS, check, configured, names, report, row};
 use crate::support::{run, stderr, stdout};
 
 const VALID: &str =
-    "expected one of config, stores, ledger, recordings, helper, engines, leftovers";
+    "expected one of config, stores, ledger, recordings, helper, engines, speakers, leftovers";
 
 #[test]
 fn named_checks_run_alone_in_display_order_once_each() {
@@ -45,19 +45,21 @@ fn a_named_check_without_a_config_reports_the_config_issue_and_exits_one() {
 #[test]
 fn an_unknown_check_name_is_a_usage_error_naming_the_valid_ones() {
     let sandbox = configured("doctor-unknown-name");
-    let output = run(sandbox
-        .vpt()
-        .current_dir(sandbox.path())
-        .args(["doctor", "helper", "speakers"]));
+    let output =
+        run(sandbox
+            .vpt()
+            .current_dir(sandbox.path())
+            .args(["doctor", "helper", "made-up-check"]));
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(stdout(&output), "");
     let text = stderr(&output);
     assert!(text.starts_with("vpt: invalid value for "), "{text}");
     assert!(text.lines().next().unwrap().ends_with(VALID), "{text}");
-    let output = run(sandbox
-        .vpt()
-        .current_dir(sandbox.path())
-        .args(["doctor", "speakers", "--json"]));
+    let output =
+        run(sandbox
+            .vpt()
+            .current_dir(sandbox.path())
+            .args(["doctor", "made-up-check", "--json"]));
     assert_eq!(output.status.code(), Some(2));
     let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();
     assert_eq!(error["error"]["kind"], "usage");

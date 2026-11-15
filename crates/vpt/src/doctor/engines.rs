@@ -3,14 +3,18 @@ use super::parts::{available, fix, not_tested};
 use super::report::Row;
 use crate::style::Verdict;
 use std::collections::BTreeSet;
-use vpt_application::engines::EngineKind;
+use vpt_application::engines::{EngineKind, EngineSettings};
+
+pub(super) fn selected(settings: &EngineSettings) -> BTreeSet<&String> {
+    std::iter::once(&settings.pair)
+        .chain(settings.by_language.values())
+        .flat_map(|pair| std::iter::once(&pair.main).chain(pair.checker.iter()))
+        .collect()
+}
 
 pub(super) fn rows(context: &Context) -> Vec<Row> {
     let settings = &context.settings.engines;
-    let selected: BTreeSet<_> = std::iter::once(&settings.pair)
-        .chain(settings.by_language.values())
-        .flat_map(|pair| std::iter::once(&pair.main).chain(pair.checker.iter()))
-        .collect();
+    let selected = selected(settings);
     settings
         .definitions
         .iter()
@@ -18,19 +22,6 @@ pub(super) fn rows(context: &Context) -> Vec<Row> {
             let used = selected.contains(name);
             let (available, locality) = match &engine.kind {
                 EngineKind::Apple => (context.helper().verdict == Verdict::Ok, "local"),
-                EngineKind::Whisply {
-                    command,
-                    hf_token: Some(_),
-                    ..
-                } if used => (available(command), "local, speaker labels on"),
-                EngineKind::Whisply {
-                    command,
-                    hf_token: Some(_),
-                    ..
-                } => (
-                    available(command),
-                    "local, token set but whisply is not selected, so no speaker labels",
-                ),
                 EngineKind::Whisply { command, .. } => (available(command), "local"),
                 EngineKind::Command { command, local, .. } => (
                     available(command),

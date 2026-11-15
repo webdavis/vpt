@@ -18,6 +18,8 @@ mod observations;
 mod observations_fixture;
 #[path = "doctor/source.rs"]
 mod source;
+#[path = "doctor/speakers.rs"]
+mod speakers;
 #[path = "doctor/state_dir.rs"]
 mod state_dir;
 #[allow(

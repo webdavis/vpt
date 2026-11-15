@@ -6,6 +6,7 @@ mod leftovers;
 mod parts;
 mod report;
 mod source;
+mod speakers;
 mod state_dir;
 mod stores;
 
