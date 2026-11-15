@@ -1,6 +1,6 @@
 use super::checks::Context;
 use super::parts::{available, fix, not_tested};
-use super::report::Row;
+use crate::report::Row;
 use crate::style::Verdict;
 use std::collections::BTreeSet;
 use vpt_application::engines::{EngineKind, EngineSettings};

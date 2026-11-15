@@ -1,5 +1,5 @@
-use super::report::Row;
 use crate::compose::{errors, mutation::private_state_error};
+use crate::report::Row;
 use std::path::Path;
 use vpt_adapters::config::planned_directory;
 use vpt_adapters::{ContainedError, RootDir};

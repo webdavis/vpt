@@ -4,6 +4,7 @@ mod compose;
 mod dispatch;
 mod doctor;
 mod documents;
+mod report;
 mod style;
 #[cfg(test)]
 mod test_temp;

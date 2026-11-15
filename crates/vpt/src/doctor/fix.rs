@@ -1,8 +1,8 @@
 use super::checks::named;
 use super::config;
-use super::report::Check;
 use crate::commands::{setup, symlink};
 use crate::compose::Environment;
+use crate::report::Check;
 use crate::style::Verdict;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};

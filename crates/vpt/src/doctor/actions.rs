@@ -1,6 +1,6 @@
 use super::checks::Context;
 use super::parts::{command, not_configured, not_tested};
-use super::report::Row;
+use crate::report::Row;
 
 pub(super) fn rows(context: &Context) -> Vec<Row> {
     let settings = &context.settings;

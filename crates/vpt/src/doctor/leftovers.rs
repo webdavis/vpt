@@ -1,6 +1,6 @@
 use super::checks::Context;
-use super::report::Row;
 use crate::compose::{RuntimeLedger, errors};
+use crate::report::Row;
 use std::path::Path;
 use vpt_adapters::config::planned_directory;
 use vpt_adapters::{ClonefileArchive, Roots, kept_files};

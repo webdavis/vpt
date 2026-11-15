@@ -1,6 +1,6 @@
 use super::checks::Context;
-use super::report::Row;
 use crate::compose::errors::root_error;
+use crate::report::Row;
 use crate::style::Verdict;
 use std::path::Path;
 use vpt_adapters::SymlinkError;

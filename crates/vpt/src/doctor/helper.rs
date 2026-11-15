@@ -1,5 +1,5 @@
 use super::checks::Context;
-use super::report::Row;
+use crate::report::Row;
 use vpt_adapters::{BUILT_AGAINST_MAJOR, HelperClient, HelperError};
 use vpt_application::Settings;
 

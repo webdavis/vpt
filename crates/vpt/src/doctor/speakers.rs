@@ -1,7 +1,7 @@
 use super::checks::Context;
 use super::engines::selected;
 use super::parts::{not_configured, not_tested};
-use super::report::Row;
+use crate::report::Row;
 use crate::style::Verdict;
 use vpt_application::engines::EngineKind;
 
