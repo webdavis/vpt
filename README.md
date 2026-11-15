@@ -40,6 +40,9 @@ and `--config`. VPT refuses to read unsafe configuration without changing its pe
 must already have mode `0700` and be owned by the current user; otherwise setup refuses before
 prompting or writing configuration. It also rechecks each directory before using it. `--force`
 allows configuration replacement; it does not change existing directory permissions.
+Writing commands refuse a state directory that is not owned by the current user with mode `0700`
+(`unsafe_state`). The refusal names the directory, and when only the mode is wrong it ends with the
+`chmod 700` command that fixes it; vpt never changes the mode itself.
 
 A configured home, state directory, or store may sit below folders that do not exist yet. Writing
 commands create every missing folder with mode `0700`; `vpt doctor` and other read-only commands
@@ -296,7 +299,8 @@ recording yet, the Voice Memos `Recordings` folder does not exist, and doctor re
 the folder appears after the first recording, and `vpt import` works without it. A folder that exists
 but cannot be read, for example because the privacy system refuses access, still fails.
 `kept_edits` fails while any store holds a version vpt kept beside a note, and lists each kept file
-by store and name.
+by store and name. `state_dir` fails when the state directory exists but is not owned by you with
+mode `0700`, the same condition that makes writing commands refuse it.
 
 ## Note writing
 

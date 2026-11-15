@@ -3,6 +3,7 @@ mod engines;
 mod kept;
 mod probes;
 mod source;
+mod state_dir;
 mod vault;
 
 use crate::cli::output::Outcome;

@@ -9,7 +9,7 @@ use vpt_domain::time::{FileTime, UtcInstant};
 
 pub(super) use crate::observations_fixture::snapshot;
 
-pub(super) const NAMES: [&str; 21] = [
+pub(super) const NAMES: [&str; 22] = [
     "config",
     "stores",
     "vault",
@@ -30,6 +30,7 @@ pub(super) const NAMES: [&str; 21] = [
     "subdirectory:EncryptedCloudRecordings",
     "cleanup_pending",
     "kept_edits",
+    "state_dir",
     "source_gone",
 ];
 
