@@ -1,9 +1,8 @@
 use super::checks::Context;
+use super::parts::{available, fix, not_tested};
 use super::report::Row;
 use crate::style::Verdict;
 use std::collections::BTreeSet;
-use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
 use vpt_application::engines::EngineKind;
 
 pub(super) fn rows(context: &Context) -> Vec<Row> {
@@ -45,35 +44,23 @@ pub(super) fn rows(context: &Context) -> Vec<Row> {
             let detail = format!(
                 "{}, {}, {locality}",
                 if used { "selected" } else { "unused" },
-                if available { "available" } else { "unavailable" },
+                if available {
+                    "available"
+                } else {
+                    "unavailable"
+                },
             );
             if used && !available {
                 let fix = if matches!(engine.kind, EngineKind::Apple) {
                     "see `vpt doctor helper`".to_string()
                 } else {
-                    format!("make its program an executable file, or change `engines.{name}` in the config")
+                    fix(&format!("engines.{name}"))
                 };
                 Row::issue(name.as_str(), detail).advice(fix)
             } else {
                 Row::ok(name.as_str(), detail)
             }
         })
+        .chain([not_tested("engines")])
         .collect()
-}
-
-fn available(command: &[String]) -> bool {
-    let Some(program) = command.first() else {
-        return false;
-    };
-    if program.contains('/') {
-        return executable(Path::new(program));
-    }
-    std::env::var_os("PATH").is_some_and(|paths| {
-        std::env::split_paths(&paths).any(|path| executable(&path.join(program)))
-    })
-}
-
-fn executable(path: &Path) -> bool {
-    path.metadata()
-        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
 }
