@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use vpt_adapters::config::{RootError, Roots, resolve};
 use vpt_application::Settings;
 
-pub(crate) const NAMES: [&str; 9] = [
+pub(crate) const NAMES: [&str; 10] = [
     "config",
     "stores",
     "ledger",
@@ -14,6 +14,7 @@ pub(crate) const NAMES: [&str; 9] = [
     "engines",
     "speakers",
     "summary",
+    "actions",
     "leftovers",
 ];
 
@@ -34,7 +35,7 @@ impl Context {
 
 type Probe = fn(&Context) -> Vec<Row>;
 
-const AFTER_CONFIG: [(&str, &str, Probe); 8] = [
+const AFTER_CONFIG: [(&str, &str, Probe); 9] = [
     ("stores", "where vpt keeps its files", super::stores::rows),
     (
         "ledger",
@@ -62,6 +63,11 @@ const AFTER_CONFIG: [(&str, &str, Probe); 8] = [
         "summary",
         "the analysis command that writes each summary; no command is run",
         super::summary::rows,
+    ),
+    (
+        "actions",
+        "the commands that send and withdraw follow-ups; no command is run",
+        super::actions::rows,
     ),
     (
         "leftovers",
