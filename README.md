@@ -421,8 +421,8 @@ With `context.type = none`, both context halves are disabled. `context.type = da
 `["dam"]`). Calendar events come from one `dam agenda` call for the window, whose query selects the
 configured calendar paths. vpt then runs `dam show <oid>` for each event that starts inside the window,
 to read its attendees and organizer; an agenda row that already carries attendees needs no `show`.
-Open tasks come from one `dam ls` query per project. Every call passes `--json --no-pull`, so no remote
-pull is requested. Both selections must be nonempty. Paths containing query operators or whitespace
+Open tasks come from one `dam ls` query per project. Every call passes `--json`; dam's read
+commands contact no remote. Both selections must be nonempty. Paths containing query operators or whitespace
 are refused before state creation. Collection shares one 30-second deadline and validates bounded
 provider output.
 
