@@ -28,6 +28,13 @@ pub(super) enum Command {
         #[arg(long)]
         fix: bool,
     },
+    /// Make each part do its real job once and report.
+    #[command(after_long_help = examples::TEST)]
+    Test {
+        /// Test only these parts.
+        #[arg(value_name = "PART", value_parser = clap::builder::PossibleValuesParser::new(crate::self_test::NAMES))]
+        parts: Vec<String>,
+    },
     /// Archive new Voice Memos recordings.
     #[command(after_long_help = examples::INGEST)]
     Ingest {
@@ -113,6 +120,7 @@ impl Command {
             Self::Run(run) => run.verb(),
             Self::Setup { overwrite, engine } => Verb::Setup { overwrite, engine },
             Self::Doctor { checks, fix } => Verb::Doctor { checks, fix },
+            Self::Test { parts } => Verb::Test { parts },
             Self::Ingest { dry_run, once } => Verb::Ingest { dry_run, once },
             Self::Import(options) => return options.verb(),
             Self::Show(args) => return args.verb(),

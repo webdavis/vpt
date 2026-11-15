@@ -63,6 +63,9 @@ pub enum Verb {
         checks: Vec<String>,
         fix: bool,
     },
+    Test {
+        parts: Vec<String>,
+    },
     Ledger(super::ledger::Action),
     NoteWrite {
         id: String,

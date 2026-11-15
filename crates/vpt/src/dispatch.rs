@@ -109,6 +109,11 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             checks,
             *fix,
         ),
+        Verb::Test { parts } => crate::self_test::run(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            parts,
+        ),
         Verb::Ledger(action) => commands::ledger::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
