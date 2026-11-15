@@ -1,5 +1,5 @@
 use super::super::{OpenError, SCHEMA_VERSION, SqliteLedger};
-use super::{database, seed, supervised};
+use super::{database, seed, seed_uncheckpointed, supervised};
 use crate::{RootDir, database::snapshot};
 use std::os::unix::fs::PermissionsExt;
 use vpt_application::ports::LedgerError;
@@ -139,12 +139,12 @@ pub(super) fn run(scenario: &str, root: &RootDir) {
 }
 
 fn populated(scenario: &str, root: &RootDir) {
-    drop(seed(root));
     if let Some(leaf) = match scenario {
         "ledger_observe_missing_wal" => Some("vpt.db-wal"),
         "ledger_observe_missing_shm" => Some("vpt.db-shm"),
         _ => None,
     } {
+        seed_uncheckpointed(root);
         std::fs::rename(
             root.path().join(leaf),
             root.path().with_file_name("held-companion"),
@@ -155,6 +155,7 @@ fn populated(scenario: &str, root: &RootDir) {
         assert_eq!(snapshot(root.path()), before);
         return;
     }
+    drop(seed(root));
     if scenario == "ledger_observe_readonly" {
         for leaf in ["vpt.db", "vpt.db-wal", "vpt.db-shm"] {
             std::fs::set_permissions(

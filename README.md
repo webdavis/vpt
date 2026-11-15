@@ -62,6 +62,15 @@ report the path as usable and create nothing. VPT checks overlaps from the neare
 so it refuses a path with `..` below a missing folder, a dangling symlink, a symlink that appears
 where a folder is about to be created, or a file where a folder belongs.
 
+## Ledger files
+
+The ledger is `vpt.db` in the state directory. A writing command works in SQLite's write-ahead log,
+`vpt.db-wal`, and ends by moving every change into `vpt.db` and emptying `vpt.db-wal`. Between
+commands `vpt.db` alone holds the whole ledger: a copy of that one file lists every recording, and
+reading it creates no other file. If a command stops before that last step, or another process is
+reading the ledger at that moment, the changes stay in `vpt.db-wal`. Every command still reads them
+there, and the next writing command moves them.
+
 ## Apple speech helper
 
 `vpt-macos transcribe <audio-path> --locale en-US` emits a `vpt.engine/1` transcript with word

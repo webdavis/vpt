@@ -50,16 +50,29 @@ pub(super) fn open(
 }
 
 pub(super) fn companions(state: &RootDir) -> Result<(), LedgerError> {
-    for leaf in ["vpt.db-wal", "vpt.db-shm"] {
-        let file = state
-            .open_file(Path::new(leaf), Access::Read)
-            .map_err(error::contained)?;
-        let metadata = file
-            .metadata()
-            .map_err(|error| LedgerError::Io(format!("file metadata: {:?}", error.kind())))?;
-        if metadata.nlink() != 1 {
-            return Err(LedgerError::PathEscape(state.path().join(leaf)));
-        }
-    }
+    let wal = single_link(state, "vpt.db-wal", false)?;
+    single_link(state, "vpt.db-shm", wal.is_some_and(|wal| wal.len() > 0))?;
     Ok(())
+}
+
+fn single_link(
+    state: &RootDir,
+    leaf: &str,
+    required: bool,
+) -> Result<Option<std::fs::Metadata>, LedgerError> {
+    let file = match state.open_file(Path::new(leaf), Access::Read) {
+        Ok(file) => file,
+        Err(ContainedError::Io {
+            kind: ErrorKind::NotFound,
+            ..
+        }) if !required => return Ok(None),
+        Err(error) => return Err(error::contained(error)),
+    };
+    let metadata = file
+        .metadata()
+        .map_err(|error| LedgerError::Io(format!("file metadata: {:?}", error.kind())))?;
+    if metadata.nlink() != 1 {
+        return Err(LedgerError::PathEscape(state.path().join(leaf)));
+    }
+    Ok(Some(metadata))
 }

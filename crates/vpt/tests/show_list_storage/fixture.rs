@@ -91,6 +91,27 @@ pub(super) fn preserve_wal(connection: &rusqlite::Connection) {
     assert_eq!(result, rusqlite::ffi::SQLITE_OK);
 }
 
+/// Leaves the statement's change only in the write-ahead log, as a crash after a commit and
+/// before its checkpoint does, and as every ledger written before checkpoints existed does.
+pub(super) fn uncheckpointed(sandbox: &Sandbox, statement: &str) -> rusqlite::Connection {
+    let state = sandbox.path().join("state/vpt");
+    let connection = rusqlite::Connection::open(state.join("vpt.db")).unwrap();
+    connection
+        .set_db_config(
+            rusqlite::config::DbConfig::SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE,
+            true,
+        )
+        .unwrap();
+    preserve_wal(&connection);
+    let mode: String = connection
+        .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(mode, "wal");
+    connection.execute_batch(statement).unwrap();
+    assert!(std::fs::metadata(state.join("vpt.db-wal")).unwrap().len() > 0);
+    connection
+}
+
 pub(super) fn dirty(sandbox: &Sandbox, record: RecordingRecord) {
     seed(sandbox, vec![record]);
     let state = RootDir::open(&sandbox.path().join("state/vpt")).unwrap();

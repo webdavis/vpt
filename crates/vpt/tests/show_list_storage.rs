@@ -8,7 +8,7 @@ mod fixture;
 )]
 mod support;
 
-use fixture::{configured, dirty, record, seed, snapshot, write_config};
+use fixture::{configured, dirty, record, seed, snapshot, uncheckpointed, write_config};
 use std::time::Duration;
 use support::{run, stderr, stdout};
 use vpt_adapters::{RootDir, WriteLock};
@@ -305,6 +305,10 @@ fn missing_companion(command: &str, companion: &str) {
     let sandbox = configured(&format!("{command}-missing-{companion}"));
     let row = record(&sandbox, 1, StageStates::fresh());
     seed(&sandbox, vec![row.clone()]);
+    drop(uncheckpointed(
+        &sandbox,
+        "UPDATE recordings SET duration_secs = 20",
+    ));
     let companion_path = sandbox.path().join("state/vpt").join(companion);
     let held = sandbox.path().join(format!("held-{companion}"));
     std::fs::rename(&companion_path, &held).unwrap();

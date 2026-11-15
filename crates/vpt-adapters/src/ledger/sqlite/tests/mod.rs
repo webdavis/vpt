@@ -95,6 +95,18 @@ fn seed(root: &RootDir) -> SqliteLedger {
     SqliteLedger::open_with_timeout(root, Duration::from_millis(50)).expect("ledger seed")
 }
 
+fn seed_uncheckpointed(root: &RootDir) {
+    drop(seed(root));
+    database(root, |connection| {
+        connection
+            .execute_batch(
+                "PRAGMA journal_mode=WAL; INSERT INTO dirty_publications VALUES('uncheckpointed', NULL, 'committed', 1)",
+            )
+            .map_err(map)
+    })
+    .unwrap();
+}
+
 pub(crate) fn run_scenario(
     scenario: &str,
     root: RootDir,
