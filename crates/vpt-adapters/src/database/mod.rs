@@ -7,7 +7,6 @@ mod registration;
 mod shared_memory;
 mod state;
 
-pub(crate) use locks::{LockKind, set_record_lock};
 pub(crate) use owner::Database;
 
 use crate::ContainedError;

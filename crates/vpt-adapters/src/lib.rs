@@ -27,6 +27,7 @@ pub mod note_document;
 pub mod note_index;
 mod prompt;
 pub mod proposal;
+mod record_lock;
 mod spawn;
 mod stores;
 mod symlink;
