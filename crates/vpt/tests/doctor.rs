@@ -2,6 +2,8 @@
 mod actions;
 #[path = "doctor/active_writer.rs"]
 mod active_writer;
+#[path = "doctor/calendar.rs"]
+mod calendar;
 #[path = "doctor/engines.rs"]
 mod engines;
 #[path = "doctor/fixture.rs"]

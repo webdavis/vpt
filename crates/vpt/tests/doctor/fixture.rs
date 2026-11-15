@@ -9,7 +9,7 @@ use vpt_domain::time::{FileTime, UtcInstant};
 
 pub(super) use crate::observations_fixture::snapshot;
 
-pub(super) const CHECKS: [&str; 10] = [
+pub(super) const CHECKS: [&str; 11] = [
     "config",
     "stores",
     "ledger",
@@ -19,6 +19,7 @@ pub(super) const CHECKS: [&str; 10] = [
     "speakers",
     "summary",
     "actions",
+    "calendar",
     "leftovers",
 ];
 
