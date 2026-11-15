@@ -8,6 +8,7 @@ mod eligibility;
 mod engine_output;
 mod flags;
 pub(crate) mod json;
+mod marker;
 mod memory;
 mod note;
 mod proposal;
@@ -18,6 +19,7 @@ mod transcript;
 mod verification;
 mod vocabulary;
 
+pub use marker::{MarkerError, Markers};
 pub use memory::MemoryLedger;
 pub use proposal::basis::compute as grounding_basis_for;
 pub use sqlite::{OpenError, SCHEMA_VERSION, SqliteLedger};

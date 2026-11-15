@@ -17,6 +17,7 @@ pub(crate) mod events;
 pub(crate) mod history;
 pub(crate) mod index;
 mod ledger;
+pub(crate) mod ledger_identity;
 pub(crate) mod mentions;
 pub(crate) mod mutation;
 mod observations;

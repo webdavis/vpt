@@ -9,7 +9,7 @@ fn writer_waits_for_the_previous_lock_to_be_released() {
         std::thread::sleep(Duration::from_millis(50));
         drop(held);
     });
-    let result = lock(&root);
+    let result = lock_with_wait(&root, Duration::from_secs(5));
     release.join().unwrap();
     assert!(
         result.is_ok(),

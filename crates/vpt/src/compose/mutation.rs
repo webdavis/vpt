@@ -30,11 +30,18 @@ pub(crate) fn private_state_error(path: &Path, error: PrivateStateError) -> Erro
     ErrorDocument::new(ErrorKind::Refused, message).rule("unsafe_state")
 }
 
+/// Takes this machine's write lock, then refuses unless this machine's last write is in the ledger.
 pub(crate) fn lock(state: &RootDir) -> Result<WriteLock, Box<ErrorDocument>> {
-    lock_with_wait(state, Duration::from_secs(5))
+    let lock = lock_with_wait(state, Duration::from_secs(5))?;
+    let markers = super::ledger_identity::markers(&super::Environment::from_process())?;
+    super::ledger_identity::claim(state, &markers)?;
+    Ok(lock)
 }
 
-fn lock_with_wait(state: &RootDir, wait: Duration) -> Result<WriteLock, Box<ErrorDocument>> {
+pub(crate) fn lock_with_wait(
+    state: &RootDir,
+    wait: Duration,
+) -> Result<WriteLock, Box<ErrorDocument>> {
     WriteLock::acquire(state, wait).map_err(|error| {
         Box::new(match error {
             LockError::Contained(error) => contained_error(error),
