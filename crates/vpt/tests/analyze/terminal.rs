@@ -40,7 +40,7 @@ fn analyze_at_a_terminal_names_its_notes_and_the_findings_left_to_verify() {
         shown,
         format!(
             "  ✓ {id}: analyzed\n  ✓ note: {transcript}\n  ✓ note: {analysis}\n\
-             \x20 ⚠ {id}: 1 finding to verify\n    → vpt review {id}\n\n\
+             \x20 ⚠ {id}: 1 finding to verify\n    → vpt review list {id}\n\n\
              Needs attention\n  ⚠ 1 warning to look at\n  1. {id}: 1 finding to verify\n"
         )
     );

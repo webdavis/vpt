@@ -28,7 +28,7 @@ pub(super) fn one(document: &Value, diagnostics: &[String]) -> String {
         let detail = format!("{} to verify", counted(findings, "finding", "findings"));
         summary
             .row(Verdict::Warning, id, &detail)
-            .advice(&format!("vpt review {id}"));
+            .advice(&format!("vpt review list {id}"));
     }
     let resend = format!("vpt analyze {id} --resend-refused");
     actions::rows(&mut summary, &document["actions"], &resend);

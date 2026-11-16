@@ -131,7 +131,12 @@ fn json(output: &std::process::Output) -> serde_json::Value {
 fn review_returns_ranked_flags_occurrences_and_separate_diagnostics_without_writes() {
     let (sandbox, id) = configured();
     let before = fixture::snapshot(&sandbox);
-    let result = json(&run(sandbox.vpt().args(["review", id.as_str(), "--json"])));
+    let result = json(&run(sandbox.vpt().args([
+        "review",
+        "list",
+        id.as_str(),
+        "--json",
+    ])));
     assert_eq!(result["command"], "review");
     assert_eq!(result["id"], id.as_str());
     assert_eq!(result["open_flags"], 3);
@@ -153,7 +158,7 @@ fn review_returns_ranked_flags_occurrences_and_separate_diagnostics_without_writ
 #[test]
 fn human_review_exposes_text_alternatives_and_first_timecodes() {
     let (sandbox, id) = configured();
-    let output = run(sandbox.vpt().args(["review", id.as_str()]));
+    let output = run(sandbox.vpt().args(["review", "list", id.as_str()]));
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let text = stdout(&output);
     assert!(text.contains("[00:02] numeric"));
@@ -169,7 +174,7 @@ fn absent_or_invalid_recording_is_a_usage_error_without_creating_state() {
     let sandbox = fixture::configured("review-absent");
     let before = fixture::snapshot(&sandbox);
     for id in ["bad-id", "2026-08-24T144736-4f3ab19c02de"] {
-        let output = run(sandbox.vpt().args(["review", id, "--json"]));
+        let output = run(sandbox.vpt().args(["review", "list", id, "--json"]));
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
         let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();
@@ -186,7 +191,12 @@ fn an_ingested_recording_without_accepted_text_has_an_empty_review() {
     let id = row.id.clone();
     fixture::seed(&sandbox, vec![row]);
     let before = fixture::snapshot(&sandbox);
-    let result = json(&run(sandbox.vpt().args(["review", id.as_str(), "--json"])));
+    let result = json(&run(sandbox.vpt().args([
+        "review",
+        "list",
+        id.as_str(),
+        "--json",
+    ])));
     assert_eq!(result["transcribed"], false);
     assert_eq!(result["open_flags"], 0);
     assert_eq!(result["flags"], serde_json::json!([]));

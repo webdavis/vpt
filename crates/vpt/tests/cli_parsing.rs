@@ -59,15 +59,13 @@ fn private_text_never_appears_in_a_usage_error() {
         vec!["confirm", "id", "--relation", canary, "--term", "other"],
         vec!["show", "id", "--tag", canary],
         vec!["review", "memo", "--correct", canary],
-        vec![
-            "review",
-            "memo",
-            "--resolve",
-            "f",
-            "--correct",
-            canary,
-            "--dismiss",
-        ],
+        vec!["review", "list", "memo", "--correct", canary],
+        vec!["review", "correct", "memo", "f", canary, "--dismiss"],
+        vec!["review", "correct", "memo", "f", canary, "extra"],
+        vec!["review", "correct", "memo", canary],
+        vec!["review", "confirm", "memo", "f", canary],
+        vec!["review", "dismiss", "memo", "f", canary],
+        vec!["review", "list", "memo", canary],
         vec!["import", "--title", canary],
         vec!["redact", "--title", canary],
         vec!["brief", "--title", canary, "--upcoming"],
@@ -76,13 +74,7 @@ fn private_text_never_appears_in_a_usage_error() {
         vec!["tag", "rename", "--Private canary", "new"],
         vec!["import", "--Private canary.m4a"],
         vec!["verify-note", "--Private canary.md", "--recording", "r"],
-        vec![
-            "review",
-            "memo",
-            "--resolve",
-            "f",
-            "--confirm=Private canary",
-        ],
+        vec!["review", "confirm", "memo", "f", "--json=Private canary"],
     ] {
         for format in [None, Some("--json")] {
             let output = run(sandbox.vpt().args(format).args(&args));

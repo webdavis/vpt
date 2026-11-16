@@ -297,12 +297,14 @@ interrupted, while preserving committed work and the normal operational-failure 
 
 ## Review and known terms
 
-`vpt review <id> [--output json|toon|yaml]` displays ranked open lexical flags, alternatives, occurrence ranges and
+`vpt review list <id> [--output json|toon|yaml]` displays ranked open lexical flags, alternatives, occurrence ranges and
 timecodes, with whole-recording diagnostics listed separately. It reads saved state without running an
-engine or changing files.
+engine or changing files. `vpt review` alone shows its subcommands.
 
-`vpt review <id> --resolve <flag> --confirm|--correct <text>|--dismiss [--output json|toon|yaml]` resolves a
-surfaced flag and rewrites the transcript note. Corrections remain separate from accepted words.
+`vpt review confirm <id> <flag>`, `vpt review correct <id> <flag> <text>` and
+`vpt review dismiss <id> <flag>`, each with `[--output json|toon|yaml]`, resolve a surfaced flag and
+rewrite the transcript note. The correction text is taken as typed, even when it starts with `-`;
+a text spelled exactly like one of vpt's own options, such as `--json`, goes after `--`. Corrections remain separate from accepted words.
 Confirming proper-noun/agreed-unverified flags learns their record text; corrections learn the new
 text. Repeating the same action preserves its resolution time and avoids duplicate terms. Diagnostics
 can be confirmed or dismissed. Invalid flags/actions refuse before mutating work.

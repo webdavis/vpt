@@ -60,10 +60,9 @@ fn lexical_review_invalidates_analysis_in_the_same_publication() {
     note::success(&support::run_with_budget(
         sandbox.vpt().args([
             "review",
+            "correct",
             record.id.as_str(),
-            "--resolve",
             &lexical.identifier.hex(),
-            "--correct",
             "Fixed words",
             "--json",
         ]),
@@ -129,10 +128,9 @@ fn lexical_review_invalidates_analysis_in_the_same_publication() {
     note::success(&support::run_with_budget(
         sandbox.vpt().args([
             "review",
+            "correct",
             record.id.as_str(),
-            "--resolve",
             &finding.identifier.hex(),
-            "--correct",
             "Fixed words",
             "--json",
         ]),
@@ -186,10 +184,9 @@ fn changed_transcript_removes_stale_annotations_and_rechecking_keeps_the_review_
         note::success(&support::run_with_budget(
             sandbox.vpt().args([
                 "review",
+                "correct",
                 record.id.as_str(),
-                "--resolve",
                 &flag.identifier.hex(),
-                "--correct",
                 "Operator correction",
                 "--json",
             ]),

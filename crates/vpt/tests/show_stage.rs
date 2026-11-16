@@ -48,15 +48,7 @@ fn correct_the_flag(sandbox: &Sandbox, id: &vpt_domain::identity::RecordingId, t
     let flag = flag.identifier.hex();
     json(&invoke(
         sandbox,
-        &[
-            "review",
-            id.as_str(),
-            "--resolve",
-            &flag,
-            "--correct",
-            text,
-            "--json",
-        ],
+        &["review", "correct", id.as_str(), &flag, text, "--json"],
     ));
 }
 

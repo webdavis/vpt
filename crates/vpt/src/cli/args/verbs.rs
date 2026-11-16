@@ -55,8 +55,8 @@ pub(super) enum Command {
     #[command(after_long_help = examples::TRANSCRIBE)]
     Transcribe(pipeline::Transcribe),
     /// List a transcript's open review flags, or resolve one.
-    #[command(after_long_help = examples::REVIEW)]
-    Review(review::Args),
+    #[command(subcommand, after_long_help = examples::DOCS)]
+    Review(review::Review),
     /// Confirm a term, or confirm or reject a recording's tag or relation.
     #[command(after_long_help = examples::CONFIRM)]
     Confirm(confirm::Args),
@@ -125,7 +125,7 @@ impl Command {
             Self::Import(options) => return options.verb(),
             Self::Show(args) => return args.verb(),
             Self::Transcribe(transcribe) => transcribe.verb(),
-            Self::Review(args) => args.verb(),
+            Self::Review(review) => review.verb(),
             Self::Confirm(args) => args.verb(),
             Self::Tag(tag) => tag.verb(),
             Self::Analyze(args) => args.verb(),

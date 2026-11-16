@@ -57,10 +57,9 @@ fn redact_analysis_rechecks_stale_findings_after_the_source_flag_is_resolved() {
         &sandbox,
         &[
             "review",
+            "confirm",
             id.as_str(),
-            "--resolve",
             &flag.identifier.hex(),
-            "--confirm",
             "--json",
         ],
     ));

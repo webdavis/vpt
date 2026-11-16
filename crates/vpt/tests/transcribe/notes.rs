@@ -125,21 +125,18 @@ fn resolved_flags_stay_closed_and_corrections_survive_retranscription() {
     for flag in snapshot.flags {
         let action = if matches!(&flag.content, vpt_domain::review::FlagContent::Lexical(lexical) if lexical.class == vpt_domain::uncertainty::Class::LowConfidence)
         {
-            vec!["--correct", "Private correction"]
+            vec!["correct", "Private correction"]
         } else {
-            vec!["--dismiss"]
+            vec!["dismiss"]
         };
         let output = support::run_with_budget(
             sandbox
                 .vpt()
-                .args([
-                    "review",
-                    row.id.as_str(),
-                    "--resolve",
-                    &flag.identifier.hex(),
-                    "--json",
-                ])
-                .args(action),
+                .arg("review")
+                .arg(action[0])
+                .args([row.id.as_str(), &flag.identifier.hex()])
+                .args(&action[1..])
+                .arg("--json"),
             std::time::Duration::from_secs(5),
         );
         json(&output);

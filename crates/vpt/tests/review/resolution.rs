@@ -44,11 +44,13 @@ pub(super) fn resolve(
     flag: &str,
     action: &[&str],
 ) -> std::process::Output {
+    let (verb, rest) = action.split_first().unwrap();
     support::run_with_budget(
         sandbox
             .vpt()
-            .args(["review", id.as_str(), "--resolve", flag, "--json"])
-            .args(action),
+            .args(["review", verb.trim_start_matches("--"), id.as_str(), flag])
+            .args(rest)
+            .arg("--json"),
         std::time::Duration::from_secs(5),
     )
 }

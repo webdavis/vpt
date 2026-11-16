@@ -89,6 +89,7 @@ fn observations_count_current_flags_and_hide_stale_verification() {
     let observed = show(&sandbox, row.id.as_str());
     let review = json(&support::run(sandbox.vpt().args([
         "review",
+        "list",
         row.id.as_str(),
         "--json",
     ])));
@@ -106,14 +107,9 @@ fn observations_count_current_flags_and_hide_stale_verification() {
     assert_eq!(fixture::snapshot(&sandbox), before);
     let flag = review["flags"][0]["identifier"].as_str().unwrap();
     json(&support::run_with_budget(
-        sandbox.vpt().args([
-            "review",
-            row.id.as_str(),
-            "--resolve",
-            flag,
-            "--confirm",
-            "--json",
-        ]),
+        sandbox
+            .vpt()
+            .args(["review", "confirm", row.id.as_str(), flag, "--json"]),
         std::time::Duration::from_secs(5),
     ));
     let before = fixture::snapshot(&sandbox);

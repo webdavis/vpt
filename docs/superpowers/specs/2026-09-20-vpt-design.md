@@ -72,7 +72,7 @@ it says; it never records the option that lost.
 | D1  | vpt does not use or depend on `minutes` in any form.                                                                                          |
 | D2  | Whether audio leaves the machine is the user's choice; local is the default.                                                                  |
 | D3  | Two engine slots, both named in config; whether the second runs on failure only or always is config.                                          |
-| D4  | Reconciliation picks a winner, flags uncertainty inline plus a `vpt review <id>` queue; no summary block.                                     |
+| D4  | Reconciliation picks a winner, flags uncertainty inline plus a `vpt review list <id>` queue; no summary block.                                     |
 | D5  | Built: a winner rule, both-engines-fail handling, engine per language. Not built: a disagreement threshold, a cloud spend ceiling.            |
 | D6  | Events are logged by default; optional `[report] command` and `[alert] command` hooks receive JSON on stdin. |
 | D7  | vpt carries no copy of any notification engine's wire contract and no producer-wire crate.                                                    |
@@ -730,8 +730,9 @@ the note records `vpt-readability: true` when it ran.
 ### 6.7 Review and confirmation
 
 ```
-vpt review <id> [--json]                     print open flags, ranked: record text, alternative, timecode
-vpt review <id> --resolve <flag-id> --confirm | --correct <text> | --dismiss
+vpt review list <id> [--json]                print open flags, ranked: record text, alternative, timecode
+vpt review confirm|dismiss <id> <flag-id>    resolve a flag as it is, or dismiss it
+vpt review correct <id> <flag-id> <text>     resolve a flag with a correction
 vpt confirm --term <text>                      append to known-terms.txt (idempotent)
 vpt confirm <id> --tag <t> | --reject-tag <t> | --relation <kind>:<target>
 vpt tag rename <old> <new> [--preview]         rename one tag on every note and list vpt owns
@@ -846,7 +847,7 @@ The vault-relative folder syntax follows the [Obsidian internal links guide](htt
 
 The H1 matches the filename. Each segment is one paragraph prefixed with its `[mm:ss]` timecode, then
 its speaker label and a colon when it has one; the timecode is the source reference every consumer uses. Transcript uncertainty appears in exactly two
-places, the inline markers and `vpt review <id>`: there is no summary block and no separate document.
+places, the inline markers and `vpt review list <id>`: there is no summary block and no separate document.
 
 A note has two managed regions, `vpt:links` and `vpt:content`, each between a start and an end marker.
 Generated content (the transcript or the analysis, with its inline markers and annotations) lives in
@@ -1538,7 +1539,7 @@ under `--json`.
 | `vpt ingest [--preview] [--once <path>]`                                                      | clones, ledger rows                                                                                                                   | `{"ingested": [record...], "deferred": [{"path", "reason"}], "skipped": n}`                                           | 0, 1 aborted                          |
 | `vpt import <file> [--title <t>] [--captured-at <RFC3339>]`                                   | clones, ledger rows                                                                                                                   | the `ingest` shape                                                                                                    | 0, 1 aborted, 2 no file, 3 refused    |
 | `vpt transcribe <id> [--language <tag>] [--preview]`                                          | engine outputs, flags, transcript note                                                                                                | the record plus `{"flags": {"<class>": n}}`                                                                           | 0, 1 engines failed, 3 refused        |
-| `vpt review <id> [--resolve <flag> --confirm\|--correct <t>\|--dismiss]`                      | flag state, note rewrite, known-terms                                                                                                 | `{"flags": [{"id", "class", "at", "record", "alternative", "state"}]}`                                                | 0, 2 no such flag                     |
+| `vpt review list <id>` / `vpt review confirm\|correct\|dismiss <id> <flag> [<t>]`               | flag state, note rewrite, known-terms                                                                                                 | `{"flags": [{"id", "class", "at", "record", "alternative", "state"}]}`                                                | 0, 2 no such flag                     |
 | `vpt confirm --term <t>` / `vpt confirm <id> --tag <t>\|--reject-tag <t>\|--relation <k>:<t>` | the two lists, ledger, note rewrite                                                                                                   | `{"confirmed": {...}}`                                                                                                | 0, 2                                  |
 | `vpt tag rename <old> <new> [--preview]`                                                      | tag state, owned note rewrite, `known-tags.txt`, the rename record                                                                    | `{"dry_run", "changed", "recordings": [{"id", "notes"}], "known_tags_changed", "untouched_briefs", "untouched_notes"}` | 0, 1 or 3 some recordings failed, 2   |
 | `vpt note write <id>`                                                                         | re-renders managed regions of both notes                                                                                              | the record                                                                                                            | 0, 3 markers                          |

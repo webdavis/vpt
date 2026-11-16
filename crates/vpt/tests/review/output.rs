@@ -8,10 +8,9 @@ fn output_failure_keeps_correction_and_reports_its_recording_without_private_tex
     let output = support::run_with_broken_stdout(
         sandbox.vpt().args([
             "review",
+            "correct",
             id.as_str(),
-            "--resolve",
             &flag,
-            "--correct",
             "Private correction",
             "--json",
         ]),

@@ -43,16 +43,20 @@ fn an_unknown_verb_is_a_usage_error_naming_it() {
 #[test]
 fn review_accepts_global_options_and_requires_exactly_one_identity() {
     for line in [
-        "review memo --json",
-        "--json review memo",
-        "review --config custom.toml memo",
+        "review list memo --json",
+        "--json review list memo",
+        "review list --config custom.toml memo",
     ] {
         assert_eq!(
             parsed(line).unwrap().verb,
             Verb::Review { id: "memo".into() }
         );
     }
-    for line in ["review", "review --json", "review memo extra"] {
+    for line in [
+        "review list",
+        "review list --json",
+        "review list memo extra",
+    ] {
         assert!(parsed(line).is_err(), "{line}");
     }
 }
