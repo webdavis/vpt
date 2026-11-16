@@ -7,6 +7,10 @@ mod fixture;
 mod list_terminal;
 #[path = "review/output.rs"]
 mod output;
+#[path = "review/resolve_terminal.rs"]
+mod resolve_terminal;
+#[path = "note/styled.rs"]
+mod styled;
 mod support;
 
 use support::{Sandbox, run, stderr, stdout};
