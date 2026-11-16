@@ -3,6 +3,7 @@ mod analyze;
 mod ingest;
 mod list;
 mod run;
+mod storage;
 mod transcribe;
 
 use super::{args::Verb, format::Format, output::Outcome};
@@ -41,6 +42,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::Analyze { .. } => Some(analyze::one),
         Verb::AnalyzeBatch { .. } => Some(analyze::batch),
         Verb::List { .. } => Some(list::render),
+        Verb::Storage => Some(storage::render),
         _ => None,
     }
 }
