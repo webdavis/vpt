@@ -376,8 +376,7 @@ named, so doctor exits 1.
 
 Doctor never runs a part to see whether it works. Each configured part ends with a `test` row,
 `not tested`, whose advice names the command that tries it for real, such as `vpt test engines`.
-`vpt test` has the `engines`, `speakers`, `summary` and `calendar` parts so far; until the others arrive, it refuses their
-names. A part that is not configured is one `not_run` row naming the config key that turns it on;
+A part that is not configured is one `not_run` row naming the config key that turns it on;
 that is not an issue. A configured part whose program is missing is an issue.
 Where a part sends data off the machine when it runs, its row says so.
 
@@ -414,12 +413,12 @@ name.
 ## vpt test
 
 `vpt test [part ...] [--json|--toon|--yaml]` makes each part do its real job once and reports. The
-parts so far are `engines`, `speakers`, `summary` and `calendar`. Name parts to test only those, as in `vpt test engines`. An unknown
-name is refused with exit 2 and the list of valid names. Bare `vpt test` tests every configured part.
-A named part with nothing to test is refused with exit 2, and the message names the config key that
-would let it run. In a bare run it is a `not_run` row naming that key, and a run that tests nothing
-exits 1. The configuration must load; otherwise vpt prints the configuration
-error and exits 2.
+parts are `engines`, `speakers`, `summary`, `calendar` and `actions`, in that order. Name parts to
+test only those, as in `vpt test engines`. An unknown name is refused with exit 2 and the list of
+valid names. Bare `vpt test` tests every configured part. A named part with nothing to test is
+refused with exit 2, and the message names the config key that would let it run. In a bare run it is
+a `not_run` row naming that key, and a run that tests nothing exits 1. The configuration must load;
+otherwise vpt prints the configuration error and exits 2.
 
 `engines` runs macOS `say`, found on `PATH`, to speak a fixed made-up English sentence into a clip
 in a new private temporary folder. Each selected engine (the main engine, the checker and every
@@ -451,8 +450,16 @@ the same reader `vpt brief` uses, and asks for no tasks. The row says how many e
 how long it took and which source answered: the program for a command source, or Google Calendar
 for the built-in client. No occasion is recorded.
 
-Nothing is kept. vpt writes nothing to the ledger, the archive, the notes or any store, sends no
-follow-up, and removes the temporary folder at the end, also when a part fails.
+`actions` sends one follow-up through `actions.command`, with the `[actions.env]` variables, then
+withdraws it through `actions.withdraw_command`, the way `vpt run` does. The follow-up's text starts
+with `vpt test:` and its id is new on every run. Each step is a row: `send` and `withdraw`, with the
+id and how long the command took. When the send fails, nothing is withdrawn. When the withdrawal
+fails, the `withdraw` row is an issue that names the id, so the follow-up can be removed by hand.
+Without `actions.withdraw_command` nothing is sent: a named `vpt test actions` is refused with exit 2
+and the message says to set it, and in a bare run `actions` is a `not_run` row giving that reason.
+
+Nothing is kept. vpt writes nothing to the ledger, the archive, the notes or any store, queues no
+follow-up in the ledger, and removes the temporary folder at the end, also when a part fails.
 
 | Part | What leaves the machine |
 | --- | --- |
@@ -460,6 +467,7 @@ follow-up, and removes the temporary folder at the end, also when a part fails.
 | `speakers` | Whisply sends the token to Hugging Face and downloads the two speaker models on first use; the clip stays on the machine. The row says so. |
 | `summary` | The made-up transcript goes to the command, and so to whatever the command calls, such as a model provider. The row says so. |
 | `calendar` | A command source gets the calendar scopes and today's dates; whether it contacts a remote is up to it. The built-in client sends the credentials to Google Calendar and receives today's events. |
+| `actions` | The made-up follow-up and its withdrawal go to the two commands, and so to whatever they call, such as a task service. The `send` row says so. |
 
 The report has the same form as doctor's: the version line, a heading per part, rows marked `✓`,
 `⚠`, `✗` or `·`, advice after `→`, and "Needs attention". It goes to standard output. vpt exits 1

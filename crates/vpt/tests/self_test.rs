@@ -1,4 +1,6 @@
 #![cfg(feature = "dev-tools")]
+#[path = "self_test/actions.rs"]
+mod actions;
 #[path = "self_test/calendar.rs"]
 mod calendar;
 #[path = "self_test/engines.rs"]
