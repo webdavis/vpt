@@ -101,10 +101,13 @@ pub(super) fn script(sandbox: &Sandbox, name: &str, body: &str) -> PathBuf {
 }
 
 pub(super) fn rows(document: &Value) -> Vec<&Value> {
-    let checks = document["checks"].as_array().unwrap();
-    assert_eq!(checks.len(), 1, "{document}");
-    assert_eq!(checks[0]["name"], "engines");
-    checks[0]["rows"].as_array().unwrap().iter().collect()
+    let engines = document["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|check| check["name"] == "engines")
+        .unwrap_or_else(|| panic!("no engines check: {document}"));
+    engines["rows"].as_array().unwrap().iter().collect()
 }
 
 pub(super) fn row<'a>(document: &'a Value, name: &str) -> &'a Value {

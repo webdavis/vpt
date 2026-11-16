@@ -1,3 +1,4 @@
+use super::plan::Run;
 use crate::commands::transcribe::errors::cause;
 use crate::report::Row;
 use std::time::Instant;
@@ -5,13 +6,19 @@ use vpt_adapters::{Clip, GuardedEngines, SpeechError, speak};
 use vpt_application::Settings;
 use vpt_application::engine_trial::{LANGUAGE, SENTENCE, heard};
 use vpt_application::engines::EngineConfig;
-use vpt_application::ports::{Engine, EngineFailure, EngineRequest};
+use vpt_application::ports::{Engine, EngineFailure, EngineOutput, EngineRequest};
 
-pub(super) fn configured(settings: &Settings) -> bool {
-    !settings.engines.selected().is_empty()
+pub(super) fn test(settings: &Settings) -> Result<Run<'_>, Row> {
+    if settings.engines.selected().is_empty() {
+        return Err(Row::not_run(
+            "configured",
+            "no engine is selected, set `engines.main` in the config",
+        ));
+    }
+    Ok(Box::new(|| rows(settings)))
 }
 
-pub(super) fn rows(settings: &Settings) -> Vec<Row> {
+fn rows(settings: &Settings) -> Vec<Row> {
     let clip = match speak(SENTENCE, settings.source.max_audio_bytes) {
         Ok(clip) => clip,
         Err(error) => return vec![unspoken(error)],
@@ -36,16 +43,28 @@ pub(super) fn rows(settings: &Settings) -> Vec<Row> {
         .collect()
 }
 
-fn unspoken(error: SpeechError) -> Row {
-    let detail = match error {
-        SpeechError::Missing => "could not make the test clip: macOS `say` was not found".into(),
-        SpeechError::Failed(reason) => format!("could not make the test clip with `say`: {reason}"),
+pub(super) fn unspoken(error: SpeechError) -> Row {
+    let (program, detail) = match error {
+        SpeechError::Missing(program) => (
+            program,
+            format!("could not make the test clip: macOS `{program}` was not found"),
+        ),
+        SpeechError::Failed(program, reason) => (
+            program,
+            format!("could not make the test clip with `{program}`: {reason}"),
+        ),
     };
-    Row::issue("clip", detail)
-        .advice("vpt speaks the test clip with macOS `say`; make sure `say` runs from your PATH")
+    Row::issue("clip", detail).advice(format!(
+        "vpt makes test clips with macOS `say` and `afconvert`; make sure `{program}` runs from \
+         your PATH"
+    ))
 }
 
-fn row(settings: &Settings, clip: &Clip, config: &EngineConfig) -> Row {
+pub(super) fn transcribe(
+    settings: &Settings,
+    clip: &Clip,
+    config: &EngineConfig,
+) -> (Result<EngineOutput, EngineFailure>, f64) {
     let started = Instant::now();
     let result = GuardedEngines::new(
         settings.helper_path.clone(),
@@ -60,7 +79,11 @@ fn row(settings: &Settings, clip: &Clip, config: &EngineConfig) -> Row {
         duration: clip.duration,
         timeout: settings.engines.timeout,
     });
-    let seconds = started.elapsed().as_secs_f64();
+    (result, started.elapsed().as_secs_f64())
+}
+
+fn row(settings: &Settings, clip: &Clip, config: &EngineConfig) -> Row {
+    let (result, seconds) = transcribe(settings, clip, config);
     let sent = !config.local() && !matches!(result, Err(EngineFailure::Unavailable));
     let notes = format!(
         "{}{}",

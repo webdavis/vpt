@@ -11,6 +11,8 @@ mod named;
 )]
 #[path = "show_list_storage/fixture.rs"]
 mod observations_fixture;
+#[path = "self_test/speakers.rs"]
+mod speakers;
 #[allow(
     dead_code,
     reason = "shared integration support serves other test targets"
