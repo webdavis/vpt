@@ -5,6 +5,8 @@ mod report;
 #[cfg(feature = "dev-tools")]
 #[path = "upcoming/retention.rs"]
 mod retention;
+#[path = "upcoming/terminal.rs"]
+mod terminal;
 use super::*;
 use serde_json::{Value, json};
 use std::{fs, os::unix::fs::PermissionsExt};

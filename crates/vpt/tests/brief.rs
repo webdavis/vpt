@@ -22,10 +22,12 @@ mod rendering_rewrite;
 #[cfg(feature = "dev-tools")]
 #[path = "brief/retention.rs"]
 mod retention;
+#[path = "note/styled.rs"]
+mod styled;
 mod support;
 #[path = "brief/upcoming.rs"]
 mod upcoming;
-use support::{Sandbox, stderr};
+use support::{Sandbox, stderr, stdout};
 use vpt_adapters::SqliteLedger;
 use vpt_application::ports::*;
 fn invoke(sandbox: &Sandbox, args: &[&str]) -> std::process::Output {

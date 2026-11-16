@@ -1,5 +1,6 @@
 mod actions;
 mod analyze;
+mod brief;
 mod confirm;
 mod ingest;
 mod list;
@@ -16,7 +17,11 @@ mod symlink;
 mod tag;
 mod transcribe;
 
-use super::{args::Verb, format::Format, output::Outcome};
+use super::{
+    args::{Verb, brief::Target},
+    format::Format,
+    output::Outcome,
+};
 use serde_json::Value;
 use std::io::IsTerminal;
 
@@ -67,6 +72,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::SymlinkDeploy => Some(symlink::deploy),
         Verb::SymlinkVerify => Some(symlink::verify),
         Verb::Setup { .. } => Some(setup::render),
+        Verb::Brief(options) if options.target == Target::Upcoming => Some(brief::upcoming),
         _ => None,
     }
 }
