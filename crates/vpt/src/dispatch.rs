@@ -22,16 +22,10 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             invocation.config.as_deref(),
             options,
         ),
-        Verb::Occasions | Verb::OccasionPath { .. } => match compose::ledger_from(
-            &compose::Environment::from_process(),
-            invocation.config.as_deref(),
-        ) {
-            Ok(ledger) => match &invocation.verb {
-                Verb::OccasionPath { id, stage } => commands::occasions::path(&ledger, id, stage),
-                _ => commands::occasions::run(&ledger),
-            },
-            Err(error) => Outcome::Failure(*error),
-        },
+        Verb::Occasions => observe(invocation, commands::occasions::run),
+        Verb::OccasionPath { id, stage } => observe(invocation, |ledger| {
+            commands::occasions::path(ledger, id, stage)
+        }),
         Verb::Analyze {
             id,
             dry_run,
@@ -137,13 +131,9 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
         ),
-        Verb::Path { id, stage } => match compose::ledger_from(
-            &compose::Environment::from_process(),
-            invocation.config.as_deref(),
-        ) {
-            Ok(ledger) => commands::path::run(&ledger, id, stage),
-            Err(error) => Outcome::Failure(*error),
-        },
+        Verb::Path { id, stage } => {
+            observe(invocation, |ledger| commands::path::run(ledger, id, stage))
+        }
         Verb::Show {
             id,
             stage: Some(stage),
@@ -157,32 +147,16 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
         ),
         Verb::Show {
             id, stage: None, ..
-        } => match compose::ledger_from(
-            &compose::Environment::from_process(),
-            invocation.config.as_deref(),
-        ) {
-            Ok(ledger) => commands::show::run(&ledger, id),
-            Err(error) => Outcome::Failure(*error),
-        },
+        } => observe(invocation, |ledger| commands::show::run(ledger, id)),
         Verb::Search(options) => commands::search::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
             options,
         ),
-        Verb::Review { id } => match compose::ledger_from(
-            &compose::Environment::from_process(),
-            invocation.config.as_deref(),
-        ) {
-            Ok(ledger) => commands::review::run(&ledger, id),
-            Err(error) => Outcome::Failure(*error),
-        },
-        Verb::List { stage } => match compose::ledger_from(
-            &compose::Environment::from_process(),
-            invocation.config.as_deref(),
-        ) {
-            Ok(ledger) => commands::list::run(&ledger, stage.as_deref()),
-            Err(error) => Outcome::Failure(*error),
-        },
+        Verb::Review { id } => observe(invocation, |ledger| commands::review::run(ledger, id)),
+        Verb::List { stage } => observe(invocation, |ledger| {
+            commands::list::run(ledger, stage.as_deref())
+        }),
         Verb::RetentionRun { dry_run } => commands::retention::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
@@ -223,4 +197,17 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
     };
     let outcome = crate::cli::terminal::styled(outcome, &invocation.verb, invocation.format);
     emit(outcome, invocation.format)
+}
+
+fn observe(
+    invocation: &Invocation,
+    command: impl FnOnce(&compose::RuntimeLedger) -> Outcome,
+) -> Outcome {
+    match compose::ledger_from(
+        &compose::Environment::from_process(),
+        invocation.config.as_deref(),
+    ) {
+        Ok(ledger) => command(&ledger),
+        Err(error) => Outcome::Failure(*error),
+    }
 }
