@@ -114,7 +114,7 @@ fn stale_dam_calendar_names_the_staleness_for_manual_and_upcoming_briefs() {
             .contains("stale")
     );
     assert_eq!(result["context"]["tasks"]["status"], "present");
-    let output = invoke(&sandbox, &["brief", "--upcoming", "--json"]);
+    let output = invoke(&sandbox, &["brief", "upcoming", "--json"]);
     assert_eq!(output.status.code(), Some(1));
     assert!(stderr(&output).contains("calendar data is stale"));
     assert!(!stderr(&output).contains("PRIVATE"));

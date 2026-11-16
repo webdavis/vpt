@@ -102,7 +102,7 @@ impl Fixture {
                 "--at",
                 "2026-10-01T10:00:00-06:00",
             ],
-            "upcoming" => vec!["brief", "--upcoming"],
+            "upcoming" => vec!["brief", "upcoming"],
             _ => vec![verb, &self.id],
         }
     }

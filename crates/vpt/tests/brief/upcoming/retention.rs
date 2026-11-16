@@ -6,7 +6,7 @@ fn upcoming_discovery_keeps_expired_brief_absent_even_when_event_details_change(
     let sandbox = configured();
     let now = SystemClock.now().secs;
     reply(&sandbox, vec![event("one", now + 3600)]);
-    json(&invoke(&sandbox, &["brief", "--upcoming", "--json"]));
+    json(&invoke(&sandbox, &["brief", "upcoming", "--json"]));
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
         .unwrap()
         .unwrap();
@@ -25,7 +25,7 @@ fn upcoming_discovery_keeps_expired_brief_absent_even_when_event_details_change(
     let emitted = reports(&sandbox);
     for offset in [3600, 7200] {
         reply(&sandbox, vec![event("one", now + offset)]);
-        let result = json(&invoke(&sandbox, &["brief", "--upcoming", "--json"]));
+        let result = json(&invoke(&sandbox, &["brief", "upcoming", "--json"]));
         assert_eq!(result["written"], json!([]));
         assert!(!brief.target.exists());
         assert_eq!(ledger.brief(&occasion.id).unwrap().unwrap(), brief);

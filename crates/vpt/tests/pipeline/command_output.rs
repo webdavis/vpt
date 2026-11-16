@@ -25,7 +25,7 @@ fn every_mutating_command_emits_one_versioned_success_or_human_summary() {
             assert!(!output.stdout.is_empty(), "{args:?}");
             if structured {
                 let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-                let is_pack = args[0] == "brief" && args[1] != "--upcoming";
+                let is_pack = args[0] == "brief" && args[1] != "upcoming";
                 assert_eq!(
                     document["schema"],
                     if is_pack {

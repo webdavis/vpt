@@ -114,8 +114,10 @@ pub(super) const RETENTION_RUN: &str =
 pub(super) const BRIEF: &str = examples![
     "vpt brief 2026-08-25T100000-9f8e7d6c5b4a --explain",
     "vpt brief --title \"Design review\" --at 2026-08-25T10:00:00-06:00 --participant Alice",
-    "vpt brief --upcoming --json",
+    "vpt brief 2026-08-25T100000-9f8e7d6c5b4a --preview --json",
 ];
+pub(super) const BRIEF_UPCOMING: &str =
+    examples!["vpt brief upcoming", "vpt brief upcoming --json"];
 pub(super) const REDACT: &str = examples![
     "vpt redact 2026-08-24T144736-4f3ab19c02de",
     "vpt redact 2026-08-24T144736-4f3ab19c02de --stage analysis --to ~/Shared",

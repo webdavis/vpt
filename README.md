@@ -629,7 +629,7 @@ Set `context.dam.max_age` to bound how old dam's calendar data may be. Name your
 each value; for a remote called `work`, write `max_age = ["work=15m"]` under `[context.dam]`. Each
 value is passed to `dam agenda` as `--max-age`; the default, an empty list, passes none. When dam refuses with `stale_remote`, the calendar half
 fails with the detail `calendar data is stale: dam refused it under context.dam.max_age`, and
-`--upcoming` exits with that detail instead of writing nothing. A value whose remote dam does not
+`brief upcoming` exits with that detail instead of writing nothing. A value whose remote dam does not
 know, or whose data its token may not read, fails the calendar half with its own detail,
 `context.dam.max_age names a remote that dam does not know or that its token may not read; use a name
 from dam remote list`.
@@ -640,7 +640,7 @@ only `calendar.events.readonly`. Recurring events are expanded within the reques
 most ten pages per calendar and one 30-second deadline for refresh and collection. Google tasks are
 unsupported. Provider failures use fixed details without credentials or response bodies.
 
-Enable `[brief.trigger] enabled = true` to use `vpt brief --upcoming [--output json|toon|yaml]`. The default lead time is
+Enable `[brief.trigger] enabled = true` to use `vpt brief upcoming [--output json|toon|yaml]`. The default lead time is
 `24h`; discovery selects events with `now <= start < now + lead_time`. A writing run saves its start
 before collecting context. Failed calendar discovery exits 1 and records the failed run without
 saving an occasion or publishing a brief. Successful discovery writes each unbriefed provider identity

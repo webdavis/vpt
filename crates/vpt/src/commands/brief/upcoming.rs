@@ -9,7 +9,7 @@ pub(super) fn validate(settings: &Settings) -> Result<(), Box<ErrorDocument>> {
     if !settings.brief.trigger_enabled {
         return Err(Box::new(ErrorDocument::new(
             ErrorKind::Config,
-            "brief.trigger.enabled must be true for --upcoming",
+            "brief.trigger.enabled must be true for brief upcoming",
         )));
     }
     context::validate(settings)?;

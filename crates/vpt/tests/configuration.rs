@@ -40,7 +40,7 @@ fn commands(sandbox: &Sandbox) -> Vec<Vec<String>> {
         vec!["path", "--occasion", &occasion, "--stage", "brief"],
         vec!["brief", &occasion],
         vec!["brief", "--title", "Private planning", "--at", at],
-        vec!["brief", "--upcoming"],
+        vec!["brief", "upcoming"],
         vec!["redact", &id, "--stage", "transcript"],
         vec!["redact", &id, "--stage", "analysis"],
         vec!["show", &id, "--stage", "released"],
