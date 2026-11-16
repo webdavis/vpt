@@ -47,10 +47,22 @@ pub(super) const TRANSCRIBE: &str = examples![
     "vpt transcribe 2026-08-24T144736-4f3ab19c02de --language fr-CA",
     "vpt transcribe 2026-08-24T144736-4f3ab19c02de --preview --json",
 ];
-pub(super) const REVIEW: &str = examples![
-    "vpt review 2026-08-24T144736-4f3ab19c02de",
-    "vpt review 2026-08-24T144736-4f3ab19c02de --json",
-    "vpt review 2026-08-24T144736-4f3ab19c02de --resolve \"$FLAG\" --correct \"Kubernetes\"",
+pub(super) const REVIEW_LIST: &str = examples![
+    "vpt review list 2026-08-24T144736-4f3ab19c02de",
+    "vpt review list 2026-08-24T144736-4f3ab19c02de --json",
+];
+pub(super) const REVIEW_CONFIRM: &str = examples![
+    "vpt review confirm 2026-08-24T144736-4f3ab19c02de \"$FLAG\"",
+    "vpt review confirm 2026-08-24T144736-4f3ab19c02de \"$FLAG\" --json",
+];
+pub(super) const REVIEW_CORRECT: &str = examples![
+    "vpt review correct 2026-08-24T144736-4f3ab19c02de \"$FLAG\" Kubernetes",
+    "vpt review correct 2026-08-24T144736-4f3ab19c02de \"$FLAG\" \"Kubernetes cluster\" --json",
+    "vpt review correct 2026-08-24T144736-4f3ab19c02de \"$FLAG\" -- \"-5 degrees\"",
+];
+pub(super) const REVIEW_DISMISS: &str = examples![
+    "vpt review dismiss 2026-08-24T144736-4f3ab19c02de \"$FLAG\"",
+    "vpt review dismiss 2026-08-24T144736-4f3ab19c02de \"$FLAG\" --json",
 ];
 pub(super) const CONFIRM: &str = examples![
     "vpt confirm --term \"Kubernetes\"",

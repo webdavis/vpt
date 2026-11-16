@@ -85,10 +85,9 @@ fn changed_grounding_window_rechecks_analysis_without_agent_and_keeps_review_dec
     json(&support::run_with_budget(
         sandbox.vpt().args([
             "review",
+            "confirm",
             row.id.as_str(),
-            "--resolve",
             &action.identifier.hex(),
-            "--confirm",
             "--json",
         ]),
         std::time::Duration::from_secs(5),

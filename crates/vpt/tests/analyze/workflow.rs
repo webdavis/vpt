@@ -167,10 +167,9 @@ fn analysis_preserves_operator_edits_and_review_resolutions_on_repeated_claims()
     let output = support::run_with_budget(
         sandbox.vpt().args([
             "review",
+            "correct",
             record.id.as_str(),
-            "--resolve",
             &flag.identifier.hex(),
-            "--correct",
             "Operator correction",
             "--json",
         ]),

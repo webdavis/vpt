@@ -110,7 +110,9 @@ fn builtin_pair_classifies_once_by_precedence_and_exposes_ranked_occurrences() {
     assert_eq!(flags[5].alternative_text.as_deref(), Some("green"));
     assert_eq!(result["flags"]["agreed_unverified"], 2);
     let review = json(&support::run_with_budget(
-        sandbox.vpt().args(["review", row.id.as_str(), "--json"]),
+        sandbox
+            .vpt()
+            .args(["review", "list", row.id.as_str(), "--json"]),
         std::time::Duration::from_secs(5),
     ));
     assert_eq!(review["open_flags"], 5);

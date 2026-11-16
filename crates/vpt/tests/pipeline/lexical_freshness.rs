@@ -76,10 +76,9 @@ fn lexical_confirmation_refreshes_inherited_uncertainty_once_without_retranscrib
     json(&support::run_with_budget(
         sandbox.vpt().args([
             "review",
+            "confirm",
             record.id.as_str(),
-            "--resolve",
             &lexical.identifier.hex(),
-            "--confirm",
             "--json",
         ]),
         std::time::Duration::from_secs(5),

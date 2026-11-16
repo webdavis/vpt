@@ -173,7 +173,7 @@ fn option_like_correction_is_literal_and_a_later_action_can_replace_it() {
     assert_eq!(fs::read_to_string(&terms).unwrap(), "--term\n");
     let output = run(sandbox
         .vpt()
-        .args(["review", id.as_str(), "--resolve", &flag, "--dismiss"]));
+        .args(["review", "dismiss", id.as_str(), &flag]));
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert!(stdout(&output).contains("2 open lexical flags"));
     let after = inputs(&sandbox, &id);

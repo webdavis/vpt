@@ -50,10 +50,9 @@ fn released_copy_uses_frozen_provenance_and_the_exact_body() {
         &sandbox,
         &[
             "review",
+            "confirm",
             id.as_str(),
-            "--resolve",
             &flag.identifier.hex(),
-            "--confirm",
             "--json",
         ],
     ));

@@ -239,10 +239,9 @@ fn resolving_an_analysis_finding_updates_its_annotation_and_both_counts() {
         &sandbox,
         &[
             "review",
+            "correct",
             row.id.as_str(),
-            "--resolve",
             &flags[0].identifier.hex(),
-            "--correct",
             "operator] correction",
         ],
     ));
@@ -406,13 +405,7 @@ fn resolving_a_finding_with_both_notes_expired_keeps_them_expired() {
     }
     let result = success(&command(
         &sandbox,
-        &[
-            "review",
-            row.id.as_str(),
-            "--resolve",
-            &flag.identifier.hex(),
-            "--dismiss",
-        ],
+        &["review", "dismiss", row.id.as_str(), &flag.identifier.hex()],
     ));
     assert!(result["resolved"]["path"].is_null());
     for note in &before {

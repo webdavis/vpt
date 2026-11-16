@@ -50,7 +50,7 @@ pub(super) fn prepare() -> (Sandbox, Vec<Vec<String>>) {
             "--recording",
             id,
         ],
-        vec!["review", id, "--resolve", &flag, "--confirm"],
+        vec!["review", "confirm", id, &flag],
         vec!["confirm", "--term", "Private term"],
         vec!["confirm", id, "--tag", "planning"],
         vec!["confirm", id, "--reject-tag", "planning"],
@@ -164,7 +164,7 @@ pub(super) fn observations(sandbox: &Sandbox) -> Vec<Vec<String>> {
     let id = ledger.recordings().unwrap().remove(0).id;
     let occasion = ledger.occasions().unwrap().remove(0).id;
     [
-        vec!["review", id.as_str()],
+        vec!["review", "list", id.as_str()],
         vec!["occasions"],
         vec!["path", id.as_str(), "--stage", "transcript"],
         vec!["path", id.as_str(), "--stage", "analysis"],

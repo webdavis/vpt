@@ -34,10 +34,9 @@ fn redact_omits_or_marks_open_spans_and_freezes_the_original_review_snapshot() {
         &sandbox,
         &[
             "review",
+            "confirm",
             id.as_str(),
-            "--resolve",
             &flag.identifier.hex(),
-            "--confirm",
             "--json",
         ],
     ));
