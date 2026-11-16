@@ -2,6 +2,8 @@
 #![allow(dead_code, reason = "shared CLI fixtures")]
 #[path = "note/analysis.rs"]
 mod analysis;
+#[path = "note/confirm_terminal.rs"]
+mod confirm_terminal;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
 #[path = "note/mentions.rs"]
@@ -18,6 +20,8 @@ mod relation_confirm;
 mod relations;
 #[path = "note/rename.rs"]
 mod rename;
+#[path = "note/styled.rs"]
+mod styled;
 mod support;
 #[path = "note/tag_confirm.rs"]
 mod tag_confirm;
