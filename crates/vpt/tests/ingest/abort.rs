@@ -7,7 +7,7 @@ use vpt_application::ports::RecordingLedger;
 fn empty_previously_populated_source_aborts_once_per_run_and_preserves_archive() {
     let sandbox = configured();
     let source = add(&sandbox, "gone.m4a");
-    let ingested = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    let ingested = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     let archive = std::path::Path::new(ingested["ingested"][0]["audio_path"].as_str().unwrap());
     let bytes = fs::read(archive).unwrap();
     fs::rename(&source, sandbox.path().join("held-source.m4a")).unwrap();
@@ -15,7 +15,7 @@ fn empty_previously_populated_source_aborts_once_per_run_and_preserves_archive()
         let mut command = sandbox.vpt();
         command.arg("ingest");
         if json_output {
-            command.arg("--json");
+            command.args(["-o", "json"]);
         }
         let output = run(&mut command);
         assert_eq!(output.status.code(), Some(1));
@@ -58,7 +58,7 @@ fn unreadable_title_database_continues_untitled_without_changing_voice_memos() {
     )
     .unwrap();
     let before = snapshot(&sandbox);
-    let result = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     assert_eq!(result["ingested"].as_array().unwrap().len(), 1);
     assert!(result["ingested"][0]["title"].is_null());
     assert_eq!(result["ingested"][0]["title_source"], "unavailable");

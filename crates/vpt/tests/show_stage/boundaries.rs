@@ -9,7 +9,7 @@ fn sql(sandbox: &Sandbox, statement: &str) {
 #[test]
 fn changed_non_utf8_release_is_an_artifact_refusal() {
     let (sandbox, id) = configured("show-invalid-text");
-    let released = json(&invoke(&sandbox, &["redact", id.as_str(), "--json"]));
+    let released = json(&invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]));
     fs::write(released["written"].as_str().unwrap(), [255, 254]).unwrap();
     let output = show(&sandbox, id.as_str(), "released");
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
@@ -27,7 +27,7 @@ fn pending_release_is_an_operational_failure_without_recovery_or_publication() {
         "CREATE TRIGGER fail_release BEFORE INSERT ON release_completions BEGIN SELECT RAISE(ABORT, 'fixture'); END;",
     );
     assert_eq!(
-        invoke(&sandbox, &["redact", id.as_str(), "--json"])
+        invoke(&sandbox, &["redact", id.as_str(), "-o", "json"])
             .status
             .code(),
         Some(1)
@@ -45,7 +45,7 @@ fn brief_resolves_occasion_sources_and_keeps_operator_prose() {
     let (sandbox, id) = configured("show-brief");
     json(&invoke(
         &sandbox,
-        &["confirm", "tag", id.as_str(), "planning", "--json"],
+        &["confirm", "tag", id.as_str(), "planning", "-o", "json"],
     ));
     let result = json(&invoke(
         &sandbox,
@@ -57,7 +57,8 @@ fn brief_resolves_occasion_sources_and_keeps_operator_prose() {
             "2026-08-25T10:00:00-06:00",
             "--tag",
             "planning",
-            "--json",
+            "-o",
+            "json",
         ],
     ));
     let occasion = result["occasion"]["id"].as_str().unwrap();
@@ -101,7 +102,7 @@ fn human_output_is_the_text_and_broken_stdout_claims_no_completed_work() {
     let failed = support::run_with_broken_stdout(
         sandbox
             .vpt()
-            .args(["show", id.as_str(), "--stage", "transcript", "--json"]),
+            .args(["show", id.as_str(), "--stage", "transcript", "-o", "json"]),
         std::time::Duration::from_secs(5),
     );
     assert_eq!(failed.status.code(), Some(1));

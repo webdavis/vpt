@@ -38,7 +38,8 @@ fn show_routes_to_the_recorded_row_and_preserves_its_fields() {
     let result = json(&run(sandbox.vpt().args([
         "show",
         row.id.as_str(),
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(result["schema"], "vpt.result/1");
     assert_eq!(result["command"], "show");
@@ -52,7 +53,7 @@ fn show_routes_to_the_recorded_row_and_preserves_its_fields() {
 fn show_unknown_id_is_usage_with_the_requested_identity() {
     let sandbox = configured("show-unknown");
     let id = "2026-08-24T144736-4f3ab19c02de";
-    let output = run(sandbox.vpt().args(["show", id, "--json"]));
+    let output = run(sandbox.vpt().args(["show", id, "-o", "json"]));
     let failure = error(&output, 2, "usage");
     assert_eq!(failure["error"]["ids"], serde_json::json!([id]));
 }
@@ -60,7 +61,7 @@ fn show_unknown_id_is_usage_with_the_requested_identity() {
 #[test]
 fn show_malformed_id_is_usage() {
     let sandbox = configured("show-malformed");
-    let output = run(sandbox.vpt().args(["show", "nonsense", "--json"]));
+    let output = run(sandbox.vpt().args(["show", "nonsense", "-o", "json"]));
     error(&output, 2, "usage");
 }
 
@@ -70,7 +71,7 @@ fn list_routes_to_every_record_in_capture_order() {
     let second = record(&sandbox, 2, StageStates::fresh());
     let first = record(&sandbox, 1, StageStates::fresh());
     seed(&sandbox, vec![second.clone(), first.clone()]);
-    let output = run(sandbox.vpt().args(["list", "--json"]));
+    let output = run(sandbox.vpt().args(["list", "-o", "json"]));
     let result = json(&output);
     assert_eq!(result["command"], "list");
     assert_eq!(result["recordings"][0]["id"], first.id.as_str());
@@ -109,7 +110,7 @@ fn stage_case(stage: &str) -> (String, serde_json::Value) {
     seed(&sandbox, vec![done, first, second]);
     let result = json(&run(sandbox
         .vpt()
-        .args(["list", "--stage", stage, "--json"])));
+        .args(["list", "--stage", stage, "-o", "json"])));
     (result["command"].as_str().unwrap().to_owned(), result)
 }
 
@@ -139,7 +140,9 @@ fn list_analysis_includes_disabled_and_pending() {
 #[test]
 fn list_rejects_unrecognized_stage_words() {
     let sandbox = configured("list-invalid");
-    let output = run(sandbox.vpt().args(["list", "--stage", "polish", "--json"]));
+    let output = run(sandbox
+        .vpt()
+        .args(["list", "--stage", "polish", "-o", "json"]));
     error(&output, 2, "usage");
 }
 
@@ -149,7 +152,7 @@ fn storage_reports_seven_roots_and_real_file_metadata() {
     let audio = sandbox.path().join("home/.vpt/audio");
     std::fs::create_dir_all(&audio).unwrap();
     std::fs::write(audio.join("synthetic.m4a"), b"abc").unwrap();
-    let result = json(&run(sandbox.vpt().args(["storage", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["storage", "-o", "json"])));
     assert_eq!(result["command"], "storage");
     assert_eq!(result["stores"].as_object().unwrap().len(), 7);
     assert_eq!(result["stores"]["audio"]["files"], 1);
@@ -163,7 +166,7 @@ fn storage_reports_seven_roots_and_real_file_metadata() {
 fn fresh_list_does_not_create_state_or_stores() {
     let sandbox = configured("fresh-list");
     let before = snapshot(&sandbox);
-    let result = json(&run(sandbox.vpt().args(["list", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["list", "-o", "json"])));
     assert_eq!(result["recordings"].as_array().unwrap().len(), 0);
     assert_eq!(snapshot(&sandbox), before);
 }
@@ -172,7 +175,7 @@ fn fresh_list_does_not_create_state_or_stores() {
 fn fresh_storage_does_not_create_state_or_stores() {
     let sandbox = configured("fresh-storage");
     let before = snapshot(&sandbox);
-    let result = json(&run(sandbox.vpt().args(["storage", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["storage", "-o", "json"])));
     assert_eq!(result["stores"].as_object().unwrap().len(), 7);
     assert_eq!(snapshot(&sandbox), before);
 }
@@ -183,7 +186,7 @@ fn fresh_show_reports_unknown_without_creating_state() {
     let before = snapshot(&sandbox);
     let output = run(sandbox
         .vpt()
-        .args(["show", "2026-08-24T144736-4f3ab19c02de", "--json"]));
+        .args(["show", "2026-08-24T144736-4f3ab19c02de", "-o", "json"]));
     error(&output, 2, "usage");
     assert_eq!(snapshot(&sandbox), before);
 }
@@ -197,7 +200,8 @@ fn show_preserves_dirty_ledger_and_store_bytes_modes_and_mtimes() {
     json(&run(sandbox.vpt().args([
         "show",
         row.id.as_str(),
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(snapshot(&sandbox), before);
 }
@@ -208,7 +212,7 @@ fn list_preserves_dirty_ledger_and_store_bytes_modes_and_mtimes() {
     let row = record(&sandbox, 1, StageStates::fresh());
     dirty(&sandbox, row);
     let before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["list", "--json"])));
+    json(&run(sandbox.vpt().args(["list", "-o", "json"])));
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -218,7 +222,7 @@ fn list_after_the_fixture_writer_exits_changes_no_state() {
     let row = record(&sandbox, 1, StageStates::fresh());
     seed(&sandbox, vec![row.clone()]);
     let before = snapshot(&sandbox);
-    let result = json(&run(sandbox.vpt().args(["list", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["list", "-o", "json"])));
     assert_eq!(result["command"], "list");
     assert_eq!(result["recordings"][0]["id"], row.id.as_str());
     assert_eq!(snapshot(&sandbox), before);
@@ -230,7 +234,7 @@ fn storage_preserves_dirty_ledger_and_store_bytes_modes_and_mtimes() {
     let row = record(&sandbox, 1, StageStates::fresh());
     dirty(&sandbox, row);
     let before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["storage", "--json"])));
+    json(&run(sandbox.vpt().args(["storage", "-o", "json"])));
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -247,11 +251,16 @@ fn show_needs_neither_recorder_source_nor_valid_store_roots() {
     let regular = sandbox.path().join("regular-audio");
     std::fs::write(&regular, b"not a store directory").unwrap();
     write_config(&sandbox, &format!("[stores]\naudio = {:?}\n", regular));
-    error(&run(sandbox.vpt().args(["storage", "--json"])), 2, "config");
+    error(
+        &run(sandbox.vpt().args(["storage", "-o", "json"])),
+        2,
+        "config",
+    );
     let result = json(&run(sandbox.vpt().args([
         "show",
         row.id.as_str(),
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(result["id"], row.id.as_str());
 }
@@ -269,8 +278,12 @@ fn list_needs_neither_recorder_source_nor_valid_store_roots() {
     let regular = sandbox.path().join("regular-audio");
     std::fs::write(&regular, b"not a store directory").unwrap();
     write_config(&sandbox, &format!("[stores]\naudio = {:?}\n", regular));
-    error(&run(sandbox.vpt().args(["storage", "--json"])), 2, "config");
-    let result = json(&run(sandbox.vpt().args(["list", "--json"])));
+    error(
+        &run(sandbox.vpt().args(["storage", "-o", "json"])),
+        2,
+        "config",
+    );
+    let result = json(&run(sandbox.vpt().args(["list", "-o", "json"])));
     assert_eq!(result["recordings"][0]["id"], row.id.as_str());
 }
 
@@ -292,11 +305,11 @@ fn storage_needs_neither_recorder_source_nor_readable_ledger() {
     assert!(!state.join("vpt.db-wal").exists());
     assert!(!state.join("vpt.db-shm").exists());
     let before = snapshot(&sandbox);
-    let probe = run(sandbox.vpt().args(["show", row.id.as_str(), "--json"]));
+    let probe = run(sandbox.vpt().args(["show", row.id.as_str(), "-o", "json"]));
     let refusal = error(&probe, 1, "ledger");
     assert_eq!(refusal["error"]["message"], "ledger is corrupt");
     assert_eq!(snapshot(&sandbox), before);
-    let result = json(&run(sandbox.vpt().args(["storage", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["storage", "-o", "json"])));
     assert_eq!(result["stores"]["audio"]["bytes"], 3);
     assert_eq!(snapshot(&sandbox), before);
 }
@@ -314,7 +327,7 @@ fn missing_companion(command: &str, companion: &str) {
     std::fs::rename(&companion_path, &held).unwrap();
     let held_bytes = std::fs::read(&held).unwrap();
     let before = snapshot(&sandbox);
-    let mut args = vec![command, "--json"];
+    let mut args = vec![command, "-o", "json"];
     if command == "show" {
         args.insert(1, row.id.as_str());
     }
@@ -356,9 +369,9 @@ fn observations_complete_while_application_write_lock_is_held() {
     let _held = WriteLock::acquire(&state, Duration::ZERO).unwrap();
     let before = snapshot(&sandbox);
     for args in [
-        vec!["show", row.id.as_str(), "--json"],
-        vec!["list", "--json"],
-        vec!["storage", "--json"],
+        vec!["show", row.id.as_str(), "-o", "json"],
+        vec!["list", "-o", "json"],
+        vec!["storage", "-o", "json"],
     ] {
         json(&run(sandbox.vpt().args(args)));
         assert_eq!(snapshot(&sandbox), before);
@@ -407,7 +420,7 @@ fn linked_ledger_leaf(command: &str, leaf: &str, message: &str) {
     let before = std::fs::read(&held).unwrap();
     std::os::unix::fs::symlink(&held, &checked).unwrap();
     let tree_before = snapshot(&sandbox);
-    let mut args = vec![command, "--json"];
+    let mut args = vec![command, "-o", "json"];
     if command == "show" {
         args.insert(1, row.id.as_str());
     }

@@ -110,7 +110,7 @@ fn apple_availability_requires_a_compatible_helper() {
             .vpt()
             .current_dir(sandbox.path())
             .env("VPT_FAKE_VERSION", "2.0.0")
-            .args(["doctor", "--json"]),
+            .args(["doctor", "-o", "json"]),
     );
     let document = crate::fixture::report(&output, 1);
     assert_eq!(result(&document, "engines", "apple"), "issue");

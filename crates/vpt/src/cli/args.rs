@@ -37,10 +37,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
         Err(error) => return usage::from_clap(&error),
     };
     let global = cli.global;
-    let format = global
-        .output
-        .or(global.json.then_some(Format::Json))
-        .or(global.toon.then_some(Format::Toon));
+    let format = global.output;
     let verb = match (cli.command, cli.version) {
         (Some(_), true) => return Err(UsageError::new("--version takes no command")),
         (Some(command), false) => command.verb().map_err(UsageError::new)?,

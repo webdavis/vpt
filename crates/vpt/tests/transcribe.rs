@@ -80,7 +80,10 @@ fn configured() -> (Sandbox, vpt_application::ports::RecordingRecord) {
 
 fn run(sandbox: &Sandbox, id: &str, extra: &[&str]) -> std::process::Output {
     support::run_with_budget(
-        sandbox.vpt().args(["transcribe", id, "--json"]).args(extra),
+        sandbox
+            .vpt()
+            .args(["transcribe", id, "-o", "json"])
+            .args(extra),
         std::time::Duration::from_secs(5),
     )
 }

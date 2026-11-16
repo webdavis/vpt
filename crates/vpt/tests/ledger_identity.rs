@@ -88,7 +88,7 @@ pub(crate) fn ingested(sandbox: &Sandbox, name: &str, captured: i64) {
 }
 
 pub(crate) fn recordings(sandbox: &Sandbox) -> usize {
-    json(sandbox, &["list", "--json"])["recordings"]
+    json(sandbox, &["list", "-o", "json"])["recordings"]
         .as_array()
         .unwrap()
         .len()

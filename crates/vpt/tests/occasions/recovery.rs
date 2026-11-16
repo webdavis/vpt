@@ -97,10 +97,10 @@ fn startup_recovers_saved_brief_bytes_and_marks_completion_without_a_notificatio
     let sandbox = fixture::configured("brief-recovery");
     let artifact = pending(&sandbox);
     let before = fixture::snapshot(&sandbox);
-    let observed = invoke(&sandbox, &["occasions", "--json"]);
+    let observed = invoke(&sandbox, &["occasions", "-o", "json"]);
     assert_eq!(observed.status.code(), Some(0), "{}", stderr(&observed));
     assert_eq!(fixture::snapshot(&sandbox), before);
-    let output = invoke(&sandbox, &["retention", "run", "--json"]);
+    let output = invoke(&sandbox, &["retention", "run", "-o", "json"]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert_eq!(
         std::fs::read_to_string(&artifact.target).unwrap(),
@@ -137,7 +137,7 @@ fn startup_refuses_replaced_brief_bytes_and_keeps_the_pending_pack() {
     let sandbox = fixture::configured("brief-replaced");
     let artifact = pending(&sandbox);
     std::fs::write(&artifact.target, b"Private operator replacement").unwrap();
-    let output = invoke(&sandbox, &["retention", "run", "--json"]);
+    let output = invoke(&sandbox, &["retention", "run", "-o", "json"]);
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
     assert_eq!(
         std::fs::read(&artifact.target).unwrap(),
@@ -166,7 +166,7 @@ fn startup_preserves_brief_completion_when_pipeline_source_is_unreadable() {
             recordings
         ),
     );
-    let output = invoke(&sandbox, &["run", "--json"]);
+    let output = invoke(&sandbox, &["run", "-o", "json"]);
     std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert!(!output.status.success());
     let error: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
@@ -191,7 +191,7 @@ fn later_publication_failure_preserves_the_first_completed_occasion() {
     ];
     artifacts.sort_by(|a, b| a.target.cmp(&b.target));
     std::fs::write(&artifacts[1].target, b"Private replacement").unwrap();
-    let output = invoke(&sandbox, &["retention", "run", "--json"]);
+    let output = invoke(&sandbox, &["retention", "run", "-o", "json"]);
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
     let error: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(
@@ -226,7 +226,7 @@ fn recovery_finishes_a_brief_already_renamed_before_the_journal_was_cleared() {
     let sandbox = fixture::configured("brief-after-rename");
     let artifact = pending(&sandbox);
     std::fs::write(&artifact.target, &artifact.text).unwrap();
-    let output = invoke(&sandbox, &["retention", "run", "--json"]);
+    let output = invoke(&sandbox, &["retention", "run", "-o", "json"]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
         .unwrap()
@@ -246,7 +246,7 @@ fn recovery_finishes_a_brief_already_renamed_before_the_journal_was_cleared() {
         published
     );
     assert!(ledger.pending_publications().unwrap().is_empty());
-    let rerun = invoke(&sandbox, &["retention", "run", "--json"]);
+    let rerun = invoke(&sandbox, &["retention", "run", "-o", "json"]);
     assert_eq!(rerun.status.code(), Some(0), "{}", stderr(&rerun));
     assert_eq!(
         ledger

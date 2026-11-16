@@ -39,7 +39,7 @@ fn actions_resend_sends_every_refused_action_once_without_running_analysis() {
         json(&support::run_with_budget(
             sandbox
                 .vpt()
-                .args(["actions", "resend", "--json"])
+                .args(["actions", "resend", "-o", "json"])
                 .args(extra),
             std::time::Duration::from_secs(5),
         ))

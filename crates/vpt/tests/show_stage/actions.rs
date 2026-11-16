@@ -28,7 +28,7 @@ fn analyze_on(
         &sandbox,
         &format!("[analysis]\n{settings}command=['/bin/sh', {script:?}, {proposal:?}]\n"),
     );
-    let output = invoke(&sandbox, &["analyze", id.as_str(), "--json"]);
+    let output = invoke(&sandbox, &["analyze", id.as_str(), "-o", "json"]);
     (sandbox, id, output)
 }
 
@@ -176,7 +176,10 @@ fn a_spoken_due_date_reaches_show_and_the_note_and_survives_a_rewrite() {
     }
     let expected = "## Actions\n\n- email Bob [00:00-00:01] [owner:: me] [due:: 2026-11-19]\n- call Alice [00:00-00:01] [due:: 2026-11-20 15:00]\n";
     assert_eq!(section, expected);
-    json(&invoke(&sandbox, &["note", "write", id.as_str(), "--json"]));
+    json(&invoke(
+        &sandbox,
+        &["note", "write", id.as_str(), "-o", "json"],
+    ));
     let note = analysis_note(&sandbox, &id);
     assert_eq!(actions_section(&note.text), expected);
     let verified = json(&invoke(
@@ -187,7 +190,8 @@ fn a_spoken_due_date_reaches_show_and_the_note_and_survives_a_rewrite() {
             note.target.to_str().unwrap(),
             "--recording",
             id.as_str(),
-            "--json",
+            "-o",
+            "json",
         ],
     ));
     assert_eq!(verified["flags"], json!([]));

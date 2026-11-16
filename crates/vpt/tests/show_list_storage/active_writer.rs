@@ -86,12 +86,13 @@ fn show_and_list_read_committed_rows_while_another_process_writes() {
     let before = snapshot(&sandbox);
     let mut show = sandbox.vpt();
     show.current_dir(sandbox.path())
-        .args(["show", row.id.as_str(), "--json"]);
+        .args(["show", row.id.as_str(), "-o", "json"]);
     let shown = json(&run(&mut show));
     assert_eq!(shown["id"], row.id.as_str());
     assert_eq!(shown["title"], "title-1");
     let mut list = sandbox.vpt();
-    list.current_dir(sandbox.path()).args(["list", "--json"]);
+    list.current_dir(sandbox.path())
+        .args(["list", "-o", "json"]);
     let listed = json(&run(&mut list));
     assert_eq!(listed["recordings"][0]["id"], row.id.as_str());
     assert_eq!(listed["recordings"][0]["title"], "title-1");

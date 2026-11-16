@@ -5,7 +5,7 @@ use serde_json::Value;
 const FIRST: i64 = 1_787_604_456;
 
 fn ledger_rows(sandbox: &Sandbox, code: i32) -> Vec<Value> {
-    let output = vpt(sandbox, &["doctor", "ledger", "--json"]);
+    let output = vpt(sandbox, &["doctor", "ledger", "-o", "json"]);
     assert_eq!(output.status.code(), Some(code), "{}", stderr(&output));
     assert!(output.stderr.is_empty(), "{}", stderr(&output));
     let document: Value = serde_json::from_str(&stdout(&output)).unwrap();

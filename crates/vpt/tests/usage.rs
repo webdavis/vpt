@@ -5,7 +5,7 @@ use support::{Sandbox, broken_output, run, stderr, stdout};
 #[test]
 fn an_unknown_verb_under_json_is_an_error_document_on_stderr() {
     let sandbox = Sandbox::new("usage-json");
-    for args in [["--json", "transcode"], ["transcode", "--json"]] {
+    for args in [["-o", "json", "transcode"], ["transcode", "-o", "json"]] {
         let output = run(sandbox.vpt().args(args));
         assert_eq!(output.status.code(), Some(2));
         assert_eq!(stdout(&output), "");
@@ -22,7 +22,7 @@ fn json_usage_with_broken_stderr_exits_one() {
     let sandbox = Sandbox::new("usage-json-broken-stderr");
     for verb in ["transcode", "list"] {
         let (descriptor, _peer) = broken_output();
-        let output = run(sandbox.vpt().args([verb, "--json"]).stderr(descriptor));
+        let output = run(sandbox.vpt().args([verb, "-o", "json"]).stderr(descriptor));
         assert_eq!(output.status.code(), Some(1));
         assert_eq!(stdout(&output), "");
     }

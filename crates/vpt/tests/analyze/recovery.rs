@@ -106,7 +106,8 @@ fn unrelated_vocabulary_recovery_does_not_skip_an_explicit_analysis_request() {
             "tag",
             record.id.as_str(),
             "another-topic",
-            "--json",
+            "-o",
+            "json",
         ]),
         Duration::from_secs(5),
     );

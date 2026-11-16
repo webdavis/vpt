@@ -79,7 +79,8 @@ fn lexical_confirmation_refreshes_inherited_uncertainty_once_without_retranscrib
             "confirm",
             record.id.as_str(),
             &lexical.identifier.hex(),
-            "--json",
+            "-o",
+            "json",
         ]),
         std::time::Duration::from_secs(5),
     ));

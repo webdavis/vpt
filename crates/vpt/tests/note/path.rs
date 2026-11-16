@@ -4,7 +4,7 @@ fn path(sandbox: &Sandbox, id: &str, stage: &str, json: bool) -> std::process::O
     let mut command = sandbox.vpt();
     command.args(["path", id, "--stage", stage]);
     if json {
-        command.arg("--json");
+        command.args(["-o", "json"]);
     }
     support::run_with_budget(&mut command, std::time::Duration::from_secs(5))
 }

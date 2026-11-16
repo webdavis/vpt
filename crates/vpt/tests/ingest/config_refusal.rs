@@ -41,10 +41,10 @@ fn assert_refused_store(fail_delivery: bool) {
     }
     fs::set_permissions(&parent, fs::Permissions::from_mode(0o500)).unwrap();
     let before = snapshot(&sandbox);
-    let dry = run(sandbox.vpt().args(["ingest", "--preview", "--json"]));
+    let dry = run(sandbox.vpt().args(["ingest", "--preview", "-o", "json"]));
     assert_eq!(dry.status.code(), Some(0), "{}", stderr(&dry));
     assert_eq!(snapshot(&sandbox), before);
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     fs::set_permissions(&parent, fs::Permissions::from_mode(0o700)).unwrap();
     assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
     assert!(output.stdout.is_empty());
@@ -120,7 +120,7 @@ fn config_refusal_before_root_validation_never_writes_history_or_calls_hooks() {
         let config = fs::read_to_string(sandbox.config_path()).unwrap();
         fs::write(sandbox.config_path(), format!("{config}\n[stores]\naudio = {:?}\n[alert]\ncommand = ['/usr/bin/touch', {marker:?}]\n", sandbox.path().join("missing-parent/../audio"))).unwrap();
         let before = snapshot(&sandbox);
-        let output = run(sandbox.vpt().args(["ingest", "--json"]));
+        let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
         let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();

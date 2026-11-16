@@ -9,7 +9,7 @@ fn invoke_selected(
     args: &[&str],
 ) -> std::process::Output {
     let mut command = sandbox.vpt();
-    command.args(args).arg("--json");
+    command.args(args).args(["-o", "json"]);
     if explicit {
         command.arg("--config").arg(selected);
     } else {

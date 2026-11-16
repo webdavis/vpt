@@ -25,11 +25,13 @@ fn analyze(sandbox: &Sandbox, id: &str, proposal: Value) -> Value {
         format!("{config}\n[analysis]\ncommand=['/bin/sh', {script:?}, {path:?}]\n"),
     )
     .unwrap();
-    json(&support::run(sandbox.vpt().args(["analyze", id, "--json"])));
+    json(&support::run(
+        sandbox.vpt().args(["analyze", id, "-o", "json"]),
+    ));
     json(&support::run(
         sandbox
             .vpt()
-            .args(["show", id, "--stage", "analysis", "--json"]),
+            .args(["show", id, "--stage", "analysis", "-o", "json"]),
     ))
 }
 
@@ -88,7 +90,7 @@ fn a_claim_may_name_the_speaker_of_a_segment_it_cites_and_no_other() {
             .vpt()
             .args(["note", "verify"])
             .arg(&note.target)
-            .args(["--recording", row.id.as_str(), "--json"]),
+            .args(["--recording", row.id.as_str(), "-o", "json"]),
     ));
     let classes: Vec<_> = verified["flags"]
         .as_array()

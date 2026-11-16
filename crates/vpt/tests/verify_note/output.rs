@@ -25,7 +25,8 @@ fn output_failure_reports_owned_note_commit_and_keeps_external_verification_obse
             sandbox.vpt().args(["note", "verify"]).arg(&path).args([
                 "--recording",
                 record.id.as_str(),
-                "--json",
+                "-o",
+                "json",
             ]),
             Duration::from_secs(5),
         );

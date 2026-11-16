@@ -7,7 +7,7 @@ fn output_failure_preserves_accepted_transcription_and_note_without_private_text
         let (sandbox, row) = configured();
         let before = fixture::snapshot(&sandbox);
         let mut command = sandbox.vpt();
-        command.args(["transcribe", row.id.as_str(), "--json"]);
+        command.args(["transcribe", row.id.as_str(), "-o", "json"]);
         if dry {
             command.arg("--preview");
         }

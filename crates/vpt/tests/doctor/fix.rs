@@ -20,7 +20,7 @@ pub(super) fn fix(sandbox: &Sandbox, checks: &[&str], code: i32) -> Value {
             .current_dir(sandbox.path())
             .arg("doctor")
             .args(checks)
-            .args(["--fix", "--json"])),
+            .args(["--fix", "-o", "json"])),
         code,
     )
 }
@@ -105,7 +105,7 @@ fn doctor_without_fix_has_no_fixed_array_and_creates_nothing() {
     let output = run(sandbox
         .vpt()
         .current_dir(sandbox.path())
-        .args(["doctor", "--json"]));
+        .args(["doctor", "-o", "json"]));
     let document = report(&output, 1);
     assert!(document.get("fixed").is_none(), "{document}");
     assert!(advice(&document, "config", "file").contains("vpt doctor --fix"));

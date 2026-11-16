@@ -8,7 +8,7 @@ fn output_failure_preserves_retention_completions_but_dry_run_claims_none() {
         let row = expired_audio(&sandbox);
         let before = snapshot(&sandbox);
         let mut command = sandbox.vpt();
-        command.args(["retention", "run", "--json"]);
+        command.args(["retention", "run", "-o", "json"]);
         if dry {
             command.arg("--preview");
         }

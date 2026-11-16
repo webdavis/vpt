@@ -3,9 +3,10 @@ use super::*;
 #[test]
 fn relation_confirmation_keeps_private_target_text_out_of_debug() {
     for relation in ["related:Private-target", "-related:Private"] {
-        let invocation =
-            parse(["vpt", "confirm", "relation", "memo", relation, "--json"].map(OsString::from))
-                .unwrap();
+        let invocation = parse(
+            ["vpt", "confirm", "relation", "memo", relation, "-o", "json"].map(OsString::from),
+        )
+        .unwrap();
         assert!(!format!("{invocation:?}").contains(relation));
         let Verb::ConfirmRelation {
             id,

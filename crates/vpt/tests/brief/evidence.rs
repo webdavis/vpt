@@ -74,10 +74,13 @@ pub(super) fn seed(sandbox: &Sandbox) -> vpt_domain::identity::RecordingId {
         ),
         HistoryWrite::Committed(_)
     ));
-    json(&invoke(sandbox, &["note", "write", id.as_str(), "--json"]));
     json(&invoke(
         sandbox,
-        &["confirm", "tag", id.as_str(), "planning", "--json"],
+        &["note", "write", id.as_str(), "-o", "json"],
+    ));
+    json(&invoke(
+        sandbox,
+        &["confirm", "tag", id.as_str(), "planning", "-o", "json"],
     ));
     id
 }
@@ -183,7 +186,10 @@ fn participant_selection_uses_confirmed_terms_current_index_and_saved_mentions()
     std::fs::set_permissions(&terms, std::fs::Permissions::from_mode(0o600)).unwrap();
     let indexed = sandbox.path().join("home/.vpt/transcripts/Private.md");
     std::fs::write(&indexed, "# Private\n").unwrap();
-    json(&invoke(&sandbox, &["note", "write", id.as_str(), "--json"]));
+    json(&invoke(
+        &sandbox,
+        &["note", "write", id.as_str(), "-o", "json"],
+    ));
     let args = [
         "brief",
         "--title",
@@ -193,7 +199,8 @@ fn participant_selection_uses_confirmed_terms_current_index_and_saved_mentions()
         "--participant",
         "Private",
         "--explain",
-        "--json",
+        "-o",
+        "json",
     ];
     let before = fixture::snapshot(&sandbox);
     let result = json(&invoke(&sandbox, &args));
@@ -241,7 +248,7 @@ fn human_explain_lists_the_selected_candidate_and_matched_tag_without_writes() {
     let id = seed(&sandbox);
     let before = fixture::snapshot(&sandbox);
     let mut args = manual(&["--explain"]);
-    args.retain(|arg| *arg != "--json");
+    args.retain(|arg| !matches!(*arg, "-o" | "json"));
     let output = invoke(&sandbox, &args);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let text = support::stdout(&output);

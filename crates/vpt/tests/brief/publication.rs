@@ -25,7 +25,7 @@ fn interrupted_publication_retains_the_accepted_pack_for_startup_repair() {
     let connection = rusqlite::Connection::open(sandbox.path().join("state/vpt/vpt.db")).unwrap();
     connection.execute_batch("CREATE TRIGGER refuse_brief_completion BEFORE DELETE ON dirty_publications BEGIN SELECT RAISE(ABORT,'Private interruption'); END").unwrap();
     fixture::preserve_wal(&connection);
-    let output = invoke(&sandbox, &["brief", id, "--json"]);
+    let output = invoke(&sandbox, &["brief", id, "-o", "json"]);
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
     assert!(!stderr(&output).contains("Private"));
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
@@ -36,7 +36,7 @@ fn interrupted_publication_retains_the_accepted_pack_for_startup_repair() {
         .execute_batch("DROP TRIGGER refuse_brief_completion")
         .unwrap();
     drop(connection);
-    json(&invoke(&sandbox, &["brief", id, "--json"]));
+    json(&invoke(&sandbox, &["brief", id, "-o", "json"]));
     assert!(ledger.pending_publications().unwrap().is_empty());
     let artifact = ledger
         .brief(&vpt_domain::occasion::OccasionId::parse(id).unwrap())
@@ -133,7 +133,7 @@ fn rescheduled_provider_occasion_rewrites_its_original_pinned_file() {
             ),
             HistoryWrite::Committed(_)
         ));
-        let result = json(&invoke(&sandbox, &["brief", id.as_str(), "--json"]));
+        let result = json(&invoke(&sandbox, &["brief", id.as_str(), "-o", "json"]));
         assert_eq!(result["occasion"]["at"], at);
         let artifact = ledger.brief(&id).unwrap().unwrap();
         assert_eq!(artifact.snapshot.occasion.title, title);

@@ -33,7 +33,7 @@ fn brief_rewrites_preserve_operator_fields_tags_prose_and_creation_metadata() {
             }
             edited.push_str("\nOperator prose outside the managed block.\n");
             std::fs::write(&saved.target, edited).unwrap();
-            json(&invoke(&sandbox, &["brief", id.as_str(), "--json"]));
+            json(&invoke(&sandbox, &["brief", id.as_str(), "-o", "json"]));
             let after = ledger(&sandbox).brief(&id).unwrap().unwrap();
             assert_eq!(after.target, saved.target);
             assert_eq!(after.first_written, saved.first_written);
@@ -78,7 +78,8 @@ fn empty_brief_persists_every_empty_section_and_provenance_field() {
             "Empty planning",
             "--at",
             "2026-10-01T10:00:00Z",
-            "--json",
+            "-o",
+            "json",
         ],
     ));
     let id = OccasionId::parse(result["occasion"]["id"].as_str().unwrap()).unwrap();

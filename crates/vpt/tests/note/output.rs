@@ -10,7 +10,7 @@ fn broken_write(json: bool, blocked_log: bool) {
     let mut command = sandbox.vpt();
     command.args(["note", "write", row.id.as_str()]);
     if json {
-        command.arg("--json");
+        command.args(["-o", "json"]);
     }
     command.stdout(Stdio::from(descriptor));
     let output = support::run_with_budget(&mut command, Duration::from_secs(5));

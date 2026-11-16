@@ -24,7 +24,10 @@ fn ledger(sandbox: &Sandbox) -> SqliteLedger {
 fn configured(name: &str) -> (Sandbox, vpt_domain::identity::RecordingId) {
     let sandbox = fixture::configured(name);
     let id = recording::seed(&sandbox);
-    json(&invoke(&sandbox, &["confirm", "term", "Alice", "--json"]));
+    json(&invoke(
+        &sandbox,
+        &["confirm", "term", "Alice", "-o", "json"],
+    ));
     fs::write(
         sandbox.path().join("home/.vpt/transcripts/Bob.md"),
         "# Bob\n",
@@ -38,7 +41,7 @@ fn redact_masks_live_terms_and_names_publishes_both_files_and_preserves_source()
     let ledger = ledger(&sandbox);
     let note = ledger.note(&id, NoteStage::Transcript).unwrap().unwrap();
     let source = fs::read(&note.target).unwrap();
-    let result = json(&invoke(&sandbox, &["redact", id.as_str(), "--json"]));
+    let result = json(&invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]));
     assert_eq!(result["command"], "redact");
     let written = Path::new(result["written"].as_str().unwrap());
     assert_eq!(
@@ -89,7 +92,8 @@ fn redact_refuses_duplicate_under_an_unrelated_filename_without_another_release(
         id.as_str(),
         "--to",
         destination.to_str().unwrap(),
-        "--json",
+        "-o",
+        "json",
     ];
     let first = json(&invoke(&sandbox, &args));
     let renamed = destination.join("export.txt");
@@ -110,7 +114,7 @@ fn redact_refuses_private_destinations_and_header_residue_before_reservation() {
         vec!["--to", private.to_str().unwrap()],
         vec!["--title", "Alice"],
     ] {
-        let mut args = vec!["redact", id.as_str(), "--json"];
+        let mut args = vec!["redact", id.as_str(), "-o", "json"];
         args.extend(options);
         let result = invoke(&sandbox, &args);
         assert_eq!(result.status.code(), Some(3), "{}", stderr(&result));
@@ -133,7 +137,7 @@ fn redact_rejects_unsupported_options_and_private_values_stay_out_of_usage_error
         vec!["--to"],
     ] {
         let before = fixture::snapshot(&sandbox);
-        let mut args = vec!["redact", id, "--json"];
+        let mut args = vec!["redact", id, "-o", "json"];
         args.extend(extra);
         let result = invoke(&sandbox, &args);
         assert_eq!(result.status.code(), Some(2), "{}", stderr(&result));

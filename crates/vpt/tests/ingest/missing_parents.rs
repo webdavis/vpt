@@ -35,7 +35,7 @@ fn ingest_creates_every_missing_folder_of_configured_roots_privately() {
             ("briefs", &nested.join("briefs")),
         ],
     );
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     for leaf in [
         "vault/vpt",
@@ -57,7 +57,7 @@ fn parent_traversal_below_a_missing_folder_is_refused_without_writes() {
     let evil = sandbox.path().join("missing/../voice-memos/evil");
     configure_roots(&sandbox, &[("audio", &evil)]);
     let before = snapshot(&sandbox);
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     assert_eq!(output.status.code(), Some(2));
     let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();
     assert_eq!(error["error"]["kind"], "config");

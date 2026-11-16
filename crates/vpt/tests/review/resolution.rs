@@ -50,7 +50,7 @@ pub(super) fn resolve(
             .vpt()
             .args(["review", verb.trim_start_matches("--"), id.as_str(), flag])
             .args(rest)
-            .arg("--json"),
+            .args(["-o", "json"]),
         std::time::Duration::from_secs(5),
     )
 }
@@ -165,7 +165,8 @@ fn malformed_note_prevents_both_resolution_and_known_term_commit() {
         "note",
         "write",
         id.as_str(),
-        "--json",
+        "-o",
+        "json",
     ])));
     let before = inputs(&sandbox, &id);
     let note = &before.notes[0];

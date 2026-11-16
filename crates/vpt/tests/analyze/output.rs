@@ -7,7 +7,7 @@ fn output_failure_preserves_analysis_and_dry_run_claims_no_commits() {
         agent(&sandbox, "");
         let before = fixture::snapshot(&sandbox);
         let mut command = sandbox.vpt();
-        command.args(["analyze", record.id.as_str(), "--json"]);
+        command.args(["analyze", record.id.as_str(), "-o", "json"]);
         if dry {
             command.arg("--preview");
         }

@@ -24,7 +24,7 @@ fn configured(name: &str) -> (Sandbox, PathBuf) {
 }
 fn invoke(sandbox: &Sandbox, term: &str) -> std::process::Output {
     support::run_with_budget(
-        sandbox.vpt().args(["confirm", "term", term, "--json"]),
+        sandbox.vpt().args(["confirm", "term", term, "-o", "json"]),
         std::time::Duration::from_secs(5),
     )
 }

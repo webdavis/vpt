@@ -12,7 +12,8 @@ fn output_failure_keeps_correction_and_reports_its_recording_without_private_tex
             id.as_str(),
             &flag,
             "Private correction",
-            "--json",
+            "-o",
+            "json",
         ]),
         Duration::from_secs(5),
     );

@@ -169,7 +169,7 @@ fn broken_output_rejects_writes_while_a_peer_copy_survives() {
     drop(reader);
     let output = run(sandbox
         .vpt()
-        .args(["transcode", "--json"])
+        .args(["transcode", "-o", "json"])
         .stderr(descriptor));
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(stdout(&output), "");

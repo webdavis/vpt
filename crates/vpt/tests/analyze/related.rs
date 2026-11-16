@@ -31,7 +31,8 @@ fn related_selection_obeys_default_and_configured_limits_independently_of_tag_mo
                     "relation",
                     record.id.as_str(),
                     "related:Target0",
-                    "--json",
+                    "-o",
+                    "json",
                 ]),
                 Duration::from_secs(5),
             ));

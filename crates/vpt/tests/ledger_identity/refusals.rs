@@ -7,7 +7,7 @@ const FIRST: i64 = 1_787_604_456;
 fn refuses_and_writes_nothing(sandbox: &support::Sandbox, rule: &str) {
     record(sandbox, "waiting.m4a", FIRST + 900);
     let before = snapshot(sandbox);
-    let output = vpt(sandbox, &["ingest", "--json"]);
+    let output = vpt(sandbox, &["ingest", "-o", "json"]);
     assert_eq!(snapshot(sandbox), before);
     let document: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(document["error"]["rule"], rule);

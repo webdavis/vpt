@@ -62,7 +62,7 @@ fn assert_link_refused(leaf: &str, hard_link: bool) {
             let mut command = sandbox.vpt();
             command.args(&args);
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = support::run_with_budget(
                 &mut command,

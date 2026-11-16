@@ -71,7 +71,8 @@ fn both_flat_note_paths_use_only_capture_title_and_identity_then_remain_pinned()
                 "tag",
                 record.id.as_str(),
                 "Changed tag",
-                "--json",
+                "-o",
+                "json",
             ]),
             Duration::from_secs(5),
         ));

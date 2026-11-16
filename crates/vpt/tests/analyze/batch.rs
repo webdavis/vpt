@@ -36,7 +36,11 @@ pub(super) fn propose(sandbox: &Sandbox, summary: &str, tags: &[&str]) {
 
 pub(super) fn bulk(sandbox: &Sandbox, args: &[&str]) -> std::process::Output {
     support::run_with_budget(
-        sandbox.vpt().args(["analyze"]).args(args).arg("--json"),
+        sandbox
+            .vpt()
+            .args(["analyze"])
+            .args(args)
+            .args(["-o", "json"]),
         Duration::from_secs(20),
     )
 }

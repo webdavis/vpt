@@ -6,7 +6,7 @@ fn unreadable_source_records_one_safe_failure_event() {
     let sandbox = configured();
     let recordings = sandbox.path().join("voice-memos/Recordings");
     std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o000)).unwrap();
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
@@ -25,7 +25,7 @@ fn unavailable_log_export_warns_and_preserves_ingestion_result() {
     fixture::seed(&sandbox, vec![]);
     std::fs::create_dir(sandbox.path().join("state/vpt/events.jsonl")).unwrap();
     add(&sandbox, "a.m4a");
-    let doc = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    let doc = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     assert_eq!(doc["ingested"].as_array().unwrap().len(), 1);
     assert!(
         doc["diagnostics"]
@@ -40,11 +40,16 @@ fn unavailable_log_export_warns_and_preserves_ingestion_result() {
 fn dry_run_ignores_write_lock_and_preserves_existing_state_and_title_copy() {
     let sandbox = configured();
     add(&sandbox, "a.m4a");
-    json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     let root = vpt_adapters::RootDir::open(&sandbox.path().join("state/vpt")).unwrap();
     let _lock = vpt_adapters::WriteLock::acquire(&root, std::time::Duration::ZERO).unwrap();
     let before = snapshot(&sandbox);
-    let doc = json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
+    let doc = json(&run(sandbox.vpt().args([
+        "ingest",
+        "--preview",
+        "-o",
+        "json",
+    ])));
     assert_eq!(doc["skipped"], 1);
     assert_eq!(snapshot(&sandbox), before);
 }

@@ -14,8 +14,6 @@ pub(crate) fn named(args: &[OsString]) -> Option<Format> {
     let mut formats = Vec::new();
     for (index, word) in words.iter().enumerate() {
         let value = match *word {
-            "--json" => Some("json"),
-            "--toon" => Some("toon"),
             "--output" | "-o" => words.get(index + 1).copied(),
             _ => word
                 .strip_prefix("--output=")

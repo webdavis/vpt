@@ -46,7 +46,7 @@ fn expired_audio(sandbox: &Sandbox) -> vpt_application::ports::RecordingRecord {
 fn disabled_retention_is_a_configuration_error_without_writes() {
     let sandbox = configured(false);
     let before = snapshot(&sandbox);
-    let output = run(sandbox.vpt().args(["retention", "run", "--json"]));
+    let output = run(sandbox.vpt().args(["retention", "run", "-o", "json"]));
     let doc = error(&output, 2, "config");
     assert_eq!(doc["error"]["message"], "retention is disabled");
     assert_eq!(snapshot(&sandbox), before);
@@ -60,7 +60,8 @@ fn dry_run_with_absent_state_creates_nothing() {
         "retention",
         "run",
         "--preview",
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(doc["command"], "retention run");
     assert_eq!(doc["moved"], serde_json::json!([]));
@@ -79,7 +80,8 @@ fn dry_run_reports_candidates_while_write_lock_is_held_without_changes() {
         "retention",
         "run",
         "--preview",
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(doc["moved"][0]["path"], row.audio_path.to_str().unwrap());
     assert_eq!(doc["counts"]["audio"], 1);
@@ -91,7 +93,7 @@ fn retention_moves_owned_audio_and_logs_the_result() {
     let sandbox = configured(true);
     sandbox.install_fake_helper();
     let row = expired_audio(&sandbox);
-    let doc = json(&run(sandbox.vpt().args(["retention", "run", "--json"])));
+    let doc = json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     assert_eq!(doc["moved"][0]["store"], "audio");
     assert_eq!(doc["completed"], serde_json::json!([row.id.as_str()]));
     assert!(!row.audio_path.exists());
@@ -116,7 +118,7 @@ fn missing_helper_refuses_removal_and_preserves_audio() {
     let sandbox = configured(true);
     let row = expired_audio(&sandbox);
     let doc = error(
-        &run(sandbox.vpt().args(["retention", "run", "--json"])),
+        &run(sandbox.vpt().args(["retention", "run", "-o", "json"])),
         3,
         "refused",
     );

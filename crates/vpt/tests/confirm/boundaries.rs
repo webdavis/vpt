@@ -100,21 +100,25 @@ fn an_export_failure_preserves_confirmation_and_reports_a_safe_warning() {
 fn option_like_term_text_remains_data() {
     let (sandbox, path) = configured("confirm-option-text");
     success(&invoke(&sandbox, "--term"));
+    success(&invoke(&sandbox, "--json"));
     success(&support::run_with_budget(
         sandbox
             .vpt()
-            .args(["--json", "confirm", "term", "--", "--json"]),
+            .args(["-o", "json", "confirm", "term", "--", "--progress"]),
         std::time::Duration::from_secs(5),
     ));
-    assert_eq!(fs::read_to_string(&path).unwrap(), "--term\n--json\n");
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        "--term\n--json\n--progress\n"
+    );
 }
 
 #[test]
 fn a_term_spelled_like_a_global_flag_is_refused_without_the_end_of_flags() {
     let (sandbox, path) = configured("confirm-flag-spelled-term");
     for words in [
-        &["confirm", "term", "--toon"][..],
-        &["--json", "confirm", "term", "--json"],
+        &["confirm", "term", "--progress"][..],
+        &["-o", "json", "confirm", "term", "--progress"],
     ] {
         let output =
             support::run_with_budget(sandbox.vpt().args(words), std::time::Duration::from_secs(5));
@@ -139,7 +143,7 @@ fn dry_run_leaves_pending_terms_untouched_and_retention_startup_recovers_them() 
     let output = support::run_with_budget(
         sandbox
             .vpt()
-            .args(["retention", "run", "--preview", "--json"]),
+            .args(["retention", "run", "--preview", "-o", "json"]),
         std::time::Duration::from_secs(5),
     );
     success(&output);
@@ -150,7 +154,7 @@ fn dry_run_leaves_pending_terms_untouched_and_retention_startup_recovers_them() 
         Some(saved)
     );
     let output = support::run_with_budget(
-        sandbox.vpt().args(["retention", "run", "--json"]),
+        sandbox.vpt().args(["retention", "run", "-o", "json"]),
         std::time::Duration::from_secs(5),
     );
     success(&output);

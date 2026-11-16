@@ -7,7 +7,7 @@ fn progress_lines_bracket_the_agent_command_on_stderr() {
     let output = support::run_with_budget(
         sandbox
             .vpt()
-            .args(["analyze", record.id.as_str(), "--json", "--progress"]),
+            .args(["analyze", record.id.as_str(), "-o", "json", "--progress"]),
         Duration::from_secs(5),
     );
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));

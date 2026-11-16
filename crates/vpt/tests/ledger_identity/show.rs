@@ -10,7 +10,7 @@ fn ledger_show_reports_the_set_and_this_machine_in_every_format() {
     ingested(&sandbox, "a.m4a", FIRST);
     ingested(&sandbox, "b.m4a", FIRST + 60);
     let before = snapshot(&sandbox);
-    let shown = crate::json(&sandbox, &["ledger", "show", "--json"]);
+    let shown = crate::json(&sandbox, &["ledger", "show", "-o", "json"]);
     assert_eq!(shown["command"], "ledger show");
     assert_eq!(shown["folder"], state(&sandbox).display().to_string());
     assert_eq!(shown["database"]["write_counter"], 2);
@@ -37,7 +37,7 @@ fn ledger_show_reports_the_set_and_this_machine_in_every_format() {
         &["ledger", "show", "--output", "yaml"],
     ));
     assert!(yaml.contains("write_counter: 2"), "{yaml}");
-    crate::succeeds(&sandbox, &["ledger", "show", "--toon"]);
+    crate::succeeds(&sandbox, &["ledger", "show", "-o", "toon"]);
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -48,7 +48,7 @@ fn ledger_show_names_the_finding_as_its_rule() {
     let older = backup(&sandbox);
     ingested(&sandbox, "b.m4a", FIRST + 60);
     deliver(&older, &state(&sandbox));
-    let shown = crate::json(&sandbox, &["ledger", "show", "--json"]);
+    let shown = crate::json(&sandbox, &["ledger", "show", "-o", "json"]);
     assert_eq!(shown["finding"]["rule"], "ledger_behind");
     assert!(
         shown["finding"]["message"]
@@ -63,7 +63,7 @@ fn ledger_show_names_the_finding_as_its_rule() {
 #[test]
 fn ledger_show_before_any_write_names_no_database_and_no_marker() {
     let sandbox = machine("identity-show-empty");
-    let shown = crate::json(&sandbox, &["ledger", "show", "--json"]);
+    let shown = crate::json(&sandbox, &["ledger", "show", "-o", "json"]);
     assert_eq!(shown["database"], serde_json::Value::Null);
     assert_eq!(shown["this_machine"], serde_json::Value::Null);
     assert_eq!(shown["finding"], serde_json::Value::Null);
@@ -77,5 +77,5 @@ fn bare_ledger_shows_help_and_exits_zero() {
     assert!(help.contains("show"), "{help}");
     assert!(help.contains("accept"), "{help}");
     let help = stdout(&crate::succeeds(&sandbox, &["ledger", "show", "--help"]));
-    assert!(help.contains("vpt ledger show --json"), "{help}");
+    assert!(help.contains("vpt ledger show -o json"), "{help}");
 }

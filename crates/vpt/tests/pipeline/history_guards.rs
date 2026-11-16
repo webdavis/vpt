@@ -31,7 +31,7 @@ pub(super) fn prepare() -> (Sandbox, Vec<Vec<String>>) {
         "2026-10-01T10:00:00-06:00",
     ];
     json(&support::run_with_budget(
-        sandbox.vpt().args(&manual).arg("--json"),
+        sandbox.vpt().args(&manual).args(["-o", "json"]),
         Duration::from_secs(5),
     ));
     let occasion = ledger.occasions().unwrap().remove(0).id;
@@ -91,7 +91,7 @@ fn assert_stopped(unsafe_state: bool) {
             let mut command = sandbox.vpt();
             command.args(&args);
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = support::run_with_budget(
                 &mut command,

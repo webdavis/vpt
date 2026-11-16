@@ -44,7 +44,7 @@ fn corpus(name: &str) -> (Sandbox, String, String) {
 }
 
 fn hits(sandbox: &Sandbox, args: &[&str]) -> Vec<Value> {
-    let mut command = vec!["--json", "search"];
+    let mut command = vec!["-o", "json", "search"];
     command.extend(args);
     json(&invoke(sandbox, &command))["hits"]
         .as_array()
@@ -56,7 +56,10 @@ fn hits(sandbox: &Sandbox, args: &[&str]) -> Vec<Value> {
 fn search_returns_every_line_holding_all_words_with_its_moment() {
     let (sandbox, older, newer) = corpus("search-moments");
     let before = record::snapshot(&sandbox);
-    let result = json(&invoke(&sandbox, &["--json", "search", "budget", "review"]));
+    let result = json(&invoke(
+        &sandbox,
+        &["-o", "json", "search", "budget", "review"],
+    ));
     assert_eq!(result["schema"], "vpt.result/1");
     assert_eq!(result["command"], "search");
     assert_eq!(result["words"], json!(["budget", "review"]));
@@ -131,16 +134,16 @@ fn search_bounds_its_hits_and_says_when_it_cut_them() {
     let (sandbox, _, newer) = corpus("search-limit");
     let result = json(&invoke(
         &sandbox,
-        &["--json", "search", "budget", "--limit", "1"],
+        &["-o", "json", "search", "budget", "--limit", "1"],
     ));
     assert_eq!(result["limit"], 1);
     assert_eq!(result["truncated"], true);
     assert_eq!(result["hits"].as_array().unwrap().len(), 1);
     assert_eq!(result["hits"][0]["recording"], newer);
     for args in [
-        &["--json", "search"][..],
-        &["--json", "search", "budget", "--limit", "0"],
-        &["--json", "search", "budget", "--limit", "many"],
+        &["-o", "json", "search"][..],
+        &["-o", "json", "search", "budget", "--limit", "0"],
+        &["-o", "json", "search", "budget", "--limit", "many"],
     ] {
         assert_eq!(
             refused(&invoke(&sandbox, args), 2)["error"]["kind"],
@@ -189,7 +192,7 @@ fn search_skips_a_saved_note_that_cannot_be_read_and_counts_it() {
         )
         .unwrap();
     drop(connection);
-    let output = invoke(&sandbox, &["--json", "search", "budget"]);
+    let output = invoke(&sandbox, &["-o", "json", "search", "budget"]);
     assert!(!stdout(&output).contains("Private canary"));
     let result = json(&output);
     assert_eq!(result["skipped"], 1);
@@ -207,7 +210,7 @@ fn search_skips_a_saved_note_that_cannot_be_read_and_counts_it() {
         ]
     );
     assert_eq!(
-        json(&invoke(&sandbox, &["--json", "search", "lunch"]))["skipped"],
+        json(&invoke(&sandbox, &["-o", "json", "search", "lunch"]))["skipped"],
         1
     );
 }

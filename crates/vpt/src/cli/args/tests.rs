@@ -21,7 +21,7 @@ const UNKNOWN_FLAG: &str =
 
 #[test]
 fn json_and_config_are_global_flags_in_any_position() {
-    let invocation = parsed("ingest --json --config /tmp/c.toml --preview").expect("parsed");
+    let invocation = parsed("ingest -o json --config /tmp/c.toml --preview").expect("parsed");
     assert_eq!(invocation.format, Some(Format::Json));
     assert_eq!(invocation.config, Some(PathBuf::from("/tmp/c.toml")));
     assert_eq!(
@@ -43,8 +43,8 @@ fn an_unknown_verb_is_a_usage_error_naming_it() {
 #[test]
 fn review_accepts_global_options_and_requires_exactly_one_identity() {
     for line in [
-        "review list memo --json",
-        "--json review list memo",
+        "review list memo -o json",
+        "-o json review list memo",
         "review list --config custom.toml memo",
     ] {
         assert_eq!(
@@ -54,7 +54,7 @@ fn review_accepts_global_options_and_requires_exactly_one_identity() {
     }
     for line in [
         "review list",
-        "review list --json",
+        "review list -o json",
         "review list memo extra",
     ] {
         assert!(parsed(line).is_err(), "{line}");
@@ -146,7 +146,7 @@ fn every_stage_one_verb_decodes_its_arguments() {
     ] {
         assert_eq!(parsed(line).expect(line).verb, verb);
     }
-    let invocation = parsed("--config c.toml --json doctor").expect("global flags first");
+    let invocation = parsed("--config c.toml -o json doctor").expect("global flags first");
     assert_eq!(invocation.format, Some(Format::Json));
     assert_eq!(invocation.config, Some("c.toml".into()));
     assert_eq!(
@@ -161,7 +161,7 @@ fn every_stage_one_verb_decodes_its_arguments() {
 #[test]
 fn missing_positionals_subcommands_and_flag_values_are_refused() {
     assert_eq!(
-        parse([OsString::from("vpt"), OsString::from("--json")]),
+        parse(["vpt", "-o", "json"].map(OsString::from)),
         Err(UsageError::new("a command is required"))
     );
     for (line, message) in [
@@ -171,7 +171,7 @@ fn missing_positionals_subcommands_and_flag_values_are_refused() {
         ("retention erase", "unknown command"),
         ("symlink erase", "unknown command"),
         (
-            "--config --json doctor",
+            "--config -o json doctor",
             "a value is required for '--config <FILE>'",
         ),
         ("list --stage --force", UNKNOWN_FLAG),
@@ -184,8 +184,8 @@ fn missing_positionals_subcommands_and_flag_values_are_refused() {
 #[test]
 fn global_flags_cannot_fill_missing_value_slots() {
     for (line, flag) in [
-        ("ingest --once --json memo.m4a", "--once <PATH>"),
-        ("list --stage --json extract", "--stage <STAGE>"),
+        ("ingest --once -o json memo.m4a", "--once <PATH>"),
+        ("list --stage -o json extract", "--stage <STAGE>"),
         ("ingest --once --config c.toml memo.m4a", "--once <PATH>"),
     ] {
         assert_eq!(
@@ -230,7 +230,7 @@ fn transcribe_accepts_language_and_dry_run_flags_around_the_identity() {
     }
     for line in [
         "transcribe id --language",
-        "transcribe --language --json id",
+        "transcribe --language -o json id",
         "transcribe",
     ] {
         assert!(parsed(line).is_err());
@@ -240,8 +240,8 @@ fn transcribe_accepts_language_and_dry_run_flags_around_the_identity() {
 #[test]
 fn path_requires_one_identity_and_an_explicit_stage_with_global_options() {
     for line in [
-        "path memo --stage transcript --json",
-        "--json path --stage transcript memo",
+        "path memo --stage transcript -o json",
+        "-o json path --stage transcript memo",
     ] {
         assert_eq!(
             parsed(line).unwrap().verb,
@@ -266,7 +266,7 @@ mod review;
 #[test]
 fn run_accepts_preview_and_global_flags_but_no_recording_or_resend() {
     assert_eq!(
-        parsed("run --preview --json").unwrap().verb,
+        parsed("run --preview -o json").unwrap().verb,
         Verb::Run { dry_run: true }
     );
     for line in [
@@ -285,7 +285,7 @@ fn actions_list_and_resend_take_an_optional_recording() {
     for (line, verb) in [
         ("actions list", Verb::ActionsList { id: None }),
         (
-            "actions list memo --json",
+            "actions list memo -o json",
             Verb::ActionsList {
                 id: Some("memo".into()),
             },

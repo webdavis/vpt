@@ -33,7 +33,7 @@ fn invalid_brief_arguments_and_disabled_trigger_are_observational_and_private() 
         ],
     ] {
         let mut args = args;
-        args.push("--json");
+        args.extend(["-o", "json"]);
         let output = invoke(&sandbox, &args);
         assert_eq!(
             output.status.code(),
@@ -55,7 +55,7 @@ fn option_like_title_and_tags_remain_literal_private_values() {
         &[
             "brief",
             "--title",
-            "--json",
+            "--output",
             "--at",
             "2026-10-01T00:00:00Z",
             "--tag",
@@ -63,10 +63,11 @@ fn option_like_title_and_tags_remain_literal_private_values() {
             "--participant",
             "--preview",
             "--preview",
-            "--json",
+            "-o",
+            "json",
         ],
     ));
-    assert_eq!(result["occasion"]["title"], "--json");
+    assert_eq!(result["occasion"]["title"], "--output");
     assert_eq!(result["occasion"]["participants"][0]["name"], "--preview");
     assert_eq!(fixture::snapshot(&sandbox), before);
 }
@@ -86,7 +87,7 @@ fn unknown_existing_occasion_does_not_create_state() {
     let before = fixture::snapshot(&sandbox);
     let output = invoke(
         &sandbox,
-        &["brief", "2026-10-01T000000-aaaaaaaaaaaa", "--json"],
+        &["brief", "2026-10-01T000000-aaaaaaaaaaaa", "-o", "json"],
     );
     assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
     assert_eq!(fixture::snapshot(&sandbox), before);

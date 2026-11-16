@@ -299,7 +299,7 @@ fn tag_confirmation_refreshes_continuation_with_the_note_in_the_same_commit() {
     let output = support::run_with_budget(
         sandbox
             .vpt()
-            .args(["confirm", "tag", row.id.as_str(), "topic", "--json"]),
+            .args(["confirm", "tag", row.id.as_str(), "topic", "-o", "json"]),
         std::time::Duration::from_secs(5),
     );
     success(&output);

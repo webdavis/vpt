@@ -75,7 +75,7 @@ fn invoke_later(sandbox: &Sandbox, args: &[&str], structured: bool) -> std::proc
     let mut command = sandbox.vpt();
     command.args(args);
     if structured {
-        command.arg("--json");
+        command.args(["-o", "json"]);
     }
     support::run_with_budget(&mut command, Duration::from_secs(5))
 }

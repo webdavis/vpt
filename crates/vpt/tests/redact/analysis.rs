@@ -10,7 +10,7 @@ fn analyzed() -> (Sandbox, vpt_domain::identity::RecordingId) {
         &sandbox,
         &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
     );
-    json(&invoke(&sandbox, &["analyze", id.as_str(), "--json"]));
+    json(&invoke(&sandbox, &["analyze", id.as_str(), "-o", "json"]));
     (sandbox, id)
 }
 #[test]
@@ -22,7 +22,7 @@ fn redact_analysis_omits_whole_claims_and_explicit_mark_retains_the_accepted_cla
         .unwrap();
     let first = json(&invoke(
         &sandbox,
-        &["redact", id.as_str(), "--stage", "analysis", "--json"],
+        &["redact", id.as_str(), "--stage", "analysis", "-o", "json"],
     ));
     assert_eq!(first["omitted"], 1);
     assert!(
@@ -34,7 +34,7 @@ fn redact_analysis_omits_whole_claims_and_explicit_mark_retains_the_accepted_cla
     fixture::write_config(&sandbox, "[share.redact]\nflagged_spans='mark'\n");
     let second = json(&invoke(
         &sandbox,
-        &["redact", id.as_str(), "--stage", "analysis", "--json"],
+        &["redact", id.as_str(), "--stage", "analysis", "-o", "json"],
     ));
     assert_eq!(second["marked"], 1);
     let marked = fs::read_to_string(second["written"].as_str().unwrap()).unwrap();
@@ -60,14 +60,15 @@ fn redact_analysis_rechecks_stale_findings_after_the_source_flag_is_resolved() {
             "confirm",
             id.as_str(),
             &flag.identifier.hex(),
-            "--json",
+            "-o",
+            "json",
         ],
     ));
     let source = ledger.note(&id, NoteStage::Analysis).unwrap().unwrap();
     let before = fs::read(&source.target).unwrap();
     let result = json(&invoke(
         &sandbox,
-        &["redact", id.as_str(), "--stage", "analysis", "--json"],
+        &["redact", id.as_str(), "--stage", "analysis", "-o", "json"],
     ));
     assert_eq!(result["omitted"], 0);
     assert!(

@@ -116,6 +116,9 @@ pub(super) fn seed_segments(
         ),
         HistoryWrite::Committed(_)
     ));
-    json(&invoke(sandbox, &["note", "write", id.as_str(), "--json"]));
+    json(&invoke(
+        sandbox,
+        &["note", "write", id.as_str(), "-o", "json"],
+    ));
     id
 }

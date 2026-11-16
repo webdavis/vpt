@@ -12,7 +12,7 @@ fn run_without_a_recordings_folder_still_transcribes_imported_recordings() {
     )
     .unwrap();
     let imported = json(&support::run_with_budget(
-        sandbox.vpt().args(["import", "--json"]).arg(&file),
+        sandbox.vpt().args(["import", "-o", "json"]).arg(&file),
         std::time::Duration::from_secs(8),
     ));
     let id = imported["ingested"][0]["id"].clone();

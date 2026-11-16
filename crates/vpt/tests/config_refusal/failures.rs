@@ -3,7 +3,10 @@ use vpt_domain::run::HookFailureClass;
 
 fn run(case: &refusal::Fixture, verb: &str) -> std::process::Output {
     support::run_with_budget(
-        case.sandbox.vpt().args(case.args(verb)).arg("--json"),
+        case.sandbox
+            .vpt()
+            .args(case.args(verb))
+            .args(["-o", "json"]),
         if verb == "run" {
             Duration::from_secs(8)
         } else {

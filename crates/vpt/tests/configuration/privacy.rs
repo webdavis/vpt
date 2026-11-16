@@ -25,7 +25,7 @@ fn unsafe_configuration_permissions_refuse_every_command_without_chmod_or_work()
                 let mut command = sandbox.vpt();
                 command.args(&args);
                 if structured {
-                    command.arg("--json");
+                    command.args(["-o", "json"]);
                 }
                 refusal(&mut command, "private", structured);
                 assert_eq!(fixture::snapshot(&sandbox), before, "{args:?}");

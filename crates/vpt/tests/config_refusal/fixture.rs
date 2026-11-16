@@ -51,7 +51,7 @@ impl Fixture {
             .set_modified(UNIX_EPOCH + Duration::from_secs(1_787_604_456))
             .unwrap();
         let output = support::run_with_budget(
-            sandbox.vpt().args(["run", "--json"]),
+            sandbox.vpt().args(["run", "-o", "json"]),
             Duration::from_secs(8),
         );
         assert!(output.status.success(), "{}", stderr(&output));

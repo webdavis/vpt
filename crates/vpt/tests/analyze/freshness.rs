@@ -64,7 +64,8 @@ fn lexical_review_invalidates_analysis_in_the_same_publication() {
             record.id.as_str(),
             &lexical.identifier.hex(),
             "Fixed words",
-            "--json",
+            "-o",
+            "json",
         ]),
         Duration::from_secs(5),
     ));
@@ -103,7 +104,8 @@ fn lexical_review_invalidates_analysis_in_the_same_publication() {
                 transcript.target.to_str().unwrap(),
                 "--recording",
                 record.id.as_str(),
-                "--json",
+                "-o",
+                "json",
             ]),
             Duration::from_secs(5),
         ));
@@ -133,7 +135,8 @@ fn lexical_review_invalidates_analysis_in_the_same_publication() {
             record.id.as_str(),
             &finding.identifier.hex(),
             "Fixed words",
-            "--json",
+            "-o",
+            "json",
         ]),
         Duration::from_secs(5),
     ));
@@ -145,7 +148,8 @@ fn lexical_review_invalidates_analysis_in_the_same_publication() {
                 transcript.target.to_str().unwrap(),
                 "--recording",
                 record.id.as_str(),
-                "--json",
+                "-o",
+                "json",
             ]),
             Duration::from_secs(5),
         ));
@@ -190,7 +194,8 @@ fn changed_transcript_removes_stale_annotations_and_rechecking_keeps_the_review_
                 record.id.as_str(),
                 &flag.identifier.hex(),
                 "Operator correction",
-                "--json",
+                "-o",
+                "json",
             ]),
             Duration::from_secs(5),
         ));
@@ -258,7 +263,8 @@ fn changed_transcript_removes_stale_annotations_and_rechecking_keeps_the_review_
                     analysis.target.to_str().unwrap(),
                     "--recording",
                     record.id.as_str(),
-                    "--json",
+                    "-o",
+                    "json",
                 ]),
                 Duration::from_secs(5),
             ));

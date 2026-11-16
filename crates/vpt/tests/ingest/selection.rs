@@ -34,7 +34,7 @@ fn once_and_sweep_select_only_immediate_recordings_without_changing_sources() {
         .vpt()
         .args(["ingest", "--once"])
         .arg(&second)
-        .args(["--preview", "--json"])));
+        .args(["--preview", "-o", "json"])));
     assert_eq!(dry["would_ingest"].as_array().unwrap().len(), 1);
     assert_eq!(dry["would_ingest"][0]["path"], second.to_str().unwrap());
     assert_eq!(snapshot(&sandbox), before);
@@ -42,9 +42,9 @@ fn once_and_sweep_select_only_immediate_recordings_without_changing_sources() {
         .vpt()
         .args(["ingest", "--once"])
         .arg(&second)
-        .arg("--json")));
+        .args(["-o", "json"])));
     assert_eq!(once["ingested"].as_array().unwrap().len(), 1);
-    let sweep = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    let sweep = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     assert_eq!(sweep["ingested"].as_array().unwrap().len(), 1);
     assert_eq!(
         sweep["already_ingested"],
@@ -95,7 +95,7 @@ fn once_preserves_source_gates_in_observation_and_mutating_modes() {
             .vpt()
             .args(["ingest", "--once"])
             .arg(&path)
-            .args(["--preview", "--json"])));
+            .args(["--preview", "-o", "json"])));
         assert_eq!(
             dry["deferred"],
             serde_json::json!([{"path": path, "reason": reason}])
@@ -105,7 +105,7 @@ fn once_preserves_source_gates_in_observation_and_mutating_modes() {
             .vpt()
             .args(["ingest", "--once"])
             .arg(&path)
-            .arg("--json")));
+            .args(["-o", "json"])));
         assert_eq!(actual["deferred"], dry["deferred"]);
         assert_eq!(actual["ingested"], serde_json::json!([]));
         let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
@@ -135,11 +135,11 @@ fn once_refuses_linked_nonregular_and_nested_paths_without_observational_writes(
         (nested, 3, "refused"),
     ] {
         let before = snapshot(&sandbox);
-        let result = run(sandbox
-            .vpt()
-            .args(["ingest", "--once"])
-            .arg(path)
-            .args(["--preview", "--json"]));
+        let result = run(sandbox.vpt().args(["ingest", "--once"]).arg(path).args([
+            "--preview",
+            "-o",
+            "json",
+        ]));
         assert_eq!(result.status.code(), Some(code));
         assert!(result.stdout.is_empty());
         let error: serde_json::Value = serde_json::from_slice(&result.stderr).unwrap();

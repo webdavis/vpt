@@ -4,7 +4,7 @@ use crate::actions::{configure_with, propose, sent};
 fn resend(sandbox: &Sandbox, id: &str, extra: &[&str]) -> std::process::Output {
     let mut command = sandbox.vpt();
     command
-        .args(["actions", "resend", id, "--json"])
+        .args(["actions", "resend", id, "-o", "json"])
         .args(extra);
     support::run_with_budget(&mut command, Duration::from_secs(5))
 }

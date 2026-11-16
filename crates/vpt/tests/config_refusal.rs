@@ -24,7 +24,7 @@ fn check(verb: &str, kind: RunKind) {
     let before = case.ledger().recovery_view().unwrap().records.len();
     let args = case.args(verb);
     let output = support::run_with_budget(
-        case.sandbox.vpt().args(args).arg("--json"),
+        case.sandbox.vpt().args(args).args(["-o", "json"]),
         if verb == "run" {
             Duration::from_secs(8)
         } else {

@@ -15,7 +15,8 @@ fn every_dry_run_preserves_pending_recovery_and_ignores_the_write_lock() {
             "Private preview",
             "--at",
             "2026-10-01T10:00:00Z",
-            "--json",
+            "-o",
+            "json",
         ]),
         Duration::from_secs(5),
     ));
@@ -71,7 +72,7 @@ fn every_dry_run_preserves_pending_recovery_and_ignores_the_write_lock() {
             let mut command = sandbox.vpt();
             command.args(["brief", occasion, flag]);
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = support::run_with_budget(&mut command, Duration::from_secs(5));
             assert!(output.status.success(), "{}", stderr(&output));

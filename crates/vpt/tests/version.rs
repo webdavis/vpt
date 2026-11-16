@@ -8,7 +8,7 @@ fn a_json_stdout_write_failure_is_one_store_document_on_stderr() {
     let (descriptor, _peer) = broken_output();
     let output = run(sandbox
         .vpt()
-        .args(["--version", "--json"])
+        .args(["--version", "-o", "json"])
         .stdout(descriptor));
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(stdout(&output), "");
@@ -26,7 +26,7 @@ fn json_version_with_both_output_streams_broken_exits_one() {
     let err = out.try_clone().expect("stderr descriptor");
     let output = run(sandbox
         .vpt()
-        .args(["--version", "--json"])
+        .args(["--version", "-o", "json"])
         .stdout(out)
         .stderr(err));
     assert_eq!(output.status.code(), Some(1));
@@ -37,7 +37,7 @@ fn json_version_with_both_output_streams_broken_exits_one() {
 #[test]
 fn version_reports_the_crate_version_and_no_helper_when_the_path_is_empty() {
     let sandbox = Sandbox::new("version-json");
-    let output = run(sandbox.vpt().args(["--version", "--json"]));
+    let output = run(sandbox.vpt().args(["--version", "-o", "json"]));
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(stderr(&output), "");
     let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("json");
@@ -85,7 +85,7 @@ fn version_with_both_output_streams_broken_exits_one() {
 fn version_uses_path_helper_only_when_selected_configuration_is_absent() {
     let sandbox = Sandbox::new("version-fallback");
     sandbox.install_fake_helper();
-    let output = run(sandbox.vpt().args(["--version", "--json"]));
+    let output = run(sandbox.vpt().args(["--version", "-o", "json"]));
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(stderr(&output), "");
     let document: serde_json::Value =
@@ -116,7 +116,7 @@ fn version_honors_environment_configuration_and_explicit_override() {
         std::fs::Permissions::from_mode(0o600),
     )
     .unwrap();
-    let configured = run(sandbox.vpt().args(["--version", "--json"]));
+    let configured = run(sandbox.vpt().args(["--version", "-o", "json"]));
     assert_eq!(configured.status.code(), Some(0));
     let document: serde_json::Value =
         serde_json::from_str(&stdout(&configured)).expect("one JSON document");
@@ -132,7 +132,7 @@ fn version_honors_environment_configuration_and_explicit_override() {
     std::fs::set_permissions(&alternate, std::fs::Permissions::from_mode(0o600)).unwrap();
     let output = run(sandbox
         .vpt()
-        .args(["--version", "--json", "--config"])
+        .args(["--version", "-o", "json", "--config"])
         .arg(&alternate));
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(stderr(&output), "");
@@ -159,7 +159,7 @@ fn invalid_existing_configuration_keeps_version_success_without_path_fallback() 
         std::fs::Permissions::from_mode(0o600),
     )
     .unwrap();
-    let output = run(sandbox.vpt().args(["--version", "--json"]));
+    let output = run(sandbox.vpt().args(["--version", "-o", "json"]));
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(stderr(&output), "");
     let text = stdout(&output);
@@ -174,7 +174,7 @@ fn unreadable_existing_configuration_keeps_version_success_without_path_fallback
     let sandbox = Sandbox::new("version-unreadable");
     sandbox.install_fake_helper();
     std::fs::create_dir_all(sandbox.config_path()).expect("nonregular config leaf");
-    let output = run(sandbox.vpt().args(["--version", "--json"]));
+    let output = run(sandbox.vpt().args(["--version", "-o", "json"]));
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(stderr(&output), "");
     let document: serde_json::Value =
@@ -185,7 +185,7 @@ fn unreadable_existing_configuration_keeps_version_success_without_path_fallback
 #[test]
 fn the_version_command_prints_what_the_version_flag_prints() {
     let sandbox = Sandbox::new("version-command");
-    for format in [None, Some("--json")] {
+    for format in [&[][..], &["-o", "json"]] {
         let command = run(sandbox.vpt().arg("version").args(format));
         let flag = run(sandbox.vpt().arg("--version").args(format));
         assert_eq!(command.status.code(), Some(0), "{format:?}");

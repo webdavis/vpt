@@ -92,7 +92,7 @@ fn add(sandbox: &Sandbox, name: &str, seconds: i64) -> std::path::PathBuf {
 }
 fn invoke(sandbox: &Sandbox, extra: &[&str]) -> std::process::Output {
     support::run_with_budget(
-        sandbox.vpt().args(["run", "--json"]).args(extra),
+        sandbox.vpt().args(["run", "-o", "json"]).args(extra),
         std::time::Duration::from_secs(8),
     )
 }

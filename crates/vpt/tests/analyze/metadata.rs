@@ -131,7 +131,8 @@ fn repeated_analysis_preserves_manual_tag_and_relation_decisions() {
                 arguments[0],
                 record.id.as_str(),
                 arguments[1],
-                "--json",
+                "-o",
+                "json",
             ]),
             Duration::from_secs(5),
         ));

@@ -46,7 +46,7 @@ pub(super) fn run_json(sandbox: &Sandbox, code: i32) -> Value {
         &run(sandbox
             .vpt()
             .current_dir(sandbox.path())
-            .args(["doctor", "--json"])),
+            .args(["doctor", "-o", "json"])),
         code,
     )
 }

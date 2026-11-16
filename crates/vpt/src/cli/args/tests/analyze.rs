@@ -4,7 +4,7 @@ use crate::cli::args::analyze::Scope;
 #[test]
 fn analysis_accepts_only_its_identity_and_observational_option() {
     assert_eq!(
-        parsed("analyze memo --preview --json").unwrap().verb,
+        parsed("analyze memo --preview -o json").unwrap().verb,
         Verb::Analyze {
             id: "memo".into(),
             dry_run: true,
@@ -37,7 +37,7 @@ fn bulk_analysis_is_the_all_subcommand_or_ids_on_stdin() {
             dry_run: true
         }
     );
-    for line in ["analyze -", "analyze - --json"] {
+    for line in ["analyze -", "analyze - -o json"] {
         assert_eq!(
             parsed(line).unwrap().verb,
             Verb::AnalyzeBatch {

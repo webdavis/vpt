@@ -78,22 +78,22 @@ fn configured(name: &str) -> Sandbox {
     sandbox
 }
 
-const JSON: &[&str] = &["--json"];
-const TOON: &[&str] = &["--toon"];
+const JSON: &[&str] = &["-o", "json"];
+const TOON: &[&str] = &["-o", "toon"];
 const YAML: &[&str] = &["--output", "yaml"];
 const SPELLINGS: [&[&str]; 6] = [
     JSON,
     TOON,
     YAML,
-    &["-o", "json"],
+    &["--output=json"],
     &["--output=toon"],
-    &["-o", "yaml"],
+    &["-oyaml"],
 ];
 
 fn decoded(flag: &[&str], text: &str) -> Value {
     match flag.concat().as_str() {
-        "--json" | "-ojson" => serde_json::from_str(text).map_err(|error| error.to_string()),
-        "--toon" | "--output=toon" | "-otoon" => {
+        "-ojson" | "--output=json" => serde_json::from_str(text).map_err(|error| error.to_string()),
+        "-otoon" | "--output=toon" => {
             toon_format::decode_default(text).map_err(|error| error.to_string())
         }
         _ => serde_yaml_ng::from_str(text).map_err(|error| error.to_string()),
@@ -142,21 +142,14 @@ fn a_usage_error_is_one_document_in_the_chosen_format() {
 #[test]
 fn two_format_flags_are_refused_in_plain_text_with_the_usage() {
     let sandbox = configured("formats-two-flags");
-    for pair in [
-        [JSON, TOON],
-        [TOON, YAML],
-        [YAML, JSON],
-        [&["-o", "json"], JSON],
-    ] {
+    for pair in [[JSON, TOON], [TOON, YAML], [YAML, JSON], [JSON, JSON]] {
         let output = run(sandbox.vpt().arg("list").args(pair.concat()));
         assert_eq!(output.status.code(), Some(2), "{pair:?}");
         assert_eq!(stdout(&output), "", "{pair:?}");
         let text = stderr(&output);
         let first = text.lines().next().unwrap_or_default();
-        assert!(first.contains("cannot be used with"), "{text}");
         assert!(
-            pair.iter()
-                .all(|flag| first.contains(flag[0]) || first.contains("--output")),
+            first.contains("'--output <FORMAT>' is given more than once"),
             "{text}"
         );
         assert!(text.contains("vpt help"), "{text}");
@@ -180,5 +173,22 @@ fn the_removed_yaml_flag_and_an_unknown_format_are_usage_errors() {
         let output = run(sandbox.vpt().args(words));
         assert_eq!(output.status.code(), Some(2), "{words:?}");
         assert_eq!(stdout(&output), "", "{words:?}");
+    }
+}
+
+#[test]
+fn the_removed_json_and_toon_flags_are_usage_errors_naming_the_output_flag() {
+    let sandbox = configured("formats-removed-json-toon");
+    for (flag, fix) in [("--json", "-o json"), ("--toon", "-o toon")] {
+        for words in [&["list", flag][..], &[flag, "list"]] {
+            let output = run(sandbox.vpt().args(words));
+            assert_eq!(output.status.code(), Some(2), "{words:?}");
+            assert_eq!(stdout(&output), "", "{words:?}");
+            let text = stderr(&output);
+            assert!(
+                text.lines().next().unwrap_or_default().contains(fix),
+                "{words:?}: {text}"
+            );
+        }
     }
 }

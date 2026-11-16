@@ -35,7 +35,7 @@ fn ingest(sandbox: &Sandbox, name: &str, captured: i64) -> String {
         .set_modified(std::time::UNIX_EPOCH + Duration::from_secs(captured as u64))
         .unwrap();
     let output = support::run_with_budget(
-        sandbox.vpt().args(["ingest", "--json"]),
+        sandbox.vpt().args(["ingest", "-o", "json"]),
         Duration::from_secs(10),
     );
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
@@ -67,7 +67,7 @@ fn reads_without_writing(sandbox: &Sandbox, id: &str) {
         &["doctor"],
         &["show", id],
         &["list"],
-        &["list", "--json"],
+        &["list", "-o", "json"],
         &["storage"],
         &["ledger", "show"],
         &["ingest", "--preview"],

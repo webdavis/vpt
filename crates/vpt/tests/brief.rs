@@ -46,7 +46,8 @@ fn manual<'a>(extra: &'a [&'a str]) -> Vec<&'a str> {
         "work",
         "--duration-minutes",
         "30",
-        "--json",
+        "-o",
+        "json",
     ];
     args.extend_from_slice(extra);
     args
@@ -89,7 +90,7 @@ fn manual_brief_publishes_one_pinned_owned_file_and_rewrites_by_identity() {
     let edited =
         before.text.replace("\ntags:", "\noperator: keep\ntags:") + "\nPrivate operator prose\n";
     std::fs::write(&before.target, &edited).unwrap();
-    json(&invoke(&sandbox, &["brief", id.as_str(), "--json"]));
+    json(&invoke(&sandbox, &["brief", id.as_str(), "-o", "json"]));
     let after = ledger.brief(&id).unwrap().unwrap();
     assert_eq!(after.target, before.target);
     assert_eq!(after.first_written, before.first_written);

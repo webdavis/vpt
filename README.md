@@ -1,7 +1,7 @@
 # vpt
 
 The Voice Processing Tool is under construction. Implemented commands include `vpt version`
-(or `vpt --version`), `vpt version --json`, and `vpt setup`. The macOS helper provides version reporting, Trash,
+(or `vpt --version`), `vpt version -o json`, and `vpt setup`. The macOS helper provides version reporting, Trash,
 and Apple speech transcription. Feature completion is tracked in
 [the remaining-work roadmap](docs/vpt-remaining-work.md).
 The design is [the approved specification](docs/superpowers/specs/2026-09-20-vpt-design.md).
@@ -17,8 +17,8 @@ shell.
 
 A flag takes its value as `--flag value` or `--flag=value`, and `--` ends the flags, so
 `vpt search -- --force` searches for `--force`. A mistyped command or flag is refused with exit 2
-and a tip naming the closest match; under `--output` (or `--json` or `--toon`) the tip is in the error
-document's `diagnostics`. A usage error names only vpt's own commands, flags and values, never a word
+and a tip naming the closest match; under `--output` the tip is in the error document's
+`diagnostics`. A usage error names only vpt's own commands, flags and values, never a word
 you typed, so private text stays out of it.
 
 Every command that can change something and offers to show the change first takes `--preview`, or
@@ -32,8 +32,9 @@ workspace checks.
 
 ## Machine-readable output
 
-Every command accepts `--output json|toon|yaml`, or `-o` for short, in any position. `--json` is
-short for `--output json` and `--toon` for `--output toon`. Each format prints the same document: a
+Every command accepts `--output json|toon|yaml`, or `-o` for short, in any position; it is the only
+way to choose a format. `--json` and `--toon` are refused with exit 2 and a message naming
+`-o json` or `-o toon`. Each format prints the same document: a
 `vpt.result/1` document on standard output when the command succeeds, or a `vpt.error/1` document on
 standard error when it fails, with the same exit code. JSON is the document as one line of compact
 JSON. TOON (Token-Oriented Object Notation) nests by indentation, with a declared length on every
@@ -79,7 +80,7 @@ Errors still print as `vpt: <message>` on standard error.
 starts and one when it ends: `{"schema": "vpt.progress/1", "recording", "step", "state", "audio_secs",
 "at"}`, where `step` is `transcribe` or `analyze`, `state` is `started`, `done` or `failed`, and
 `audio_secs` is the recording's length for a transcription and null otherwise. Standard output is
-unchanged. On failure the error document follows the progress lines, so under `--json` standard error
+unchanged. On failure the error document follows the progress lines, so under `-o json` standard error
 stays one JSON object per line. Other verbs and previews write no progress lines.
 
 ## Configuration permissions
@@ -304,7 +305,8 @@ engine or changing files. `vpt review` alone shows its subcommands.
 `vpt review confirm <id> <flag>`, `vpt review correct <id> <flag> <text>` and
 `vpt review dismiss <id> <flag>`, each with `[--output json|toon|yaml]`, resolve a surfaced flag and
 rewrite the transcript note. The correction text is taken as typed, even when it starts with `-`;
-a text spelled exactly like one of vpt's own options, such as `--json`, goes after `--`. Corrections remain separate from accepted words.
+a text spelled exactly like one of vpt's own options, such as `--output`, goes after `--`.
+Corrections remain separate from accepted words.
 Confirming proper-noun/agreed-unverified flags learns their record text; corrections learn the new
 text. Repeating the same action preserves its resolution time and avoids duplicate terms. Diagnostics
 can be confirmed or dismissed. Invalid flags/actions refuse before mutating work.
@@ -318,7 +320,7 @@ remaining open flags. History omits correction and transcript text.
 `vpt confirm term <text> [--output json|toon|yaml]` adds a confirmed term without needing a recording or engine.
 `vpt confirm` alone shows its subcommands: `term`, `tag`, `reject-tag` and `relation`. Each takes its
 term, tag or relation as typed, even when it starts with `-`. A value spelled exactly like one of
-vpt's own options, such as `--json`, goes after `--`: `vpt --json confirm term -- --json`.
+vpt's own options, such as `--output`, goes after `--`: `vpt -o json confirm term -- --output`.
 It normalizes whitespace, preserves existing list content, and recognizes whole-term Unicode/case
 variants as duplicates. New files are private. The ledger saves publication bytes and intent before
 writing, and mutating startup recovers interrupted updates. Changed files or a changed configured list
@@ -388,7 +390,7 @@ is at its path. It never overwrites, deletes, moves or changes the mode of anyth
 second run changes nothing. With named checks it repairs only within them: `config` for the file,
 `stores` for the folders and the link. Doctor then checks again and reports the state after the
 repairs; each repaired row's detail starts with `created`, and the exit code follows that state. A
-repair that fails stays an issue with its reason, and the other repairs still run. Under `--json` the
+repair that fails stays an issue with its reason, and the other repairs still run. Under `-o json` the
 document gains `fixed`, present only with `--fix`: one `{"check", "name", "detail"}` entry per repair
 made, `[]` when there was nothing to create. `--fix` leaves these for you, and their rows say what to
 do: staged audio waiting for the Trash, note versions vpt kept, the mode of an existing state folder,
@@ -513,7 +515,7 @@ follow-up in the ledger, and removes the temporary folder at the end, also when 
 The report has the same form as doctor's: the version line, a heading per part, rows marked `✓`,
 `⚠`, `✗` or `·`, advice after `→`, and "Needs attention". It goes to standard output. vpt exits 1
 when any row is an issue and 0 otherwise. Every `--output` format prints the same fields as
-doctor, with `command` set to `test`. A program can run `vpt test summary --json`, read each
+doctor, with `command` set to `test`. A program can run `vpt test summary -o json`, read each
 row's `result` and `detail`, and act on its `advice`.
 
 ## Note writing
@@ -597,7 +599,7 @@ provider occasion is rescheduled. Rewrites preserve operator properties, tags, a
 Briefs select current owned transcript notes using confirmed terms, tags, and relations. Quotes use
 accepted transcript text and retain recording/timecode provenance and uncertainty. Missing or expired
 transcripts supply no evidence; unaccepted changes to managed transcript content refuse the request.
-`--json` emits `vpt.brief/1`; `--explain` includes selection decisions and omission counts. Both
+`-o json` emits `vpt.brief/1`; `--explain` includes selection decisions and omission counts. Both
 `--preview` and `--explain` leave stores, ledger, and history unchanged.
 
 With `context.type = none`, both context halves are disabled. `context.type = dam` reads the selected
@@ -991,7 +993,7 @@ sent), `sent`, `refused` (the tool refused it for good) or `withdrawing` (droppe
 to be withdrawn). It reads the ledger and writes nothing. Each row carries the `recording`, the
 action `id` your tool received, the `state` and the `text`; `text` is null once the recording's
 accepted analysis no longer holds the action as it was sent. With nothing saved it prints
-`no follow-ups`, and `"actions": []` under `--json`, and exits 0.
+`no follow-ups`, and `"actions": []` under `-o json`, and exits 0.
 
 ## Note verification
 
@@ -1124,7 +1126,7 @@ Install the command and helper separately:
 
 To install the current checkout, use `cargo install --locked --path crates/vpt` from the repository
 root. Put the installation's `bin` directory on `PATH`; `[helper] path` can instead select an explicit
-helper location. `vpt --version --json` reports both versions, and `vpt doctor` reports a missing or
+helper location. `vpt --version -o json` reports both versions, and `vpt doctor` reports a missing or
 incompatible helper with installation instructions.
 
 Without the helper, configure Whisply or a command engine to transcribe. Ingestion, notes, briefs,

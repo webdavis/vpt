@@ -136,7 +136,7 @@ fn resolved_flags_stay_closed_and_corrections_survive_retranscription() {
                 .arg(action[0])
                 .args([row.id.as_str(), &flag.identifier.hex()])
                 .args(&action[1..])
-                .arg("--json"),
+                .args(["-o", "json"]),
             std::time::Duration::from_secs(5),
         );
         json(&output);

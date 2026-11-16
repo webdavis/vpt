@@ -62,7 +62,7 @@ fn fake_extractor(sandbox: &Sandbox, output: &[u8]) -> PathBuf {
 }
 
 fn import(sandbox: &Sandbox, args: &[&str]) -> Output {
-    run(sandbox.vpt().arg("--json").arg("import").args(args))
+    run(sandbox.vpt().args(["-o", "json"]).arg("import").args(args))
 }
 
 fn json(output: &Output) -> serde_json::Value {
@@ -165,11 +165,12 @@ fn conversion_succeeds_when_the_temp_directory_sits_behind_a_symlink() {
     let linked_temp = sandbox.path().join("linked-tmp");
     std::os::unix::fs::symlink(sandbox.path().join("tmp"), &linked_temp).unwrap();
     let source = file(&sandbox, "call.wav", b"RIFF wave", None);
-    let output =
-        run(sandbox
-            .vpt()
-            .env("TMPDIR", &linked_temp)
-            .args(["--json", "import", path(&source)]));
+    let output = run(sandbox.vpt().env("TMPDIR", &linked_temp).args([
+        "-o",
+        "json",
+        "import",
+        path(&source),
+    ]));
     assert_eq!(json(&output)["ingested"][0]["title"], "call");
 }
 

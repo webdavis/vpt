@@ -12,7 +12,7 @@ pub(super) fn rename(sandbox: &Sandbox, args: &[&str]) -> std::process::Output {
             .vpt()
             .args(["tag", "rename"])
             .args(args)
-            .arg("--json"),
+            .args(["-o", "json"]),
         std::time::Duration::from_secs(10),
     )
 }

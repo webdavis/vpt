@@ -40,7 +40,9 @@ fn interrupted_analysis_marks_child_and_pipeline_runs_interrupted() {
             invoke(&sandbox, &[])
         } else {
             support::run_with_budget(
-                sandbox.vpt().args(["analyze", row.id.as_str(), "--json"]),
+                sandbox
+                    .vpt()
+                    .args(["analyze", row.id.as_str(), "-o", "json"]),
                 std::time::Duration::from_secs(5),
             )
         };

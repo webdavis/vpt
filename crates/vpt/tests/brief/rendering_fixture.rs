@@ -57,7 +57,10 @@ pub(super) fn prepared(profile: &str, style: &str) -> (Sandbox, RecordingId) {
     );
     assert!(matches!(saved, HistoryWrite::Committed(_)), "{saved:?}");
     drop(ledger);
-    json(&invoke(&sandbox, &["note", "write", id.as_str(), "--json"]));
+    json(&invoke(
+        &sandbox,
+        &["note", "write", id.as_str(), "-o", "json"],
+    ));
     (sandbox, id)
 }
 

@@ -51,7 +51,7 @@ fn publication_failure_keeps_diagnostics_from_the_current_and_prior_stages_once(
             let mut command = sandbox.vpt();
             command.arg("run");
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = support::run_with_budget(&mut command, Duration::from_secs(8));
             assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
@@ -93,7 +93,7 @@ fn pipeline_preserves_engine_and_proposal_diagnostics_in_human_and_json_success(
         let mut command = sandbox.vpt();
         command.arg("run");
         if structured {
-            command.arg("--json");
+            command.args(["-o", "json"]);
         }
         let output = support::run_with_budget(&mut command, Duration::from_secs(8));
         assert!(output.status.success(), "{}", stderr(&output));
@@ -129,7 +129,7 @@ fn later_analysis_failure_preserves_diagnostics_from_completed_transcription() {
 fn stdout_failure_preserves_diagnostics_and_completed_pipeline_work() {
     let sandbox = prepared();
     let output = support::run_with_broken_stdout(
-        sandbox.vpt().args(["run", "--json"]),
+        sandbox.vpt().args(["run", "-o", "json"]),
         Duration::from_secs(8),
     );
     assert_eq!(output.status.code(), Some(1));
@@ -153,7 +153,7 @@ fn analysis_run_finish_failure_preserves_proposal_diagnostics_and_completed_work
         let mut command = sandbox.vpt();
         command.args(["analyze", id.as_str()]);
         if structured {
-            command.arg("--json");
+            command.args(["-o", "json"]);
         }
         let output = support::run_with_budget(&mut command, Duration::from_secs(5));
         assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));

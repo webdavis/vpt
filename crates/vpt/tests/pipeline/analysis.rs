@@ -46,7 +46,7 @@ fn pipeline_names_an_unsupported_proposal_version_without_publishing_analysis() 
         let mut command = sandbox.vpt();
         command.arg("run");
         if structured {
-            command.arg("--json");
+            command.args(["-o", "json"]);
         }
         let output = support::run_with_budget(&mut command, std::time::Duration::from_secs(8));
         assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));

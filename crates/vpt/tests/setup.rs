@@ -53,7 +53,7 @@ fn setup_json_terminal_success_keeps_the_prompt_off_standard_streams() {
     let output = terminal::run_args(
         &sandbox,
         terminal::Answer::Line(b"\n"),
-        &["setup", "--json"],
+        &["setup", "-o", "json"],
     );
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let text = stdout(&output);
@@ -217,7 +217,7 @@ fn terminal_panic_message(failure: &Box<dyn std::any::Any + Send>) -> &str {
 #[test]
 fn setup_without_a_terminal_exits_2_and_writes_nothing() {
     let sandbox = Sandbox::new("setup-no-tty");
-    let output = run(sandbox.vpt().args(["setup", "--json"]));
+    let output = run(sandbox.vpt().args(["setup", "-o", "json"]));
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(stdout(&output), "");
     let error: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("error document");
@@ -313,7 +313,7 @@ fn setup_refuses_shared_home_state_or_store_before_prompt_or_config_write() {
             let mut command = sandbox.vpt();
             command.arg("setup");
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = run(&mut command);
             assert_eq!(output.status.code(), Some(3), "{leaf}: {}", stderr(&output));
