@@ -72,7 +72,7 @@ fn on_disk(path: &Path) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_file())
 }
 
-fn printable(text: &str) -> String {
+pub(crate) fn printable(text: &str) -> String {
     text.chars()
         .map(|c| match c.is_control() {
             true => c.escape_debug().to_string(),
