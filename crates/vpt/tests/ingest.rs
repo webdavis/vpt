@@ -27,6 +27,8 @@ mod selection;
 #[path = "ingest/startup.rs"]
 mod startup;
 mod support;
+#[path = "ingest/terminal.rs"]
+mod terminal;
 
 use fixture::{snapshot, write_config};
 use support::{Sandbox, stderr, stdout};
