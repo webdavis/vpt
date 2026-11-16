@@ -5,6 +5,7 @@ mod confirm;
 mod ingest;
 mod list;
 mod note;
+mod occasions;
 mod redact;
 mod retention;
 mod review;
@@ -61,6 +62,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::Search(_) => Some(search::render),
         Verb::Show { stage: None, .. } => Some(show::render),
         Verb::Review { .. } => Some(review::render),
+        Verb::Occasions => Some(occasions::render),
         Verb::ConfirmTerm { .. } | Verb::ConfirmTag { .. } | Verb::ConfirmRelation { .. } => {
             Some(confirm::render)
         }

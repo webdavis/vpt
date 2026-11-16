@@ -3,7 +3,11 @@
 mod fixture;
 #[path = "occasions/recovery.rs"]
 mod recovery;
+#[path = "note/styled.rs"]
+mod styled;
 mod support;
+#[path = "occasions/terminal.rs"]
+mod terminal;
 use support::{Sandbox, stderr, stdout};
 use vpt_adapters::{RootDir, SqliteLedger};
 use vpt_application::ports::*;
