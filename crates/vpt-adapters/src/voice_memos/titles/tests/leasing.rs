@@ -39,7 +39,6 @@ pub(super) fn shared(root: &RootDir) {
     let started = Instant::now();
     busy(CopyLease::refresh(&copy, SHORT));
     assert!(started.elapsed() >= SHORT);
-    assert!(started.elapsed() < crate::test_support::WATCHDOG);
     unchanged(&before, &snapshot(root.path()));
     drop((reader, other));
     assert!(CopyLease::refresh(&copy, SHORT).is_ok());

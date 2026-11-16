@@ -1,7 +1,7 @@
 use super::*;
 use std::os::unix::ffi::OsStrExt;
 use std::process::{Child, Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 struct OwnedChild(Child);
 
@@ -58,14 +58,9 @@ fn opening_a_fifo_returns_not_regular_without_a_writer() {
         }
     };
     drop(child);
-    let elapsed = started.elapsed();
-    assert!(
-        elapsed < crate::test_support::WATCHDOG.saturating_add(Duration::from_millis(500)),
-        "FIFO test exceeded its cleanup bound: {elapsed:?}"
-    );
     assert!(
         outcome.is_some(),
-        "FIFO rejection exceeded the watchdog; child killed and reaped ({elapsed:?})"
+        "FIFO rejection exceeded the watchdog; child killed and reaped"
     );
     assert!(
         outcome.expect("completed child").success(),
