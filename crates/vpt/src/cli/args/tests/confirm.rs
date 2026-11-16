@@ -43,7 +43,7 @@ fn tag_actions_keep_private_values_literal_and_require_a_recording() {
             "another",
         ],
         vec!["show", "id", "--tag", "Private topic"],
-        vec!["confirm", "id", "--tag", "Private topic", "--dry-run"],
+        vec!["confirm", "id", "--tag", "Private topic", "--preview"],
     ] {
         let error = parse(std::iter::once("vpt").chain(args).map(OsString::from)).unwrap_err();
         assert!(!format!("{error:?}").contains("Private topic"));
@@ -89,7 +89,7 @@ fn confirmation_requires_one_term_and_refuses_unrelated_options() {
             "--term",
             "Other",
         ],
-        vec!["vpt", "confirm", "--term", "Private canary", "--dry-run"],
+        vec!["vpt", "confirm", "--term", "Private canary", "--preview"],
         vec!["vpt", "show", "id", "--term", "Private canary"],
     ] {
         let error = parse(words.into_iter().map(OsString::from)).unwrap_err();

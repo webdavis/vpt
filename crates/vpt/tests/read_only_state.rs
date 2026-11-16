@@ -70,8 +70,8 @@ fn reads_without_writing(sandbox: &Sandbox, id: &str) {
         &["list", "--json"],
         &["storage"],
         &["ledger", "show"],
-        &["ingest", "--dry-run"],
-        &["run", "--dry-run"],
+        &["ingest", "--preview"],
+        &["run", "--preview"],
     ];
     for args in commands {
         let output = support::run_with_budget(sandbox.vpt().args(args), Duration::from_secs(10));

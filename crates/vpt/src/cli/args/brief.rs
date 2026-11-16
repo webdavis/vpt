@@ -28,7 +28,7 @@ pub(super) struct Args {
     )]
     id: Option<OccasionId>,
     /// Show the brief without writing it.
-    #[arg(long)]
+    #[arg(long = "preview", short = 'n')]
     dry_run: bool,
     /// Show the brief's sections and where each came from.
     #[arg(long)]

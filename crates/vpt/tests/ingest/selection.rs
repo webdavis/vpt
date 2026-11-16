@@ -34,7 +34,7 @@ fn once_and_sweep_select_only_immediate_recordings_without_changing_sources() {
         .vpt()
         .args(["ingest", "--once"])
         .arg(&second)
-        .args(["--dry-run", "--json"])));
+        .args(["--preview", "--json"])));
     assert_eq!(dry["would_ingest"].as_array().unwrap().len(), 1);
     assert_eq!(dry["would_ingest"][0]["path"], second.to_str().unwrap());
     assert_eq!(snapshot(&sandbox), before);
@@ -95,7 +95,7 @@ fn once_preserves_source_gates_in_observation_and_mutating_modes() {
             .vpt()
             .args(["ingest", "--once"])
             .arg(&path)
-            .args(["--dry-run", "--json"])));
+            .args(["--preview", "--json"])));
         assert_eq!(
             dry["deferred"],
             serde_json::json!([{"path": path, "reason": reason}])
@@ -139,7 +139,7 @@ fn once_refuses_linked_nonregular_and_nested_paths_without_observational_writes(
             .vpt()
             .args(["ingest", "--once"])
             .arg(path)
-            .args(["--dry-run", "--json"]));
+            .args(["--preview", "--json"]));
         assert_eq!(result.status.code(), Some(code));
         assert!(result.stdout.is_empty());
         let error: serde_json::Value = serde_json::from_slice(&result.stderr).unwrap();

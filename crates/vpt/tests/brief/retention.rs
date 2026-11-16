@@ -37,7 +37,7 @@ fn retention_reports_brief_occasion_and_explicit_brief_regenerates_the_expired_f
     let planned = json(&support::run(sandbox.vpt().args([
         "retention",
         "run",
-        "--dry-run",
+        "--preview",
         "--json",
     ])));
     assert_eq!(planned["counts"]["briefs"], 1);
@@ -158,7 +158,7 @@ fn pipeline_retention_reports_later_store_moves_and_keeps_expired_briefs_absent(
     )
     .unwrap();
     let before = fixture::snapshot(&sandbox);
-    let plan = json(&invoke(&sandbox, &["run", "--dry-run", "--json"]));
+    let plan = json(&invoke(&sandbox, &["run", "--preview", "--json"]));
     assert_eq!(
         plan["retention"]["moved"][0]["id"],
         brief.snapshot.id.as_str()

@@ -114,7 +114,7 @@ fn missing_artifacts_name_only_stages_whose_files_exist() {
     for args in [
         vec!["show", id.as_str(), "--stage", "released", "--json"],
         vec!["show", id.as_str(), "--stage", "audio", "--json"],
-        vec!["show", id.as_str(), "--stage", "released", "--dry-run"],
+        vec!["show", id.as_str(), "--stage", "released", "--preview"],
     ] {
         let result = invoke(&sandbox, &args);
         assert_eq!(result.status.code(), Some(2), "{}", stderr(&result));

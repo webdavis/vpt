@@ -33,7 +33,7 @@ fn a_dry_run_lists_the_notes_then_a_merge_keeps_hand_set_state_and_never_writes_
         success(&invoke(&sandbox, row.id.as_str()));
     }
     let notes: Vec<_> = rows.iter().map(|row| saved(&sandbox, row)).collect();
-    let preview = success(&rename(&sandbox, &["old-topic", "new-topic", "--dry-run"]));
+    let preview = success(&rename(&sandbox, &["old-topic", "new-topic", "--preview"]));
     assert_eq!(preview["dry_run"], true);
     assert_eq!(preview["changed"], true);
     assert_eq!(preview["known_tags_changed"], true);

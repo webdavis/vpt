@@ -160,7 +160,7 @@ fn readability_change_refreshes_successful_notes_without_rerunning_engines() {
     )
     .unwrap();
     let before = fixture::snapshot(&sandbox);
-    let plan = json(&invoke(&sandbox, &["--dry-run"]));
+    let plan = json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(plan["plan"][0]["stage"], "note");
     assert_eq!(fixture::snapshot(&sandbox), before);
     let result = json(&invoke(&sandbox, &[]));

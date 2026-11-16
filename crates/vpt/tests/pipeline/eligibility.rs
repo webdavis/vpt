@@ -102,7 +102,7 @@ fn disabled_analysis_is_saved_once_and_enabling_it_is_logged_before_work() {
     analysis::enable(&sandbox);
     let before = fixture::snapshot(&sandbox);
     assert_eq!(
-        json(&invoke(&sandbox, &["--dry-run"]))["plan"][0]["stage"],
+        json(&invoke(&sandbox, &["--preview"]))["plan"][0]["stage"],
         "analyze"
     );
     assert_eq!(fixture::snapshot(&sandbox), before);

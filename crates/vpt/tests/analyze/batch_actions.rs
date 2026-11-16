@@ -27,6 +27,6 @@ fn bulk_redo_reports_no_action_counts_without_a_command_or_on_a_dry_run() {
     let result = note::success(&batch::bulk(&sandbox, &["--all"]));
     assert!(result.get("actions").is_none(), "{result}");
     actions::configure(&sandbox);
-    let result = note::success(&batch::bulk(&sandbox, &["--all", "--dry-run"]));
+    let result = note::success(&batch::bulk(&sandbox, &["--all", "--preview"]));
     assert!(result.get("actions").is_none(), "{result}");
 }

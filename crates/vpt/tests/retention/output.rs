@@ -10,7 +10,7 @@ fn output_failure_preserves_retention_completions_but_dry_run_claims_none() {
         let mut command = sandbox.vpt();
         command.args(["retention", "run", "--json"]);
         if dry {
-            command.arg("--dry-run");
+            command.arg("--preview");
         }
         let output = support::run_with_broken_stdout(&mut command, Duration::from_secs(5));
         let document = error(&output, 1, "store");

@@ -21,6 +21,9 @@ and a tip naming the closest match; under `--json`, `--toon` or `--yaml` the tip
 document's `diagnostics`. A usage error names only vpt's own commands, flags and values, never a word
 you typed, so private text stays out of it.
 
+Every command that can change something and offers to show the change first takes `--preview`, or
+`-n` for short: it shows what the command would do and changes nothing.
+
 ## Build
 
 `cargo build --locked` builds `target/debug/vpt`. The helper requires Xcode and Swift 6.
@@ -77,7 +80,7 @@ starts and one when it ends: `{"schema": "vpt.progress/1", "recording", "step", 
 "at"}`, where `step` is `transcribe` or `analyze`, `state` is `started`, `done` or `failed`, and
 `audio_secs` is the recording's length for a transcription and null otherwise. Standard output is
 unchanged. On failure the error document follows the progress lines, so under `--json` standard error
-stays one JSON object per line. Other verbs and dry runs write no progress lines.
+stays one JSON object per line. Other verbs and previews write no progress lines.
 
 ## Configuration permissions
 
@@ -122,7 +125,7 @@ refuses with exit 3 when this machine's last write is not in it:
 | `ledger_diverged` | another machine wrote it from an older copy, and this machine's last write is gone |
 
 The message names the folder, points at `vpt ledger show` and ends with `vpt ledger accept`.
-Read-only commands, dry runs included, never refuse and write nothing, the marker included: they print
+Read-only commands, previews included, never refuse and write nothing, the marker included: they print
 the same finding as one line on standard error, starting `vpt: warning: <rule>:`, and leave standard
 output as it would be. A
 higher counter that still holds this machine's last write is another machine's later write and is
@@ -161,7 +164,7 @@ that variable. Ordinary tests skip this host-dependent case.
 
 ## Ingestion and archive recovery
 
-`vpt ingest [--once <path>] [--dry-run] [--json|--toon|--yaml]` archives eligible Voice Memos recordings.
+`vpt ingest [--once <path>] [--preview] [--json|--toon|--yaml]` archives eligible Voice Memos recordings.
 A sweep considers only immediate `.m4a` files; it excludes sidecars and nested folders. `--once`
 selects one recording inside that directory and applies the same eligibility checks. The defaults
 are a 2 GiB size limit and a 30-second quiet period. Dataless iCloud entries are deferred without
@@ -176,7 +179,7 @@ the sweep, and so does a folder that disappears after vpt has ingested from it.
 
 Deferrals retain their reason and consecutive count. The fourth deferral sends one alert if an alert
 command is configured; later retries do not repeat it. `source.deferral_page_threshold` changes that
-threshold. Successful ingestion clears the deferral state. Dry runs leave files, ledger state,
+threshold. Successful ingestion clears the deferral state. Previews leave files, ledger state,
 history, hooks, and title copies untouched.
 
 A renamed source with known bytes keeps its recording identity and archive path, including after a
@@ -212,11 +215,11 @@ differently, so re-importing a converted file after an ffmpeg upgrade can create
 
 ## Transcription command
 
-`vpt transcribe <id> [--language <tag>] [--dry-run] [--json|--toon|--yaml]` runs the configured main engine
+`vpt transcribe <id> [--language <tag>] [--preview] [--json|--toon|--yaml]` runs the configured main engine
 and optional checker against a private copy of archived audio. It saves the accepted transcript
 and raw engine documents, then publishes the transcript note using the selected profile and
 readability settings. Interrupted publication resumes from saved bytes. Engine failures preserve the
-previous accepted text; note failures retain newly accepted text and leave the note pending. Dry runs report the selected engines and their locality without starting them
+previous accepted text; note failures retain newly accepted text and leave the note pending. Previews report the selected engines and their locality without starting them
 or changing files.
 
 `[engines.whisply] hf_token` holds a Hugging Face access token. When it is set, Whisply runs with
@@ -265,7 +268,7 @@ successful work. Failed publication emits no review alert. Retranscription leave
 
 ## Pipeline
 
-`vpt run [--dry-run] [--resend-refused] [--json|--toon|--yaml]` composes ingestion, transcription, note publication, stale-finding
+`vpt run [--preview] [--resend-refused] [--json|--toon|--yaml]` composes ingestion, transcription, note publication, stale-finding
 verification, configured analysis, and optional automatic redaction.
 It resumes pending or failed work in capture order, retries previously disabled incomplete stages,
 and preserves successful transcription and expired notes. Changed readability/profile settings refresh
@@ -275,7 +278,7 @@ repeat review alert.
 Mutating runs hold one write lock and recover saved publications, pending retention, and logging
 before new work. A later failure reports committed recording identities. Review alerts follow durable
 note publication; more than `[alert].aggregate_after` recordings (default three) produce one combined
-alert with class counts. Dry runs report ingestion candidates and pending stages without starting
+alert with class counts. Previews report ingestion candidates and pending stages without starting
 engines, changing files, repairing state, or invoking hooks.
 
 Enabled analysis runs after current transcript findings are rechecked. Unchanged rendered inputs and
@@ -283,7 +286,7 @@ grounding settings skip the agent. Failed analysis retries without repeating suc
 pending publication repairs accepted analysis without rerunning its agent. Expired notes stay expired,
 including when the other artifact still needs verification. When `[retention] enabled = true`, the
 pipeline runs retention after processing and includes moved files, kept files, and per-store counts
-in its result. Audio also requires `include_audio = true` and a nonzero hold time. Dry runs list the
+in its result. Audio also requires `include_audio = true` and a nonzero hold time. Previews list the
 current candidates without moving them. Startup reconciles pending moves, and a later retention
 failure preserves completed processing work. Retention ownership for later stores remains unfinished.
 Disabling analysis
@@ -564,7 +567,7 @@ refuse rewriting. Operator edits and first-write metadata survive recovery.
 
 Analysis rewrites retain saved claim content and apply matching verification resolutions. Review,
 tag, and relation updates publish both notes together; automatic updates leave expired analysis notes
-expired. The pipeline detects changes to either note, and dry runs remain observational. Publishing
+expired. The pipeline detects changes to either note, and previews remain observational. Publishing
 analysis metadata does not complete analysis whose input digest or grounding basis has changed, or
 clear a failed analysis attempt. `analyze` creates the initial analysis note.
 
@@ -580,7 +583,7 @@ publishes or repairs an artifact. Accepted brief packs and rendered text are sto
 mutating startup repairs pending brief publication and then marks the occasion briefed. Replaced
 files are preserved and recovery refuses to overwrite them.
 
-`vpt brief <occasion-id> [--dry-run|--explain] [--json|--toon|--yaml]` writes or previews a saved occasion's brief.
+`vpt brief <occasion-id> [--preview|--explain] [--json|--toon|--yaml]` writes or previews a saved occasion's brief.
 Create a manual occasion with `vpt brief --title <title> --at <RFC3339>`, optionally adding
 `--duration-minutes <minutes>`, repeated `--participant <name>`, and repeated `--tag <tag>`.
 Repeated requests preserve the original brief path and first-write metadata, including after a
@@ -590,7 +593,7 @@ Briefs select current owned transcript notes using confirmed terms, tags, and re
 accepted transcript text and retain recording/timecode provenance and uncertainty. Missing or expired
 transcripts supply no evidence; unaccepted changes to managed transcript content refuse the request.
 `--json` emits `vpt.brief/1`; `--explain` includes selection decisions and omission counts. Both
-`--dry-run` and `--explain` leave stores, ledger, and history unchanged.
+`--preview` and `--explain` leave stores, ledger, and history unchanged.
 
 With `context.type = none`, both context halves are disabled. `context.type = dam` reads the selected
 `context.calendars` and `context.projects` through the configured `context.dam.command` (default
@@ -648,7 +651,7 @@ Requested briefs emit no automatic notification.
 
 ## Analysis
 
-`vpt analyze <id> [--dry-run] [--resend-refused] [--json|--toon|--yaml]` uses the configured `[analysis] command` argument list.
+`vpt analyze <id> [--preview] [--resend-refused] [--json|--toon|--yaml]` uses the configured `[analysis] command` argument list.
 An empty command disables analysis and explicit invocation returns a configuration error. No model
 vendor is built in. The command receives `{transcript}`, `{id}`, `{language}`, `{captured_at}`,
 `{known_tags}`, and `{refused_tags}` substitutions and exact rendered transcript content on stdin; the
@@ -668,16 +671,16 @@ entry, without a marker, so that it stays within 64 KiB and the expanded command
 never reach stdin, so a tag change does not change the recorded input digest or make `run` redo a
 summary. A command without either placeholder runs exactly as before.
 
-`vpt analyze --all [--since <RFC3339>] [--dry-run]` reruns analysis for every recording with an
+`vpt analyze --all [--since <RFC3339>] [--preview]` reruns analysis for every recording with an
 accepted transcript, in capture order; `--since` keeps those captured at or after the time.
-`vpt analyze --stdin [--dry-run]` reads one recording id per line instead, so `vpt list` or
+`vpt analyze --stdin [--preview]` reads one recording id per line instead, so `vpt list` or
 `vpt search` output can choose the set. Both rerun the command even when the saved analysis is current,
 so a changed prompt reaches old recordings, and both carry on past a recording that fails. The result
 lists each recording with `summary_changed`, `tags_added` and `tags_removed` counts; tag names stay out
 of it. When any recording fails, the error document names the failed ids in `ids`, the finished ones
 in `completed`, and each failure's kind and message in `diagnostics`. A redo drops tags and related
 links an earlier proposal added automatically when the new proposal omits them; hand-set tags and
-decisions stay. `--dry-run` lists the recordings
+decisions stay. `--preview` lists the recordings
 without starting the command.
 
 An action may name whose it is with `owner`: `"me"` when the speaker will do it, `{"other": "Dana"}`
@@ -719,7 +722,7 @@ private tag text. A proposed tag that `vpt tag rename` renamed away, by key, bec
 following chains, and logs `tag_renamed` with its proposal index; confirming the old name by hand on
 any recording ends that rename's effect. Related suggestions use indexed names/aliases or recording identities, preserve
 provenance, and respect the configured cap. Manual tag and relation decisions survive later proposals.
-Dry runs render an input plan without starting an agent or creating notes, logs, or directories.
+Previews render an input plan without starting an agent or creating notes, logs, or directories.
 Transcript, lexical, or claim changes invalidate saved findings and remove them from active review counts.
 Note rewrites check claim freshness before rendering counts, including when readability settings change.
 Note rewrites remove stale analysis annotations. Rechecking with `verify-note` or `analyze` retains
@@ -934,7 +937,7 @@ command failed`, counts it as failed, and the next run tries again. If `withdraw
 while withdrawals wait, they wait until it is set again. If a redo holds the id again before the
 withdrawal succeeds, vpt sends the action again instead. As with sends, if vpt stops between the
 command's exit and saving the result, the next run withdraws the action again, so the command must
-accept a repeat. Dry runs withdraw nothing.
+accept a repeat. Previews withdraw nothing.
 
 An id comes from the action's start time and its order within that second, so when a redo drops the
 first of two actions that start in the same second, the second action takes the first one's id. Your
@@ -958,9 +961,9 @@ After you change the rule, `--resend-refused` sends the refused actions again on
 analysis command, and `vpt run --resend-refused` sends every recording's refused actions with the
 rest of the run. Each refused action goes through the command once more and is counted as usual. If
 the command refuses it again, it stays refused. Without `[actions] command` the flag is refused with
-exit 2. With `--dry-run` it sends nothing and changes nothing.
+exit 2. With `--preview` it sends nothing and changes nothing.
 A send counts once the command exits 0. If vpt stops between that exit and saving the result, the
-next run sends the action again, so the command must accept a repeat. Dry runs send nothing.
+next run sends the action again, so the command must accept a repeat. Previews send nothing.
 
 When the command is set, the result of `vpt analyze <id>` and of `vpt run` carries `"actions":
 {"sent", "failed", "refused"}` counts, and a `"withdrawn"` count as well when `withdraw_command` is
@@ -1028,7 +1031,7 @@ retaining operator tags and the global vocabulary. Expired notes remain expired;
 can regenerate them. Tag state, note bytes, and pending vocabulary bytes commit together, and startup
 recovery completes interrupted publication while preserving operator edits.
 
-`vpt tag rename <old> <new> [--dry-run] [--json|--toon|--yaml]` renames one tag everywhere vpt owns
+`vpt tag rename <old> <new> [--preview] [--json|--toon|--yaml]` renames one tag everywhere vpt owns
 it: the saved tag state of every recording, the transcript and analysis notes, and `known-tags.txt`.
 The ledger remembers the rename. Case and separator variants of `<old>` match. When a recording
 already carries `<new>`, the two merge into one entry; a hand-set state beats one a summary set, and
@@ -1037,7 +1040,7 @@ A recording that fails is listed in the error's `ids`, the others still change, 
 non-zero, and running the same command again finishes the rename. Brief notes are not renamed,
 because a brief's tags are its meeting's labels and the next brief would restore them; the result
 counts briefs that carry `<old>` as `untouched_briefs`. Expired notes and notes vpt did not create stay
-untouched, and `untouched_notes` counts the other indexed notes that still carry `<old>`. `--dry-run` lists the notes it would rewrite and changes nothing. A tag nothing carries
+untouched, and `untouched_notes` counts the other indexed notes that still carry `<old>`. `--preview` lists the notes it would rewrite and changes nothing. A tag nothing carries
 exits 0 with nothing changed; a malformed name, a missing name, or two names that normalize to the
 same tag exit 2.
 
@@ -1074,7 +1077,7 @@ filename collision. Private mask mappings stay in the mode-0600 report under `dr
 `[share] automatic = true` enables release creation during `run`, independently of analysis. The
 transcript is released before analysis runs; analysis is released after its publication and verification.
 Previously finalized matching content in the configured destination is skipped on subsequent runs.
-Interrupted copy/report publication is recovered from saved bytes before new work. `run --dry-run`
+Interrupted copy/report publication is recovered from saved bytes before new work. `run --preview`
 reports pending redaction without creating files or changing release history.
 
 ## Searching transcripts and analysis
@@ -1140,7 +1143,7 @@ History is saved in the private ledger before export to `events.jsonl` or hook d
 hook failures add a safe warning and preserve the operation's result. A later mutating command repairs
 an incomplete final log line, replays pending records with their original identifiers and occurrence
 times, and summarizes the saved recovery evidence. It does not resend hooks or repeat completed work.
-Dry runs leave history and logs unchanged.
+Previews leave history and logs unchanged.
 
 Ledger-backed commands record a `config_refused` alert when store creation fails after the state
 directory has been validated and locked. Configuration failures before root validation use command

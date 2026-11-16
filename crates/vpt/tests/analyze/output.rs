@@ -9,7 +9,7 @@ fn output_failure_preserves_analysis_and_dry_run_claims_no_commits() {
         let mut command = sandbox.vpt();
         command.args(["analyze", record.id.as_str(), "--json"]);
         if dry {
-            command.arg("--dry-run");
+            command.arg("--preview");
         }
         let output = support::run_with_broken_stdout(&mut command, Duration::from_secs(5));
         assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));

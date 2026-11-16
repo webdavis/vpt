@@ -41,7 +41,7 @@ fn assert_refused_store(fail_delivery: bool) {
     }
     fs::set_permissions(&parent, fs::Permissions::from_mode(0o500)).unwrap();
     let before = snapshot(&sandbox);
-    let dry = run(sandbox.vpt().args(["ingest", "--dry-run", "--json"]));
+    let dry = run(sandbox.vpt().args(["ingest", "--preview", "--json"]));
     assert_eq!(dry.status.code(), Some(0), "{}", stderr(&dry));
     assert_eq!(snapshot(&sandbox), before);
     let output = run(sandbox.vpt().args(["ingest", "--json"]));

@@ -52,7 +52,7 @@ fn real_expiration_stays_terminal_and_explicit_note_restores_saved_render_inputs
     assert_eq!(expired.stages.note, StageState::Expired);
     assert_eq!(expired.stages.analysis, StageState::Expired);
     let before = fixture::snapshot(&sandbox);
-    let plan = json(&invoke(&sandbox, &["--dry-run"]));
+    let plan = json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(plan["plan"], serde_json::json!([]));
     assert_eq!(fixture::snapshot(&sandbox), before);
     let again = json(&invoke(&sandbox, &[]));

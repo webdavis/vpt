@@ -71,7 +71,7 @@ fn ingestion_dry_run_leaves_pending_retention_and_logs_untouched() {
     pending_retention(&sandbox);
     add(&sandbox, "new.m4a");
     let before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["ingest", "--dry-run", "--json"])));
+    json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
     assert_eq!(snapshot(&sandbox), before);
 }
 

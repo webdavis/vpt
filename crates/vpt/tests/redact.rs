@@ -128,7 +128,7 @@ fn redact_rejects_unsupported_options_and_private_values_stay_out_of_usage_error
     for extra in [
         vec!["--stage", "brief"],
         vec!["--stage", "audio"],
-        vec!["--dry-run"],
+        vec!["--preview"],
         vec!["--title", "Private title", "--title", "Private other"],
         vec!["--to"],
     ] {

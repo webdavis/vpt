@@ -18,7 +18,7 @@ fn missing_recordings_folder_means_nothing_to_ingest() {
         let mut command = sandbox.vpt();
         command.args(["ingest", "--json"]);
         if dry_run {
-            command.arg("--dry-run");
+            command.arg("--preview");
         }
         let doc = json(&run(&mut command));
         assert_eq!(doc["ingested"], serde_json::json!([]));

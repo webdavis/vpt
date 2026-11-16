@@ -48,7 +48,7 @@ fn stdin_with_only_good_ids_succeeds_in_the_given_order() {
     let result = note::success(&piped(&sandbox, &input, &[]));
     assert_eq!(result["recordings"][0]["id"], rows[1].id.as_str());
     assert_eq!(result["recordings"][1]["id"], rows[0].id.as_str());
-    let planned = note::success(&piped(&sandbox, &input, &["--dry-run"]));
+    let planned = note::success(&piped(&sandbox, &input, &["--preview"]));
     assert_eq!(planned["recordings"][0]["status"], "planned");
     assert_eq!(calls(&sandbox).len(), 2);
 }

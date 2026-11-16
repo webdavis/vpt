@@ -126,7 +126,7 @@ fn dry_run_preserves_pending_engine_output_and_saved_state() {
     let (target, _) = seed_output(&sandbox);
     add(&sandbox, "new.m4a");
     let before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["ingest", "--dry-run", "--json"])));
+    json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
     assert_eq!(snapshot(&sandbox), before);
     assert!(!target.exists());
 }
@@ -145,7 +145,7 @@ fn retention_repairs_engine_outputs_before_new_work_but_its_dry_run_does_not() {
     json(&run(sandbox.vpt().args([
         "retention",
         "run",
-        "--dry-run",
+        "--preview",
         "--json",
     ])));
     assert_eq!(snapshot(&sandbox), before);

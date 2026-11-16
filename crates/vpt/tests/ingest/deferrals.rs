@@ -79,7 +79,7 @@ fn persistent_deferrals_alert_once_at_default_and_custom_threshold_then_recover(
             1
         );
         let before = snapshot(&sandbox);
-        json(&run(sandbox.vpt().args(["ingest", "--dry-run", "--json"])));
+        json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
         assert_eq!(snapshot(&sandbox), before);
         fs::write(&path, m4a(1_787_604_456, 12, b"repaired audio")).unwrap();
         fs::File::open(&path)

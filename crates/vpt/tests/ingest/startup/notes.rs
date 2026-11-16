@@ -98,7 +98,7 @@ fn dry_run_does_not_publish_pending_notes_or_change_saved_state() {
     let sandbox = configured();
     let note = seed_note(&sandbox);
     let before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["ingest", "--dry-run", "--json"])));
+    json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
     assert!(!note.target.exists());
     assert_eq!(snapshot(&sandbox), before);
 }

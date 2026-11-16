@@ -94,7 +94,7 @@ fn enabled_run_analyzes_after_transcription_and_skips_unchanged_inputs() {
     );
     let before = fixture::snapshot(&sandbox);
     assert_eq!(
-        json(&invoke(&sandbox, &["--dry-run"]))["plan"],
+        json(&invoke(&sandbox, &["--preview"]))["plan"],
         serde_json::json!([])
     );
     assert_eq!(fixture::snapshot(&sandbox), before);
@@ -130,7 +130,7 @@ fn analysis_failure_preserves_transcription_and_retries_without_the_engine() {
     fs::write(proposal, valid).unwrap();
     let before = fixture::snapshot(&sandbox);
     assert_eq!(
-        json(&invoke(&sandbox, &["--dry-run"]))["plan"][0]["stage"],
+        json(&invoke(&sandbox, &["--preview"]))["plan"][0]["stage"],
         "analyze"
     );
     assert_eq!(fixture::snapshot(&sandbox), before);

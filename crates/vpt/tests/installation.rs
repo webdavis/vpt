@@ -86,7 +86,7 @@ fn installed_command_and_whisply_engines_work_without_helper_and_scheduled_runs_
         let source = runtime::add_audio(&sandbox);
         let original = std::fs::read(&source).unwrap();
         let before = fixture::snapshot(&sandbox);
-        let plan = json(&runtime::invoke(&sandbox, &["run", "--dry-run", "--json"]));
+        let plan = json(&runtime::invoke(&sandbox, &["run", "--preview", "--json"]));
         assert_eq!(plan["would_ingest"].as_array().unwrap().len(), 1);
         assert_eq!(fixture::snapshot(&sandbox), before);
         let first = json(&runtime::invoke(&sandbox, &["run", "--json"]));

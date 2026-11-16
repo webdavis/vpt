@@ -146,7 +146,7 @@ fn occasion_path_usage_and_missing_pin_are_observational() {
             "brief",
         ],
         vec!["path", "--occasion", "--stage", "brief"],
-        vec!["occasions", "--dry-run"],
+        vec!["occasions", "--preview"],
     ] {
         let output = invoke(&sandbox, &args);
         assert_eq!(

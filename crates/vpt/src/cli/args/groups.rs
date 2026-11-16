@@ -10,7 +10,7 @@ pub(super) enum Tag {
         /// Its new name.
         new: PrivateText,
         /// Show what would change without changing anything.
-        #[arg(long)]
+        #[arg(long = "preview", short = 'n')]
         dry_run: bool,
     },
 }
@@ -31,7 +31,7 @@ pub(super) enum Retention {
     #[command(after_long_help = examples::RETENTION_RUN)]
     Run {
         /// Show what would be removed without removing anything.
-        #[arg(long)]
+        #[arg(long = "preview", short = 'n')]
         dry_run: bool,
     },
 }

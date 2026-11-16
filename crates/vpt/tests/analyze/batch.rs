@@ -163,7 +163,7 @@ fn a_dry_run_lists_the_recordings_without_starting_an_agent() {
     bulk_agent(&sandbox);
     propose(&sandbox, "words", &[]);
     let before = fixture::snapshot(&sandbox);
-    let result = note::success(&bulk(&sandbox, &["--all", "--dry-run"]));
+    let result = note::success(&bulk(&sandbox, &["--all", "--preview"]));
     assert_eq!(result["dry_run"], true);
     assert_eq!(
         result["recordings"],

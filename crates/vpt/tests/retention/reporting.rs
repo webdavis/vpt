@@ -29,7 +29,7 @@ fn hook_failure_warns_without_changing_the_completed_move() {
 fn human_dry_run_describes_proposed_moves() {
     let sandbox = configured(true);
     let row = expired_audio(&sandbox);
-    let output = run(sandbox.vpt().args(["retention", "run", "--dry-run"]));
+    let output = run(sandbox.vpt().args(["retention", "run", "--preview"]));
     assert_eq!(output.status.code(), Some(0));
     assert!(stdout(&output).contains("Would move 1 file(s)"));
     assert!(stdout(&output).contains(row.audio_path.to_str().unwrap()));

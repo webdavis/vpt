@@ -71,7 +71,7 @@ fn dry_run_with_absent_state_is_observational_and_reports_candidates() {
     let sandbox = configured();
     let path = add(&sandbox, "a.m4a");
     let before = snapshot(&sandbox);
-    let doc = json(&run(sandbox.vpt().args(["ingest", "--dry-run", "--json"])));
+    let doc = json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
     assert_eq!(doc["command"], "ingest");
     assert_eq!(doc["would_ingest"][0]["path"], path.to_str().unwrap());
     assert_eq!(doc["would_ingest"][0]["title_source"], "unavailable");
@@ -103,7 +103,7 @@ fn once_dry_run_refuses_an_escaped_source() {
     let before = snapshot(&sandbox);
     let output = run(sandbox
         .vpt()
-        .args(["ingest", "--dry-run", "--json", "--once"])
+        .args(["ingest", "--preview", "--json", "--once"])
         .arg(outside));
     assert_eq!(output.status.code(), Some(3));
     assert!(output.stdout.is_empty());

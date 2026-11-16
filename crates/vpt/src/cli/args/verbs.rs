@@ -39,7 +39,7 @@ pub(super) enum Command {
     #[command(after_long_help = examples::INGEST)]
     Ingest {
         /// Show what would happen without changing anything.
-        #[arg(long)]
+        #[arg(long = "preview", short = 'n')]
         dry_run: bool,
         /// Archive only this one recording file.
         #[arg(long, value_name = "PATH")]

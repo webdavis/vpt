@@ -9,7 +9,7 @@ fn output_failure_preserves_accepted_transcription_and_note_without_private_text
         let mut command = sandbox.vpt();
         command.args(["transcribe", row.id.as_str(), "--json"]);
         if dry {
-            command.arg("--dry-run");
+            command.arg("--preview");
         }
         let output = support::run_with_broken_stdout(&mut command, Duration::from_secs(5));
         assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));

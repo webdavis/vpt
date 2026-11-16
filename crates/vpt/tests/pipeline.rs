@@ -117,7 +117,7 @@ fn dry_run_with_absent_state_is_observational_and_reports_ingestion_candidates()
     let sandbox = configured();
     let source = add(&sandbox, "one.m4a", 1_787_604_456);
     let before = fixture::snapshot(&sandbox);
-    let result = json(&invoke(&sandbox, &["--dry-run"]));
+    let result = json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(result["command"], "run");
     assert_eq!(result["dry_run"], true);
     assert_eq!(result["would_ingest"][0]["path"], source.to_str().unwrap());
@@ -184,7 +184,7 @@ fn pending_note_resumes_without_audio_or_an_engine_and_expired_notes_stay_expire
     fs::remove_file(sandbox.path().join("bin/engine")).unwrap();
     sql(&sandbox, "UPDATE recordings SET stage_note='pending'");
     let before = fixture::snapshot(&sandbox);
-    let plan = json(&invoke(&sandbox, &["--dry-run"]));
+    let plan = json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(plan["plan"][0]["stage"], "note");
     assert_eq!(fixture::snapshot(&sandbox), before);
     let result = json(&invoke(&sandbox, &[]));
@@ -263,7 +263,7 @@ fn pipeline_publishes_and_saves_the_immediate_continuation_link() {
         vpt_domain::relations::Target::Recording(rows[0].id.clone())
     );
     let before = fixture::snapshot(&sandbox);
-    json(&invoke(&sandbox, &["--dry-run"]));
+    json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(fixture::snapshot(&sandbox), before);
 }
 

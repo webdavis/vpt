@@ -140,7 +140,7 @@ fn invocation_language_selects_the_override_pair_and_reports_configured_locality
     let plan = json(&run(
         &sandbox,
         row.id.as_str(),
-        &["--language", "ja-JP", "--dry-run"],
+        &["--language", "ja-JP", "--preview"],
     ));
     assert_eq!(plan["language"], "ja-JP");
     assert_eq!(plan["engines"].as_array().unwrap().len(), 1);
@@ -177,7 +177,7 @@ fn matching_families_require_explicit_opt_in_before_either_engine_starts() {
     let (sandbox, row) = configured();
     pair_fixture::configure(&sandbox, "always", true, "");
     let before = fixture::snapshot(&sandbox);
-    for args in [vec![], vec!["--dry-run"]] {
+    for args in [vec![], vec!["--preview"]] {
         let output = run(&sandbox, row.id.as_str(), &args);
         assert_eq!(output.status.code(), Some(3));
         for name in ["primary", "secondary", "shared"] {
