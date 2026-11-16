@@ -2,6 +2,8 @@
 mod active_writer;
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
+#[path = "show_list_storage/list_terminal.rs"]
+mod list_terminal;
 #[allow(
     dead_code,
     reason = "shared integration support serves other test targets"
