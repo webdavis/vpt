@@ -97,7 +97,7 @@ fn lexical_confirmation_refreshes_inherited_uncertainty_once_without_retranscrib
     );
     assert!(!input.review.stale_findings.is_empty());
     let snapshot = fixture::snapshot(&sandbox);
-    json(&invoke(&sandbox, &["--dry-run"]));
+    json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(fixture::snapshot(&sandbox), snapshot);
     let refreshed = json(&invoke(&sandbox, &[]));
     assert_eq!(

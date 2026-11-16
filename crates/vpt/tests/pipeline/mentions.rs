@@ -35,7 +35,7 @@ fn changed_index_refreshes_mentions_without_engines_and_dry_run_is_observational
     .unwrap();
     fs::remove_file(sandbox.path().join("bin/engine")).unwrap();
     let before = fixture::snapshot(&sandbox);
-    let planned = json(&invoke(&sandbox, &["--dry-run"]));
+    let planned = json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(
         planned["plan"],
         serde_json::json!([{"id":row.id.as_str(), "stage":"note"}])

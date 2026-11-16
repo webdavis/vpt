@@ -115,7 +115,7 @@ fn dry_run_leaves_pending_terms_untouched_and_retention_startup_recovers_them() 
     let output = support::run_with_budget(
         sandbox
             .vpt()
-            .args(["retention", "run", "--dry-run", "--json"]),
+            .args(["retention", "run", "--preview", "--json"]),
         std::time::Duration::from_secs(5),
     );
     success(&output);

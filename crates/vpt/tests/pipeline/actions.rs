@@ -31,7 +31,7 @@ fn run_retries_a_failed_action_send_once_the_command_works_and_never_resends() {
     );
     assert!(!log.exists());
     fs::remove_file(log.with_extension("fail")).unwrap();
-    json(&invoke(&sandbox, &["--dry-run"]));
+    json(&invoke(&sandbox, &["--preview"]));
     assert!(!log.exists());
     for sent in [1, 0] {
         let result = json(&invoke(&sandbox, &[]));

@@ -83,7 +83,7 @@ fn invoke(sandbox: &Sandbox, id: &str, dry: bool) -> std::process::Output {
     let mut command = sandbox.vpt();
     command.args(["analyze", id, "--json"]);
     if dry {
-        command.arg("--dry-run");
+        command.arg("--preview");
     }
     support::run_with_budget(&mut command, Duration::from_secs(5))
 }

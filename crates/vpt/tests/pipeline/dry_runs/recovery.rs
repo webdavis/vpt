@@ -65,7 +65,7 @@ fn every_dry_run_preserves_pending_recovery_and_ignores_the_write_lock() {
         assert_preview(&sandbox, verb, record.id.as_str(), &[0]);
     }
     let occasion = brief["occasion"]["id"].as_str().unwrap();
-    for flag in ["--dry-run", "--explain"] {
+    for flag in ["--preview", "--explain"] {
         for structured in [true, false] {
             let before = fixture::snapshot(&sandbox);
             let mut command = sandbox.vpt();

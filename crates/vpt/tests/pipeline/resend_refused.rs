@@ -35,7 +35,7 @@ fn run_resends_every_refused_action_once_only_with_the_flag() {
     );
     fs::remove_file(log.with_extension("fail")).unwrap();
     json(&invoke(&sandbox, &[]));
-    json(&invoke(&sandbox, &["--resend-refused", "--dry-run"]));
+    json(&invoke(&sandbox, &["--resend-refused", "--preview"]));
     assert_eq!(attempts(&log), 1);
     for sent in [1, 0] {
         let result = json(&invoke(&sandbox, &["--resend-refused"]));

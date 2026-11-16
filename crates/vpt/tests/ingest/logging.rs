@@ -70,7 +70,7 @@ fn failed_export_and_hook_recover_persisted_history_without_repeating_notificati
     );
 
     let snapshot_before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["ingest", "--dry-run", "--json"])));
+    json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
     assert_eq!(snapshot(&sandbox), snapshot_before);
     fs::rename(&log, sandbox.path().join("held-log-directory")).unwrap();
     let first_record = &before.records[0];

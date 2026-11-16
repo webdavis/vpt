@@ -2,7 +2,7 @@ use super::*;
 #[test]
 fn broken_stdout_preserves_the_published_occasion_identity() {
     let sandbox = fixture::configured("brief-broken-output");
-    let result = json(&invoke(&sandbox, &manual(&["--dry-run"])));
+    let result = json(&invoke(&sandbox, &manual(&["--preview"])));
     let id = result["occasion"]["id"].as_str().unwrap();
     let output = support::run_with_broken_stdout(
         sandbox.vpt().args(manual(&[])),

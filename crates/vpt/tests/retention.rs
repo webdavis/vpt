@@ -59,7 +59,7 @@ fn dry_run_with_absent_state_creates_nothing() {
     let doc = json(&run(sandbox.vpt().args([
         "retention",
         "run",
-        "--dry-run",
+        "--preview",
         "--json",
     ])));
     assert_eq!(doc["command"], "retention run");
@@ -78,7 +78,7 @@ fn dry_run_reports_candidates_while_write_lock_is_held_without_changes() {
     let doc = json(&run(sandbox.vpt().args([
         "retention",
         "run",
-        "--dry-run",
+        "--preview",
         "--json",
     ])));
     assert_eq!(doc["moved"][0]["path"], row.audio_path.to_str().unwrap());

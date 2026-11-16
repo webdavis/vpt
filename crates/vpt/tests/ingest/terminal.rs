@@ -55,11 +55,11 @@ fn a_dry_run_at_a_terminal_lists_each_file_it_would_ingest() {
     let sandbox = configured();
     let path = add(&sandbox, "a.m4a");
     assert_eq!(
-        shown(&sandbox, &["--dry-run"]),
+        shown(&sandbox, &["--preview"]),
         format!("  · {}: would ingest\n", path.display())
     );
     assert_eq!(
-        piped(&sandbox, &["--dry-run"]),
+        piped(&sandbox, &["--preview"]),
         format!(
             "Would ingest 1 recording(s); deferred 0; skipped 0\n{}\n",
             path.display()
@@ -67,8 +67,8 @@ fn a_dry_run_at_a_terminal_lists_each_file_it_would_ingest() {
     );
     for format in ["--json", "--toon", "--yaml"] {
         assert_eq!(
-            shown(&sandbox, &["--dry-run", format]),
-            piped(&sandbox, &["--dry-run", format]),
+            shown(&sandbox, &["--preview", format]),
+            piped(&sandbox, &["--preview", format]),
             "{format}"
         );
     }

@@ -63,17 +63,17 @@ fn a_dry_run_at_a_terminal_says_what_it_would_do_and_leaves_machine_output_alone
     agent(&sandbox, "");
     let id = record.id.as_str();
     assert_eq!(
-        shown(&sandbox, &[id, "--dry-run"]),
+        shown(&sandbox, &[id, "--preview"]),
         format!("  · {id}: would analyze and publish its analysis note\n")
     );
     assert_eq!(
-        piped(&sandbox, &[id, "--dry-run"]),
+        piped(&sandbox, &[id, "--preview"]),
         format!("Would analyze {id} and publish its analysis note\n")
     );
     for format in ["--json", "--toon", "--yaml"] {
         assert_eq!(
-            shown(&sandbox, &[id, "--dry-run", format]),
-            piped(&sandbox, &[id, "--dry-run", format]),
+            shown(&sandbox, &[id, "--preview", format]),
+            piped(&sandbox, &[id, "--preview", format]),
             "{format}"
         );
     }
@@ -86,11 +86,11 @@ fn analyze_all_at_a_terminal_gives_each_recording_one_row() {
     propose(&sandbox, "words", &["alpha"]);
     let [one, two] = [&rows[0].id, &rows[1].id];
     assert_eq!(
-        shown(&sandbox, &["--all", "--dry-run"]),
+        shown(&sandbox, &["--all", "--preview"]),
         format!("  · {one}: would analyze\n  · {two}: would analyze\n")
     );
     assert_eq!(
-        piped(&sandbox, &["--all", "--dry-run"]),
+        piped(&sandbox, &["--all", "--preview"]),
         format!("Would analyze {one}\nWould analyze {two}\n")
     );
     assert_eq!(

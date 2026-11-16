@@ -74,7 +74,7 @@ fn a_command_that_still_refuses_leaves_the_actions_refused() {
 fn a_dry_run_with_the_flag_sends_nothing_and_keeps_the_actions_refused() {
     let (sandbox, id, log) = refused();
     fs::remove_file(log.with_extension("fail")).unwrap();
-    note::success(&resend(&sandbox, &id, &["--dry-run"]));
+    note::success(&resend(&sandbox, &id, &["--preview"]));
     note::success(&invoke(&sandbox, &id, false));
     assert_eq!(attempts(&log), 4);
 }
@@ -83,7 +83,7 @@ fn a_dry_run_with_the_flag_sends_nothing_and_keeps_the_actions_refused() {
 fn the_flag_without_an_actions_command_is_an_input_error() {
     let (sandbox, record) = note::configured();
     agent(&sandbox, "");
-    for extra in [&[][..], &["--dry-run"]] {
+    for extra in [&[][..], &["--preview"]] {
         let output = resend(&sandbox, record.id.as_str(), extra);
         assert_eq!(output.status.code(), Some(2));
         assert!(stderr(&output).contains("--resend-refused requires [actions] command"));

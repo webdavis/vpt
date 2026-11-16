@@ -16,7 +16,7 @@ pub(super) struct Args {
     )]
     id: Option<String>,
     /// Show what would happen without changing anything.
-    #[arg(long)]
+    #[arg(long = "preview", short = 'n')]
     dry_run: bool,
     /// Send actions the action command refused before.
     #[arg(long, conflicts_with_all = ["all", "stdin"])]

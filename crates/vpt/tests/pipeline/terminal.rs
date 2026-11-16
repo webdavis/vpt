@@ -67,11 +67,11 @@ fn a_dry_run_at_a_terminal_lists_what_it_would_do_and_leaves_machine_output_alon
     let sandbox = configured();
     let source = add(&sandbox, "one.m4a", 1_787_604_456);
     assert_eq!(
-        shown(&sandbox, &["--dry-run"]),
+        shown(&sandbox, &["--preview"]),
         format!("  · {}: would ingest\n", source.display())
     );
     assert_eq!(
-        piped(&sandbox, &["--dry-run"]),
+        piped(&sandbox, &["--preview"]),
         format!(
             "Run plan: 1 ingested, 0 transcribed, 0 notes, 0 analyzed, 0 released\n\
              Would ingest {}\nWould move 0 file(s); kept 0\n",
@@ -80,8 +80,8 @@ fn a_dry_run_at_a_terminal_lists_what_it_would_do_and_leaves_machine_output_alon
     );
     for format in ["--json", "--toon", "--yaml"] {
         assert_eq!(
-            shown(&sandbox, &["--dry-run", format]),
-            piped(&sandbox, &["--dry-run", format]),
+            shown(&sandbox, &["--preview", format]),
+            piped(&sandbox, &["--preview", format]),
             "{format}"
         );
     }

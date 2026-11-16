@@ -134,7 +134,7 @@ it.
 
 Source files in the Voice Memos container are opened only through VPT's read-only file handles. SQLite
 receives the private destination directory, never the source pathname. Preserve the fixed copied files,
-their private permissions and the rule that a dry run does not refresh or open title databases.
+their private permissions and the rule that a preview does not refresh or open title databases.
 
 Drop the previous title-copy connection before refreshing its files. Refresh must have exclusive access
 to the private copy while truncating and copying; retained title-copy readers prevent refresh until they

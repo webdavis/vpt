@@ -109,7 +109,7 @@ fn orphan_recovery_preserves_archived_offset_with_or_without_a_surviving_source(
             fs::remove_file(&source).unwrap();
         }
         let before = snapshot(&sandbox);
-        let preview = json(&run(sandbox.vpt().args(["ingest", "--dry-run", "--json"])));
+        let preview = json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
         assert_eq!(preview["recovered"], serde_json::json!([]));
         assert_eq!(snapshot(&sandbox), before);
         let result = json(&run(sandbox

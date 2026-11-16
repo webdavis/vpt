@@ -23,7 +23,7 @@ fn configured(calendar_failure: bool) -> Sandbox {
 fn dry_run_collects_scoped_context_without_writing_state_or_stores() {
     let sandbox = configured(false);
     let before = fixture::snapshot(&sandbox);
-    let result = json(&invoke(&sandbox, &manual(&["--dry-run"])));
+    let result = json(&invoke(&sandbox, &manual(&["--preview"])));
     assert_eq!(result["context"]["calendar"]["status"], "present");
     assert_eq!(result["context"]["tasks"]["status"], "present");
     assert_eq!(
@@ -105,7 +105,7 @@ fn stale_dam_calendar_names_the_staleness_for_manual_and_upcoming_briefs() {
         format!("{config}[context.dam]\nmax_age=['gcal=15m']\n[brief.trigger]\nenabled=true\n"),
     )
     .unwrap();
-    let result = json(&invoke(&sandbox, &manual(&["--dry-run"])));
+    let result = json(&invoke(&sandbox, &manual(&["--preview"])));
     assert_eq!(result["context"]["calendar"]["reason"], "failed");
     assert!(
         result["context"]["calendar"]["detail"]

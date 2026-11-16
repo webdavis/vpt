@@ -11,7 +11,7 @@ fn automatic_sharing_without_analysis_releases_once_and_dry_run_is_observational
     add(&sandbox, "one.m4a", 1_787_604_456);
     let before = fixture::snapshot(&sandbox);
     assert_eq!(
-        json(&invoke(&sandbox, &["--dry-run"]))["redacted"],
+        json(&invoke(&sandbox, &["--preview"]))["redacted"],
         serde_json::json!([])
     );
     assert_eq!(fixture::snapshot(&sandbox), before);
@@ -122,7 +122,7 @@ fn sharing_plan_is_observational_and_human_run_lists_surviving_candidates() {
     json(&invoke(&sandbox, &[]));
     enable(&sandbox);
     let before = fixture::snapshot(&sandbox);
-    let plan = json(&invoke(&sandbox, &["--dry-run"]));
+    let plan = json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(plan["plan"][0]["stage"], "redact_transcript");
     assert_eq!(fixture::snapshot(&sandbox), before);
     let output =
@@ -132,7 +132,7 @@ fn sharing_plan_is_observational_and_human_run_lists_surviving_candidates() {
     assert!(stdout(&output).contains("Candidate, line"));
     assert!(stdout(&output).contains("Candidate"));
     assert_eq!(
-        json(&invoke(&sandbox, &["--dry-run"]))["plan"],
+        json(&invoke(&sandbox, &["--preview"]))["plan"],
         serde_json::json!([])
     );
 }

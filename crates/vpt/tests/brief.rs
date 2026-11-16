@@ -60,7 +60,7 @@ fn json(output: &std::process::Output) -> serde_json::Value {
 fn manual_preview_and_explain_are_observational_with_an_absent_ledger() {
     let sandbox = fixture::configured("brief-preview");
     let before = fixture::snapshot(&sandbox);
-    for mode in ["--dry-run", "--explain"] {
+    for mode in ["--preview", "--explain"] {
         let result = json(&invoke(&sandbox, &manual(&[mode])));
         assert_eq!(result["schema"], "vpt.brief/1");
         assert_eq!(result["occasion"]["title"], "Private planning");

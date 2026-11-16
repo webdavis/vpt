@@ -3,7 +3,7 @@ use super::Verb;
 #[derive(clap::Args)]
 pub(super) struct Run {
     /// Show what would happen without changing anything.
-    #[arg(long)]
+    #[arg(long = "preview", short = 'n')]
     dry_run: bool,
     /// Send actions the action command refused before.
     #[arg(long)]
@@ -18,7 +18,7 @@ pub(super) struct Transcribe {
     #[arg(long)]
     language: Option<String>,
     /// Show what would happen without changing anything.
-    #[arg(long)]
+    #[arg(long = "preview", short = 'n')]
     dry_run: bool,
 }
 

@@ -3,6 +3,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 mod analyze;
 mod confirm;
+mod preview;
 mod privacy;
 mod relation;
 mod verify;
@@ -20,7 +21,7 @@ const UNKNOWN_FLAG: &str =
 
 #[test]
 fn json_and_config_are_global_flags_in_any_position() {
-    let invocation = parsed("ingest --json --config /tmp/c.toml --dry-run").expect("parsed");
+    let invocation = parsed("ingest --json --config /tmp/c.toml --preview").expect("parsed");
     assert_eq!(invocation.format, Some(Format::Json));
     assert_eq!(invocation.config, Some(PathBuf::from("/tmp/c.toml")));
     assert_eq!(
@@ -133,7 +134,7 @@ fn every_stage_one_verb_decodes_its_arguments() {
         ("storage", Verb::Storage),
         ("retention run", Verb::RetentionRun { dry_run: false }),
         (
-            "retention run --dry-run",
+            "retention run --preview",
             Verb::RetentionRun { dry_run: true },
         ),
         ("symlink deploy", Verb::SymlinkDeploy),
@@ -211,8 +212,8 @@ fn non_utf8_paths_are_refused_without_substitution() {
 #[test]
 fn transcribe_accepts_language_and_dry_run_flags_around_the_identity() {
     for line in [
-        "transcribe --language fr-CA id --dry-run",
-        "transcribe id --dry-run --language fr-CA",
+        "transcribe --language fr-CA id --preview",
+        "transcribe id --preview --language fr-CA",
     ] {
         assert_eq!(
             parsed(line).unwrap().verb,
@@ -261,7 +262,7 @@ mod review;
 #[test]
 fn run_accepts_dry_run_and_global_flags_but_no_recording_or_once() {
     assert_eq!(
-        parsed("run --dry-run --json").unwrap().verb,
+        parsed("run --preview --json").unwrap().verb,
         Verb::Run {
             dry_run: true,
             resend_refused: false
@@ -280,7 +281,7 @@ fn run_accepts_dry_run_and_global_flags_but_no_recording_or_once() {
         "run memo",
         "run --once memo",
         "run --language fr",
-        "run --dry-run --dry-run",
+        "run --preview --preview",
     ] {
         assert!(parsed(line).is_err());
     }

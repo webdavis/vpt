@@ -53,7 +53,7 @@ fn private_text_never_appears_in_a_usage_error() {
     let canary = "Private canary";
     for args in [
         vec!["confirm", "--term", canary, "--term", "other"],
-        vec!["confirm", "--term", canary, "--dry-run"],
+        vec!["confirm", "--term", canary, "--preview"],
         vec!["confirm", "--tag", canary],
         vec!["confirm", "id", "--tag", canary, "--reject-tag", "other"],
         vec!["confirm", "id", "--relation", canary, "--term", "other"],

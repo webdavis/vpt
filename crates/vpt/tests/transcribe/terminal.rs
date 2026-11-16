@@ -67,17 +67,17 @@ fn a_dry_run_at_a_terminal_says_what_it_would_do_and_leaves_machine_output_alone
     let (sandbox, record) = configured();
     let id = record.id.as_str();
     assert_eq!(
-        shown(&sandbox, id, &["--dry-run"]),
+        shown(&sandbox, id, &["--preview"]),
         format!("  · {id}: would transcribe in fr-CA with custom\n")
     );
     assert_eq!(
-        piped(&sandbox, id, &["--dry-run"]),
+        piped(&sandbox, id, &["--preview"]),
         format!("Would transcribe {id} in fr-CA using custom\n")
     );
     for format in ["--json", "--toon", "--yaml"] {
         assert_eq!(
-            shown(&sandbox, id, &["--dry-run", format]),
-            piped(&sandbox, id, &["--dry-run", format]),
+            shown(&sandbox, id, &["--preview", format]),
+            piped(&sandbox, id, &["--preview", format]),
             "{format}"
         );
     }

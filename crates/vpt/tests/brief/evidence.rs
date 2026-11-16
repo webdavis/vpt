@@ -89,7 +89,7 @@ fn large_brief_counts_select_available_evidence_in_preview_and_publication() {
         &sandbox,
         "[brief]\nmax_notes=4294967295\nmax_spans_per_note=4294967295\n",
     );
-    for extra in [vec!["--dry-run"], vec![]] {
+    for extra in [vec!["--preview"], vec![]] {
         let result = json(&invoke(&sandbox, &manual(&extra)));
         assert_eq!(result["items"].as_array().unwrap().len(), 1);
         assert_eq!(result["items"][0]["text"], "Private accepted quote");
@@ -121,7 +121,7 @@ fn brief_quotes_accepted_text_with_current_note_digest_and_saved_confirmed_tags(
     )
     .unwrap();
     let before = fixture::snapshot(&sandbox);
-    let result = json(&invoke(&sandbox, &manual(&["--dry-run"])));
+    let result = json(&invoke(&sandbox, &manual(&["--preview"])));
     assert_eq!(result["items"].as_array().unwrap().len(), 1);
     assert_eq!(result["items"][0]["text"], "Private accepted quote");
     assert_eq!(result["items"][0]["certainty"], "unverified");
@@ -154,7 +154,7 @@ fn expired_and_missing_transcript_files_do_not_supply_brief_evidence() {
         .unwrap();
     let note = ledger.note(&id, NoteStage::Transcript).unwrap().unwrap();
     std::fs::remove_file(&note.target).unwrap();
-    let result = json(&invoke(&sandbox, &manual(&["--dry-run"])));
+    let result = json(&invoke(&sandbox, &manual(&["--preview"])));
     assert!(result["items"].as_array().unwrap().is_empty());
     std::fs::write(&note.target, &note.text).unwrap();
     let connection = rusqlite::Connection::open(sandbox.path().join("state/vpt/vpt.db")).unwrap();
@@ -164,7 +164,7 @@ fn expired_and_missing_transcript_files_do_not_supply_brief_evidence() {
     fixture::preserve_wal(&connection);
     drop(connection);
     let before = fixture::snapshot(&sandbox);
-    let result = json(&invoke(&sandbox, &manual(&["--dry-run"])));
+    let result = json(&invoke(&sandbox, &manual(&["--preview"])));
     assert!(result["items"].as_array().unwrap().is_empty());
     assert_eq!(fixture::snapshot(&sandbox), before);
 }
@@ -230,7 +230,7 @@ fn changed_managed_transcript_content_is_refused_without_writes_or_private_error
     )
     .unwrap();
     let before = fixture::snapshot(&sandbox);
-    let output = invoke(&sandbox, &manual(&["--dry-run"]));
+    let output = invoke(&sandbox, &manual(&["--preview"]));
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
     assert!(!stderr(&output).contains("Private"));
     assert_eq!(fixture::snapshot(&sandbox), before);

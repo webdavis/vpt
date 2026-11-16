@@ -26,7 +26,7 @@ fn pipeline_repairs_accepted_analysis_without_rerunning_agent_or_resending_hooks
     assert!(boundaries::alerts(&sandbox).is_empty());
     sql(&sandbox, "DROP TRIGGER refuse_analysis_ack");
     let before = fixture::snapshot(&sandbox);
-    json(&invoke(&sandbox, &["--dry-run"]));
+    json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(fixture::snapshot(&sandbox), before);
     json(&invoke(&sandbox, &[]));
     assert_eq!(analysis::calls(&sandbox, "agent.calls"), 1);
@@ -73,7 +73,7 @@ fn stale_analysis_is_rechecked_with_disabled_analysis_and_an_expired_transcript(
     sql(&sandbox, "UPDATE recordings SET stage_note='expired'");
     let before = fixture::snapshot(&sandbox);
     assert_eq!(
-        json(&invoke(&sandbox, &["--dry-run"]))["plan"][0]["stage"],
+        json(&invoke(&sandbox, &["--preview"]))["plan"][0]["stage"],
         "note"
     );
     assert_eq!(fixture::snapshot(&sandbox), before);

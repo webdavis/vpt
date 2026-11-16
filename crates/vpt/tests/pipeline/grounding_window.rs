@@ -23,7 +23,7 @@ fn empty_checks_are_rechecked_for_new_windows_and_expired_analysis_stays_expired
             .any(|flag| matches!(flag.content, FlagContent::Verification(_)))
     );
     assert_eq!(
-        json(&invoke(&sandbox, &["--dry-run"]))["plan"][0]["stage"],
+        json(&invoke(&sandbox, &["--preview"]))["plan"][0]["stage"],
         "verify_analysis"
     );
     json(&invoke(&sandbox, &[]));
@@ -40,7 +40,7 @@ fn empty_checks_are_rechecked_for_new_windows_and_expired_analysis_stays_expired
     };
     assert_eq!(window(), 5);
     assert!(
-        json(&invoke(&sandbox, &["--dry-run"]))["plan"]
+        json(&invoke(&sandbox, &["--preview"]))["plan"]
             .as_array()
             .unwrap()
             .is_empty()
@@ -102,7 +102,7 @@ fn changed_grounding_window_rechecks_analysis_without_agent_and_keeps_review_dec
         )
         .unwrap();
         let before = fixture::snapshot(&sandbox);
-        let plan = json(&invoke(&sandbox, &["--dry-run"]));
+        let plan = json(&invoke(&sandbox, &["--preview"]));
         assert_eq!(plan["plan"][0]["stage"], "verify_analysis");
         assert_eq!(fixture::snapshot(&sandbox), before);
         let result = json(&invoke(&sandbox, &[]));
@@ -136,7 +136,7 @@ fn changed_grounding_window_rechecks_analysis_without_agent_and_keeps_review_dec
             );
         }
         assert!(
-            json(&invoke(&sandbox, &["--dry-run"]))["plan"]
+            json(&invoke(&sandbox, &["--preview"]))["plan"]
                 .as_array()
                 .unwrap()
                 .is_empty()

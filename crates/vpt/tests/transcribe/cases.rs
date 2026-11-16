@@ -7,7 +7,7 @@ fn transcribe_dry_run_is_observational_and_exposes_selected_engine_posture() {
     let result = json(&run(
         &sandbox,
         row.id.as_str(),
-        &["--dry-run", "--language", "ja-JP"],
+        &["--preview", "--language", "ja-JP"],
     ));
     assert_eq!(result["command"], "transcribe");
     assert_eq!(result["language"], "ja-JP");

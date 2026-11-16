@@ -50,7 +50,7 @@ fn output_failure_during_ingestion_dry_run_claims_no_commits_or_writes() {
     let sandbox = configured();
     add(&sandbox, "new.m4a");
     let before = snapshot(&sandbox);
-    let error = fail_output(&sandbox, &["--dry-run"]);
+    let error = fail_output(&sandbox, &["--preview"]);
     assert_eq!(error["error"]["completed"], serde_json::json!([]));
     assert_eq!(snapshot(&sandbox), before);
 }

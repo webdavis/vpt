@@ -26,7 +26,7 @@ fn enabled_pipeline_retention_has_an_observational_plan_and_preserves_expiration
     sandbox.install_fake_helper();
     configure(&sandbox, true, true);
     let before = fixture::snapshot(&sandbox);
-    let plan = json(&invoke(&sandbox, &["--dry-run"]));
+    let plan = json(&invoke(&sandbox, &["--preview"]));
     assert_eq!(
         plan["retention"]["moved"][0]["path"],
         row.audio_path.to_str().unwrap()
@@ -35,7 +35,7 @@ fn enabled_pipeline_retention_has_an_observational_plan_and_preserves_expiration
     assert_eq!(plan["retention"]["completed"], serde_json::json!([]));
     assert_eq!(fixture::snapshot(&sandbox), before);
     let human = support::run_with_budget(
-        sandbox.vpt().args(["run", "--dry-run"]),
+        sandbox.vpt().args(["run", "--preview"]),
         std::time::Duration::from_secs(8),
     );
     assert!(human.status.success(), "{}", stderr(&human));
@@ -141,7 +141,7 @@ fn retention_output_failure_keeps_actual_completions_and_dry_run_claims_none() {
         let mut command = sandbox.vpt();
         command.args(["run", "--json"]);
         if dry_run {
-            command.arg("--dry-run");
+            command.arg("--preview");
         }
         let output =
             support::run_with_broken_stdout(&mut command, std::time::Duration::from_secs(8));

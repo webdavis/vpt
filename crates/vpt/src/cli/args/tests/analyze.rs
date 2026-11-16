@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn analysis_accepts_only_its_identity_and_observational_option() {
     assert_eq!(
-        parsed("analyze memo --dry-run --json").unwrap().verb,
+        parsed("analyze memo --preview --json").unwrap().verb,
         Verb::Analyze {
             id: "memo".into(),
             dry_run: true,
@@ -24,7 +24,7 @@ fn analysis_accepts_only_its_identity_and_observational_option() {
         "analyze",
         "analyze one two",
         "analyze memo --language en",
-        "analyze memo --dry-run --dry-run",
+        "analyze memo --preview --preview",
         "analyze memo --correct private",
     ] {
         assert!(parsed(input).is_err(), "{input}");
@@ -34,7 +34,7 @@ fn analysis_accepts_only_its_identity_and_observational_option() {
 #[test]
 fn bulk_analysis_selects_all_or_stdin_and_refuses_mixed_forms() {
     assert_eq!(
-        parsed("analyze --all --since 2026-08-24T14:47:00-06:00 --dry-run")
+        parsed("analyze --all --since 2026-08-24T14:47:00-06:00 --preview")
             .unwrap()
             .verb,
         Verb::AnalyzeBatch {

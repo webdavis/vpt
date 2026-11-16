@@ -30,7 +30,7 @@ fn changed_rendered_input_rechecks_transcript_before_analysis_and_then_skips_bot
     analysis::append(&sandbox, "\n[readability]\nenabled = true\n");
     let before = fixture::snapshot(&sandbox);
     assert_eq!(
-        json(&invoke(&sandbox, &["--dry-run"]))["plan"][0]["stage"],
+        json(&invoke(&sandbox, &["--preview"]))["plan"][0]["stage"],
         "note"
     );
     assert_eq!(fixture::snapshot(&sandbox), before);

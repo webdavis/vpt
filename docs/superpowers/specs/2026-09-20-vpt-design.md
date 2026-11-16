@@ -402,7 +402,7 @@ Off by default. When `[retention] enabled = true`, each store has one hold time 
 duration string such as `90d`, per store key, `0` meaning never expire), measured from a file's own
 mtime. `vpt retention run` (and `vpt run`, when retention is enabled) moves every expired artifact in a
 store to the system Trash through the helper, one call per file, and prints one line per moved file plus
-a summary; `--json` prints the list. `--dry-run` prints the same list and moves nothing.
+a summary; `--json` prints the list. `--preview` prints the same list and moves nothing.
 
 Five rules:
 
@@ -443,7 +443,7 @@ leaves every entry's size, mtime and flags unchanged.
 The database, `CloudRecordings.db` beside `Recordings/`, is used for exactly one thing: the human title
 (`ZCUSTOMLABEL` keyed by `ZPATH`). It is read from a private copy: the database plus its `-wal` and
 `-shm` files are copied over the fixed paths under `<state_dir>/title-copy/` (directory 0700, files
-0600), overwritten in place on every sweep that is not a dry run and never removed, and that copy is what
+0600), overwritten in place on every sweep that is not a preview and never removed, and that copy is what
 is opened and read. The live database is never opened, because a read-only open still lets SQLite create
 journal files inside Apple's directory. A copy that fails, a schema that has changed, or a join that
 finds no row yields `title_source = "unavailable"` and the recording is ingested untitled.
@@ -535,7 +535,7 @@ path and takes nothing.
 | a sync of the staged file or the archive directory fails | abort, exit 1, no row recorded                | `ingest_failed`                                                                             |
 | audio store parent missing                               | refuse at startup, exit 2                     | `config_refused`                                                                            |
 
-`vpt ingest --dry-run` runs every gate and writes nothing durable: no clone, no row, no event and no
+`vpt ingest --preview` runs every gate and writes nothing durable: no clone, no row, no event and no
 title copy; it reports the title from accepted ledger state when the recording is already known and
 `title_source = "unavailable"` otherwise, and no gate depends on a title. `--once <path>` ingests exactly
 one file by path, gates included.
@@ -734,7 +734,7 @@ vpt review <id> [--json]                     print open flags, ranked: record te
 vpt review <id> --resolve <flag-id> --confirm | --correct <text> | --dismiss
 vpt confirm --term <text>                      append to known-terms.txt (idempotent)
 vpt confirm <id> --tag <t> | --reject-tag <t> | --relation <kind>:<target>
-vpt tag rename <old> <new> [--dry-run]         rename one tag on every note and list vpt owns
+vpt tag rename <old> <new> [--preview]         rename one tag on every note and list vpt owns
 ```
 
 `--confirm` on a `proper-noun` or `agreed-unverified` flag appends the record's text to
@@ -902,7 +902,7 @@ Indexing grants no write authority: vpt still writes into no note it did not cre
 
 Relations and links are always written, in both settings. The switch governs tags only.
 
-`vpt tag rename <old> <new> [--dry-run]` fixes a tag list that `write` let grow messy. It renames `<old>`
+`vpt tag rename <old> <new> [--preview]` fixes a tag list that `write` let grow messy. It renames `<old>`
 in the saved tag state of every recording, in the transcript and analysis notes vpt owns, and in
 `known-tags.txt`, and the ledger records the rename (old name, new name, time) for later summary runs.
 Names match by key, so case and separator variants of `<old>` are renamed too. `<new>` takes its
@@ -915,7 +915,7 @@ recording whose step fails does not stop the others; the command exits non-zero 
 recordings in `ids`, and running the same command again finishes the rename. Brief notes, expired
 notes and notes vpt did not create are never written; brief tags are the meeting's labels, which the
 next brief would restore. The result counts briefs that carry `<old>` (`untouched_briefs`) apart from
-the other indexed notes that do (`untouched_notes`). `--dry-run` lists the notes it would rewrite and changes
+the other indexed notes that do (`untouched_notes`). `--preview` lists the notes it would rewrite and changes
 nothing. Renaming a tag that nothing carries exits 0 and reports that nothing changed.
 
 ### 7.4 Relations and filing
@@ -1132,7 +1132,7 @@ A brief is an assembled, cited evidence pack for one occasion. vpt writes no sen
 every quoted line is a verbatim transcript span with its recording identity and timecode.
 
 ```
-vpt brief <occasion-id> [--json] [--explain] [--dry-run]
+vpt brief <occasion-id> [--json] [--explain] [--preview]
 vpt brief --title <t> --at <rfc3339> [--duration-minutes <n>] [--participant <name>]... [--tag <t>]...
 vpt brief --upcoming [--json]
 vpt occasions [--json]
@@ -1466,7 +1466,7 @@ stdout or stderr. Logging must preserve the structured-output contract in sectio
 Each hook has the five-second process deadline from section 3.5. A nonzero exit, spawn failure,
 interruption or timeout produces a bounded, content-free diagnostic in the logs. It does not change
 the work's result, retry delivery inline, invoke the other hook or fall back to a desktop notification.
-Dry runs and observational commands do not spawn hooks. Built-in Apple notifications are outside the
+Previews and observational commands do not spawn hooks. Built-in Apple notifications are outside the
 roadmap; report and alert commands have no dependency on the macOS helper or any notification engine.
 
 #### 8.7.1 Saved history and recovery summaries
@@ -1512,7 +1512,7 @@ If both the ledger and the log are unavailable, VPT reports that history could n
 the command's existing output. A later summary distinguishes retained evidence from detectable
 gaps. An attempt that left no durable evidence cannot be reconstructed or reliably detected later.
 Failures before a safe state root exists are reported in the command error without writing through
-an unvalidated path. Observational commands and dry runs create no history and perform no log repair.
+an unvalidated path. Observational commands and previews create no history and perform no log repair.
 
 ## 9. The command-line surface
 
@@ -1534,19 +1534,19 @@ under `--json`.
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | `vpt setup [--overwrite] [--engine <name>]`                                                   | `config.toml` (the main engine prompted for, every other key at its default), the home, the state directory, the default store leaves | `{"written": "<path>", "main_engine": "<name>"}`                                                                      | 0, 2 exists or no terminal            |
 | `vpt doctor [--fix]`                                                                          | nothing; with `--fix`, only what is missing: the starter config, private folders, the home link                                       | `{"checks": [{"name", "ok", "notice"?, "detail"}]}` when all pass; `vpt.error/1` with the same array in `error.checks` otherwise | 0 all ok, 3 any failed                |
-| `vpt run [--dry-run] [--resend-refused]`                                                      | everything a stage writes, for new work                                                                                               | `{"ingested": [..], "transcribed": [..], "notes": [..], "analyzed": [..], "redacted": [..], "retention": {..}}`       | 0, 1 any stage failed                 |
-| `vpt ingest [--dry-run] [--once <path>]`                                                      | clones, ledger rows                                                                                                                   | `{"ingested": [record...], "deferred": [{"path", "reason"}], "skipped": n}`                                           | 0, 1 aborted                          |
+| `vpt run [--preview] [--resend-refused]`                                                      | everything a stage writes, for new work                                                                                               | `{"ingested": [..], "transcribed": [..], "notes": [..], "analyzed": [..], "redacted": [..], "retention": {..}}`       | 0, 1 any stage failed                 |
+| `vpt ingest [--preview] [--once <path>]`                                                      | clones, ledger rows                                                                                                                   | `{"ingested": [record...], "deferred": [{"path", "reason"}], "skipped": n}`                                           | 0, 1 aborted                          |
 | `vpt import <file> [--title <t>] [--captured-at <RFC3339>]`                                   | clones, ledger rows                                                                                                                   | the `ingest` shape                                                                                                    | 0, 1 aborted, 2 no file, 3 refused    |
-| `vpt transcribe <id> [--language <tag>] [--dry-run]`                                          | engine outputs, flags, transcript note                                                                                                | the record plus `{"flags": {"<class>": n}}`                                                                           | 0, 1 engines failed, 3 refused        |
+| `vpt transcribe <id> [--language <tag>] [--preview]`                                          | engine outputs, flags, transcript note                                                                                                | the record plus `{"flags": {"<class>": n}}`                                                                           | 0, 1 engines failed, 3 refused        |
 | `vpt review <id> [--resolve <flag> --confirm\|--correct <t>\|--dismiss]`                      | flag state, note rewrite, known-terms                                                                                                 | `{"flags": [{"id", "class", "at", "record", "alternative", "state"}]}`                                                | 0, 2 no such flag                     |
 | `vpt confirm --term <t>` / `vpt confirm <id> --tag <t>\|--reject-tag <t>\|--relation <k>:<t>` | the two lists, ledger, note rewrite                                                                                                   | `{"confirmed": {...}}`                                                                                                | 0, 2                                  |
-| `vpt tag rename <old> <new> [--dry-run]`                                                      | tag state, owned note rewrite, `known-tags.txt`, the rename record                                                                    | `{"dry_run", "changed", "recordings": [{"id", "notes"}], "known_tags_changed", "untouched_briefs", "untouched_notes"}` | 0, 1 or 3 some recordings failed, 2   |
+| `vpt tag rename <old> <new> [--preview]`                                                      | tag state, owned note rewrite, `known-tags.txt`, the rename record                                                                    | `{"dry_run", "changed", "recordings": [{"id", "notes"}], "known_tags_changed", "untouched_briefs", "untouched_notes"}` | 0, 1 or 3 some recordings failed, 2   |
 | `vpt note write <id>`                                                                         | re-renders managed regions of both notes                                                                                              | the record                                                                                                            | 0, 3 markers                          |
 | `vpt path <id> --stage <stage>` / `vpt path --occasion <id> --stage brief`                    | nothing                                                                                                                               | `{"path": "<abs>"}`                                                                                                   | 0, 2                                  |
-| `vpt analyze <id> [--dry-run] [--resend-refused]`                                             | analysis note, tags, relations                                                                                                        | the record plus `{"verify": {"<class>": n}}`                                                                          | 0, 1 command failed, 2 not configured |
-| `vpt analyze --all [--since <RFC3339>] [--dry-run]` / `vpt analyze --stdin [--dry-run]`       | the same, per recording, under one write lock                                                                                         | `{"dry_run", "recordings": [{"id", "status", "summary_changed", "tags_added", "tags_removed"}]}`                      | 0, 1 any recording failed, 2 usage    |
+| `vpt analyze <id> [--preview] [--resend-refused]`                                             | analysis note, tags, relations                                                                                                        | the record plus `{"verify": {"<class>": n}}`                                                                          | 0, 1 command failed, 2 not configured |
+| `vpt analyze --all [--since <RFC3339>] [--preview]` / `vpt analyze --stdin [--preview]`       | the same, per recording, under one write lock                                                                                         | `{"dry_run", "recordings": [{"id", "status", "summary_changed", "tags_added", "tags_removed"}]}`                      | 0, 1 any recording failed, 2 usage    |
 | `vpt verify-note <path> --recording <id>`                                                     | the owned artifact's annotations                                                                                                      | `{"flags": [{"class", "line", "range"}]}`                                                                             | 0, 1, 3                               |
-| `vpt brief <occasion> [--explain] [--dry-run]` / `--title --at ...` / `--upcoming`            | brief note, occasion row, events                                                                                                      | `vpt.brief/1`, or `{"written": [..]}` for `--upcoming`                                                                | 0, 2, 3                               |
+| `vpt brief <occasion> [--explain] [--preview]` / `--title --at ...` / `--upcoming`            | brief note, occasion row, events                                                                                                      | `vpt.brief/1`, or `{"written": [..]}` for `--upcoming`                                                                | 0, 2, 3                               |
 | `vpt occasions`                                                                               | nothing                                                                                                                               | `{"occasions": [..]}`                                                                                                 | 0                                     |
 | `vpt redact <id> [--stage] [--to <dir>] [--title <t>]`                                        | released copy, draft report                                                                                                           | `{"written": "<path>", "report": "<path>", "masks": {"<class>": n}, "candidates": [..]}`                              | 0, 3 duplicate or residue             |
 | `vpt show <id>` / `vpt list [--stage <s>]`                                                    | nothing                                                                                                                               | the record / `{"recordings": [..]}`                                                                                   | 0, 2                                  |
@@ -1557,7 +1557,7 @@ under `--json`.
 | `vpt show <occasion> --stage brief`                                                           | nothing                                                                                                                               | `{"occasion", "recordings", "stage", text}`; `text` = `{"title", "content", "note", "content_sha256", "provenance", "generated_at"}` | 0, 1 pending, 2, 3 changed            |
 | `vpt show <id> --stage <s> --redact`                                                          | nothing                                                                                                                               | `{"recording", "stage", text, "candidates": [..]}` with `content` masked by `[share]`, no structured fields           | 0, 2, 3 changed or residue            |
 | `vpt storage`                                                                                 | nothing                                                                                                                               | `{"stores": {"<key>": {"files", "bytes", "oldest", "newest"}}}`                                                       | 0                                     |
-| `vpt retention run [--dry-run]`                                                               | moves to Trash                                                                                                                        | `{"moved": [{"store", "path"}], "kept": [{"path", "reason"}]}`                                                        | 0, 3 helper absent                    |
+| `vpt retention run [--preview]`                                                               | moves to Trash                                                                                                                        | `{"moved": [{"store", "path"}], "kept": [{"path", "reason"}]}`                                                        | 0, 3 helper absent                    |
 | `vpt symlink deploy` / `vpt symlink verify`                                                   | the link / nothing                                                                                                                    | `{"link", "target", "ok"}`                                                                                            | 0, 3                                  |
 | `vpt --version`                                                                               | nothing                                                                                                                               | `{"version", "helper_version"}`                                                                                       | 0                                     |
 
@@ -1591,11 +1591,11 @@ order; `completed` lists the identities of work committed before the failure; `c
 `doctor_checks` and carries `doctor`'s complete check array. Every rule vpt keeps reports code 3 and
 nothing else does.
 
-`--dry-run`, wherever a verb offers it, opens existing state read-only and performs no migration,
+`--preview`, wherever a verb offers it, opens existing state read-only and performs no migration,
 directory creation, ledger write, artifact write, notification or Trash move. `run`, `transcribe` and
 `analyze` spawn no engine and no agent command under it and report the operations they would perform;
-`brief --dry-run` may collect configured read-only context and prints the pack it would write;
-`ingest --dry-run` neither creates nor refreshes the title copy and creates no durable state.
+`brief --preview` may collect configured read-only context and prints the pack it would write;
+`ingest --preview` neither creates nor refreshes the title copy and creates no durable state.
 
 ## 10. Configuration
 
@@ -1882,7 +1882,7 @@ What the tests use instead of the world:
   test reaches the network except the loopback listener.
 
 Behaviors that pin the constraints most likely to erode, written first in each stage: the source
-container's every entry has the same size, mtime and flags after a full sweep, a dry run leaves the title
+container's every entry has the same size, mtime and flags after a full sweep, a preview leaves the title
 copy untouched, a publication interrupted after its rename and before its dirty entry clears is repaired
 without a refusal, and an untracked file in a store survives a retention run (stage 1); two engines of
 one family refuse before any spawn, and an agreed proper noun not in `known-terms.txt` produces exactly

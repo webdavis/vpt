@@ -289,7 +289,7 @@ fn pipeline_detects_an_analysis_only_change_and_dry_run_stays_observational() {
     )
     .unwrap();
     let before = fixture::snapshot(&sandbox);
-    let planned = success(&command(&sandbox, &["run", "--dry-run"]));
+    let planned = success(&command(&sandbox, &["run", "--preview"]));
     assert_eq!(fixture::snapshot(&sandbox), before);
     assert_eq!(planned["plan"][0]["stage"], "note");
     let result = success(&command(&sandbox, &["run"]));

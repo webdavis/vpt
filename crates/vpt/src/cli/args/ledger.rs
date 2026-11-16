@@ -13,7 +13,7 @@ pub(crate) enum Action {
     #[command(after_long_help = examples::LEDGER_ACCEPT)]
     Accept {
         /// Show the ledger and this machine's last write, and change nothing.
-        #[arg(long)]
+        #[arg(long, short = 'n')]
         preview: bool,
     },
 }

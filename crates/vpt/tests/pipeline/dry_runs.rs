@@ -41,7 +41,7 @@ fn preview(sandbox: &Sandbox, verb: &str, id: &str, json: bool) -> std::process:
         }
         _ => {}
     }
-    command.arg("--dry-run");
+    command.arg("--preview");
     if json {
         command.arg("--json");
     }

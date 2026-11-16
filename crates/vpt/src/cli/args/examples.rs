@@ -12,7 +12,7 @@ macro_rules! examples {
 
 pub(super) const DOCS: &str = docs!();
 
-pub(super) const RUN: &str = examples!["vpt run", "vpt run --dry-run", "vpt run --json"];
+pub(super) const RUN: &str = examples!["vpt run", "vpt run --preview", "vpt run --json"];
 pub(super) const SETUP: &str = examples![
     "vpt setup",
     "vpt setup --engine apple",
@@ -30,7 +30,7 @@ pub(super) const TEST: &str = examples![
 ];
 pub(super) const INGEST: &str = examples![
     "vpt ingest",
-    "vpt ingest --dry-run",
+    "vpt ingest --preview",
     "vpt ingest --once ~/Desktop/memo.m4a --json",
 ];
 pub(super) const IMPORT: &str = examples![
@@ -45,7 +45,7 @@ pub(super) const SHOW: &str = examples![
 pub(super) const TRANSCRIBE: &str = examples![
     "vpt transcribe 2026-08-24T144736-4f3ab19c02de",
     "vpt transcribe 2026-08-24T144736-4f3ab19c02de --language fr-CA",
-    "vpt transcribe 2026-08-24T144736-4f3ab19c02de --dry-run --json",
+    "vpt transcribe 2026-08-24T144736-4f3ab19c02de --preview --json",
 ];
 pub(super) const REVIEW: &str = examples![
     "vpt review 2026-08-24T144736-4f3ab19c02de",
@@ -58,12 +58,12 @@ pub(super) const CONFIRM: &str = examples![
     "vpt confirm 2026-08-24T144736-4f3ab19c02de --relation continues:2026-08-20T091500-0a1b2c3d4e5f",
 ];
 pub(super) const TAG_RENAME: &str = examples![
-    "vpt tag rename plannning planning --dry-run",
+    "vpt tag rename plannning planning --preview",
     "vpt tag rename plannning planning",
 ];
 pub(super) const ANALYZE: &str = examples![
     "vpt analyze 2026-08-24T144736-4f3ab19c02de",
-    "vpt analyze --all --since 2026-08-01T00:00:00Z --dry-run",
+    "vpt analyze --all --since 2026-08-01T00:00:00Z --preview",
     "vpt list --stage analysis | cut -d' ' -f1 | vpt analyze --stdin",
 ];
 pub(super) const PATH: &str = examples![
@@ -87,7 +87,7 @@ pub(super) const SEARCH: &str = examples![
 ];
 pub(super) const STORAGE: &str = examples!["vpt storage", "vpt storage --json"];
 pub(super) const RETENTION_RUN: &str =
-    examples!["vpt retention run --dry-run", "vpt retention run"];
+    examples!["vpt retention run --preview", "vpt retention run"];
 pub(super) const BRIEF: &str = examples![
     "vpt brief 2026-08-25T100000-9f8e7d6c5b4a --explain",
     "vpt brief --title \"Design review\" --at 2026-08-25T10:00:00-06:00 --participant Alice",

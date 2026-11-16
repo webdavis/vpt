@@ -44,7 +44,7 @@ fn dry_run_ignores_write_lock_and_preserves_existing_state_and_title_copy() {
     let root = vpt_adapters::RootDir::open(&sandbox.path().join("state/vpt")).unwrap();
     let _lock = vpt_adapters::WriteLock::acquire(&root, std::time::Duration::ZERO).unwrap();
     let before = snapshot(&sandbox);
-    let doc = json(&run(sandbox.vpt().args(["ingest", "--dry-run", "--json"])));
+    let doc = json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
     assert_eq!(doc["skipped"], 1);
     assert_eq!(snapshot(&sandbox), before);
 }
