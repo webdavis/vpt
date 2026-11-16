@@ -1,8 +1,6 @@
 use super::Invocation;
 use clap::error::{ContextKind, ContextValue, ErrorKind};
 
-const FORMATS: [&str; 2] = ["--json", "--toon"];
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct UsageError {
     pub message: String,
@@ -29,10 +27,6 @@ pub(super) fn from_clap(error: &clap::Error) -> Result<Invocation, UsageError> {
         ErrorKind::UnknownArgument => match error.get(ContextKind::InvalidArg) {
             Some(ContextValue::String(typed)) if !typed.starts_with('-') => {
                 "unexpected extra argument".into()
-            }
-            Some(ContextValue::String(typed)) if FORMATS.contains(&typed.as_str()) => {
-                let format = typed.trim_start_matches('-');
-                format!("'--{format}' is not an option; choose the format with '-o {format}'")
             }
             _ => {
                 "unknown flag, or a value that starts with '-'; put '--' before such a value".into()

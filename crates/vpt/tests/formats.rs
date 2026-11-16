@@ -177,18 +177,21 @@ fn the_removed_yaml_flag_and_an_unknown_format_are_usage_errors() {
 }
 
 #[test]
-fn the_removed_json_and_toon_flags_are_usage_errors_naming_the_output_flag() {
+fn the_removed_json_and_toon_flags_are_refused_like_any_unknown_flag() {
     let sandbox = configured("formats-removed-json-toon");
-    for (flag, fix) in [("--json", "-o json"), ("--toon", "-o toon")] {
-        for words in [&["list", flag][..], &[flag, "list"]] {
-            let output = run(sandbox.vpt().args(words));
-            assert_eq!(output.status.code(), Some(2), "{words:?}");
-            assert_eq!(stdout(&output), "", "{words:?}");
-            let text = stderr(&output);
-            assert!(
-                text.lines().next().unwrap_or_default().contains(fix),
-                "{words:?}: {text}"
-            );
-        }
+    let first_line = |words: &[&str]| {
+        let output = run(sandbox.vpt().args(words));
+        assert_eq!(output.status.code(), Some(2), "{words:?}");
+        assert_eq!(stdout(&output), "", "{words:?}");
+        stderr(&output)
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .to_owned()
+    };
+    let unknown = first_line(&["list", "--no-such-flag"]);
+    for flag in ["--json", "--toon"] {
+        assert_eq!(first_line(&["list", flag]), unknown, "{flag}");
+        assert_eq!(first_line(&[flag, "list"]), unknown, "{flag}");
     }
 }
