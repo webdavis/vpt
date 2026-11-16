@@ -11,6 +11,7 @@ mod run;
 mod search;
 mod show;
 mod storage;
+mod symlink;
 mod tag;
 mod transcribe;
 
@@ -62,6 +63,8 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::VerifyNote { .. } => Some(note::verify),
         Verb::Redact(_) => Some(redact::render),
         Verb::RetentionRun { .. } => Some(retention::render),
+        Verb::SymlinkDeploy => Some(symlink::deploy),
+        Verb::SymlinkVerify => Some(symlink::verify),
         _ => None,
     }
 }
