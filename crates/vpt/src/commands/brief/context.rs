@@ -60,19 +60,36 @@ pub(super) fn collect_window(
     settings: &Settings,
     window: ContextWindow,
 ) -> Result<ContextSnapshot, Box<ErrorDocument>> {
-    let request = request(settings, window);
+    read(settings, &request(settings, window))
+}
+pub(crate) fn events(
+    settings: &Settings,
+    window: ContextWindow,
+) -> Result<ContextSnapshot, Box<ErrorDocument>> {
+    read(
+        settings,
+        &ContextRequest {
+            tasks: false,
+            ..request(settings, window)
+        },
+    )
+}
+fn read(
+    settings: &Settings,
+    request: &ContextRequest<'_>,
+) -> Result<ContextSnapshot, Box<ErrorDocument>> {
     match settings.context.source {
         ContextSource::None => Ok(ContextSnapshot::default()),
         ContextSource::Dam => DamContext {
             command: &settings.context.dam_command,
             max_age: &settings.context.dam_max_age,
         }
-        .collect(&request)
+        .collect(request)
         .map_err(collection_error),
         ContextSource::Google => GoogleContext {
             credentials: &settings.context.google,
         }
-        .collect(&request)
+        .collect(request)
         .map_err(collection_error),
     }
 }

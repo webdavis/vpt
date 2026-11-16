@@ -376,7 +376,7 @@ named, so doctor exits 1.
 
 Doctor never runs a part to see whether it works. Each configured part ends with a `test` row,
 `not tested`, whose advice names the command that tries it for real, such as `vpt test engines`.
-`vpt test` has the `engines`, `speakers` and `summary` parts so far; until the others arrive, it refuses their
+`vpt test` has the `engines`, `speakers`, `summary` and `calendar` parts so far; until the others arrive, it refuses their
 names. A part that is not configured is one `not_run` row naming the config key that turns it on;
 that is not an issue. A configured part whose program is missing is an issue.
 Where a part sends data off the machine when it runs, its row says so.
@@ -414,7 +414,7 @@ name.
 ## vpt test
 
 `vpt test [part ...] [--json|--toon|--yaml]` makes each part do its real job once and reports. The
-parts so far are `engines`, `speakers` and `summary`. Name parts to test only those, as in `vpt test engines`. An unknown
+parts so far are `engines`, `speakers`, `summary` and `calendar`. Name parts to test only those, as in `vpt test engines`. An unknown
 name is refused with exit 2 and the list of valid names. Bare `vpt test` tests every configured part.
 A named part with nothing to test is refused with exit 2, and the message names the config key that
 would let it run. In a bare run it is a `not_run` row naming that key, and a run that tests nothing
@@ -446,6 +446,11 @@ made-up `{id}`, `{language}` set to `en-US` and the current time as `{captured_a
 when the command exits 0 and prints a valid `vpt.proposal/1` document; it names the document's `by`
 and how long the command took. The proposal is not grounded, saved or acted on.
 
+`calendar` asks the source set in `context.type` for the events of the current local day, through
+the same reader `vpt brief` uses, and asks for no tasks. The row says how many events came back,
+how long it took and which source answered: the program for a command source, or Google Calendar
+for the built-in client. No occasion is recorded.
+
 Nothing is kept. vpt writes nothing to the ledger, the archive, the notes or any store, sends no
 follow-up, and removes the temporary folder at the end, also when a part fails.
 
@@ -454,6 +459,7 @@ follow-up, and removes the temporary folder at the end, also when a part fails.
 | `engines` | Nothing for Apple, whisply or a command engine declared local. A command engine declared remote receives the made-up clip, and its row says so. Anything an engine does on its own, such as downloading a model on first use, happens as it does in `vpt transcribe`. |
 | `speakers` | Whisply sends the token to Hugging Face and downloads the two speaker models on first use; the clip stays on the machine. The row says so. |
 | `summary` | The made-up transcript goes to the command, and so to whatever the command calls, such as a model provider. The row says so. |
+| `calendar` | A command source gets the calendar scopes and today's dates; whether it contacts a remote is up to it. The built-in client sends the credentials to Google Calendar and receives today's events. |
 
 The report has the same form as doctor's: the version line, a heading per part, rows marked `✓`,
 `⚠`, `✗` or `·`, advice after `→`, and "Needs attention". It goes to standard output. vpt exits 1
