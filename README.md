@@ -38,9 +38,9 @@ read as something else. `--yaml` prints it as block YAML with every string doubl
 flag, commands print text for people. Passing two different format flags is a usage error, reported
 as text with exit code 2.
 
-When standard output is a terminal, `run`, `ingest`, `import` and
-`transcribe` print that text in the same style as `doctor`: one row per result, `name: detail`
-marked `✓` for done, `·` for planned or skipped, `⚠` for a warning and `✗` for a failure, with advice under a row after `→`. A
+When standard output is a terminal, `run`, `ingest`, `import`, `transcribe` and `analyze` print that
+text in the same style as `doctor`: one row per result, `name: detail` marked `✓` for done, `·` for
+planned or skipped, `⚠` for a warning and `✗` for a failure, with advice under a row after `→`. A
 closing "Needs attention" section numbers every warning and failure, and appears only when there is
 one. A command with nothing to do says so in one line:
 
