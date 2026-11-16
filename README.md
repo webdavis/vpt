@@ -582,7 +582,7 @@ clear a failed analysis attempt. `analyze` creates the initial analysis note.
 order. Output includes the occasion identity, start, source, duration, participants, tags, and saved
 brief path/status. Provider object keys stay private to the ledger.
 
-`vpt path --occasion <id> --stage brief [--output json|toon|yaml]` returns the saved absolute brief path even when its
+`vpt path occasion <id> --stage brief [--output json|toon|yaml]` returns the saved absolute brief path even when its
 file is missing. Both commands are observational: an absent ledger stays absent, and neither command
 publishes or repairs an artifact. Accepted brief packs and rendered text are stored together;
 mutating startup repairs pending brief publication and then marks the occasion briefed. Replaced

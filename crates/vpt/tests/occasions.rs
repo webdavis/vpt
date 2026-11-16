@@ -108,7 +108,7 @@ fn occasion_path_reads_saved_pin_even_when_file_is_absent() {
         &sandbox,
         &[
             "path",
-            "--occasion",
+            "occasion",
             record.id.as_str(),
             "--stage",
             "brief",
@@ -128,15 +128,15 @@ fn occasion_path_usage_and_missing_pin_are_observational() {
     let record = seed(&sandbox);
     let before = fixture::snapshot(&sandbox);
     for args in [
-        vec!["path", "--occasion", record.id.as_str(), "--stage", "brief"],
+        vec!["path", "occasion", record.id.as_str(), "--stage", "brief"],
         vec![
             "path",
-            "--occasion",
+            "occasion",
             record.id.as_str(),
             "--stage",
             "analysis",
         ],
-        vec!["path", "--occasion", "invalid", "--stage", "brief"],
+        vec!["path", "occasion", "invalid", "--stage", "brief"],
         vec![
             "path",
             record.id.as_str(),
@@ -145,7 +145,7 @@ fn occasion_path_usage_and_missing_pin_are_observational() {
             "--stage",
             "brief",
         ],
-        vec!["path", "--occasion", "--stage", "brief"],
+        vec!["path", "occasion", "--stage", "brief"],
         vec!["occasions", "--preview"],
     ] {
         let output = invoke(&sandbox, &args);

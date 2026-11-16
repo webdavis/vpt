@@ -47,16 +47,29 @@ pub(super) enum Symlink {
 }
 
 #[derive(clap::Args)]
+#[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
 pub(super) struct Path {
     /// The recording id.
-    #[arg(required_unless_present = "occasion", conflicts_with = "occasion")]
+    #[arg(required = true)]
     id: Option<String>,
-    /// The stage: transcript or analysis, or brief with --occasion.
-    #[arg(long)]
-    stage: String,
-    /// An occasion id instead of a recording id.
-    #[arg(long)]
-    occasion: Option<String>,
+    /// The stage: transcript or analysis.
+    #[arg(long, required = true)]
+    stage: Option<String>,
+    #[command(subcommand)]
+    occasion: Option<Occasion>,
+}
+
+#[derive(clap::Subcommand)]
+enum Occasion {
+    /// Print the saved path of an occasion's brief.
+    #[command(after_long_help = examples::PATH_OCCASION)]
+    Occasion {
+        /// The occasion id.
+        id: String,
+        /// The stage: brief.
+        #[arg(long)]
+        stage: String,
+    },
 }
 
 #[derive(clap::Args)]
@@ -100,14 +113,11 @@ impl Symlink {
 
 impl Path {
     pub(super) fn verb(self) -> Verb {
-        match (self.occasion, self.id) {
-            (Some(id), _) => Verb::OccasionPath {
-                id,
-                stage: self.stage,
-            },
-            (None, id) => Verb::Path {
-                id: id.unwrap_or_default(),
-                stage: self.stage,
+        match self.occasion {
+            Some(Occasion::Occasion { id, stage }) => Verb::OccasionPath { id, stage },
+            None => Verb::Path {
+                id: self.id.unwrap_or_default(),
+                stage: self.stage.unwrap_or_default(),
             },
         }
     }

@@ -91,7 +91,11 @@ pub(super) const ANALYZE: &str = examples![
 ];
 pub(super) const PATH: &str = examples![
     "vpt path 2026-08-24T144736-4f3ab19c02de --stage transcript",
-    "vpt path --occasion 2026-08-25T100000-9f8e7d6c5b4a --stage brief",
+    "vpt path 2026-08-24T144736-4f3ab19c02de --stage analysis --json",
+];
+pub(super) const PATH_OCCASION: &str = examples![
+    "vpt path occasion 2026-08-25T100000-9f8e7d6c5b4a --stage brief",
+    "vpt path occasion 2026-08-25T100000-9f8e7d6c5b4a --stage brief --json",
 ];
 pub(super) const NOTE_WRITE: &str = examples![
     "vpt note write 2026-08-24T144736-4f3ab19c02de",

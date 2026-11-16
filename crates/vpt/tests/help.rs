@@ -24,6 +24,7 @@ const COMMANDS: &[&str] = &[
     "tag rename",
     "analyze",
     "path",
+    "path occasion",
     "note write",
     "verify-note",
     "occasions",

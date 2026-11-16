@@ -25,7 +25,7 @@ const EVERY_VERB: &[&[&str]] = &[
     &["show", "x", "--stage", "transcript", "--redact"],
     &["show", "x", "--stage", "analysis", "--redact"],
     &["path", "x", "--stage", "transcript"],
-    &["path", "--occasion", "x", "--stage", "brief"],
+    &["path", "occasion", "x", "--stage", "brief"],
     &["review", "list", "x"],
     &["review", "dismiss", "x", "f"],
     &["confirm", "tag", "x", "t"],

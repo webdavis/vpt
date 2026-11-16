@@ -37,7 +37,7 @@ fn commands(sandbox: &Sandbox) -> Vec<Vec<String>> {
         vec!["occasions"],
         vec!["path", &id, "--stage", "transcript"],
         vec!["path", &id, "--stage", "analysis"],
-        vec!["path", "--occasion", &occasion, "--stage", "brief"],
+        vec!["path", "occasion", &occasion, "--stage", "brief"],
         vec!["brief", &occasion],
         vec!["brief", "--title", "Private planning", "--at", at],
         vec!["brief", "upcoming"],
