@@ -4,6 +4,7 @@ mod ingest;
 mod list;
 mod run;
 mod search;
+mod show;
 mod storage;
 mod transcribe;
 
@@ -45,6 +46,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::List { .. } => Some(list::render),
         Verb::Storage => Some(storage::render),
         Verb::Search(_) => Some(search::render),
+        Verb::Show { stage: None, .. } => Some(show::render),
         _ => None,
     }
 }
