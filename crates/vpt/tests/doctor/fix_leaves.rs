@@ -20,22 +20,6 @@ fn leaves_alone(
 }
 
 #[test]
-fn fix_leaves_staged_audio_for_the_trash() {
-    let document = leaves_alone(
-        "doctor-fix-staged",
-        |sandbox| {
-            std::fs::write(
-                sandbox.path().join("home/.vpt/audio/.vpt-staging-owned"),
-                b"a",
-            )
-            .unwrap();
-        },
-        1,
-    );
-    assert_eq!(result(&document, "leftovers", "staged_audio"), "issue");
-}
-
-#[test]
 fn fix_leaves_note_versions_vpt_set_aside() {
     let document = leaves_alone(
         "doctor-fix-kept",

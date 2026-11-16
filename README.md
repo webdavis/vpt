@@ -389,17 +389,21 @@ stores. It works independently of the recording source and ledger.
 attention. It contacts nothing: no network, no model, no engine. The one program it starts is vpt's
 own helper, for its version. Without `--fix` it changes nothing on disk.
 
-`--fix` repairs what it can on this machine, and only by creating what is missing: the configuration
-file from the starter text (main engine `apple`, the same text `vpt setup --engine apple` writes), the
-home, state and store folders with mode 0700, and the home link when the config names one and nothing
-is at its path. It never overwrites, deletes, moves or changes the mode of anything that exists, so a
-second run changes nothing. With named checks it repairs only within them: `config` for the file,
-`stores` for the folders and the link. Doctor then checks again and reports the state after the
-repairs; each repaired row's detail starts with `created`, and the exit code follows that state. A
-repair that fails stays an issue with its reason, and the other repairs still run. Under `-o json` the
-document gains `fixed`, present only with `--fix`: one `{"check", "name", "detail"}` entry per repair
-made, `[]` when there was nothing to create. `--fix` leaves these for you, and their rows say what to
-do: staged audio waiting for the Trash, note versions vpt kept, the mode of an existing state folder,
+`--fix` repairs what it can on this machine: it creates what is missing and moves staged audio to the
+Trash. It creates the configuration file from the starter text (main engine `apple`, the same text
+`vpt setup --engine apple` writes), the home, state and store folders with mode 0700, and the home
+link when the config names one and nothing is at its path. It moves each staged audio file an
+interrupted import left in the audio store to the Trash through vpt's helper, while it holds the same
+write lock every writing command takes; when another vpt command holds that lock it moves nothing and
+the `staged_audio` row says so. It never overwrites, deletes or changes the mode of anything that
+exists, so a second run changes nothing. With named checks it repairs only within them: `config` for
+the file, `stores` for the folders and the link, `leftovers` for the staged audio. Doctor then checks
+again and reports the state after the repairs; each created row's detail starts with `created`, and
+the exit code follows that state. A repair that fails stays an issue with its reason, and the other
+repairs still run. Under `-o json` the document gains `fixed`, present only with `--fix`: one
+`{"check", "name", "detail"}` entry per repair made, one per file moved to the Trash with the detail
+`moved <path> to the Trash`, and `[]` when there was nothing to do. `--fix` leaves these for you, and
+their rows say what to do: note versions vpt kept, the mode of an existing state folder,
 a home link that points elsewhere, and an older ledger schema, which the next writing command
 upgrades. Plain `vpt doctor` already shows what `--fix` would create.
 
@@ -415,7 +419,7 @@ upgrades. Plain `vpt doctor` already shows what `--fix` would create.
 | `summary` | `command`, the analysis command: configured or not, available or not; `test` |
 | `actions` | `command` and `withdraw_command`: configured or not, available or not; `env`, the names of the variables set for them, never their values; `test` |
 | `calendar` | `source`, the configured `context.type`; `command`, available or not, for `dam`; `credentials`, which of the three Google keys are set, never their values; `test` |
-| `leftovers` | `staged_audio` waiting for the Trash; `kept_edits`, versions vpt kept beside a note |
+| `leftovers` | `staged_audio` waiting for the Trash, which `vpt doctor leftovers --fix` moves there; `kept_edits`, versions vpt kept beside a note |
 
 Name checks to run only those, as in `vpt doctor helper engines`. An unknown name is refused with
 exit 2 and the list of valid names. Each row is `ok`, `warning`, `issue` or `not_run`. A check takes
