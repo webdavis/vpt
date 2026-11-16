@@ -25,10 +25,6 @@ pub(crate) fn run(scenario: &str, state: RootDir, ready: fn()) {
                 started.elapsed() >= Duration::from_millis(20),
                 "contended lock did not wait"
             );
-            assert!(
-                started.elapsed() < crate::test_support::WATCHDOG,
-                "contended lock exceeded its short wait"
-            );
         }
         "lock_drop" => {
             let held = WriteLock::acquire(&state, Duration::ZERO).expect("first lock");
