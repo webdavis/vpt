@@ -3,6 +3,8 @@
 #![allow(clippy::single_range_in_vec_init, reason = "Flags contain word ranges")]
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
+#[path = "review/list_terminal.rs"]
+mod list_terminal;
 #[path = "review/output.rs"]
 mod output;
 mod support;

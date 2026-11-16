@@ -2,6 +2,7 @@ mod actions;
 mod analyze;
 mod ingest;
 mod list;
+mod review;
 mod run;
 mod search;
 mod show;
@@ -47,6 +48,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::Storage => Some(storage::render),
         Verb::Search(_) => Some(search::render),
         Verb::Show { stage: None, .. } => Some(show::render),
+        Verb::Review { .. } => Some(review::render),
         _ => None,
     }
 }
