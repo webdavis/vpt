@@ -10,6 +10,8 @@ mod engines;
 mod fix;
 #[path = "doctor/fix_leaves.rs"]
 mod fix_leaves;
+#[path = "doctor/fix_staged.rs"]
+mod fix_staged;
 #[path = "doctor/fixture.rs"]
 mod fixture;
 #[path = "doctor/human.rs"]

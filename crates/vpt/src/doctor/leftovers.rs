@@ -42,7 +42,7 @@ fn staged_audio(audio: &Path) -> Row {
                     names.join(", ")
                 ),
             )
-            .advice("move them to the Trash once no vpt command is running")
+            .advice("run `vpt doctor leftovers --fix` to move them to the Trash")
         }
         Err(message) => Row::issue("staged_audio", message),
     }

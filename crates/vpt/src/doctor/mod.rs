@@ -14,6 +14,7 @@ mod speakers;
 mod state_dir;
 mod stores;
 mod summary;
+mod trash;
 
 use crate::cli::output::Outcome;
 use crate::compose::Environment;

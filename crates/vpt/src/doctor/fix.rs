@@ -12,9 +12,15 @@ use vpt_application::Settings;
 use vpt_domain::layout::StoreKey;
 
 pub(super) struct Repair {
-    check: &'static str,
-    name: &'static str,
-    made: Result<(), String>,
+    pub(super) check: &'static str,
+    pub(super) name: &'static str,
+    pub(super) action: Action,
+    pub(super) made: Result<(), String>,
+}
+
+pub(super) enum Action {
+    Create,
+    Trash(String),
 }
 
 pub(super) fn repair(
@@ -27,16 +33,23 @@ pub(super) fn repair(
         repairs.push(Repair {
             check: "config",
             name: "file",
+            action: Action::Create,
             made: setup::write_starter(environment, config)
                 .map(drop)
                 .map_err(|error| error.message),
         });
     }
-    if named(wanted, "stores")
-        && let Ok((selected, settings)) = config::load(environment, config)
-    {
+    let Ok((selected, settings)) = config::load(environment, config) else {
+        return repairs;
+    };
+    if named(wanted, "stores") {
         repairs.extend(home_link(&settings));
         repairs.extend(directories(&settings, config::directory(&selected)));
+    }
+    if named(wanted, "leftovers")
+        && let Ok(roots) = resolve(&settings, config::directory(&selected))
+    {
+        repairs.extend(super::trash::staged_audio(&settings, &roots));
     }
     repairs
 }
@@ -48,6 +61,7 @@ fn home_link(settings: &Settings) -> Option<Repair> {
     (absent && link.is_absolute() && target.is_absolute()).then(|| Repair {
         check: "stores",
         name: "home_link",
+        action: Action::Create,
         made: deploy_symlink(link, target).map_err(|error| symlink::describe(&error, link, target)),
     })
 }
@@ -75,6 +89,7 @@ fn directories(settings: &Settings, config_dir: &Path) -> Vec<Repair> {
         .map(|(name, path)| Repair {
             check: "stores",
             name,
+            action: Action::Create,
             made: create_private_directory(&path)
                 .map_err(|error| setup::setup_error(error).message),
         })
@@ -90,17 +105,23 @@ pub(super) fn mark(checks: &mut [Check], repairs: Vec<Repair>) -> Vec<Value> {
             .flat_map(|check| check.rows.iter_mut())
             .find(|row| row.name == repair.name);
         let Some(row) = row else { continue };
-        match repair.made {
-            Ok(()) => {
+        let detail = match (repair.made, repair.action) {
+            (Ok(()), Action::Create) => {
                 row.detail = format!("created {}", row.detail);
-                fixed.push(json!({"check": repair.check, "name": repair.name,
-                    "detail": row.detail}));
+                row.detail.clone()
             }
-            Err(reason) => {
+            (Ok(()), Action::Trash(path)) => format!("moved {path} to the Trash"),
+            (Err(reason), action) => {
+                let target = match action {
+                    Action::Create => "create it".to_string(),
+                    Action::Trash(path) => format!("move {path} to the Trash"),
+                };
                 row.verdict = Verdict::Issue;
-                row.detail = format!("{}; could not create it: {reason}", row.detail);
+                row.detail = format!("{}; could not {target}: {reason}", row.detail);
+                continue;
             }
-        }
+        };
+        fixed.push(json!({"check": repair.check, "name": repair.name, "detail": detail}));
     }
     fixed
 }
