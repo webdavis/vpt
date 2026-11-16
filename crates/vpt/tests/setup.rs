@@ -4,6 +4,10 @@ mod engine;
 mod environment;
 #[path = "setup/source.rs"]
 mod source;
+#[path = "note/styled.rs"]
+mod styled;
+#[path = "setup/styled_result.rs"]
+mod styled_result;
 mod support;
 #[cfg(feature = "dev-tools")]
 #[path = "setup/terminal.rs"]

@@ -9,6 +9,7 @@ mod retention;
 mod review;
 mod run;
 mod search;
+mod setup;
 mod show;
 mod storage;
 mod symlink;
@@ -65,6 +66,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::RetentionRun { .. } => Some(retention::render),
         Verb::SymlinkDeploy => Some(symlink::deploy),
         Verb::SymlinkVerify => Some(symlink::verify),
+        Verb::Setup { .. } => Some(setup::render),
         _ => None,
     }
 }
