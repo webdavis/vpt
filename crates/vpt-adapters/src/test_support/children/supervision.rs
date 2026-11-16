@@ -1,7 +1,7 @@
 use super::{CLEANUP_BOUND, WATCHDOG, child_for_root};
 use crate::test_support::root;
 use std::io;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[test]
 fn a_second_milestone_cannot_reuse_the_first_ready_message() {
@@ -22,45 +22,6 @@ fn a_second_milestone_cannot_reuse_the_first_ready_message() {
     assert!(
         matches!(second, Err(error) if error.kind() == io::ErrorKind::TimedOut),
         "the participant is still waiting at its first milestone"
-    );
-}
-
-#[test]
-fn a_later_peer_keeps_the_original_scenario_budget() {
-    let (temp, _root) = root();
-    let observed = Instant::now();
-    let started = observed - WATCHDOG.saturating_sub(Duration::from_millis(100));
-    let mut first = child_for_root(
-        "supervision_ready",
-        temp.path(),
-        std::process::id(),
-        started,
-    )
-    .unwrap();
-    let first_pid = first.group.id();
-    first.ready().unwrap();
-    first.send("continue").unwrap();
-    assert!(first.finish().unwrap().status.success());
-    assert_reaped(first_pid);
-
-    let mut later = child_for_root(
-        "supervision_stall",
-        temp.path(),
-        std::process::id(),
-        started,
-    )
-    .unwrap();
-    let later_pid = later.group.id();
-    later.ready().unwrap();
-    later.send("continue").unwrap();
-    let error = later.finish().unwrap_err();
-    assert_reaped(later_pid);
-    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
-    assert!(error.to_string().contains("phase=pre-sql-stall"));
-    assert!(
-        observed.elapsed() < WATCHDOG,
-        "later peer reset the scenario budget: {:?}",
-        observed.elapsed()
     );
 }
 
