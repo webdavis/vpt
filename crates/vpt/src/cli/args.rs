@@ -1,3 +1,4 @@
+mod actions;
 pub(crate) mod analyze;
 pub(crate) mod brief;
 mod completion;

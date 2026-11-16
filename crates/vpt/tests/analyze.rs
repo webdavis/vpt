@@ -8,6 +8,8 @@ mod actions_crash;
 mod actions_env;
 #[path = "analyze/actions_link.rs"]
 mod actions_link;
+#[path = "analyze/actions_list.rs"]
+mod actions_list;
 #[path = "analyze/batch.rs"]
 mod batch;
 #[path = "analyze/batch_actions.rs"]

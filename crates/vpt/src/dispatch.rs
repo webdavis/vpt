@@ -154,6 +154,9 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             options,
         ),
         Verb::Review { id } => observe(invocation, |ledger| commands::review::run(ledger, id)),
+        Verb::ActionsList { id } => observe(invocation, |ledger| {
+            commands::actions::list(ledger, id.as_deref())
+        }),
         Verb::List { stage } => observe(invocation, |ledger| {
             commands::list::run(ledger, stage.as_deref())
         }),

@@ -7,7 +7,7 @@ mod withdraw;
 use super::errors::ledger_error;
 pub(crate) use counts::Counts;
 pub(crate) use queue::queue;
-use queue::queued;
+pub(crate) use queue::queued;
 pub(crate) use resend::require_command;
 use std::collections::BTreeSet;
 use vpt_adapters::{ActionSend, SendOutcome, SqliteLedger, note_link, send_action};

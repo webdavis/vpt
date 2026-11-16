@@ -105,6 +105,11 @@ pub(super) const NOTE_VERIFY: &str = examples![
     "vpt note verify notes/standup.md --recording 2026-08-24T144736-4f3ab19c02de",
     "vpt note verify notes/standup.md --recording 2026-08-24T144736-4f3ab19c02de --json",
 ];
+pub(super) const ACTIONS_LIST: &str = examples![
+    "vpt actions list",
+    "vpt actions list 2026-08-24T144736-4f3ab19c02de",
+    "vpt actions list --json",
+];
 pub(super) const OCCASIONS: &str = examples!["vpt occasions", "vpt occasions --json"];
 pub(super) const LIST: &str = examples!["vpt list", "vpt list --stage analysis", "vpt list --json"];
 pub(super) const SEARCH: &str = examples![

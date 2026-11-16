@@ -1,6 +1,6 @@
 use super::{
-    PathBuf, Verb, analyze, brief, completion, confirm, examples, groups, import, ledger, pipeline,
-    redact, review, search, show,
+    PathBuf, Verb, actions, analyze, brief, completion, confirm, examples, groups, import, ledger,
+    pipeline, redact, review, search, show,
 };
 
 #[derive(clap::Subcommand)]
@@ -63,6 +63,9 @@ pub(super) enum Command {
     /// Manage tags across every note vpt owns.
     #[command(subcommand, after_long_help = examples::DOCS)]
     Tag(groups::Tag),
+    /// See the follow-ups sent to the task tool.
+    #[command(subcommand, after_long_help = examples::DOCS)]
+    Actions(actions::Actions),
     /// Analyze one recording, every recording, or ids read from stdin.
     #[command(after_long_help = examples::ANALYZE)]
     Analyze(analyze::Args),
@@ -125,6 +128,7 @@ impl Command {
             Self::Review(review) => review.verb(),
             Self::Confirm(confirm) => confirm.verb(),
             Self::Tag(tag) => tag.verb(),
+            Self::Actions(actions) => actions.verb(),
             Self::Analyze(args) => args.verb(),
             Self::Path(path) => path.verb(),
             Self::Note(note) => note.verb(),

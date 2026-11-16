@@ -20,6 +20,9 @@ pub enum Verb {
         scope: analyze::Scope,
         dry_run: bool,
     },
+    ActionsList {
+        id: Option<String>,
+    },
     VerifyNote {
         path: PathBuf,
         recording: String,
@@ -118,6 +121,7 @@ impl Verb {
             | Self::Show { .. }
             | Self::Search(_)
             | Self::Review { .. }
+            | Self::ActionsList { .. }
             | Self::List { .. } => true,
             Self::Analyze { dry_run, .. }
             | Self::AnalyzeBatch { dry_run, .. }
