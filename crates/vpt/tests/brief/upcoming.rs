@@ -59,7 +59,7 @@ fn upcoming_publishes_each_identity_once_and_preserves_labels_and_rescheduled_pa
             event("later", now + 172800),
         ],
     );
-    let result = json(&invoke(&sandbox, &["brief", "upcoming", "--json"]));
+    let result = json(&invoke(&sandbox, &["brief", "upcoming", "-o", "json"]));
     assert_eq!(result["written"].as_array().unwrap().len(), 2);
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
         .unwrap()
@@ -102,7 +102,7 @@ fn upcoming_publishes_each_identity_once_and_preserves_labels_and_rescheduled_pa
         vec![event("one", now + 10800), event("two", now + 14400)],
     );
     assert_eq!(
-        json(&invoke(&sandbox, &["brief", "upcoming", "--json"]))["written"],
+        json(&invoke(&sandbox, &["brief", "upcoming", "-o", "json"]))["written"],
         json!([])
     );
     assert_eq!(reports(&sandbox).len(), 2);
@@ -128,7 +128,7 @@ fn failed_discovery_records_failure_without_accepting_partial_results() {
     )
     .unwrap();
     let config = fs::read(sandbox.config_path()).unwrap();
-    let output = invoke(&sandbox, &["brief", "upcoming", "--json"]);
+    let output = invoke(&sandbox, &["brief", "upcoming", "-o", "json"]);
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
     assert!(!stderr(&output).contains("PRIVATE"));
     assert!(output.stdout.is_empty());
@@ -166,7 +166,7 @@ fn disabled_context_cannot_be_used_as_successful_upcoming_discovery() {
     let sandbox = fixture::configured("brief-upcoming-none");
     fixture::write_config(&sandbox, "[brief.trigger]\nenabled=true\n");
     let before = fixture::snapshot(&sandbox);
-    let output = invoke(&sandbox, &["brief", "upcoming", "--json"]);
+    let output = invoke(&sandbox, &["brief", "upcoming", "-o", "json"]);
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
     assert_eq!(fixture::snapshot(&sandbox), before);
 }

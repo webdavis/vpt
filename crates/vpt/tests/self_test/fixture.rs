@@ -75,7 +75,7 @@ impl Trial {
     }
 
     pub(super) fn json(&self, args: &[&str], code: i32) -> Value {
-        let output = self.output(&[args, &["--json"]].concat());
+        let output = self.output(&[args, &["-o", "json"]].concat());
         assert_eq!(output.status.code(), Some(code), "{}", stderr(&output));
         assert!(output.stderr.is_empty(), "{}", stderr(&output));
         let document: Value = serde_json::from_str(&stdout(&output)).unwrap();

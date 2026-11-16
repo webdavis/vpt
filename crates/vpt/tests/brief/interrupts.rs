@@ -24,7 +24,7 @@ fn interrupted_context_stops_collection_without_publishing_manual_or_upcoming_br
                 ),
             );
             let args = if upcoming {
-                vec!["brief", "upcoming", "--json"]
+                vec!["brief", "upcoming", "-o", "json"]
             } else {
                 manual(&[])
             };

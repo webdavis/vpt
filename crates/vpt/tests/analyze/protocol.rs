@@ -22,7 +22,7 @@ fn accepted_proposal_diagnostics_survive_commit_and_publication_failures() {
             let mut command = sandbox.vpt();
             command.args(["analyze", record.id.as_str()]);
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = support::run_with_budget(&mut command, Duration::from_secs(5));
             assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
@@ -77,7 +77,7 @@ fn additive_proposal_diagnostics_are_visible_in_human_and_json_success() {
         let mut command = sandbox.vpt();
         command.args(["analyze", record.id.as_str()]);
         if structured {
-            command.arg("--json");
+            command.args(["-o", "json"]);
         }
         let output = support::run_with_budget(&mut command, Duration::from_secs(5));
         assert!(output.status.success(), "{}", stderr(&output));
@@ -118,7 +118,7 @@ fn unknown_proposal_versions_are_named_without_exposing_or_replacing_content() {
             let mut command = sandbox.vpt();
             command.args(["analyze", record.id.as_str()]);
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = support::run_with_budget(&mut command, Duration::from_secs(5));
             assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));

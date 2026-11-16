@@ -14,7 +14,8 @@ fn transcript(sandbox: &Sandbox, row: &vpt_application::ports::RecordingRecord) 
         row.id.as_str(),
         "--stage",
         "transcript",
-        "--json",
+        "-o",
+        "json",
     ]));
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let shown: Value = serde_json::from_str(&stdout(&output)).unwrap();

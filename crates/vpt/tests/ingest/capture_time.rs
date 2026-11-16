@@ -13,7 +13,7 @@ fn a_zero_or_pre_1971_creation_time_falls_back_to_the_modification_time() {
             .unwrap();
         let output = json(&run(sandbox
             .vpt()
-            .args(["ingest", "--json"])
+            .args(["ingest", "-o", "json"])
             .env("TZ", "UTC")));
         let ingested = &output["ingested"][0];
         assert_eq!(

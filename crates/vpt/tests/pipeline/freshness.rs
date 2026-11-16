@@ -18,7 +18,8 @@ fn changed_rendered_input_rechecks_transcript_before_analysis_and_then_skips_bot
             transcript.target.to_str().unwrap(),
             "--recording",
             row.id.as_str(),
-            "--json",
+            "-o",
+            "json",
         ]),
         std::time::Duration::from_secs(5),
     ));
@@ -79,7 +80,8 @@ fn run_rechecks_stale_transcript_findings_with_analysis_disabled() {
             transcript.target.to_str().unwrap(),
             "--recording",
             row.id.as_str(),
-            "--json",
+            "-o",
+            "json",
         ]),
         std::time::Duration::from_secs(5),
     ));

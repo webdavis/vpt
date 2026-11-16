@@ -135,7 +135,8 @@ fn review_returns_ranked_flags_occurrences_and_separate_diagnostics_without_writ
         "review",
         "list",
         id.as_str(),
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(result["command"], "review");
     assert_eq!(result["id"], id.as_str());
@@ -174,7 +175,7 @@ fn absent_or_invalid_recording_is_a_usage_error_without_creating_state() {
     let sandbox = fixture::configured("review-absent");
     let before = fixture::snapshot(&sandbox);
     for id in ["bad-id", "2026-08-24T144736-4f3ab19c02de"] {
-        let output = run(sandbox.vpt().args(["review", "list", id, "--json"]));
+        let output = run(sandbox.vpt().args(["review", "list", id, "-o", "json"]));
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
         let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();
@@ -195,7 +196,8 @@ fn an_ingested_recording_without_accepted_text_has_an_empty_review() {
         "review",
         "list",
         id.as_str(),
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(result["transcribed"], false);
     assert_eq!(result["open_flags"], 0);

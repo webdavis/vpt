@@ -14,22 +14,24 @@ use support::stderr;
 fn installed_pair_reports_versions_and_missing_helper_has_install_instructions() {
     let sandbox = configured("command");
     let before = fixture::snapshot(&sandbox);
-    let absent = json(&support::run(
-        command(&sandbox).args(["--version", "--json"]),
-    ));
+    let absent = json(&support::run(command(&sandbox).args([
+        "--version",
+        "-o",
+        "json",
+    ])));
     assert_eq!(absent["version"], env!("CARGO_PKG_VERSION"));
     assert!(absent["helper_version"].is_null());
     let with_helper = std::env::join_paths([sandbox.path().join("bin"), installed_bin()]).unwrap();
     let present = json(&support::run(
         command(&sandbox)
             .env("PATH", &with_helper)
-            .args(["--version", "--json"]),
+            .args(["--version", "-o", "json"]),
     ));
     assert_eq!(present["helper_version"], "1.0.0");
     let healthy = json(&support::run(
         command(&sandbox)
             .env("PATH", &with_helper)
-            .args(["doctor", "--json"]),
+            .args(["doctor", "-o", "json"]),
     ));
     assert!(
         healthy["needs_attention"]
@@ -39,7 +41,7 @@ fn installed_pair_reports_versions_and_missing_helper_has_install_instructions()
             .all(|entry| entry["result"] != "issue"),
         "{healthy}"
     );
-    let missing = support::run(command(&sandbox).args(["doctor", "--json"]));
+    let missing = support::run(command(&sandbox).args(["doctor", "-o", "json"]));
     assert_eq!(missing.status.code(), Some(1));
     assert!(missing.stderr.is_empty(), "{}", stderr(&missing));
     let report: serde_json::Value = serde_json::from_slice(&missing.stdout).unwrap();
@@ -86,16 +88,19 @@ fn installed_command_and_whisply_engines_work_without_helper_and_scheduled_runs_
         let source = runtime::add_audio(&sandbox);
         let original = std::fs::read(&source).unwrap();
         let before = fixture::snapshot(&sandbox);
-        let plan = json(&runtime::invoke(&sandbox, &["run", "--preview", "--json"]));
+        let plan = json(&runtime::invoke(
+            &sandbox,
+            &["run", "--preview", "-o", "json"],
+        ));
         assert_eq!(plan["would_ingest"].as_array().unwrap().len(), 1);
         assert_eq!(fixture::snapshot(&sandbox), before);
-        let first = json(&runtime::invoke(&sandbox, &["run", "--json"]));
+        let first = json(&runtime::invoke(&sandbox, &["run", "-o", "json"]));
         assert_eq!(first["ingested"].as_array().unwrap().len(), 1);
         assert_eq!(first["transcribed"].as_array().unwrap().len(), 1);
         assert_eq!(first["notes"].as_array().unwrap().len(), 1);
         let id = first["transcribed"][0].as_str().unwrap();
         assert_eq!(std::fs::read(source).unwrap(), original);
-        let second = json(&runtime::invoke(&sandbox, &["run", "--json"]));
+        let second = json(&runtime::invoke(&sandbox, &["run", "-o", "json"]));
         for field in ["ingested", "transcribed", "notes"] {
             assert_eq!(second[field], serde_json::json!([]));
         }
@@ -111,16 +116,17 @@ fn installed_command_and_whisply_engines_work_without_helper_and_scheduled_runs_
                 "Installation check",
                 "--at",
                 "2026-10-01T10:00:00-06:00",
-                "--json",
+                "-o",
+                "json",
             ],
         ));
         assert_eq!(brief["schema"], "vpt.brief/1");
-        let release = json(&runtime::invoke(&sandbox, &["redact", id, "--json"]));
+        let release = json(&runtime::invoke(&sandbox, &["redact", id, "-o", "json"]));
         assert!(std::path::Path::new(release["written"].as_str().unwrap()).is_file());
         let before = fixture::snapshot(&sandbox);
         let released = json(&runtime::invoke(
             &sandbox,
-            &["show", id, "--stage", "released", "--json"],
+            &["show", id, "--stage", "released", "-o", "json"],
         ));
         assert_eq!(released["command"], "show");
         assert_eq!(released["stage"], "released");
@@ -129,9 +135,11 @@ fn installed_command_and_whisply_engines_work_without_helper_and_scheduled_runs_
         assert!(!log.contains("Private words"));
         assert!(!log.contains("Installation check"));
         assert!(
-            json(&support::run(
-                command(&sandbox).args(["--version", "--json"])
-            ))["helper_version"]
+            json(&support::run(command(&sandbox).args([
+                "--version",
+                "-o",
+                "json"
+            ])))["helper_version"]
                 .is_null()
         );
         runtime::assert_retention_requires_helper(&sandbox);

@@ -10,7 +10,8 @@ fn correcting_a_renamed_note_preserves_operator_edits_and_invalidates_analysis()
         "note",
         "write",
         id.as_str(),
-        "--json",
+        "-o",
+        "json",
     ])));
     let original = inputs(&sandbox, &id).notes.remove(0);
     let renamed = original.target.with_file_name("Operator choice.md");
@@ -66,7 +67,8 @@ fn a_late_transaction_failure_rolls_back_resolution_note_and_terms() {
         "note",
         "write",
         id.as_str(),
-        "--json",
+        "-o",
+        "json",
     ])));
     let before = inputs(&sandbox, &id);
     sql(

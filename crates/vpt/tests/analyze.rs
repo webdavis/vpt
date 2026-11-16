@@ -83,7 +83,7 @@ use vpt_application::ports::*;
 
 fn invoke(sandbox: &Sandbox, id: &str, dry: bool) -> std::process::Output {
     let mut command = sandbox.vpt();
-    command.args(["analyze", id, "--json"]);
+    command.args(["analyze", id, "-o", "json"]);
     if dry {
         command.arg("--preview");
     }

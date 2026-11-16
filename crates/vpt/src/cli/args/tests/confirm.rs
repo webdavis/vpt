@@ -7,9 +7,10 @@ const LITERAL: [&str; 5] = ["Private topic", "-x", "--reject-tag", "--tag", "--t
 fn tag_acts_keep_private_values_literal_and_out_of_debug() {
     for (verb, expected) in [("tag", Action::Confirm), ("reject-tag", Action::Reject)] {
         for value in LITERAL {
-            let invocation =
-                parse(["vpt", "confirm", verb, "recording", value, "--json"].map(OsString::from))
-                    .unwrap();
+            let invocation = parse(
+                ["vpt", "confirm", verb, "recording", value, "-o", "json"].map(OsString::from),
+            )
+            .unwrap();
             assert_eq!(invocation.format, Some(Format::Json));
             assert!(!format!("{invocation:?}").contains(value));
             let Verb::ConfirmTag { id, tag, action } = invocation.verb else {
@@ -29,7 +30,8 @@ fn a_term_is_taken_literally_beside_global_options() {
         let invocation = parse(
             [
                 "vpt",
-                "--json",
+                "-o",
+                "json",
                 "confirm",
                 "term",
                 term,
@@ -52,11 +54,12 @@ fn a_term_is_taken_literally_beside_global_options() {
 #[test]
 fn a_value_spelled_like_a_global_flag_follows_the_end_of_flags() {
     let invocation =
-        parse(["vpt", "--json", "confirm", "term", "--", "--json"].map(OsString::from)).unwrap();
+        parse(["vpt", "-o", "json", "confirm", "term", "--", "--output"].map(OsString::from))
+            .unwrap();
     let Verb::ConfirmTerm { term } = invocation.verb else {
         panic!("confirm")
     };
-    assert_eq!(term.as_str(), "--json");
+    assert_eq!(term.as_str(), "--output");
 }
 
 #[test]

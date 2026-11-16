@@ -65,7 +65,7 @@ fn a_dry_run_at_a_terminal_lists_each_file_it_would_ingest() {
             path.display()
         )
     );
-    for format in ["--json", "--toon", "--output=yaml"] {
+    for format in ["--output=json", "--output=toon", "--output=yaml"] {
         assert_eq!(
             shown(&sandbox, &["--preview", format]),
             piped(&sandbox, &["--preview", format]),

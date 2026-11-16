@@ -45,7 +45,10 @@ fn brief_recovery_uses_saved_pack_without_sources_or_context_and_preserves_repla
         std::fs::set_permissions(&collector, std::fs::Permissions::from_mode(0o700)).unwrap();
         let config = std::fs::read_to_string(sandbox.config_path()).unwrap();
         std::fs::write(sandbox.config_path(), config + "\n[context]\ntype='dam'\ncalendars=['calendar/work/']\nprojects=['work/team/']\n").unwrap();
-        let output = invoke(&sandbox, &["note", "write", recording.as_str(), "--json"]);
+        let output = invoke(
+            &sandbox,
+            &["note", "write", recording.as_str(), "-o", "json"],
+        );
         assert!(!sandbox.path().join("collector-called").exists());
         let after = ledger(&sandbox).brief(&occasion.id).unwrap().unwrap();
         assert_eq!(after.snapshot, saved.snapshot);

@@ -66,7 +66,7 @@ fn note_acknowledgement_failure_keeps_saved_inputs_and_emits_no_premature_alert(
     json(&support::run_with_budget(
         sandbox
             .vpt()
-            .args(["confirm", "term", "Recovered", "--json"]),
+            .args(["confirm", "term", "Recovered", "-o", "json"]),
         std::time::Duration::from_secs(5),
     ));
     assert!(ledger(&sandbox).pending_publications().unwrap().is_empty());

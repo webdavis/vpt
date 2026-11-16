@@ -40,7 +40,7 @@ fn saved_engine_output_recovers_without_audio_or_another_engine_invocation() {
     let output = support::run_with_budget(
         sandbox
             .vpt()
-            .args(["note", "write", row.id.as_str(), "--json"]),
+            .args(["note", "write", row.id.as_str(), "-o", "json"]),
         std::time::Duration::from_secs(5),
     );
     json(&output);

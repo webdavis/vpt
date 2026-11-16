@@ -5,7 +5,7 @@ use vpt_application::ports::{RecordingLedger, RetentionJournal};
 
 fn fail_output(sandbox: &Sandbox, extra: &[&str]) -> serde_json::Value {
     let output = support::run_with_broken_stdout(
-        sandbox.vpt().args(["ingest", "--json"]).args(extra),
+        sandbox.vpt().args(["ingest", "-o", "json"]).args(extra),
         Duration::from_secs(5),
     );
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));

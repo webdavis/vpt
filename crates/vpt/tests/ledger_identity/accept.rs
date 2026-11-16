@@ -12,7 +12,7 @@ fn accept_preview_names_both_sides_and_changes_nothing() {
     ingested(&sandbox, "b.m4a", FIRST + 60);
     deliver(&older, &state(&sandbox));
     let before = snapshot(&sandbox);
-    let preview = crate::json(&sandbox, &["ledger", "accept", "--preview", "--json"]);
+    let preview = crate::json(&sandbox, &["ledger", "accept", "--preview", "-o", "json"]);
     assert_eq!(snapshot(&sandbox), before);
     assert_eq!(preview["command"], "ledger accept");
     assert_eq!(preview["preview"], true);
@@ -47,7 +47,7 @@ fn accept_with_nothing_to_accept_exits_two_and_changes_nothing() {
     }
     ingested(&sandbox, "a.m4a", FIRST);
     let before = snapshot(&sandbox);
-    let healthy = vpt(&sandbox, &["ledger", "accept", "--json"]);
+    let healthy = vpt(&sandbox, &["ledger", "accept", "-o", "json"]);
     assert_eq!(healthy.status.code(), Some(2), "{}", stderr(&healthy));
     let document: serde_json::Value = serde_json::from_slice(&healthy.stderr).unwrap();
     assert!(

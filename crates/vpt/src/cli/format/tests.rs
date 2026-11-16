@@ -94,16 +94,17 @@ fn the_format_named_before_parsing_is_found_in_every_spelling() {
             .collect()
     };
     for (line, format) in [
-        ("show --json", Some(Format::Json)),
-        ("--toon show", Some(Format::Toon)),
+        ("show --json", None),
+        ("--toon show", None),
+        ("-o toon show", Some(Format::Toon)),
         ("show --output yaml", Some(Format::Yaml)),
         ("show -o json", Some(Format::Json)),
         ("show --output=toon", Some(Format::Toon)),
         ("show -oyaml", Some(Format::Yaml)),
-        ("show --json --toon", None),
+        ("show -o json --output toon", None),
         ("show --output xml", None),
         ("show --yaml", None),
-        ("search -- --json", None),
+        ("search -- -o json", None),
     ] {
         assert_eq!(super::named(&words(line)), format, "{line}");
     }

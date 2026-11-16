@@ -8,7 +8,9 @@ const NO_TERMINAL: &str =
 fn setup_with_an_engine_writes_the_config_without_a_terminal() {
     for engine in ["apple", "whisply"] {
         let sandbox = Sandbox::new("setup-engine");
-        let output = run(sandbox.vpt().args(["setup", "--engine", engine, "--json"]));
+        let output = run(sandbox
+            .vpt()
+            .args(["setup", "--engine", engine, "-o", "json"]));
         assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
         let result: serde_json::Value = serde_json::from_str(&stdout(&output)).unwrap();
         assert_eq!(result["main_engine"], engine);
@@ -31,7 +33,7 @@ fn setup_refuses_an_engine_it_does_not_offer() {
 #[test]
 fn setup_without_an_engine_or_a_terminal_names_the_flag() {
     let sandbox = Sandbox::new("setup-engine-missing");
-    let output = run(sandbox.vpt().args(["setup", "--json"]));
+    let output = run(sandbox.vpt().args(["setup", "-o", "json"]));
     assert_eq!(output.status.code(), Some(2));
     let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();
     assert_eq!(error["error"]["message"], NO_TERMINAL);

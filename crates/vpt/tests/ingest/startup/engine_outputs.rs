@@ -101,7 +101,7 @@ fn startup_recovers_saved_engine_output_privately_without_running_an_engine() {
     sandbox.install_fake_helper();
     let (target, bytes) = seed_output(&sandbox);
     add(&sandbox, "new.m4a");
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     json(&output);
     assert_eq!(std::fs::read(&target).unwrap(), bytes);
     assert_eq!(
@@ -126,7 +126,12 @@ fn dry_run_preserves_pending_engine_output_and_saved_state() {
     let (target, _) = seed_output(&sandbox);
     add(&sandbox, "new.m4a");
     let before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
+    json(&run(sandbox.vpt().args([
+        "ingest",
+        "--preview",
+        "-o",
+        "json",
+    ])));
     assert_eq!(snapshot(&sandbox), before);
     assert!(!target.exists());
 }
@@ -146,10 +151,11 @@ fn retention_repairs_engine_outputs_before_new_work_but_its_dry_run_does_not() {
         "retention",
         "run",
         "--preview",
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(snapshot(&sandbox), before);
-    json(&run(sandbox.vpt().args(["retention", "run", "--json"])));
+    json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     assert_eq!(std::fs::read(&target).unwrap(), bytes);
     assert_eq!(
         std::fs::metadata(target).unwrap().permissions().mode() & 0o777,
@@ -163,7 +169,7 @@ fn replaced_raw_output_is_preserved_and_its_publication_stays_pending() {
     let (target, _) = seed_output(&sandbox);
     std::fs::write(&target, b"operator replacement").unwrap();
     add(&sandbox, "new.m4a");
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
     assert!(output.stdout.is_empty());
     assert_eq!(std::fs::read(&target).unwrap(), b"operator replacement");

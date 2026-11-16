@@ -8,7 +8,7 @@ fn output_failure_reports_each_committed_recording_once_and_unchanged_retry_clai
     add(&sandbox, "two.m4a", 1_787_604_476);
     for first in [true, false] {
         let output = support::run_with_broken_stdout(
-            sandbox.vpt().args(["run", "--json"]),
+            sandbox.vpt().args(["run", "-o", "json"]),
             Duration::from_secs(8),
         );
         assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
@@ -53,7 +53,7 @@ fn dry_run_output_failure_does_not_claim_or_perform_planned_work() {
     add(&sandbox, "one.m4a", 1_787_604_456);
     let before = fixture::snapshot(&sandbox);
     let output = support::run_with_broken_stdout(
-        sandbox.vpt().args(["run", "--json", "--preview"]),
+        sandbox.vpt().args(["run", "-o", "json", "--preview"]),
         Duration::from_secs(8),
     );
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));

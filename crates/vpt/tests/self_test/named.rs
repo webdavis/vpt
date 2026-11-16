@@ -64,7 +64,7 @@ fn an_issue_prints_its_advice_and_exits_one() {
 fn a_missing_config_is_a_config_error() {
     let trial = Trial::new("test-no-config");
     std::fs::remove_file(trial.sandbox.config_path()).unwrap();
-    let output = trial.output(&["test", "--json"]);
+    let output = trial.output(&["test", "-o", "json"]);
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(stdout(&output), "");
     let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();

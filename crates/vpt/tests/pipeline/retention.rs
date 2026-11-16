@@ -139,7 +139,7 @@ fn retention_output_failure_keeps_actual_completions_and_dry_run_claims_none() {
     for dry_run in [true, false] {
         let before = fixture::snapshot(&sandbox);
         let mut command = sandbox.vpt();
-        command.args(["run", "--json"]);
+        command.args(["run", "-o", "json"]);
         if dry_run {
             command.arg("--preview");
         }

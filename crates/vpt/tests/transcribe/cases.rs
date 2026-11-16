@@ -229,7 +229,7 @@ fn both_engine_provenances_survive_raw_output_removal_and_note_publication() {
     let output = support::run_with_budget(
         sandbox
             .vpt()
-            .args(["note", "write", row.id.as_str(), "--json"]),
+            .args(["note", "write", row.id.as_str(), "-o", "json"]),
         std::time::Duration::from_secs(5),
     );
     let result = json(&output);

@@ -29,7 +29,7 @@ fn each_follow_up_is_listed_with_its_state_and_listing_writes_nothing() {
     fs::write(log.with_extension("fail"), "4").unwrap();
     note::success(&invoke(&sandbox, record.id.as_str(), false));
     let before = fixture::snapshot(&sandbox);
-    let all = note::success(&list(&sandbox, &["--json"]));
+    let all = note::success(&list(&sandbox, &["-o", "json"]));
     assert_eq!(all["command"], "actions list");
     let rows = states(&all);
     assert_eq!(rows.len(), 4, "{all}");
@@ -61,7 +61,7 @@ fn sent_follow_ups_are_listed_as_sent() {
     let (sandbox, record) = spoken();
     configure_with(&sandbox, "");
     note::success(&invoke(&sandbox, record.id.as_str(), false));
-    let rows = states(&note::success(&list(&sandbox, &["--json"])));
+    let rows = states(&note::success(&list(&sandbox, &["-o", "json"])));
     assert_eq!(rows.len(), 4);
     assert!(rows.iter().all(|(state, _)| state == "sent"), "{rows:?}");
 }
@@ -70,7 +70,7 @@ fn sent_follow_ups_are_listed_as_sent() {
 fn an_empty_list_exits_zero_and_says_so() {
     let (sandbox, _) = spoken();
     configure_with(&sandbox, "");
-    let document = note::success(&list(&sandbox, &["--json"]));
+    let document = note::success(&list(&sandbox, &["-o", "json"]));
     assert_eq!(document["actions"], serde_json::json!([]));
     let output = list(&sandbox, &[]);
     assert_eq!(output.status.code(), Some(0));

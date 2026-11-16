@@ -52,7 +52,9 @@ fn standalone_analysis_reports_findings_after_analysis_publication() {
     boundaries::alert_hook(&sandbox, 3);
     let row = ledger(&sandbox).recordings().unwrap().remove(0);
     json(&support::run_with_budget(
-        sandbox.vpt().args(["analyze", row.id.as_str(), "--json"]),
+        sandbox
+            .vpt()
+            .args(["analyze", row.id.as_str(), "-o", "json"]),
         std::time::Duration::from_secs(5),
     ));
     let analysis = ledger(&sandbox)

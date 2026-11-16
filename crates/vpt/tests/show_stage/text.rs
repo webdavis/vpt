@@ -26,7 +26,7 @@ pub(super) fn analyze(sandbox: &Sandbox, id: &vpt_domain::identity::RecordingId,
         sandbox,
         &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {path:?}]\n"),
     );
-    json(&invoke(sandbox, &["analyze", id.as_str(), "--json"]));
+    json(&invoke(sandbox, &["analyze", id.as_str(), "-o", "json"]));
 }
 
 #[test]

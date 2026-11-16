@@ -43,7 +43,7 @@ fn preview(sandbox: &Sandbox, verb: &str, id: &str, json: bool) -> std::process:
     }
     command.arg("--preview");
     if json {
-        command.arg("--json");
+        command.args(["-o", "json"]);
     }
     let budget = match verb {
         "ingest" => Duration::from_secs(3),

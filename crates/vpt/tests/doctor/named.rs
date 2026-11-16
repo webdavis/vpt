@@ -9,7 +9,7 @@ fn named_checks_run_alone_in_display_order_once_each() {
     let output = run(sandbox
         .vpt()
         .current_dir(sandbox.path())
-        .args(["doctor", "engines", "helper", "engines", "--json"]));
+        .args(["doctor", "engines", "helper", "engines", "-o", "json"]));
     let document = report(&output, 0);
     assert_eq!(names(&document), ["helper", "engines"]);
     assert_eq!(row(&document, "engines", "apple")["result"], "ok");
@@ -22,7 +22,7 @@ fn every_check_name_is_accepted_alone() {
         let output = run(sandbox
             .vpt()
             .current_dir(sandbox.path())
-            .args(["doctor", name, "--json"]));
+            .args(["doctor", name, "-o", "json"]));
         assert_eq!(names(&report(&output, 0)), [name]);
     }
 }
@@ -34,7 +34,7 @@ fn a_named_check_without_a_config_reports_the_config_issue_and_exits_one() {
     let output = run(sandbox
         .vpt()
         .current_dir(sandbox.path())
-        .args(["doctor", "helper", "--json"]));
+        .args(["doctor", "helper", "-o", "json"]));
     let document = report(&output, 1);
     assert_eq!(names(&document), ["config", "helper"]);
     assert_eq!(row(&document, "config", "file")["result"], "issue");
@@ -54,11 +54,12 @@ fn an_unknown_check_name_is_a_usage_error_naming_the_valid_ones() {
     let text = stderr(&output);
     assert!(text.starts_with("vpt: invalid value for "), "{text}");
     assert!(text.lines().next().unwrap().ends_with(VALID), "{text}");
-    let output =
-        run(sandbox
-            .vpt()
-            .current_dir(sandbox.path())
-            .args(["doctor", "made-up-check", "--json"]));
+    let output = run(sandbox.vpt().current_dir(sandbox.path()).args([
+        "doctor",
+        "made-up-check",
+        "-o",
+        "json",
+    ]));
     assert_eq!(output.status.code(), Some(2));
     let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();
     assert_eq!(error["error"]["kind"], "usage");

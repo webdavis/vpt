@@ -29,7 +29,7 @@ fn configured() -> (Sandbox, Vec<RecordingRecord>, std::path::PathBuf) {
 
 fn vpt(sandbox: &Sandbox, args: &[&str]) {
     note::success(&support::run_with_budget(
-        sandbox.vpt().args(args).arg("--json"),
+        sandbox.vpt().args(args).args(["-o", "json"]),
         Duration::from_secs(10),
     ));
 }

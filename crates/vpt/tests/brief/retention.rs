@@ -38,7 +38,8 @@ fn retention_reports_brief_occasion_and_explicit_brief_regenerates_the_expired_f
         "retention",
         "run",
         "--preview",
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(planned["counts"]["briefs"], 1);
     assert_eq!(planned["moved"][0]["id"], brief.snapshot.id.as_str());
@@ -46,7 +47,8 @@ fn retention_reports_brief_occasion_and_explicit_brief_regenerates_the_expired_f
     let moved = json(&support::run(sandbox.vpt().args([
         "retention",
         "run",
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(moved["counts"]["briefs"], 1);
     assert_eq!(
@@ -72,7 +74,7 @@ fn retention_reports_brief_occasion_and_explicit_brief_regenerates_the_expired_f
     drop(ledger);
     json(&invoke(
         &sandbox,
-        &["brief", brief.snapshot.id.as_str(), "--json"],
+        &["brief", brief.snapshot.id.as_str(), "-o", "json"],
     ));
     assert!(brief.target.exists());
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
@@ -129,7 +131,7 @@ fn mutating_startup_recovers_absent_brief_by_occasion_before_deliberate_regenera
     drop(ledger);
     let result = json(&invoke(
         &sandbox,
-        &["brief", brief.snapshot.id.as_str(), "--json"],
+        &["brief", brief.snapshot.id.as_str(), "-o", "json"],
     ));
     assert_eq!(
         result["retention"]["completed"],
@@ -158,21 +160,21 @@ fn pipeline_retention_reports_later_store_moves_and_keeps_expired_briefs_absent(
     )
     .unwrap();
     let before = fixture::snapshot(&sandbox);
-    let plan = json(&invoke(&sandbox, &["run", "--preview", "--json"]));
+    let plan = json(&invoke(&sandbox, &["run", "--preview", "-o", "json"]));
     assert_eq!(
         plan["retention"]["moved"][0]["id"],
         brief.snapshot.id.as_str()
     );
     assert_eq!(plan["retention"]["completed"], serde_json::json!([]));
     assert_eq!(fixture::snapshot(&sandbox), before);
-    let result = json(&invoke(&sandbox, &["run", "--json"]));
+    let result = json(&invoke(&sandbox, &["run", "-o", "json"]));
     assert_eq!(result["retention"]["counts"]["briefs"], 1);
     assert_eq!(
         result["retention"]["completed"],
         serde_json::json!([brief.snapshot.id.as_str()])
     );
     assert!(!brief.target.exists());
-    let again = json(&invoke(&sandbox, &["run", "--json"]));
+    let again = json(&invoke(&sandbox, &["run", "-o", "json"]));
     assert_eq!(again["retention"]["moved"], serde_json::json!([]));
     assert!(!brief.target.exists());
 }

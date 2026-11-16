@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn verification_requires_a_path_and_recording_and_accepts_global_options() {
     assert_eq!(
-        parsed("note verify note.md --recording memo --json")
+        parsed("note verify note.md --recording memo -o json")
             .unwrap()
             .verb,
         Verb::VerifyNote {
@@ -27,7 +27,7 @@ fn verification_requires_a_path_and_recording_and_accepts_global_options() {
 #[test]
 fn an_occasion_path_is_its_own_subcommand() {
     assert_eq!(
-        parsed("path occasion meeting --stage brief --json")
+        parsed("path occasion meeting --stage brief -o json")
             .unwrap()
             .verb,
         Verb::OccasionPath {

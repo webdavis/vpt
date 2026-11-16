@@ -63,7 +63,7 @@ fn real_expiration_stays_terminal_and_explicit_note_restores_saved_render_inputs
     json(&support::run_with_budget(
         sandbox
             .vpt()
-            .args(["note", "write", row.id.as_str(), "--json"]),
+            .args(["note", "write", row.id.as_str(), "-o", "json"]),
         std::time::Duration::from_secs(8),
     ));
     let restored = ledger(&sandbox).note_inputs(&row.id).unwrap().unwrap();
@@ -212,8 +212,8 @@ fn changed_pending_note_blocks_automatic_and_explicit_regeneration() {
     );
     fs::write(&note.path, &changed).unwrap();
     for args in [
-        vec!["run", "--json"],
-        vec!["note", "write", row.id.as_str(), "--json"],
+        vec!["run", "-o", "json"],
+        vec!["note", "write", row.id.as_str(), "-o", "json"],
     ] {
         let output =
             support::run_with_budget(sandbox.vpt().args(args), std::time::Duration::from_secs(8));

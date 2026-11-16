@@ -40,11 +40,11 @@ fn ingest(sandbox: &Sandbox, name: &str, captured: i64) -> serde_json::Value {
         .unwrap()
         .set_modified(std::time::UNIX_EPOCH + Duration::from_secs(captured as u64))
         .unwrap();
-    json(sandbox.vpt().args(["ingest", "--json"]))
+    json(sandbox.vpt().args(["ingest", "-o", "json"]))
 }
 
 fn titles(sandbox: &Sandbox) -> Vec<String> {
-    let listed = json(sandbox.vpt().args(["list", "--json"]));
+    let listed = json(sandbox.vpt().args(["list", "-o", "json"]));
     let mut titles: Vec<String> = listed["recordings"]
         .as_array()
         .unwrap()
@@ -56,7 +56,7 @@ fn titles(sandbox: &Sandbox) -> Vec<String> {
 }
 
 fn ids(sandbox: &Sandbox) -> Vec<String> {
-    let listed = json(sandbox.vpt().args(["list", "--json"]));
+    let listed = json(sandbox.vpt().args(["list", "-o", "json"]));
     let mut ids: Vec<String> = listed["recordings"]
         .as_array()
         .unwrap()

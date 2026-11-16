@@ -23,7 +23,7 @@ fn accepted_engine_diagnostics_survive_commit_and_publication_failures() {
             let mut command = sandbox.vpt();
             command.args(["transcribe", record.id.as_str()]);
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = support::run_with_budget(&mut command, Duration::from_secs(5));
             assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
@@ -81,7 +81,7 @@ fn unsupported_engine_version_is_named_in_both_error_formats() {
         let mut command = sandbox.vpt();
         command.args(["transcribe", record.id.as_str()]);
         if structured {
-            command.arg("--json");
+            command.args(["-o", "json"]);
         }
         let output = support::run_with_budget(&mut command, Duration::from_secs(5));
         assert_eq!(output.status.code(), Some(1));

@@ -22,14 +22,14 @@ fn split(name: &str, term: Option<&str>, texts: &[&str], halves: &[(usize, &str)
             .collect();
         let id = recording::seed_segments(&sandbox, flags, texts);
         if let Some(term) = term {
-            json(&invoke(&sandbox, &["confirm", "term", term, "--json"]));
+            json(&invoke(&sandbox, &["confirm", "term", term, "-o", "json"]));
         }
         if mark {
             fixture::write_config(&sandbox, "[share.redact]\nflagged_spans = \"mark\"\n");
         }
         let mut before = BTreeSet::new();
         files(sandbox.path(), &mut before);
-        let output = invoke(&sandbox, &["redact", id.as_str(), "--json"]);
+        let output = invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]);
         let mut emitted = format!("{}{}", support::stdout(&output), stderr(&output));
         assert_eq!(output.status.code(), Some(3), "{mark} {emitted}");
         let error: serde_json::Value = serde_json::from_slice(&output.stderr).unwrap();

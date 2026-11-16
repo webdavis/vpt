@@ -31,7 +31,7 @@ fn a_redo_drops_automatic_tags_the_new_proposal_omits_and_keeps_hand_set_ones() 
         note::success(&support::run_with_budget(
             sandbox
                 .vpt()
-                .args(["confirm", flag, record.id.as_str(), tag, "--json"]),
+                .args(["confirm", flag, record.id.as_str(), tag, "-o", "json"]),
             Duration::from_secs(5),
         ));
     }

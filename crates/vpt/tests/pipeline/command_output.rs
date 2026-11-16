@@ -9,7 +9,7 @@ fn every_mutating_command_emits_one_versioned_success_or_human_summary() {
             let mut command = sandbox.vpt();
             command.args(&args);
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = support::run_with_budget(
                 &mut command,
@@ -58,7 +58,7 @@ fn observational_commands_emit_one_versioned_document_and_preserve_all_files() {
     let ledger = ledger(&sandbox);
     let id = ledger.recordings().unwrap().remove(0).id;
     json(&support::run_with_budget(
-        sandbox.vpt().args(["redact", id.as_str(), "--json"]),
+        sandbox.vpt().args(["redact", id.as_str(), "-o", "json"]),
         Duration::from_secs(5),
     ));
     let before = fixture::snapshot(&sandbox);
@@ -67,7 +67,7 @@ fn observational_commands_emit_one_versioned_document_and_preserve_all_files() {
             let mut command = sandbox.vpt();
             command.args(&args);
             if structured {
-                command.arg("--json");
+                command.args(["-o", "json"]);
             }
             let output = support::run_with_budget(&mut command, Duration::from_secs(5));
             assert_eq!(

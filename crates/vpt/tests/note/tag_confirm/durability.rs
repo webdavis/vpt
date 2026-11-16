@@ -22,9 +22,14 @@ fn export_failure_keeps_tag_success_and_reports_a_safe_warning() {
 fn output_failure_preserves_confirmed_tag_and_vocabulary_without_leaking_tag_text() {
     let (sandbox, row, path) = configured_tags();
     let output = support::run_with_broken_stdout(
-        sandbox
-            .vpt()
-            .args(["confirm", "tag", row.id.as_str(), "Private topic", "--json"]),
+        sandbox.vpt().args([
+            "confirm",
+            "tag",
+            row.id.as_str(),
+            "Private topic",
+            "-o",
+            "json",
+        ]),
         std::time::Duration::from_secs(5),
     );
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));

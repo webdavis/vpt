@@ -16,7 +16,7 @@ fn hook_failure_warns_without_changing_the_completed_move() {
     sandbox.install_fake_helper();
     let row = expired_audio(&sandbox);
     report_command(&sandbox, "[\"missing-report-command\"]");
-    let result = json(&run(sandbox.vpt().args(["retention", "run", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     assert_eq!(result["completed"], serde_json::json!([row.id.as_str()]));
     assert_eq!(
         result["diagnostics"],
@@ -47,7 +47,7 @@ fn unchanged_untracked_and_modified_files_are_kept() {
         .unwrap()
         .set_modified(SystemTime::UNIX_EPOCH)
         .unwrap();
-    let result = json(&run(sandbox.vpt().args(["retention", "run", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     assert_eq!(result["moved"], serde_json::json!([]));
     let reasons: Vec<_> = result["kept"]
         .as_array()
@@ -69,7 +69,7 @@ fn unsafe_state_is_refused_before_lock_or_history_creation() {
     std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o755)).unwrap();
     let before = snapshot(&sandbox);
     let result = error(
-        &run(sandbox.vpt().args(["retention", "run", "--json"])),
+        &run(sandbox.vpt().args(["retention", "run", "-o", "json"])),
         3,
         "refused",
     );
@@ -95,7 +95,7 @@ fn retention_waits_for_an_existing_writer_to_finish() {
         std::thread::sleep(Duration::from_millis(150));
         drop(held);
     });
-    let output = run(sandbox.vpt().args(["retention", "run", "--json"]));
+    let output = run(sandbox.vpt().args(["retention", "run", "-o", "json"]));
     release.join().unwrap();
     let result = json(&output);
     assert_eq!(result["completed"], serde_json::json!([row.id.as_str()]));
@@ -110,7 +110,7 @@ fn completed_move_sends_one_private_safe_report_document() {
         &sandbox,
         &format!("[{:?}, \"command-sink\"]", support::FAKE_ENGINE),
     );
-    json(&run(sandbox.vpt().args(["retention", "run", "--json"])));
+    json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     let log = std::fs::read_to_string(sandbox.fake_log()).unwrap();
     let records: Vec<serde_json::Value> = log
         .lines()
@@ -138,7 +138,7 @@ fn redirected_audio_is_kept_while_regular_candidates_are_moved() {
     std::fs::write(&outside, b"external audio").unwrap();
     let link = row.audio_path.with_file_name("redirected.m4a");
     std::os::unix::fs::symlink(&outside, &link).unwrap();
-    let result = json(&run(sandbox.vpt().args(["retention", "run", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     assert_eq!(result["moved"].as_array().unwrap().len(), 1);
     assert_eq!(
         result["kept"],
@@ -155,7 +155,7 @@ fn ledger_audio_outside_configured_authority_is_reported_kept() {
     row.audio_path = sandbox.path().join("outside-authority.m4a");
     std::fs::write(&row.audio_path, b"outside").unwrap();
     seed(&sandbox, vec![row.clone()]);
-    let result = json(&run(sandbox.vpt().args(["retention", "run", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     assert_eq!(
         result["kept"],
         serde_json::json!([{"path": row.audio_path, "reason": "path_escape"}])

@@ -106,7 +106,7 @@ fn configuration_precedence_reaches_every_new_command_without_mutation() {
                 let mut command = sandbox.vpt();
                 command.env_remove("VPT_CONFIG");
                 if structured {
-                    command.arg("--json");
+                    command.args(["-o", "json"]);
                 }
                 command.args(&args);
                 let key = match selected {
@@ -148,7 +148,7 @@ fn configuration_versions_and_invalid_values_refuse_before_new_command_work() {
         write(&sandbox.config_path(), text);
         let before = fixture::snapshot(&sandbox);
         for args in commands(&sandbox) {
-            refusal(sandbox.vpt().args(&args).arg("--json"), key, true);
+            refusal(sandbox.vpt().args(&args).args(["-o", "json"]), key, true);
             assert_eq!(fixture::snapshot(&sandbox), before, "{args:?}");
         }
     }

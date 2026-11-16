@@ -71,7 +71,12 @@ fn dry_run_with_absent_state_is_observational_and_reports_candidates() {
     let sandbox = configured();
     let path = add(&sandbox, "a.m4a");
     let before = snapshot(&sandbox);
-    let doc = json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
+    let doc = json(&run(sandbox.vpt().args([
+        "ingest",
+        "--preview",
+        "-o",
+        "json",
+    ])));
     assert_eq!(doc["command"], "ingest");
     assert_eq!(doc["would_ingest"][0]["path"], path.to_str().unwrap());
     assert_eq!(doc["would_ingest"][0]["title_source"], "unavailable");
@@ -82,14 +87,14 @@ fn dry_run_with_absent_state_is_observational_and_reports_candidates() {
 fn ingest_archives_records_logs_and_skips_an_unchanged_source() {
     let sandbox = configured();
     let path = add(&sandbox, "a.m4a");
-    let first = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    let first = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     let id = first["ingested"][0]["id"].as_str().unwrap();
     let audio = first["ingested"][0]["audio_path"].as_str().unwrap();
     assert_eq!(std::fs::read(audio).unwrap(), std::fs::read(path).unwrap());
     let log = std::fs::read_to_string(sandbox.path().join("state/vpt/events.jsonl")).unwrap();
     assert!(log.contains("ingest"));
     assert!(!log.contains("private audio"));
-    let second = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    let second = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     assert_eq!(second["skipped"], 1);
     assert_eq!(second["already_ingested"][0], id);
     assert_eq!(second["ingested"], serde_json::json!([]));
@@ -103,7 +108,7 @@ fn once_dry_run_refuses_an_escaped_source() {
     let before = snapshot(&sandbox);
     let output = run(sandbox
         .vpt()
-        .args(["ingest", "--preview", "--json", "--once"])
+        .args(["ingest", "--preview", "-o", "json", "--once"])
         .arg(outside));
     assert_eq!(output.status.code(), Some(3));
     assert!(output.stdout.is_empty());

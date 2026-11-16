@@ -26,7 +26,7 @@ fn invoke(sandbox: &Sandbox, path: &Path, id: &str) -> std::process::Output {
             .vpt()
             .args(["note", "verify"])
             .arg(path)
-            .args(["--recording", id, "--json"]),
+            .args(["--recording", id, "-o", "json"]),
         std::time::Duration::from_secs(5),
     )
 }

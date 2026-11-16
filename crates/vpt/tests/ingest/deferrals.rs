@@ -43,7 +43,7 @@ fn persistent_deferrals_alert_once_at_default_and_custom_threshold_then_recover(
         fs::write(sandbox.config_path(), config).unwrap();
         let mut first_seen = None;
         for count in 1..=threshold + 1 {
-            let result = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+            let result = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
             assert_eq!(
                 result["deferred"],
                 serde_json::json!([{"path":path,"reason":"invalid_container"}])
@@ -79,16 +79,21 @@ fn persistent_deferrals_alert_once_at_default_and_custom_threshold_then_recover(
             1
         );
         let before = snapshot(&sandbox);
-        json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
+        json(&run(sandbox.vpt().args([
+            "ingest",
+            "--preview",
+            "-o",
+            "json",
+        ])));
         assert_eq!(snapshot(&sandbox), before);
         fs::write(&path, m4a(1_787_604_456, 12, b"repaired audio")).unwrap();
         fs::File::open(&path)
             .unwrap()
             .set_modified(std::time::UNIX_EPOCH)
             .unwrap();
-        let settling = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+        let settling = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
         assert_eq!(settling["deferred"][0]["reason"], "not_at_rest");
-        let accepted = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+        let accepted = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
         assert_eq!(accepted["ingested"].as_array().unwrap().len(), 1);
         let seen = ledger(&sandbox).seen(&path).unwrap().unwrap();
         assert_eq!(seen.deferral_count, 0);

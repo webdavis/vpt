@@ -25,7 +25,10 @@ pub(super) fn transcribed(sandbox: &Sandbox, seed: u8, segments: &[(f64, &str)])
         record::seed(sandbox, vec![row]);
     }
     accept(sandbox, &id, segments);
-    json(&invoke(sandbox, &["note", "write", id.as_str(), "--json"]));
+    json(&invoke(
+        sandbox,
+        &["note", "write", id.as_str(), "-o", "json"],
+    ));
     id
 }
 
@@ -107,7 +110,7 @@ pub(super) fn analyzed(sandbox: &Sandbox, id: &RecordingId, proposal: &str) {
         sandbox,
         &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {document:?}]\n"),
     );
-    json(&invoke(sandbox, &["analyze", id.as_str(), "--json"]));
+    json(&invoke(sandbox, &["analyze", id.as_str(), "-o", "json"]));
     std::fs::remove_file(script).unwrap();
     std::fs::remove_file(document).unwrap();
 }

@@ -115,7 +115,7 @@ fn two_speaker_labels_are_ok_and_the_row_says_what_left_the_machine() {
     let trial = Trial::new("test-speakers-two");
     let logs = speakers(&trial, &["SPEAKER_00", "SPEAKER_01"], true);
     let before = crate::observations_fixture::snapshot(&trial.sandbox);
-    let output = trial.output(&["test", "speakers", "--json"]);
+    let output = trial.output(&["test", "speakers", "-o", "json"]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert!(!stdout(&output).contains(TOKEN));
     let document: Value = serde_json::from_str(&stdout(&output)).unwrap();

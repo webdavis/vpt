@@ -37,7 +37,7 @@ fn failed_export_and_hook_recover_persisted_history_without_repeating_notificati
     let config = fs::read_to_string(sandbox.config_path()).unwrap();
     fs::write(sandbox.config_path(), format!("{config}deferral_page_threshold = 1\n[alert]\ncommand = [{hook:?}, {captured:?}]\n[report]\ncommand = ['/usr/bin/touch', {:?}]\n", sandbox.path().join("report-called"))).unwrap();
 
-    let first = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    let first = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     let diagnostics = first["diagnostics"].as_array().unwrap();
     assert!(diagnostics.contains(&serde_json::json!("event log export is unavailable")));
     assert!(diagnostics.contains(&serde_json::json!("configured notification command failed")));
@@ -70,7 +70,12 @@ fn failed_export_and_hook_recover_persisted_history_without_repeating_notificati
     );
 
     let snapshot_before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
+    json(&run(sandbox.vpt().args([
+        "ingest",
+        "--preview",
+        "-o",
+        "json",
+    ])));
     assert_eq!(snapshot(&sandbox), snapshot_before);
     fs::rename(&log, sandbox.path().join("held-log-directory")).unwrap();
     let first_record = &before.records[0];
@@ -87,7 +92,7 @@ fn failed_export_and_hook_recover_persisted_history_without_repeating_notificati
     file.sync_all().unwrap();
     drop(file);
 
-    json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     assert_eq!(fs::read(&captured).unwrap(), delivered);
     assert!(!sandbox.path().join("report-called").exists());
     let restored = documents(&log);
@@ -148,7 +153,7 @@ fn failed_export_and_hook_recover_persisted_history_without_repeating_notificati
         assert!(!bytes.contains(private));
     }
 
-    json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     assert_eq!(fs::read(captured).unwrap(), delivered);
     assert_eq!(
         history(&sandbox)

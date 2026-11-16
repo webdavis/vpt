@@ -47,7 +47,7 @@ fn ingest_reconciles_pending_retention_even_when_retention_is_disabled() {
     sandbox.install_fake_helper();
     let row = pending_retention(&sandbox);
     add(&sandbox, "new.m4a");
-    let doc = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    let doc = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     assert_eq!(doc["ingested"].as_array().unwrap().len(), 1);
     assert!(!row.audio_path.exists());
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
@@ -71,7 +71,12 @@ fn ingestion_dry_run_leaves_pending_retention_and_logs_untouched() {
     pending_retention(&sandbox);
     add(&sandbox, "new.m4a");
     let before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
+    json(&run(sandbox.vpt().args([
+        "ingest",
+        "--preview",
+        "-o",
+        "json",
+    ])));
     assert_eq!(snapshot(&sandbox), before);
 }
 
@@ -100,7 +105,7 @@ fn assert_recovered_before_source_failure(fail_delivery: bool) {
     }
     let recordings = sandbox.path().join("voice-memos/Recordings");
     std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o000)).unwrap();
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     std::fs::set_permissions(&recordings, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
     assert!(output.stdout.is_empty());
@@ -155,7 +160,7 @@ fn changed_publication_target_blocks_ingestion_and_preserves_operator_bytes() {
     let sandbox = configured();
     fixture::dirty(&sandbox, fixture::record(&sandbox, 1, StageStates::fresh()));
     add(&sandbox, "new.m4a");
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
     assert!(output.stdout.is_empty());
     let doc: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();
@@ -193,7 +198,7 @@ fn already_published_bytes_complete_the_journal_before_ingestion() {
         .unwrap();
     drop(ledger);
     add(&sandbox, "new.m4a");
-    json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
         .unwrap()
         .unwrap();

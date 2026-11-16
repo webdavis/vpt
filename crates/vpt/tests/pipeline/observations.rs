@@ -1,7 +1,9 @@
 use super::*;
 
 fn show(sandbox: &Sandbox, id: &str) -> serde_json::Value {
-    json(&support::run(sandbox.vpt().args(["show", id, "--json"])))
+    json(&support::run(
+        sandbox.vpt().args(["show", id, "-o", "json"]),
+    ))
 }
 
 #[test]
@@ -36,7 +38,7 @@ fn observations_expose_later_metadata_and_expiration_without_writes() {
         let note = artifacts.iter().find(|a| a.kind == kind).unwrap();
         assert_eq!(shown["note_paths"][stage], note.path.to_str().unwrap());
     }
-    let listed = json(&support::run(sandbox.vpt().args(["list", "--json"])));
+    let listed = json(&support::run(sandbox.vpt().args(["list", "-o", "json"])));
     let mut body = shown.clone();
     body.as_object_mut().unwrap().remove("schema");
     body.as_object_mut().unwrap().remove("command");
@@ -61,11 +63,11 @@ fn observations_expose_later_metadata_and_expiration_without_writes() {
     );
     for stage in ["note", "analysis"] {
         let listed = json(&support::run(
-            sandbox.vpt().args(["list", "--stage", stage, "--json"]),
+            sandbox.vpt().args(["list", "--stage", stage, "-o", "json"]),
         ));
         assert_eq!(listed["recordings"][0]["stages"][stage], "expired");
     }
-    let storage = json(&support::run(sandbox.vpt().args(["storage", "--json"])));
+    let storage = json(&support::run(sandbox.vpt().args(["storage", "-o", "json"])));
     assert!(
         storage["stores"]
             .as_object()
@@ -91,7 +93,8 @@ fn observations_count_current_flags_and_hide_stale_verification() {
         "review",
         "list",
         row.id.as_str(),
-        "--json",
+        "-o",
+        "json",
     ])));
     assert_eq!(observed["open_flags"], 2);
     assert_eq!(observed["open_flags"], review["open_flags"]);
@@ -109,7 +112,7 @@ fn observations_count_current_flags_and_hide_stale_verification() {
     json(&support::run_with_budget(
         sandbox
             .vpt()
-            .args(["review", "confirm", row.id.as_str(), flag, "--json"]),
+            .args(["review", "confirm", row.id.as_str(), flag, "-o", "json"]),
         std::time::Duration::from_secs(5),
     ));
     let before = fixture::snapshot(&sandbox);

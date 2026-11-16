@@ -98,7 +98,7 @@ fn accept(ledger: &SqliteLedger, row: &RecordingRecord, words: &str) {
 
 pub(super) fn invoke(sandbox: &Sandbox, id: &str) -> std::process::Output {
     support::run_with_budget(
-        sandbox.vpt().args(["note", "write", id, "--json"]),
+        sandbox.vpt().args(["note", "write", id, "-o", "json"]),
         std::time::Duration::from_secs(5),
     )
 }

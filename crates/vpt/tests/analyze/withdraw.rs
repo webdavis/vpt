@@ -108,7 +108,7 @@ fn a_withdrawal_refused_with_a_final_code_is_counted_and_never_retried() {
     );
     fs::remove_file(withdrawn.with_extension("fail")).unwrap();
     let mut resend = sandbox.vpt();
-    resend.args(["actions", "resend", &id, "--json"]);
+    resend.args(["actions", "resend", &id, "-o", "json"]);
     let resent = note::success(&support::run_with_budget(
         &mut resend,
         Duration::from_secs(5),

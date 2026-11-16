@@ -31,7 +31,7 @@ fn configured(name: &str) -> (Sandbox, vpt_domain::identity::RecordingId) {
     (sandbox, id)
 }
 fn show(sandbox: &Sandbox, id: &str, stage: &str) -> std::process::Output {
-    invoke(sandbox, &["show", id, "--stage", stage, "--json"])
+    invoke(sandbox, &["show", id, "--stage", stage, "-o", "json"])
 }
 fn correct_the_flag(sandbox: &Sandbox, id: &vpt_domain::identity::RecordingId, text: &str) {
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
@@ -48,7 +48,7 @@ fn correct_the_flag(sandbox: &Sandbox, id: &vpt_domain::identity::RecordingId, t
     let flag = flag.identifier.hex();
     json(&invoke(
         sandbox,
-        &["review", "correct", id.as_str(), &flag, text, "--json"],
+        &["review", "correct", id.as_str(), &flag, text, "-o", "json"],
     ));
 }
 
@@ -89,7 +89,7 @@ fn a_stage_without_saved_state_is_an_input_error() {
     assert!(!stderr(&unknown).contains("unexpected argument"));
     let wrong = invoke(
         &sandbox,
-        &["show", id.as_str(), "--stage", "audio", "--json"],
+        &["show", id.as_str(), "--stage", "audio", "-o", "json"],
     );
     assert_eq!(wrong.status.code(), Some(2), "{}", stderr(&wrong));
 }
@@ -105,7 +105,7 @@ fn analysis_lists_summary_and_actions_with_a_moment_per_line() {
         &sandbox,
         &format!("[analysis]\ncommand=['/bin/sh', {script:?}, {proposal:?}]\n"),
     );
-    json(&invoke(&sandbox, &["analyze", id.as_str(), "--json"]));
+    json(&invoke(&sandbox, &["analyze", id.as_str(), "-o", "json"]));
     let before = fixture::snapshot(&sandbox);
     let result = json(&show(&sandbox, id.as_str(), "analysis"));
     let moment = format!("{}@00:00", id.as_str());

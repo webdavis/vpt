@@ -19,7 +19,7 @@ fn a_source_rename_and_timezone_change_keep_identity_then_an_edit_creates_a_new_
     let source = add(&sandbox, "original.m4a");
     let first = json(&run(sandbox
         .vpt()
-        .args(["ingest", "--json"])
+        .args(["ingest", "-o", "json"])
         .env("TZ", "UTC")));
     let id = RecordingId::parse(first["ingested"][0]["id"].as_str().unwrap()).unwrap();
     let original = ledger(&sandbox).by_id(&id).unwrap().unwrap();
@@ -29,7 +29,7 @@ fn a_source_rename_and_timezone_change_keep_identity_then_an_edit_creates_a_new_
     fs::rename(&source, &renamed).unwrap();
     let second = json(&run(sandbox
         .vpt()
-        .args(["ingest", "--json"])
+        .args(["ingest", "-o", "json"])
         .env("TZ", "Pacific/Kiritimati")));
     assert_eq!(second["ingested"], serde_json::json!([]));
     assert_eq!(second["already_ingested"], serde_json::json!([id.as_str()]));
@@ -71,7 +71,7 @@ fn a_source_rename_and_timezone_change_keep_identity_then_an_edit_creates_a_new_
         .unwrap();
     let third = json(&run(sandbox
         .vpt()
-        .args(["ingest", "--json"])
+        .args(["ingest", "-o", "json"])
         .env("TZ", "Pacific/Kiritimati")));
     let new_id = RecordingId::parse(third["ingested"][0]["id"].as_str().unwrap()).unwrap();
     assert_ne!(new_id, id);
@@ -109,12 +109,17 @@ fn orphan_recovery_preserves_archived_offset_with_or_without_a_surviving_source(
             fs::remove_file(&source).unwrap();
         }
         let before = snapshot(&sandbox);
-        let preview = json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
+        let preview = json(&run(sandbox.vpt().args([
+            "ingest",
+            "--preview",
+            "-o",
+            "json",
+        ])));
         assert_eq!(preview["recovered"], serde_json::json!([]));
         assert_eq!(snapshot(&sandbox), before);
         let result = json(&run(sandbox
             .vpt()
-            .args(["ingest", "--json"])
+            .args(["ingest", "-o", "json"])
             .env("TZ", "Pacific/Kiritimati")));
         assert_eq!(result["recovered"], serde_json::json!([id.as_str()]));
         assert_eq!(result["ingested"], serde_json::json!([]));
@@ -137,7 +142,7 @@ fn orphan_recovery_preserves_archived_offset_with_or_without_a_surviving_source(
             fs::read_dir(sandbox.path().join("trash")).unwrap().count(),
             usize::from(survives)
         );
-        let repeated = json(&run(sandbox.vpt().args(["ingest", "--json"])));
+        let repeated = json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
         assert_eq!(repeated["recovered"], serde_json::json!([]));
         assert_eq!(ledger(&sandbox).recordings().unwrap().len(), 1);
     }
@@ -165,7 +170,10 @@ fn archive_collision_refuses_without_replacing_bytes_or_inserting_rows() {
     let foreign = m4a(1_787_604_456, 12, b"foreign audio");
     fs::write(&archive, &foreign).unwrap();
     fs::set_permissions(&archive, fs::Permissions::from_mode(0o600)).unwrap();
-    let output = run(sandbox.vpt().args(["ingest", "--json"]).env("TZ", "UTC"));
+    let output = run(sandbox
+        .vpt()
+        .args(["ingest", "-o", "json"])
+        .env("TZ", "UTC"));
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
     assert!(output.stdout.is_empty());
     let error: serde_json::Value = serde_json::from_str(&stderr(&output)).unwrap();

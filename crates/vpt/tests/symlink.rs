@@ -8,7 +8,7 @@ use support::{Sandbox, broken_output, run, stderr, stdout};
 #[test]
 fn deploy_reports_the_link_and_target_and_verify_succeeds() {
     let (sandbox, target) = configured();
-    let output = run(sandbox.vpt().args(["symlink", "deploy", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "deploy", "-o", "json"]));
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert!(output.stderr.is_empty());
     let document: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("result JSON");
@@ -21,7 +21,7 @@ fn deploy_reports_the_link_and_target_and_verify_succeeds() {
     assert_eq!(document["target"], target.to_string_lossy().as_ref());
     assert_eq!(document["ok"], true);
     let before = snapshot(sandbox.path());
-    let verify = run(sandbox.vpt().args(["symlink", "verify", "--json"]));
+    let verify = run(sandbox.vpt().args(["symlink", "verify", "-o", "json"]));
     assert_eq!(verify.status.code(), Some(0), "{}", stderr(&verify));
     let verified: serde_json::Value = serde_json::from_str(&stdout(&verify)).expect("result JSON");
     assert_eq!(verified["command"], "symlink verify");
@@ -33,7 +33,7 @@ fn deploy_reports_the_link_and_target_and_verify_succeeds() {
 fn missing_link_verification_reports_refusal_and_writes_nothing() {
     let (sandbox, _) = configured();
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "verify", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "verify", "-o", "json"]));
     let document = error(&output, 3, "refused");
     assert_eq!(document["error"]["rule"], "symlink_verify");
     assert!(
@@ -50,7 +50,7 @@ fn occupied_directory_deployment_reports_refusal_and_preserves_everything() {
     let (sandbox, _) = configured();
     std::fs::create_dir(sandbox.path().join("home/.vpt")).expect("occupied");
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "deploy", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "deploy", "-o", "json"]));
     let document = error(&output, 3, "refused");
     assert_eq!(document["error"]["rule"], "symlink_deploy");
     assert!(
@@ -67,7 +67,7 @@ fn dangling_link_verification_does_not_repair_the_target() {
     let (sandbox, target) = configured();
     std::os::unix::fs::symlink(&target, sandbox.path().join("home/.vpt")).expect("dangling link");
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "verify", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "verify", "-o", "json"]));
     assert_eq!(
         error(&output, 3, "refused")["error"]["rule"],
         "symlink_verify"
@@ -80,7 +80,7 @@ fn deploy_without_a_target_is_a_usage_error() {
     let sandbox = Sandbox::new("symlink-unset-deploy");
     write_config(&sandbox.config_path(), "config_version = 1\n");
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "deploy", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "deploy", "-o", "json"]));
     assert_eq!(
         error(&output, 2, "usage")["error"]["message"],
         "home.symlink_target is not set"
@@ -93,7 +93,7 @@ fn verify_without_a_target_is_a_usage_error() {
     let sandbox = Sandbox::new("symlink-unset-verify");
     write_config(&sandbox.config_path(), "config_version = 1\n");
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "verify", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "verify", "-o", "json"]));
     assert_eq!(
         error(&output, 2, "usage")["error"]["message"],
         "home.symlink_target is not set"
@@ -109,7 +109,7 @@ fn explicit_configuration_overrides_the_environment_path() {
     let before = snapshot(sandbox.path());
     let output = run(sandbox
         .vpt()
-        .args(["symlink", "deploy", "--json", "--config"])
+        .args(["symlink", "deploy", "-o", "json", "--config"])
         .arg(&alternate));
     assert_eq!(
         error(&output, 2, "usage")["error"]["message"],
@@ -160,7 +160,7 @@ fn configured_target_requires_the_default_home() {
         ),
     );
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "deploy", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "deploy", "-o", "json"]));
     let document = error(&output, 2, "config");
     assert!(
         document["error"]["message"]
@@ -179,7 +179,7 @@ fn relative_target_is_a_configuration_error_without_writes() {
         "config_version = 1\n[home]\nsymlink_target = 'relative/target'\n",
     );
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "deploy", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "deploy", "-o", "json"]));
     let document = error(&output, 2, "config");
     assert!(
         document["error"]["message"]
@@ -194,7 +194,7 @@ fn relative_target_is_a_configuration_error_without_writes() {
 fn missing_configuration_reports_the_selected_path_without_writes() {
     let sandbox = Sandbox::new("symlink-missing-config");
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "verify", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "verify", "-o", "json"]));
     let document = error(&output, 2, "config");
     assert!(
         document["error"]["message"]
@@ -213,7 +213,7 @@ fn invalid_configuration_does_not_echo_its_contents() {
         "config_version = 1\nsecret-canary = 'unterminated",
     );
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "verify", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "verify", "-o", "json"]));
     error(&output, 2, "config");
     assert!(!stderr(&output).contains("secret-canary"));
     assert!(stderr(&output).contains("configuration does not parse"));
@@ -228,7 +228,7 @@ fn configuration_leaf_symlink_is_refused_without_following_it() {
     std::fs::create_dir_all(sandbox.config_path().parent().expect("parent")).expect("parent");
     std::os::unix::fs::symlink(&selected, sandbox.config_path()).expect("config link");
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "verify", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "verify", "-o", "json"]));
     assert_eq!(error(&output, 3, "refused")["error"]["rule"], "path_escape");
     assert_eq!(snapshot(sandbox.path()), before);
 }
@@ -243,7 +243,7 @@ fn target_io_failure_is_a_safe_store_error_without_writes() {
         &format!("config_version = 1\n[home]\nsymlink_target = {quoted}\n"),
     );
     let before = snapshot(sandbox.path());
-    let output = run(sandbox.vpt().args(["symlink", "deploy", "--json"]));
+    let output = run(sandbox.vpt().args(["symlink", "deploy", "-o", "json"]));
     let document = error(&output, 1, "store");
     assert!(document["error"]["rule"].is_null());
     assert!(!stderr(&output).contains("private-canary"));
@@ -263,7 +263,7 @@ fn existing_link_target_canonicalization_io_is_a_safe_store_error() {
         .expect("existing link");
     let before = snapshot(sandbox.path());
     for verb in ["deploy", "verify"] {
-        let output = run(sandbox.vpt().args(["symlink", verb, "--json"]));
+        let output = run(sandbox.vpt().args(["symlink", verb, "-o", "json"]));
         let document = error(&output, 1, "store");
         assert!(document["error"]["rule"].is_null());
         assert!(!stderr(&output).contains("private-canary"));
@@ -283,7 +283,7 @@ fn matching_link_with_nondirectory_target_parent_is_refused_without_writes() {
     std::os::unix::fs::symlink(&target, sandbox.path().join("home/.vpt")).expect("matching link");
     let before = snapshot(sandbox.path());
     for verb in ["deploy", "verify"] {
-        let output = run(sandbox.vpt().args(["symlink", verb, "--json"]));
+        let output = run(sandbox.vpt().args(["symlink", verb, "-o", "json"]));
         let document = error(&output, 3, "refused");
         assert_eq!(document["error"]["rule"], format!("symlink_{verb}"));
         assert!(
@@ -302,7 +302,7 @@ fn deploy_output_failure_reports_store_error_and_preserves_the_created_link() {
     let (writer, _peer) = broken_output();
     let output = run(sandbox
         .vpt()
-        .args(["symlink", "deploy", "--json"])
+        .args(["symlink", "deploy", "-o", "json"])
         .stdout(writer));
     let document = error(&output, 1, "store");
     assert_eq!(document["error"]["message"], "standard output write failed");

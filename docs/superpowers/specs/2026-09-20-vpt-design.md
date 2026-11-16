@@ -160,7 +160,7 @@ trait.
 `vpt-protocol` holds the documents that cross a process boundary, each carrying a `schema` string with a
 major version: `vpt.engine/1` (an engine's transcript), `vpt.event/1` (a report or alert), `vpt.proposal/1`
 (an agent's analysis), `vpt.context/1` (calendar and task context), `vpt.brief/1`, and
-the `--json` output and error documents. It is plain serde over JSON. An unknown major version is refused
+the `-o json` output and error documents. It is plain serde over JSON. An unknown major version is refused
 with the version named; an unknown additive field is accepted and named in diagnostics; byte, depth,
 array-length and text-length limits are enforced while a document is read, before it is fully allocated:
 16,777,216 bytes for `vpt.engine/1`, 1,048,576 bytes for `vpt.proposal/1` and 65,536 bytes for every
@@ -370,8 +370,8 @@ runs the same contract tests:
 The ledger holds the render inputs: the accepted transcript, the accepted proposal and each assembled
 brief pack commit before the artifact they render is published, and they survive the retention of raw
 engine outputs, so a note can always be regenerated from the ledger. A note is a rendering of that state
-and `vpt note write` reads nothing else. `vpt show <id> --json` prints a recording's full record;
-`vpt list --json` prints the recordings table.
+and `vpt note write` reads nothing else. `vpt show <id> -o json` prints a recording's full record;
+`vpt list -o json` prints the recordings table.
 
 An accepted proposal also retains the exact vocabulary publication created by its transaction, when
 automatic tag learning adds entries. An analysis retry recognizes this dependency even after both
@@ -402,7 +402,7 @@ Off by default. When `[retention] enabled = true`, each store has one hold time 
 duration string such as `90d`, per store key, `0` meaning never expire), measured from a file's own
 mtime. `vpt retention run` (and `vpt run`, when retention is enabled) moves every expired artifact in a
 store to the system Trash through the helper, one call per file, and prints one line per moved file plus
-a summary; `--json` prints the list. `--preview` prints the same list and moves nothing.
+a summary; `-o json` prints the list. `--preview` prints the same list and moves nothing.
 
 Five rules:
 
@@ -730,7 +730,7 @@ the note records `vpt-readability: true` when it ran.
 ### 6.7 Review and confirmation
 
 ```
-vpt review list <id> [--json]                print open flags, ranked: record text, alternative, timecode
+vpt review list <id> [-o json]               print open flags, ranked: record text, alternative, timecode
 vpt review confirm|dismiss <id> <flag-id>    resolve a flag as it is, or dismiss it
 vpt review correct <id> <flag-id> <text>     resolve a flag with a correction
 vpt confirm term <text>                        append to known-terms.txt (idempotent)
@@ -1133,10 +1133,10 @@ A brief is an assembled, cited evidence pack for one occasion. vpt writes no sen
 every quoted line is a verbatim transcript span with its recording identity and timecode.
 
 ```
-vpt brief <occasion-id> [--json] [--explain] [--preview]
+vpt brief <occasion-id> [-o json] [--explain] [--preview]
 vpt brief --title <t> --at <rfc3339> [--duration-minutes <n>] [--participant <name>]... [--tag <t>]...
-vpt brief upcoming [--json]   
-vpt occasions [--json]
+vpt brief upcoming [-o json]   
+vpt occasions [-o json]
 ```
 
 An occasion has an identity, `<local date and time>-<12 hex>`, the hash over a canonical key that is
@@ -1187,7 +1187,7 @@ The brief's Markdown carries `vpt-kind: brief`, `vpt-occasion`, `vpt-occasion-at
 line, as well as being counted, because a consumer that quotes one bullet drops a footer and keeps the
 sentence. An empty section says so; it is never omitted.
 
-`vpt brief --json` prints `vpt.brief/1`: `occasion` (id, at, duration_secs, title, source, participants
+`vpt brief -o json` prints `vpt.brief/1`: `occasion` (id, at, duration_secs, title, source, participants
 with `matched_note` and `term` state), `unresolved` (flags, notes_with_flags, reviewed), `items` (each
 with `text`, `certainty` of exactly `confirmed` or `unverified`, `sources` of recording, `at_secs` and
 note, and `selector`; an item without `certainty` and `sources` fails to serialize), `not_selected`,
@@ -1263,7 +1263,7 @@ Sharing is redaction at share time, into a folder the operator sends from. There
 expiry, no transmission and no cloud service.
 
 ```
-vpt redact <id> [--stage transcript|analysis] [--to <dir>] [--title <t>] [--json]
+vpt redact <id> [--stage transcript|analysis] [--to <dir>] [--title <t>] [-o json]
 ```
 
 Two ways to produce a copy: `[share] automatic = true` makes `vpt run` redact every recording's
@@ -1312,7 +1312,7 @@ name the timecodes of the paragraphs it spans. Analysis lines are paragraphs of 
 covers them. Residue is a
 refusal, exit 3, naming the mask label and never the value; the copy is not written. The private report (mode 0600, named above) maps every mask label to its
 real value and every released line to its source span, and a candidate report lists every capitalized
-non-sentence-initial token that survived, as a review prompt the operator reads with `--json` or in the
+non-sentence-initial token that survived, as a review prompt the operator reads with `-o json` or in the
 run output. Confirming one of those tokens with `vpt confirm term` masks it in every future copy.
 
 Names in the destination are standardized: `<date>-<stage>-<hash8>.md`, never the slug, because a title
@@ -1340,8 +1340,8 @@ does not name vpt.
 ### 8.6 Reading a stage's text
 
 ```
-vpt show <id> --stage released|transcript|analysis [--redact] [--json]
-vpt show <occasion> --stage brief [--json]
+vpt show <id> --stage released|transcript|analysis [--redact] [-o json]
+vpt show <occasion> --stage brief [-o json]
 ```
 
 One read command serves a person and a program. It opens no socket, resolves no name, reads no
@@ -1517,21 +1517,21 @@ an unvalidated path. Observational commands and previews create no history and p
 
 ## 9. The command-line surface
 
-Every verb accepts `--json`. Machine-readable output is withheld until the final status is known: on
+Every verb accepts `-o json`. Machine-readable output is withheld until the final status is known: on
 success one document goes to stdout; on failure one error document goes to stderr, stdout stays empty,
 and the error carries a `completed` field listing the work already committed (for example the recordings
 a sweep ingested before it aborted). A result with no schema of its own carries `schema: "vpt.result/1"`
-and `command: "<verb>"`; an error carries `schema: "vpt.error/1"`. Without `--json`, success prints human
+and `command: "<verb>"`; an error carries `schema: "vpt.error/1"`. Without `-o json`, success prints human
 lines and failure prints `vpt: <message>`. `--progress` is the one exception to holding output back: it
 adds compact `vpt.progress/1` JSON lines (`recording`, `step` `transcribe` or `analyze`, `state`
 `started`, `done` or `failed`, `audio_secs`, `at`) on stderr as each engine run and analysis command in
 `run`, `transcribe` or `analyze` starts and ends. Stdout is unchanged; a failure's error document follows
-the progress lines, so under `--json` stderr stays one JSON object per line. Without the flag stderr
+the progress lines, so under `-o json` stderr stays one JSON object per line. Without the flag stderr
 carries only the error document. `--config <file>` overrides the config path; `VPT_CONFIG` does
 the same. An unknown argument or subcommand prints usage to stderr and exits 2, as an error document
-under `--json`.
+under `-o json`.
 
-| Verb                                                                                          | Writes                                                                                                                                | `--json` shape                                                                                                        | Exit codes                            |
+| Verb                                                                                          | Writes                                                                                                                                | `-o json` shape                                                                                                        | Exit codes                            |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | `vpt setup [--overwrite] [--engine <name>]`                                                   | `config.toml` (the main engine prompted for, every other key at its default), the home, the state directory, the default store leaves | `{"written": "<path>", "main_engine": "<name>"}`                                                                      | 0, 2 exists or no terminal            |
 | `vpt doctor [--fix]`                                                                          | nothing; with `--fix`, only what is missing: the starter config, private folders, the home link                                       | `{"checks": [{"name", "ok", "notice"?, "detail"}]}` when all pass; `vpt.error/1` with the same array in `error.checks` otherwise | 0 all ok, 3 any failed                |
@@ -1608,7 +1608,7 @@ writes that selection, writes every other key
 uncommented at its default with one concise comment so the file shows the real posture, creates the home
 and the state directory with mode 0700 and the default store leaves beneath the home, and refuses to
 overwrite an existing file without `--overwrite`. Without `--engine` or a terminal it exits 2, names `--engine` and writes nothing; with
-`--json` the prompt still uses the terminal and stdout carries only the result document. A secret is a
+`-o json` the prompt still uses the terminal and stdout carries only the result document. A secret is a
 value in this file; a key holding a secret is marked in the table. A key that is not in this table is a
 startup refusal naming it. The file's first key is `config_version = 1`, an integer `vpt setup` emits: a
 missing or unsupported version is a configuration error, exit 2, which `doctor` reports as a failed
@@ -1823,7 +1823,7 @@ it never fails the run. An absolute `recordings_dir` that does not exist is such
 creates the folder with its first recording, and `vpt import` works without it. The four subdirectory
 checks are then notices too. A relative path, a path that is not a directory, and a folder that cannot
 be read, such as one the privacy system refuses, still fail.
-Under `--json`, all checks passing puts the complete `checks` array in a `vpt.result/1` document on
+Under `-o json`, all checks passing puts the complete `checks` array in a `vpt.result/1` document on
 stdout; any check failing leaves stdout empty and puts a `vpt.error/1` document on stderr with
 `kind = "refused"`, `rule = "doctor_checks"` and the complete array in `error.checks`. Every other verb
 validates only what it needs: `vpt symlink deploy` validates its target and nothing else, `vpt storage`

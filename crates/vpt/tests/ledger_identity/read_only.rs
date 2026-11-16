@@ -11,12 +11,12 @@ fn a_read_only_command_on_a_behind_ledger_warns_once_and_writes_nothing() {
     let older = backup(&sandbox);
     let expected = [
         vpt(&sandbox, &["list"]).stdout,
-        vpt(&sandbox, &["list", "--json"]).stdout,
+        vpt(&sandbox, &["list", "-o", "json"]).stdout,
     ];
     ingested(&sandbox, "b.m4a", FIRST + 60);
     deliver(&older, &state(&sandbox));
     let before = snapshot(&sandbox);
-    for (args, expected) in [["list"].as_slice(), &["list", "--json"]]
+    for (args, expected) in [["list"].as_slice(), &["list", "-o", "json"]]
         .into_iter()
         .zip(expected)
     {

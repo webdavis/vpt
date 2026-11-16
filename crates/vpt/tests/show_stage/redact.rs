@@ -3,7 +3,10 @@ use super::*;
 const PRIVATE: [&str; 5] = ["Alice", "Bob", "person@sample.test", "303-555-0123", "1234"];
 
 fn private(sandbox: &Sandbox) {
-    json(&invoke(sandbox, &["confirm", "term", "Alice", "--json"]));
+    json(&invoke(
+        sandbox,
+        &["confirm", "term", "Alice", "-o", "json"],
+    ));
     fs::write(
         sandbox.path().join("home/.vpt/transcripts/Bob.md"),
         "# Bob\n",
@@ -16,7 +19,7 @@ fn redacted(sandbox: &Sandbox, id: &str, stage: &str) -> serde_json::Value {
     let before = fixture::snapshot(sandbox);
     let result = json(&invoke(
         sandbox,
-        &["show", id, "--stage", stage, "--redact", "--json"],
+        &["show", id, "--stage", stage, "--redact", "-o", "json"],
     ));
     assert_eq!(fixture::snapshot(sandbox), before, "--redact wrote nothing");
     let mut fields = result.clone();
@@ -97,14 +100,15 @@ fn redact_on_a_brief_a_release_or_no_stage_is_a_usage_error() {
     let (sandbox, id) = configured("show-redact-usage");
     let before = fixture::snapshot(&sandbox);
     for args in [
-        vec!["show", id.as_str(), "--redact", "--json"],
+        vec!["show", id.as_str(), "--redact", "-o", "json"],
         vec![
             "show",
             id.as_str(),
             "--stage",
             "released",
             "--redact",
-            "--json",
+            "-o",
+            "json",
         ],
         vec![
             "show",
@@ -112,7 +116,8 @@ fn redact_on_a_brief_a_release_or_no_stage_is_a_usage_error() {
             "--stage",
             "brief",
             "--redact",
-            "--json",
+            "-o",
+            "json",
         ],
     ] {
         let output = invoke(&sandbox, &args);
@@ -133,7 +138,7 @@ fn split(name: &str, term: Option<&str>, texts: &[&str], halves: &[(usize, &str)
             .collect();
         let id = super::recording::seed_segments(&sandbox, flags, texts);
         if let Some(term) = term {
-            json(&invoke(&sandbox, &["confirm", "term", term, "--json"]));
+            json(&invoke(&sandbox, &["confirm", "term", term, "-o", "json"]));
         }
         if mark {
             self::mark(&sandbox, "");
@@ -146,7 +151,8 @@ fn split(name: &str, term: Option<&str>, texts: &[&str], halves: &[(usize, &str)
                 "--stage",
                 "transcript",
                 "--redact",
-                "--json",
+                "-o",
+                "json",
             ],
         );
         let emitted = format!("{}{}", support::stdout(&output), stderr(&output));
@@ -187,12 +193,12 @@ fn a_pending_note_publication_stops_both_views() {
         .execute_batch("CREATE TRIGGER hold BEFORE DELETE ON dirty_publications BEGIN SELECT RAISE(ABORT,'held'); END")
         .unwrap();
     fixture::preserve_wal(&connection);
-    let write = invoke(&sandbox, &["note", "write", id.as_str(), "--json"]);
+    let write = invoke(&sandbox, &["note", "write", id.as_str(), "-o", "json"]);
     assert_eq!(write.status.code(), Some(1), "{}", stderr(&write));
     assert_eq!(ledger(&sandbox).pending_publications().unwrap().len(), 1);
     let before = fixture::snapshot(&sandbox);
     for redact in [false, true] {
-        let mut args = vec!["show", id.as_str(), "--stage", "transcript", "--json"];
+        let mut args = vec!["show", id.as_str(), "--stage", "transcript", "-o", "json"];
         if redact {
             args.push("--redact");
         }
@@ -244,7 +250,8 @@ fn redacted_text_lists_the_capitalized_words_that_survived_at_their_emitted_line
             "--stage",
             "analysis",
             "--redact",
-            "--json",
+            "-o",
+            "json",
         ],
     )));
     assert_eq!(unlabelled, labelled);

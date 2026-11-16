@@ -13,7 +13,7 @@ fn unrelated_non_utf8_environment_is_ignored() {
     let sandbox = Sandbox::new("unrelated-env");
     let output = run(sandbox
         .vpt()
-        .args(["setup", "--json"])
+        .args(["setup", "-o", "json"])
         .env("UNRELATED", invalid())
         .env(invalid(), "unrelated"));
     assert_eq!(output.status.code(), Some(2));
@@ -32,7 +32,7 @@ fn invalid_selected_environment_is_private_and_never_falls_back() {
         if key == "XDG_CONFIG_HOME" {
             command.env_remove("VPT_CONFIG");
         }
-        let output = run(command.args(["setup", "--json"]).env(key, invalid()));
+        let output = run(command.args(["setup", "-o", "json"]).env(key, invalid()));
         assert_eq!(output.status.code(), Some(2));
         let error: serde_json::Value = serde_json::from_str(&stderr(&output)).expect("error");
         assert_eq!(error["error"]["kind"], "config");
@@ -92,7 +92,7 @@ fn invalid_selected_state_path_is_a_key_only_config_error() {
     let sandbox = Sandbox::new("invalid-state");
     let output = run(sandbox
         .vpt()
-        .args(["setup", "--json"])
+        .args(["setup", "-o", "json"])
         .env("XDG_STATE_HOME", "PRIVATE-relative"));
     assert_eq!(output.status.code(), Some(2));
     assert!(

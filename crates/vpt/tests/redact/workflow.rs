@@ -3,7 +3,7 @@ use super::*;
 fn redact_omits_or_marks_open_spans_and_freezes_the_original_review_snapshot() {
     let sandbox = fixture::configured("redact-flags");
     let id = recording::seed_flags(&sandbox, true);
-    let first = json(&invoke(&sandbox, &["redact", id.as_str(), "--json"]));
+    let first = json(&invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]));
     assert_eq!(first["omitted"], 1);
     assert_eq!(first["marked"], 0);
     assert!(first["masks"].get("number").is_none());
@@ -14,7 +14,7 @@ fn redact_omits_or_marks_open_spans_and_freezes_the_original_review_snapshot() {
         .unwrap();
     assert_eq!(old.provenance.open_lexical_flags, 1);
     fixture::write_config(&sandbox, "[share.redact]\nflagged_spans='mark'\n");
-    let second = json(&invoke(&sandbox, &["redact", id.as_str(), "--json"]));
+    let second = json(&invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]));
     assert_eq!(second["marked"], 1);
     assert_eq!(second["omitted"], 0);
     assert_eq!(second["masks"]["number"], 1);
@@ -37,11 +37,12 @@ fn redact_omits_or_marks_open_spans_and_freezes_the_original_review_snapshot() {
             "confirm",
             id.as_str(),
             &flag.identifier.hex(),
-            "--json",
+            "-o",
+            "json",
         ],
     ));
     assert_eq!(ledger.release(old.sequence).unwrap().unwrap(), old);
-    let third = json(&invoke(&sandbox, &["redact", id.as_str(), "--json"]));
+    let third = json(&invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]));
     let latest = ledger
         .release(third["sequence"].as_i64().unwrap())
         .unwrap()
@@ -56,7 +57,7 @@ fn redact_keeps_title_and_date_minimal_and_reports_collisions_in_human_output() 
     fixture::write_config(&sandbox, "[share]\ninclude_date=true\nsource_line=''\n");
     let first = json(&invoke(
         &sandbox,
-        &["redact", id.as_str(), "--title", "Public", "--json"],
+        &["redact", id.as_str(), "--title", "Public", "-o", "json"],
     ));
     let text = fs::read_to_string(first["written"].as_str().unwrap()).unwrap();
     assert!(text.starts_with(&format!(
@@ -74,7 +75,7 @@ fn redact_completion_failure_is_repaired_by_next_mutating_command_from_saved_byt
     let connection = rusqlite::Connection::open(sandbox.path().join("state/vpt/vpt.db")).unwrap();
     connection.execute_batch("CREATE TRIGGER refuse_release_completion BEFORE INSERT ON release_completions BEGIN SELECT RAISE(ABORT,'Private failure'); END").unwrap();
     fixture::preserve_wal(&connection);
-    let result = invoke(&sandbox, &["redact", id.as_str(), "--json"]);
+    let result = invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]);
     assert_eq!(result.status.code(), Some(1), "{}", stderr(&result));
     assert!(!stderr(&result).contains("Private"));
     let ledger = ledger(&sandbox);
@@ -93,7 +94,10 @@ fn redact_completion_failure_is_repaired_by_next_mutating_command_from_saved_byt
         .execute_batch("DROP TRIGGER refuse_release_completion")
         .unwrap();
     drop(connection);
-    json(&invoke(&sandbox, &["note", "write", id.as_str(), "--json"]));
+    json(&invoke(
+        &sandbox,
+        &["note", "write", id.as_str(), "-o", "json"],
+    ));
     assert_eq!(ledger.releases(&id).unwrap(), [sequence]);
     assert!(ledger.pending_releases().unwrap().is_empty());
     assert_eq!(
@@ -109,7 +113,7 @@ fn redact_completion_failure_is_repaired_by_next_mutating_command_from_saved_byt
 fn redact_broken_stdout_preserves_completed_recording_and_selectable_release() {
     let (sandbox, id) = configured("redact-output-failure");
     let output = support::run_with_broken_stdout(
-        sandbox.vpt().args(["redact", id.as_str(), "--json"]),
+        sandbox.vpt().args(["redact", id.as_str(), "-o", "json"]),
         std::time::Duration::from_secs(5),
     );
     assert_eq!(output.status.code(), Some(1));
@@ -127,7 +131,7 @@ fn redact_refuses_changed_managed_source_but_discards_operator_prose() {
     let note = ledger.note(&id, NoteStage::Transcript).unwrap().unwrap();
     let text = format!("{}\nPrivate operator prose\n", note.text);
     fs::write(&note.target, &text).unwrap();
-    let first = json(&invoke(&sandbox, &["redact", id.as_str(), "--json"]));
+    let first = json(&invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]));
     assert!(
         !fs::read_to_string(first["written"].as_str().unwrap())
             .unwrap()
@@ -135,7 +139,7 @@ fn redact_refuses_changed_managed_source_but_discards_operator_prose() {
     );
     assert_eq!(fs::read_to_string(&note.target).unwrap(), text);
     fs::write(&note.target, text.replace("Meet", "Changed")).unwrap();
-    let failed = invoke(&sandbox, &["redact", id.as_str(), "--json"]);
+    let failed = invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]);
     assert_eq!(failed.status.code(), Some(3), "{}", stderr(&failed));
     assert!(stderr(&failed).contains("redact_source"));
     assert_eq!(ledger.releases(&id).unwrap().len(), 1);
@@ -149,11 +153,11 @@ fn redact_reports_missing_source_as_input_error_and_read_failure_as_operational_
         .unwrap()
         .unwrap();
     fs::set_permissions(&note.target, fs::Permissions::from_mode(0o000)).unwrap();
-    let unreadable = invoke(&sandbox, &["redact", id.as_str(), "--json"]);
+    let unreadable = invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]);
     fs::set_permissions(&note.target, fs::Permissions::from_mode(0o600)).unwrap();
     assert_eq!(unreadable.status.code(), Some(1), "{}", stderr(&unreadable));
     fs::remove_dir_all(note.target.parent().unwrap()).unwrap();
-    let absent = invoke(&sandbox, &["redact", id.as_str(), "--json"]);
+    let absent = invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]);
     assert_eq!(absent.status.code(), Some(2), "{}", stderr(&absent));
     assert!(ledger(&sandbox).pending_releases().unwrap().is_empty());
 }

@@ -74,7 +74,7 @@ fn a_dry_run_at_a_terminal_says_what_it_would_do_and_leaves_machine_output_alone
         piped(&sandbox, id, &["--preview"]),
         format!("Would transcribe {id} in fr-CA using custom\n")
     );
-    for format in ["--json", "--toon", "--output=yaml"] {
+    for format in ["--output=json", "--output=toon", "--output=yaml"] {
         assert_eq!(
             shown(&sandbox, id, &["--preview", format]),
             piped(&sandbox, id, &["--preview", format]),

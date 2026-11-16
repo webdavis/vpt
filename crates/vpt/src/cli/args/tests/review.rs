@@ -14,7 +14,8 @@ fn a_correction_is_taken_literally_kept_out_of_debug_and_beside_global_options()
         let invocation = parse(
             [
                 "vpt",
-                "--json",
+                "-o",
+                "json",
                 "review",
                 "correct",
                 "memo",
@@ -44,7 +45,7 @@ fn a_correction_is_taken_literally_kept_out_of_debug_and_beside_global_options()
 fn each_review_act_is_its_own_subcommand() {
     for (line, action) in [
         ("review confirm memo flag", ReviewAction::Confirm),
-        ("review dismiss memo flag --json", ReviewAction::Dismiss),
+        ("review dismiss memo flag -o json", ReviewAction::Dismiss),
     ] {
         assert_eq!(
             parsed(line).unwrap().verb,

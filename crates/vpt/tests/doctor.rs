@@ -111,7 +111,7 @@ fn helper_diagnostics(version: &str, code: i32) {
         .current_dir(sandbox.path())
         .env("VPT_FAKE_VERSION", version)
         .env("VPT_FAKE_VERSION_MODE", "additive")
-        .args(["doctor", "--json"]));
+        .args(["doctor", "-o", "json"]));
     let document = report(&output, code);
     let expected = if code == 0 { "ok" } else { "issue" };
     assert_eq!(result(&document, "helper", "vpt-macos"), expected);
@@ -128,7 +128,7 @@ fn helper_failure_never_exposes_child_streams() {
         .vpt()
         .current_dir(sandbox.path())
         .env("VPT_FAKE_VERSION_MODE", "private-failure")
-        .args(["doctor", "--json"]));
+        .args(["doctor", "-o", "json"]));
     let document = report(&output, 1);
     assert!(!document.to_string().contains("private-"));
     assert_eq!(result(&document, "helper", "vpt-macos"), "issue");
@@ -170,7 +170,7 @@ fn config_path_selection_failure_skips_the_other_checks() {
         .vpt()
         .current_dir(sandbox.path())
         .env("VPT_CONFIG", std::ffi::OsString::from_vec(vec![0xff]))
-        .args(["doctor", "--json"]));
+        .args(["doctor", "-o", "json"]));
     let document = report(&output, 1);
     assert_eq!(row(&document, "config", "file")["result"], "issue");
     assert_eq!(check(&document, "helper")["result"], "not_run");

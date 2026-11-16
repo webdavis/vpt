@@ -62,7 +62,7 @@ fn stale_analysis_is_rechecked_with_disabled_analysis_and_an_expired_transcript(
     json(&support::run_with_budget(
         sandbox
             .vpt()
-            .args(["transcribe", row.id.as_str(), "--json"]),
+            .args(["transcribe", row.id.as_str(), "-o", "json"]),
         std::time::Duration::from_secs(5),
     ));
     let transcript = ledger(&sandbox)

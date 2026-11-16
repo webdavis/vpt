@@ -112,7 +112,7 @@ fn builtin_pair_classifies_once_by_precedence_and_exposes_ranked_occurrences() {
     let review = json(&support::run_with_budget(
         sandbox
             .vpt()
-            .args(["review", "list", row.id.as_str(), "--json"]),
+            .args(["review", "list", row.id.as_str(), "-o", "json"]),
         std::time::Duration::from_secs(5),
     ));
     assert_eq!(review["open_flags"], 5);
@@ -195,7 +195,7 @@ fn readability_toggle_only_changes_rendered_text_and_preserves_every_lexical_mar
         json(&support::run_with_budget(
             sandbox
                 .vpt()
-                .args(["note", "write", row.id.as_str(), "--json"]),
+                .args(["note", "write", row.id.as_str(), "-o", "json"]),
             std::time::Duration::from_secs(5),
         ));
         let note = ledger(&sandbox)

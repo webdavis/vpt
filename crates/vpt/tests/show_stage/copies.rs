@@ -10,7 +10,14 @@ fn released_copy_uses_frozen_provenance_and_the_exact_body() {
     let (sandbox, id) = configured("show-copy-release");
     let release = json(&invoke(
         &sandbox,
-        &["redact", id.as_str(), "--title", "Public title", "--json"],
+        &[
+            "redact",
+            id.as_str(),
+            "--title",
+            "Public title",
+            "-o",
+            "json",
+        ],
     ));
     let path = Path::new(release["written"].as_str().unwrap());
     let bytes = fs::read_to_string(path).unwrap();
@@ -53,7 +60,8 @@ fn released_copy_uses_frozen_provenance_and_the_exact_body() {
             "confirm",
             id.as_str(),
             &flag.identifier.hex(),
-            "--json",
+            "-o",
+            "json",
         ],
     ));
     let second = json(&show(&sandbox, id.as_str(), "released"));
@@ -86,10 +94,17 @@ fn transcript_copy_keeps_operator_prose_and_drops_frontmatter() {
 #[test]
 fn released_selection_uses_sequence_skips_missing_files_and_refuses_changed_newest() {
     let (sandbox, id) = configured("show-copy-selection");
-    let first = json(&invoke(&sandbox, &["redact", id.as_str(), "--json"]));
+    let first = json(&invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]));
     let second = json(&invoke(
         &sandbox,
-        &["redact", id.as_str(), "--title", "Another copy", "--json"],
+        &[
+            "redact",
+            id.as_str(),
+            "--title",
+            "Another copy",
+            "-o",
+            "json",
+        ],
     ));
     let named = |result: &serde_json::Value, release: &serde_json::Value| {
         let file = Path::new(release["written"].as_str().unwrap()).file_name();
@@ -111,8 +126,8 @@ fn missing_artifacts_name_only_stages_whose_files_exist() {
     let (sandbox, id) = configured("show-copy-available");
     let before = fixture::snapshot(&sandbox);
     for args in [
-        vec!["show", id.as_str(), "--stage", "released", "--json"],
-        vec!["show", id.as_str(), "--stage", "audio", "--json"],
+        vec!["show", id.as_str(), "--stage", "released", "-o", "json"],
+        vec!["show", id.as_str(), "--stage", "audio", "-o", "json"],
         vec!["show", id.as_str(), "--stage", "released", "--preview"],
     ] {
         let result = invoke(&sandbox, &args);
@@ -120,7 +135,7 @@ fn missing_artifacts_name_only_stages_whose_files_exist() {
         assert!(result.stdout.is_empty());
     }
     assert_eq!(fixture::snapshot(&sandbox), before);
-    let release = json(&invoke(&sandbox, &["redact", id.as_str(), "--json"]));
+    let release = json(&invoke(&sandbox, &["redact", id.as_str(), "-o", "json"]));
     fs::remove_file(release["written"].as_str().unwrap()).unwrap();
     let missing = show(&sandbox, id.as_str(), "analysis");
     assert_eq!(missing.status.code(), Some(2));
@@ -190,7 +205,7 @@ fn the_handoff_verb_and_its_configuration_key_are_unknown() {
     let (sandbox, id) = configured("show-copy-handoff-gone");
     let verb = invoke(
         &sandbox,
-        &["handoff", id.as_str(), "--stage", "released", "--json"],
+        &["handoff", id.as_str(), "--stage", "released", "-o", "json"],
     );
     assert_eq!(verb.status.code(), Some(2));
     assert_eq!(error(&verb)["error"]["message"], "unknown command");

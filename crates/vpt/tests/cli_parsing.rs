@@ -20,7 +20,7 @@ fn a_mistyped_command_suggests_the_closest_one_on_stderr() {
 #[test]
 fn a_mistyped_flag_suggests_the_closest_one_in_the_error_document() {
     let sandbox = Sandbox::new("cli-suggest-flag");
-    let output = run(sandbox.vpt().args(["--json", "list", "--stge", "note"]));
+    let output = run(sandbox.vpt().args(["-o", "json", "list", "--stge", "note"]));
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(stdout(&output), "");
     let document = error_document(&stderr(&output));
@@ -39,10 +39,10 @@ fn a_value_joined_with_equals_reads_like_a_separate_value() {
     let sandbox = Sandbox::new("cli-equals");
     let joined = run(sandbox
         .vpt()
-        .args(["--json", "show", "--stage=audio", "memo"]));
+        .args(["-o", "json", "show", "--stage=audio", "memo"]));
     let separate = run(sandbox
         .vpt()
-        .args(["--json", "show", "--stage", "audio", "memo"]));
+        .args(["-o", "json", "show", "--stage", "audio", "memo"]));
     assert_eq!(joined.status.code(), Some(2));
     assert_eq!(stderr(&joined), stderr(&separate));
 }
@@ -85,7 +85,7 @@ fn private_text_never_appears_in_a_usage_error() {
         vec!["note", "verify", "--Private canary.md", "--recording", "r"],
         vec!["review", "confirm", "memo", "f", "--json=Private canary"],
     ] {
-        for format in [None, Some("--json")] {
+        for format in [&[][..], &["-o", "json"]] {
             let output = run(sandbox.vpt().args(format).args(&args));
             assert_eq!(output.status.code(), Some(2), "{args:?}");
             assert_eq!(stdout(&output), "", "{args:?}");

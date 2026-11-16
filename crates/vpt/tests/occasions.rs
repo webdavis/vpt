@@ -61,7 +61,7 @@ fn seed_named(sandbox: &Sandbox, key: &str) -> OccasionRecord {
 fn occasions_lists_unbriefed_saved_data_without_creating_or_changing_state() {
     let sandbox = fixture::configured("occasions");
     let before = fixture::snapshot(&sandbox);
-    let empty = invoke(&sandbox, &["occasions", "--json"]);
+    let empty = invoke(&sandbox, &["occasions", "-o", "json"]);
     assert_eq!(empty.status.code(), Some(0), "{}", stderr(&empty));
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(&empty.stdout).unwrap()["occasions"],
@@ -70,7 +70,7 @@ fn occasions_lists_unbriefed_saved_data_without_creating_or_changing_state() {
     assert_eq!(fixture::snapshot(&sandbox), before);
     let record = seed(&sandbox);
     let before = fixture::snapshot(&sandbox);
-    let output = invoke(&sandbox, &["occasions", "--json"]);
+    let output = invoke(&sandbox, &["occasions", "-o", "json"]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["command"], "occasions");
@@ -112,7 +112,8 @@ fn occasion_path_reads_saved_pin_even_when_file_is_absent() {
             record.id.as_str(),
             "--stage",
             "brief",
-            "--json",
+            "-o",
+            "json",
         ],
     );
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));

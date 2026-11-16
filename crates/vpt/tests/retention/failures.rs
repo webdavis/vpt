@@ -13,7 +13,7 @@ fn log_export_failure_preserves_move_and_still_delivers_report() {
         &sandbox,
         &format!("[{:?}, \"command-sink\"]", support::FAKE_ENGINE),
     );
-    let result = json(&run(sandbox.vpt().args(["retention", "run", "--json"])));
+    let result = json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     assert_eq!(result["completed"], serde_json::json!([row.id.as_str()]));
     assert!(
         result["diagnostics"]
@@ -32,7 +32,7 @@ fn log_export_failure_preserves_move_and_still_delivers_report() {
         1
     );
     std::fs::rename(&log, sandbox.path().join("held-log-directory")).unwrap();
-    json(&run(sandbox.vpt().args(["retention", "run", "--json"])));
+    json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     let recovered = std::fs::read_to_string(&log).unwrap();
     assert!(recovered.contains("recovery"));
     assert_eq!(
@@ -69,7 +69,7 @@ fn later_helper_failure_preserves_prior_committed_identifiers() {
     )
     .unwrap();
     let result = error(
-        &run(sandbox.vpt().args(["retention", "run", "--json"])),
+        &run(sandbox.vpt().args(["retention", "run", "-o", "json"])),
         1,
         "helper",
     );

@@ -78,7 +78,7 @@ fn startup_publishes_saved_note_bytes_without_transcription() {
     sandbox.install_fake_helper();
     let note = seed_note(&sandbox);
     add(&sandbox, "new.m4a");
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     json(&output);
     assert_eq!(std::fs::read_to_string(&note.target).unwrap(), note.text);
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
@@ -98,7 +98,12 @@ fn dry_run_does_not_publish_pending_notes_or_change_saved_state() {
     let sandbox = configured();
     let note = seed_note(&sandbox);
     let before = snapshot(&sandbox);
-    json(&run(sandbox.vpt().args(["ingest", "--preview", "--json"])));
+    json(&run(sandbox.vpt().args([
+        "ingest",
+        "--preview",
+        "-o",
+        "json",
+    ])));
     assert!(!note.target.exists());
     assert_eq!(snapshot(&sandbox), before);
 }
@@ -108,7 +113,7 @@ fn operator_replacement_survives_pending_note_recovery() {
     let sandbox = configured();
     let note = seed_note(&sandbox);
     std::fs::write(&note.target, "operator replacement").unwrap();
-    let output = run(sandbox.vpt().args(["ingest", "--json"]));
+    let output = run(sandbox.vpt().args(["ingest", "-o", "json"]));
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
     assert_eq!(
         std::fs::read_to_string(&note.target).unwrap(),
@@ -128,7 +133,7 @@ fn already_published_note_is_acknowledged_without_replacing_the_file() {
     let note = seed_note(&sandbox);
     std::fs::write(&note.target, &note.text).unwrap();
     let before = std::fs::metadata(&note.target).unwrap();
-    json(&run(sandbox.vpt().args(["ingest", "--json"])));
+    json(&run(sandbox.vpt().args(["ingest", "-o", "json"])));
     let after = std::fs::metadata(&note.target).unwrap();
     assert_eq!(
         (before.ino(), before.mtime(), before.mtime_nsec()),

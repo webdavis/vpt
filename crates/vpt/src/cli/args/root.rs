@@ -23,12 +23,6 @@ pub(super) struct Global {
     /// Print the result in this format.
     #[arg(long, short = 'o', global = true, value_name = "FORMAT")]
     pub output: Option<Format>,
-    /// Print the result as JSON, as --output json does.
-    #[arg(long, global = true, conflicts_with_all = ["toon", "output"])]
-    pub json: bool,
-    /// Print the result as TOON, as --output toon does.
-    #[arg(long, global = true, conflicts_with = "output")]
-    pub toon: bool,
     /// Report progress as JSON lines on stderr.
     #[arg(long, global = true)]
     pub progress: bool,

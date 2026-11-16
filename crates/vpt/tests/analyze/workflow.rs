@@ -171,7 +171,8 @@ fn analysis_preserves_operator_edits_and_review_resolutions_on_repeated_claims()
             record.id.as_str(),
             &flag.identifier.hex(),
             "Operator correction",
-            "--json",
+            "-o",
+            "json",
         ]),
         Duration::from_secs(5),
     );

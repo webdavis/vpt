@@ -136,7 +136,7 @@ fn both_notes_rewrite_with_reciprocal_links_and_preserve_operator_prose() {
 
 fn command(sandbox: &Sandbox, args: &[&str]) -> std::process::Output {
     support::run_with_budget(
-        sandbox.vpt().args(args).arg("--json"),
+        sandbox.vpt().args(args).args(["-o", "json"]),
         std::time::Duration::from_secs(5),
     )
 }

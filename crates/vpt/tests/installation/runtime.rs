@@ -119,7 +119,7 @@ pub(super) fn assert_retention_requires_helper(sandbox: &Sandbox) {
         .unwrap();
     let config = fs::read_to_string(sandbox.config_path()).unwrap();
     fs::write(sandbox.config_path(), format!("{config}\n[retention]\nenabled = true\ninclude_audio = true\n[retention.hold]\naudio = '1d'\n")).unwrap();
-    let result = support::run(command(sandbox).args(["retention", "run", "--json"]));
+    let result = support::run(command(sandbox).args(["retention", "run", "-o", "json"]));
     assert_eq!(result.status.code(), Some(3), "{}", stderr(&result));
     assert!(result.stdout.is_empty());
     let error: serde_json::Value = serde_json::from_slice(&result.stderr).unwrap();

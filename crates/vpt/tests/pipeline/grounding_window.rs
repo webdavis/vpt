@@ -88,7 +88,8 @@ fn changed_grounding_window_rechecks_analysis_without_agent_and_keeps_review_dec
             "confirm",
             row.id.as_str(),
             &action.identifier.hex(),
-            "--json",
+            "-o",
+            "json",
         ]),
         std::time::Duration::from_secs(5),
     ));
