@@ -3,50 +3,8 @@ use crate::style::{self, Verdict};
 use serde_json::{Value, json};
 use vpt_protocol::result::document;
 
-#[derive(Clone)]
-pub(crate) struct Row {
-    pub(crate) name: String,
-    pub(crate) verdict: Verdict,
-    pub(crate) detail: String,
-    pub(crate) advice: Option<String>,
-}
-
-impl Row {
-    pub(crate) fn new(
-        name: impl Into<String>,
-        verdict: Verdict,
-        detail: impl Into<String>,
-    ) -> Self {
-        Self {
-            name: name.into(),
-            verdict,
-            detail: detail.into(),
-            advice: None,
-        }
-    }
-
-    pub(crate) fn ok(name: impl Into<String>, detail: impl Into<String>) -> Self {
-        Self::new(name, Verdict::Ok, detail)
-    }
-
-    pub(crate) fn issue(name: impl Into<String>, detail: impl Into<String>) -> Self {
-        Self::new(name, Verdict::Issue, detail)
-    }
-
-    pub(crate) fn not_run(name: impl Into<String>, detail: impl Into<String>) -> Self {
-        Self::new(name, Verdict::NotRun, detail)
-    }
-
-    pub(crate) fn advice(mut self, text: impl Into<String>) -> Self {
-        self.advice = Some(text.into());
-        self
-    }
-
-    fn json(&self) -> Value {
-        json!({"name": self.name, "result": self.verdict.name(), "detail": self.detail,
-            "advice": self.advice})
-    }
-}
+mod row;
+pub(crate) use row::Row;
 
 pub(crate) struct Check {
     pub(crate) name: &'static str,

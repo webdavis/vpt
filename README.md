@@ -512,7 +512,7 @@ follow-up in the ledger, and removes the temporary folder at the end, also when 
 
 | Part | What leaves the machine |
 | --- | --- |
-| `engines` | Nothing for Apple, whisply or a command engine declared local. A command engine declared remote receives the made-up clip, and its row says so. Anything an engine does on its own, such as downloading a model on first use, happens as it does in `vpt transcribe`. |
+| `engines` | Nothing for Apple, whisply or a command engine declared local. A command engine declared remote receives the made-up clip, and its row says so. A whisply engine with a Hugging Face token gets the token, as in `vpt transcribe`, and its row says so. Anything an engine does on its own, such as downloading a model on first use, happens as it does in `vpt transcribe`. |
 | `speakers` | Whisply sends the token to Hugging Face and downloads the two speaker models on first use; the clip stays on the machine. The row says so. |
 | `summary` | The made-up transcript goes to the command, and so to whatever the command calls, such as a model provider. The row says so. |
 | `calendar` | A command source gets the calendar scopes and today's dates; whether it contacts a remote is up to it. The built-in client sends the credentials to Google Calendar and receives today's events. |
@@ -522,7 +522,9 @@ The report has the same form as doctor's: the version line, a heading per part, 
 `⚠`, `✗` or `·`, advice after `→`, and "Needs attention". It goes to standard output. vpt exits 1
 when any row is an issue and 0 otherwise. Every `--output` format prints the same fields as
 doctor, with `command` set to `test`. A program can run `vpt test summary -o json`, read each
-row's `result` and `detail`, and act on its `advice`.
+row's `result` and `detail`, and act on its `advice`. A row whose engine ran with the Hugging Face
+token, in `engines` or `speakers`, also carries `token_sent: true`; other rows leave the field out.
+The token itself never appears in any output.
 
 ## Note writing
 
