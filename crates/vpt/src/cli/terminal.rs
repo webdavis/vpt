@@ -5,6 +5,7 @@ mod ingest;
 mod list;
 mod note;
 mod redact;
+mod retention;
 mod review;
 mod run;
 mod search;
@@ -60,6 +61,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::NoteWrite { .. } => Some(note::write),
         Verb::VerifyNote { .. } => Some(note::verify),
         Verb::Redact(_) => Some(redact::render),
+        Verb::RetentionRun { .. } => Some(retention::render),
         _ => None,
     }
 }

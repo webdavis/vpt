@@ -10,7 +10,11 @@ mod output;
 mod recovery;
 #[path = "retention/reporting.rs"]
 mod reporting;
+#[path = "note/styled.rs"]
+mod styled;
 mod support;
+#[path = "retention/terminal.rs"]
+mod terminal;
 
 use fixture::{record, seed, snapshot, write_config};
 use std::time::{Duration, SystemTime};
