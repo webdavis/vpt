@@ -692,7 +692,7 @@ An action may name whose it is with `owner`: `"me"` when the speaker will do it,
 when another person will, or `{"other": null}` when the recording gives no name. A missing or null
 `owner` means unknown. The analysis note shows it after the action's sources as `[owner:: me]`,
 `[owner:: Dana]` or `[owner:: someone else]`, a Dataview-style inline field whose name is escaped like
-any proposal text. `verify-note` does not read the field as part of the claim.
+any proposal text. `note verify` does not read the field as part of the claim.
 
 An action may also carry `due`, as in `{"date": "2026-11-19", "time": "15:00", "sources":
 ["04:12-04:19"]}`, for a due date said in the recording; `time` may be null or left out. A date that is
@@ -730,7 +730,7 @@ provenance, and respect the configured cap. Manual tag and relation decisions su
 Previews render an input plan without starting an agent or creating notes, logs, or directories.
 Transcript, lexical, or claim changes invalidate saved findings and remove them from active review counts.
 Note rewrites check claim freshness before rendering counts, including when readability settings change.
-Note rewrites remove stale analysis annotations. Rechecking with `verify-note` or `analyze` retains
+Note rewrites remove stale analysis annotations. Rechecking with `note verify` or `analyze` retains
 review decisions for unchanged claims. Older saved findings without a recorded input basis need rechecking.
 `run` rechecks stale findings and checks made with a different grounding window, including empty
 finding sets and when analysis is disabled. Rechecking preserves decisions for unchanged claims
@@ -983,7 +983,7 @@ action text reaches only the command, never `events.jsonl` or vpt's output.
 
 ## Note verification
 
-`vpt verify-note <path> --recording <id> [--output json|toon|yaml]` checks Markdown claims against the recording's
+`vpt note verify <path> --recording <id> [--output json|toon|yaml]` checks Markdown claims against the recording's
 accepted transcript and current lexical flags. Findings are `unsourced`, `bad-reference`, `unsupported`,
 or `built-on-flagged-text`, in that priority order. The default citation tolerance is 15 seconds,
 configured by `analysis.grounding_window_secs`; no agent or transcription engine is run.

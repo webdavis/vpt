@@ -82,7 +82,7 @@ fn private_text_never_appears_in_a_usage_error() {
         vec!["tag", "rename", canary],
         vec!["tag", "rename", "--Private canary", "new"],
         vec!["import", "--Private canary.m4a"],
-        vec!["verify-note", "--Private canary.md", "--recording", "r"],
+        vec!["note", "verify", "--Private canary.md", "--recording", "r"],
         vec!["review", "confirm", "memo", "f", "--json=Private canary"],
     ] {
         for format in [None, Some("--json")] {

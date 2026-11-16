@@ -200,7 +200,7 @@ workspace is a trait. `dyn Trait` appears only at the composition root in `vpt`.
 | 1 Extract              | identity, wholeness gate, sweep decision         | `Ingest`                                   | `RecorderStore`, `Archive`, `Ledger`, `EventSink`          |
 | 2 Transcribe           | normalize, align, classify, rank, readability    | `Transcribe`, `Review`, `Confirm`          | `Engine` x2, `Ledger`, `Stores`, `KnownTerms`, `EventSink` |
 | 3 Vault note           | render, managed block, tag gate, relations, slug | `WriteNote`, `Path`                        | `Stores`, `Ledger`, `KnownTags`                           |
-| 4 Analysis and extras  | verify-note grounding, brief selector, redaction | `Analyze`, `Brief`, `Redact`, `Handoff`    | `AgentCommand`, `ContextSource`, `Stores`, `Ledger`       |
+| 4 Analysis and extras  | note verify grounding, brief selector, redaction | `Analyze`, `Brief`, `Redact`, `Handoff`    | `AgentCommand`, `ContextSource`, `Stores`, `Ledger`       |
 
 `vpt run` composes the use cases in stage order. Each stage of a recording is `pending`, `succeeded`,
 `failed`, `disabled` or `expired`; success is recorded only after the stage's artifacts commit. Stage
@@ -410,7 +410,7 @@ Five rules:
    transcript or analysis note, a brief, a private report or a released copy, current artifacts included.
    Before a move it verifies that the path still identifies that artifact: for a note or brief, its
    canonical ledger-owned path, its `vpt-recording` or `vpt-occasion`, its `vpt-stage` or `vpt-kind` and its
-   required markers must all identify the selected artifact, the same test `verify-note` applies (section
+   required markers must all identify the selected artifact, the same test `note verify` applies (section
    8.2); for every other file, the recorded digest must match. An untracked regular file in a store and a
    path whose identity, stage or digest names another artifact are kept and reported under `kept` with
    the reason. An expired artifact moves, and the ledger records `trashed_at` against it and keeps its
@@ -1031,7 +1031,7 @@ rendered as data under the escaping rule of section 7.2.
 vpt writes the analysis note from the proposal: frontmatter as in stage 3 with `vpt-stage: analysis`, a
 `vpt:links` region, and a `vpt:content` region holding a `Summary` section and an `Actions` section. The
 layout is fixed: one bullet per proposal line, in proposal order, each ending with its `[mm:ss-mm:ss]`
-source reference and any verify-note annotation, and no headings of the agent's own. An action may carry
+source reference and any note verify annotation, and no headings of the agent's own. An action may carry
 `owner`: `"me"` for the speaker's own task, `{"other": "<name>"}` for another person's, `{"other": null}`
 when no name was said; absent or null means unknown. Its bullet then shows `[owner:: me]`,
 `[owner:: <name>]` or `[owner:: someone else]` after the sources, with the name escaped under section 7.2;
@@ -1079,9 +1079,9 @@ Withdrawals count as `withdrawn`, or as `failed` or `refused`, and the `withdraw
 when the withdraw command is set. An empty command records and sends
 nothing.
 
-### 8.2 verify-note
+### 8.2 note verify
 
-`vpt verify-note <path> --recording <id>` checks a Markdown note against the transcript and the flags. It
+`vpt note verify <path> --recording <id>` checks a Markdown note against the transcript and the flags. It
 reports findings for any readable note, and it writes into a vpt-owned artifact only, which means all
 three of: the path, resolved through no symbolic link, is the artifact path the ledger registers for
 `--recording` (a path re-pinned by committed rename recovery, section 7.4, included); the note's
@@ -1089,7 +1089,7 @@ three of: the path, resolved through no symbolic link, is the artifact path the 
 file is report-only: it is left byte-identical, its findings go to the output alone and no ledger state
 changes. A file carrying a different `vpt-recording` is refused, exit 3 `ownership`. Claims are read from
 the `vpt:content` region (from the whole body of a file vpt does not own), excluding frontmatter,
-headings, code fences, the links region and any earlier verify-note annotation. Every list item and every
+headings, code fences, the links region and any earlier note verify annotation. Every list item and every
 sentence in a paragraph is a claim line. Four classes, in order:
 
 1. `unsourced`: no `[mm:ss-mm:ss]` range on the line.
@@ -1125,7 +1125,7 @@ disabled. Rechecking retains unchanged claim resolutions and updates both owned 
 Legacy checks without a recorded window require rechecking rather than assuming the default;
 expired artifacts remain expired.
 Findings alone exit 0; a read or write failure exits 1. `vpt analyze` runs
-`verify-note` on the analysis note it just wrote before it notifies.
+`note verify` on the analysis note it just wrote before it notifies.
 
 ### 8.3 Briefs
 
@@ -1546,7 +1546,7 @@ under `--json`.
 | `vpt path <id> --stage <stage>` / `vpt path occasion <id> --stage brief`                     | nothing                                                                                                                               | `{"path": "<abs>"}`                                                                                                   | 0, 2                                  |
 | `vpt analyze <id> [--preview] [--resend-refused]`                                             | analysis note, tags, relations                                                                                                        | the record plus `{"verify": {"<class>": n}}`                                                                          | 0, 1 command failed, 2 not configured |
 | `vpt analyze --all [--since <RFC3339>] [--preview]` / `vpt analyze --stdin [--preview]`       | the same, per recording, under one write lock                                                                                         | `{"dry_run", "recordings": [{"id", "status", "summary_changed", "tags_added", "tags_removed"}]}`                      | 0, 1 any recording failed, 2 usage    |
-| `vpt verify-note <path> --recording <id>`                                                     | the owned artifact's annotations                                                                                                      | `{"flags": [{"class", "line", "range"}]}`                                                                             | 0, 1, 3                               |
+| `vpt note verify <path> --recording <id>`                                                     | the owned artifact's annotations                                                                                                      | `{"flags": [{"class", "line", "range"}]}`                                                                             | 0, 1, 3                               |
 | `vpt brief <occasion> [--explain] [--preview]` / `--title --at ...` / `vpt brief upcoming`    | brief note, occasion row, events                                                                                                      | `vpt.brief/1`, or `{"written": [..]}` for `brief upcoming`                                                                | 0, 2, 3                               |
 | `vpt occasions`                                                                               | nothing                                                                                                                               | `{"occasions": [..]}`                                                                                                 | 0                                     |
 | `vpt redact <id> [--stage] [--to <dir>] [--title <t>]`                                        | released copy, draft report                                                                                                           | `{"written": "<path>", "report": "<path>", "masks": {"<class>": n}, "candidates": [..]}`                              | 0, 3 duplicate or residue             |
@@ -1681,7 +1681,7 @@ canary-secret test.
 | `relations.max_suggested`            | int            | `5`                                                                       | agent-proposed `related` links kept per note                                                                 |
 | `analysis.command`                   | string list    | `[]`                                                                      | the agent command; empty disables analysis only (automatic redaction is `share.automatic`)                   |
 | `analysis.timeout_secs`              | int            | `600`                                                                     | the command's deadline                                                                                       |
-| `analysis.grounding_window_secs`     | int            | `15`                                                                      | verify-note's tolerance around a cited span                                                                  |
+| `analysis.grounding_window_secs`     | int            | `15`                                                                      | note verify's tolerance around a cited span                                                                  |
 | `brief.lookback_days`                | int            | `180`                                                                     | how far back selection reaches                                                                               |
 | `brief.max_notes`                    | int            | `12`                                                                      | selection cap                                                                                                |
 | `brief.max_spans_per_note`           | int            | `5`                                                                       | quoted spans per selected note                                                                               |
@@ -1890,7 +1890,7 @@ one family refuse before any spawn, and an agreed proper noun not in `known-term
 one aggregated flag (stage 2); the portable profile emits none of the vault's keys and a full run against
 a store with no `.obsidian` directory produces no vault syntax, and a rewrite preserves every byte
 outside the markers (stage 3); the released file contains no removed value, no `vpt` key and no source
-slug, a byte-identical duplicate is refused, `verify-note` leaves a note the ledger does not own
+slug, a byte-identical duplicate is refused, `note verify` leaves a note the ledger does not own
 byte-identical, a proposal line holding a managed delimiter renders as text, `vpt show --stage` writes no file
 and succeeds with name resolution failing, and the grep for notebook vocabulary finds nothing (stage 4).
 
@@ -1975,7 +1975,7 @@ composing stages 1 to 3. Depends on stage 2.
 
 ### Stage 4: Analysis and extras
 
-Ships `[analysis]`, `vpt.proposal/1`, `vpt analyze`, `vpt verify-note` and the analysis note;
+Ships `[analysis]`, `vpt.proposal/1`, `vpt analyze`, `vpt note verify` and the analysis note;
 occasions, `vpt brief` in all three forms, `vpt occasions`, `vpt.brief/1`, `vpt.context/1`, the `dam`,
 `google` and `none` context sources, the calendar trigger and `brief_written`; `vpt redact`, `[share]`,
 the release rows and the draft reports; `vpt show --stage` with its text and `--redact`; and `vpt run` extended with

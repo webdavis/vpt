@@ -69,12 +69,9 @@ pub(super) enum Command {
     /// Print the saved path of a recording's stage or an occasion's brief.
     #[command(after_long_help = examples::PATH)]
     Path(groups::Path),
-    /// Write notes from saved state.
+    /// Write notes from saved state, or check one against its recording.
     #[command(subcommand, after_long_help = examples::DOCS)]
     Note(groups::Note),
-    /// Check that a note matches its recording.
-    #[command(after_long_help = examples::VERIFY_NOTE)]
-    VerifyNote(groups::VerifyNote),
     /// List saved occasions.
     #[command(after_long_help = examples::OCCASIONS)]
     Occasions,
@@ -131,7 +128,6 @@ impl Command {
             Self::Analyze(args) => args.verb(),
             Self::Path(path) => path.verb(),
             Self::Note(note) => note.verb(),
-            Self::VerifyNote(verify) => verify.verb(),
             Self::Occasions => Verb::Occasions,
             Self::List { stage } => Verb::List { stage },
             Self::Search(options) => Verb::Search(options),

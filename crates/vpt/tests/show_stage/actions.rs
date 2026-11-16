@@ -182,7 +182,8 @@ fn a_spoken_due_date_reaches_show_and_the_note_and_survives_a_rewrite() {
     let verified = json(&invoke(
         &sandbox,
         &[
-            "verify-note",
+            "note",
+            "verify",
             note.target.to_str().unwrap(),
             "--recording",
             id.as_str(),

@@ -22,7 +22,7 @@ fn output_failure_reports_owned_note_commit_and_keeps_external_verification_obse
         };
         let before = fixture::snapshot(&sandbox);
         let output = support::run_with_broken_stdout(
-            sandbox.vpt().arg("verify-note").arg(&path).args([
+            sandbox.vpt().args(["note", "verify"]).arg(&path).args([
                 "--recording",
                 record.id.as_str(),
                 "--json",

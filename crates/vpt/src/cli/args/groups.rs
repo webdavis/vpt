@@ -23,6 +23,9 @@ pub(super) enum Note {
         /// The recording id.
         id: String,
     },
+    /// Check that a note matches its recording.
+    #[command(after_long_help = examples::NOTE_VERIFY)]
+    Verify(VerifyNote),
 }
 
 #[derive(clap::Subcommand)]
@@ -90,8 +93,10 @@ impl Tag {
 
 impl Note {
     pub(super) fn verb(self) -> Verb {
-        let Self::Write { id } = self;
-        Verb::NoteWrite { id }
+        match self {
+            Self::Write { id } => Verb::NoteWrite { id },
+            Self::Verify(verify) => verify.verb(),
+        }
     }
 }
 

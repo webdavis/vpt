@@ -223,7 +223,8 @@ fn resolving_an_analysis_finding_updates_its_annotation_and_both_counts() {
     success(&command(
         &sandbox,
         &[
-            "verify-note",
+            "note",
+            "verify",
             note.target.to_str().unwrap(),
             "--recording",
             row.id.as_str(),
@@ -383,7 +384,8 @@ fn resolving_a_finding_with_both_notes_expired_keeps_them_expired() {
     success(&command(
         &sandbox,
         &[
-            "verify-note",
+            "note",
+            "verify",
             note.target.to_str().unwrap(),
             "--recording",
             row.id.as_str(),

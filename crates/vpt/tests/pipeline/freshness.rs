@@ -13,7 +13,8 @@ fn changed_rendered_input_rechecks_transcript_before_analysis_and_then_skips_bot
         .unwrap();
     json(&support::run_with_budget(
         sandbox.vpt().args([
-            "verify-note",
+            "note",
+            "verify",
             transcript.target.to_str().unwrap(),
             "--recording",
             row.id.as_str(),
@@ -73,7 +74,8 @@ fn run_rechecks_stale_transcript_findings_with_analysis_disabled() {
         .unwrap();
     json(&support::run_with_budget(
         sandbox.vpt().args([
-            "verify-note",
+            "note",
+            "verify",
             transcript.target.to_str().unwrap(),
             "--recording",
             row.id.as_str(),

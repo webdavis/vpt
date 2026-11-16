@@ -39,6 +39,7 @@ fn every_mutating_command_emits_one_versioned_success_or_human_summary() {
                     assert_eq!(
                         document["command"],
                         match args[0].as_str() {
+                            "note" if args[1] == "verify" => "verify-note",
                             "note" => "note write",
                             "retention" => "retention run",
                             name => name,
