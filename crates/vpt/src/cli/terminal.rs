@@ -8,6 +8,7 @@ mod run;
 mod search;
 mod show;
 mod storage;
+mod tag;
 mod transcribe;
 
 use super::{args::Verb, format::Format, output::Outcome};
@@ -53,6 +54,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::ConfirmTerm { .. } | Verb::ConfirmTag { .. } | Verb::ConfirmRelation { .. } => {
             Some(confirm::render)
         }
+        Verb::TagRename { .. } => Some(tag::render),
         _ => None,
     }
 }
