@@ -4,6 +4,8 @@ mod active_writer;
 mod fixture;
 #[path = "show_list_storage/list_terminal.rs"]
 mod list_terminal;
+#[path = "show_list_storage/show_terminal.rs"]
+mod show_terminal;
 #[path = "show_list_storage/storage_terminal.rs"]
 mod storage_terminal;
 #[allow(
