@@ -45,6 +45,8 @@ mod resend_refused;
 #[path = "pipeline/state_paths.rs"]
 mod state_paths;
 mod support;
+#[path = "pipeline/terminal.rs"]
+mod terminal;
 use std::{fs, os::unix::fs::PermissionsExt};
 use support::{Sandbox, stderr, stdout};
 use vpt_adapters::SqliteLedger;
