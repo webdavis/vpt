@@ -118,7 +118,10 @@ impl EventLog {
         self.write_bytes(b"\n", inspection.complete_end_offset, effects, before)?;
         synchronize(&self.file, AppendStep::FileSync, before)?;
         effects.synced = AppendSync::File;
-        synchronize(&self.root.file, AppendStep::DirectorySync, before)?;
+        if !self.directory_synced {
+            synchronize(&self.root.file, AppendStep::DirectorySync, before)?;
+            self.directory_synced = true;
+        }
         effects.synced = AppendSync::FileAndDirectory;
         before(AppendStep::Confirm)?;
         verify_file(&self.root, &self.file, effective_user())?;

@@ -157,6 +157,49 @@ fn reopened_unsynced_creation_still_syncs_the_directory() {
 }
 
 #[test]
+fn later_append_from_the_same_log_skips_the_settled_directory_sync() {
+    let (_temp, root) = fixture();
+    let mut log = log(&root, b"");
+    log.append_line("first").expect("first append");
+    let mut stages = Vec::new();
+    let result = log.append_with("second", |step| {
+        stages.push(step);
+        Ok(())
+    });
+    assert!(result.is_ok(), "second append: {result:?}");
+    assert_eq!(
+        stages,
+        [
+            AppendStep::Write,
+            AppendStep::Write,
+            AppendStep::FileSync,
+            AppendStep::Confirm
+        ]
+    );
+}
+
+#[test]
+fn failed_directory_sync_is_retried_by_the_next_append() {
+    let (_temp, root) = fixture();
+    let mut log = log(&root, b"");
+    log.append_with("first", |step| {
+        if step == AppendStep::DirectorySync {
+            Err(LogError::Io(std::io::ErrorKind::Other))
+        } else {
+            Ok(())
+        }
+    })
+    .expect_err("directory sync failure");
+    let mut stages = Vec::new();
+    log.append_with("second", |step| {
+        stages.push(step);
+        Ok(())
+    })
+    .expect("second append");
+    assert!(stages.contains(&AppendStep::DirectorySync), "{stages:?}");
+}
+
+#[test]
 fn replaced_leaf_is_refused_before_append() {
     let (_temp, root) = fixture();
     let mut log = log(&root, b"held\n");

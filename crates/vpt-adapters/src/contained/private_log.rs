@@ -31,6 +31,9 @@ pub enum LogError {
 pub struct EventLog {
     root: RootDir,
     file: File,
+    /// The log's directory entry is durable once this handle has synced the directory, because
+    /// every append refuses a log whose file was replaced since.
+    directory_synced: bool,
 }
 
 impl RootDir {
@@ -47,6 +50,7 @@ impl RootDir {
                 .try_clone()
                 .map_err(|error| LogError::State(PrivateStateError::Contained(error)))?,
             file,
+            directory_synced: false,
         })
     }
 }
