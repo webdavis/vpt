@@ -1,6 +1,7 @@
 mod actions;
 mod analyze;
 mod ingest;
+mod list;
 mod run;
 mod transcribe;
 
@@ -39,6 +40,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::Transcribe { .. } => Some(transcribe::render),
         Verb::Analyze { .. } => Some(analyze::one),
         Verb::AnalyzeBatch { .. } => Some(analyze::batch),
+        Verb::List { .. } => Some(list::render),
         _ => None,
     }
 }
