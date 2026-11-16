@@ -188,7 +188,8 @@ fn later_commands_preserve_success_and_export_every_history_record_when_logging_
             let before = ledger.recovery_view().unwrap().records.len();
             let args = match verb {
                 "verify-note" => vec![
-                    verb,
+                    "note",
+                    "verify",
                     analysis.target.to_str().unwrap(),
                     "--recording",
                     row.id.as_str(),

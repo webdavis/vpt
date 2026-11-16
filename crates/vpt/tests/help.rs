@@ -26,7 +26,7 @@ const COMMANDS: &[&str] = &[
     "path",
     "path occasion",
     "note write",
-    "verify-note",
+    "note verify",
     "occasions",
     "list",
     "search",

@@ -17,6 +17,6 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "analysis.grounding_window_secs",
         Kind::PositiveInt,
         "15",
-        "verify-note's tolerance around a cited span",
+        "note verify's tolerance around a cited span",
     ),
 ];

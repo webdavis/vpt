@@ -98,7 +98,8 @@ fn lexical_review_invalidates_analysis_in_the_same_publication() {
     for _ in 0..2 {
         note::success(&support::run_with_budget(
             sandbox.vpt().args([
-                "verify-note",
+                "note",
+                "verify",
                 transcript.target.to_str().unwrap(),
                 "--recording",
                 record.id.as_str(),
@@ -139,7 +140,8 @@ fn lexical_review_invalidates_analysis_in_the_same_publication() {
     for _ in 0..2 {
         note::success(&support::run_with_budget(
             sandbox.vpt().args([
-                "verify-note",
+                "note",
+                "verify",
                 transcript.target.to_str().unwrap(),
                 "--recording",
                 record.id.as_str(),
@@ -251,7 +253,8 @@ fn changed_transcript_removes_stale_annotations_and_rechecking_keeps_the_review_
         } else {
             note::success(&support::run_with_budget(
                 sandbox.vpt().args([
-                    "verify-note",
+                    "note",
+                    "verify",
                     analysis.target.to_str().unwrap(),
                     "--recording",
                     record.id.as_str(),

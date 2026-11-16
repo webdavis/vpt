@@ -24,7 +24,7 @@ fn invoke(sandbox: &Sandbox, path: &Path, id: &str) -> std::process::Output {
     support::run_with_budget(
         sandbox
             .vpt()
-            .arg("verify-note")
+            .args(["note", "verify"])
             .arg(path)
             .args(["--recording", id, "--json"]),
         std::time::Duration::from_secs(5),

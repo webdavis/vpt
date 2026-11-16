@@ -43,7 +43,7 @@ const EVERY_VERB: &[&[&str]] = &[
     ],
     &["analyze", "--stdin"],
     &["note", "write", "x"],
-    &["verify-note", "/absent.md", "--recording", "x"],
+    &["note", "verify", "/absent.md", "--recording", "x"],
     &["redact", "x"],
     &["brief", "x"],
     &["import", "/absent.mp3"],

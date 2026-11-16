@@ -45,7 +45,8 @@ pub(super) fn prepare() -> (Sandbox, Vec<Vec<String>>) {
         vec!["note", "write", id],
         vec!["analyze", id],
         vec![
-            "verify-note",
+            "note",
+            "verify",
             analysis.target.to_str().unwrap(),
             "--recording",
             id,

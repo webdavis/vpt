@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn verification_requires_a_path_and_recording_and_accepts_global_options() {
     assert_eq!(
-        parsed("verify-note note.md --recording memo --json")
+        parsed("note verify note.md --recording memo --json")
             .unwrap()
             .verb,
         Verb::VerifyNote {
@@ -12,12 +12,13 @@ fn verification_requires_a_path_and_recording_and_accepts_global_options() {
         }
     );
     for args in [
-        "verify-note",
-        "verify-note note.md",
-        "verify-note --recording memo",
-        "verify-note note.md --recording",
-        "verify-note note.md --recording memo --recording other",
-        "verify-note note.md --recording memo --preview",
+        "note verify",
+        "note verify note.md",
+        "note verify --recording memo",
+        "note verify note.md --recording",
+        "note verify note.md --recording memo --recording other",
+        "note verify note.md --recording memo --preview",
+        "verify-note note.md --recording memo",
     ] {
         assert!(parsed(args).is_err(), "{args}");
     }

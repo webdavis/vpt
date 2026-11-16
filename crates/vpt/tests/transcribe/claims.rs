@@ -84,11 +84,11 @@ fn a_claim_may_name_the_speaker_of_a_segment_it_cites_and_no_other() {
         .unwrap()
         .unwrap();
     let verified = json(&support::run(
-        sandbox.vpt().arg("verify-note").arg(&note.target).args([
-            "--recording",
-            row.id.as_str(),
-            "--json",
-        ]),
+        sandbox
+            .vpt()
+            .args(["note", "verify"])
+            .arg(&note.target)
+            .args(["--recording", row.id.as_str(), "--json"]),
     ));
     let classes: Vec<_> = verified["flags"]
         .as_array()
