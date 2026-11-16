@@ -36,8 +36,7 @@ workspace checks.
 ## Machine-readable output
 
 Every command accepts `--output json|toon|yaml`, or `-o` for short, in any position; it is the only
-way to choose a format. `--json` and `--toon` are refused with exit 2 and a message naming
-`-o json` or `-o toon`. Each format prints the same document: a
+way to choose a format. Each format prints the same document: a
 `vpt.result/1` document on standard output when the command succeeds, or a `vpt.error/1` document on
 standard error when it fails, with the same exit code. JSON is the document as one line of compact
 JSON. TOON (Token-Oriented Object Notation) nests by indentation, with a declared length on every
