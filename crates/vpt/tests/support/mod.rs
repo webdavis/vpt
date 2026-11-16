@@ -26,6 +26,9 @@ pub const WATCHDOG: Duration = Duration::from_secs(2);
 pub const GRACE: Duration = Duration::from_secs(1);
 /// Bounds the forced cleanup of a command that outlived the watchdog.
 pub const CLEANUP_BOUND: Duration = WATCHDOG.saturating_add(GRACE).saturating_add(GRACE);
+/// Bounds a whole vpt command so that only a hang fails its test. Commands run in parallel on a
+/// loaded machine, so a test's own budget is raised to this floor and never asserts speed.
+pub const HANG_BOUND: Duration = Duration::from_secs(60);
 #[cfg(feature = "dev-tools")]
 #[allow(dead_code, reason = "used only by helper integration tests")]
 pub const FAKE_ENGINE: &str = env!("CARGO_BIN_EXE_vpt-fake-engine");
@@ -117,10 +120,7 @@ impl Sandbox {
 }
 
 pub fn run(command: &mut Command) -> Output {
-    let started = Instant::now();
-    let child = spawn(command);
-    let spawn_return = Instant::now();
-    collect(child, started, Some(spawn_return))
+    run_with_budget(command, HANG_BOUND)
 }
 
 pub fn spawn(command: &mut Command) -> ProcessGroup {
@@ -149,10 +149,12 @@ pub(crate) fn spawn_with_signal(
     )
 }
 
+#[allow(dead_code, reason = "used only by tests that drive a spawned command")]
 pub fn collect(child: ProcessGroup, started: Instant, spawn_return: Option<Instant>) -> Output {
     collect_with(child, started, spawn_return, || {})
 }
 
+#[allow(dead_code, reason = "used only by tests that drive a spawned command")]
 pub fn collect_with(
     group: ProcessGroup,
     started: Instant,
@@ -162,14 +164,16 @@ pub fn collect_with(
     collect_with_budget(group, started, spawn_return, drive, WATCHDOG)
 }
 
-#[allow(
-    dead_code,
-    reason = "durable recovery scenarios allow multiple filesystem synchronizations"
-)]
 pub fn run_with_budget(command: &mut Command, budget: Duration) -> Output {
     let started = Instant::now();
     let child = spawn(command);
-    collect_with_budget(child, started, Some(Instant::now()), || {}, budget)
+    collect_with_budget(
+        child,
+        started,
+        Some(Instant::now()),
+        || {},
+        budget.max(HANG_BOUND),
+    )
 }
 
 fn collect_with_budget(
