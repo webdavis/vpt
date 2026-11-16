@@ -1,5 +1,5 @@
 pub(crate) mod batch;
-mod errors;
+pub(crate) mod errors;
 mod history;
 mod mutation;
 mod notification;

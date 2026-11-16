@@ -376,7 +376,7 @@ named, so doctor exits 1.
 
 Doctor never runs a part to see whether it works. Each configured part ends with a `test` row,
 `not tested`, whose advice names the command that tries it for real, such as `vpt test engines`.
-`vpt test` has the `engines` and `speakers` parts so far; until the others arrive, it refuses their
+`vpt test` has the `engines`, `speakers` and `summary` parts so far; until the others arrive, it refuses their
 names. A part that is not configured is one `not_run` row naming the config key that turns it on;
 that is not an issue. A configured part whose program is missing is an issue.
 Where a part sends data off the machine when it runs, its row says so.
@@ -414,7 +414,7 @@ name.
 ## vpt test
 
 `vpt test [part ...] [--json|--toon|--yaml]` makes each part do its real job once and reports. The
-parts so far are `engines` and `speakers`. Name parts to test only those, as in `vpt test engines`. An unknown
+parts so far are `engines`, `speakers` and `summary`. Name parts to test only those, as in `vpt test engines`. An unknown
 name is refused with exit 2 and the list of valid names. Bare `vpt test` tests every configured part.
 A named part with nothing to test is refused with exit 2, and the message names the config key that
 would let it run. In a bare run it is a `not_run` row naming that key, and a run that tests nothing
@@ -440,19 +440,26 @@ labels, and it says how many labels came back and how long whisply took. When wh
 asked for speakers, the advice asks the token's account to accept the terms of
 `pyannote/speaker-diarization-3.1` and `pyannote/segmentation-3.0`, the usual first failure.
 
-Nothing is kept. vpt writes nothing to the ledger, the archive, the notes or any store, and it
-removes the temporary folder at the end, also when an engine fails.
+`summary` sends a fixed, made-up transcript to `analysis.command` the way `vpt analyze` does: the
+transcript on standard input, and a copy in the private temporary folder for `{transcript}`, with a
+made-up `{id}`, `{language}` set to `en-US` and the current time as `{captured_at}`. The row is `ok`
+when the command exits 0 and prints a valid `vpt.proposal/1` document; it names the document's `by`
+and how long the command took. The proposal is not grounded, saved or acted on.
+
+Nothing is kept. vpt writes nothing to the ledger, the archive, the notes or any store, sends no
+follow-up, and removes the temporary folder at the end, also when a part fails.
 
 | Part | What leaves the machine |
 | --- | --- |
 | `engines` | Nothing for Apple, whisply or a command engine declared local. A command engine declared remote receives the made-up clip, and its row says so. Anything an engine does on its own, such as downloading a model on first use, happens as it does in `vpt transcribe`. |
 | `speakers` | Whisply sends the token to Hugging Face and downloads the two speaker models on first use; the clip stays on the machine. The row says so. |
+| `summary` | The made-up transcript goes to the command, and so to whatever the command calls, such as a model provider. The row says so. |
 
 The report has the same form as doctor's: the version line, a heading per part, rows marked `✓`,
 `⚠`, `✗` or `·`, advice after `→`, and "Needs attention". It goes to standard output. vpt exits 1
 when any row is an issue and 0 otherwise. `--json`, `--toon` and `--yaml` print the same fields as
-doctor, with `command` set to `test`. A program can run `vpt test engines --json`, read each
-engine row's `result` and `detail`, and act on its `advice`.
+doctor, with `command` set to `test`. A program can run `vpt test summary --json`, read each
+row's `result` and `detail`, and act on its `advice`.
 
 ## Note writing
 
