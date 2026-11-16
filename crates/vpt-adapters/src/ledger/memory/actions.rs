@@ -1,14 +1,8 @@
 use super::{MemoryLedger, State, with};
 use crate::ledger::actions::{check, conflict};
-use vpt_application::ports::{ActionChange, ActionLedger, LedgerError, QueuedAction, WorkDelta};
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum SendState {
-    Pending,
-    Sent,
-    Refused,
-    Withdrawing,
-}
+use vpt_application::ports::{
+    ActionChange, ActionLedger, LedgerError, QueuedAction, SendState, WorkDelta,
+};
 
 #[derive(Clone)]
 pub(super) struct Saved {
@@ -18,12 +12,8 @@ pub(super) struct Saved {
 }
 
 impl ActionLedger for MemoryLedger {
-    fn pending_actions(&self) -> Result<Vec<QueuedAction>, LedgerError> {
-        with(self, |state| in_state(state, SendState::Pending))
-    }
-
-    fn withdrawing_actions(&self) -> Result<Vec<QueuedAction>, LedgerError> {
-        with(self, |state| in_state(state, SendState::Withdrawing))
+    fn actions_in(&self, wanted: SendState) -> Result<Vec<QueuedAction>, LedgerError> {
+        with(self, |state| in_state(state, wanted))
     }
 }
 

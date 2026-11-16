@@ -61,7 +61,7 @@ pub(crate) fn an_action_is_pending_until_settled_and_again_only_when_its_digest_
         action: action(id, digest),
         refused,
     };
-    let pending = || ids(ledger.pending_actions().unwrap());
+    let pending = || ids(ledger.actions_in(SendState::Pending).unwrap());
     assert!(committed(queue(vec![
         action("a", '1'),
         action("b", '1'),
@@ -70,6 +70,14 @@ pub(crate) fn an_action_is_pending_until_settled_and_again_only_when_its_digest_
     assert!(committed(settle("a", '1', false)));
     assert!(committed(settle("b", '1', true)));
     assert_eq!(pending(), [("c".into(), '1')]);
+    assert_eq!(
+        ids(ledger.actions_in(SendState::Sent).unwrap()),
+        [("a".into(), '1')]
+    );
+    assert_eq!(
+        ids(ledger.actions_in(SendState::Refused).unwrap()),
+        [("b".into(), '1')]
+    );
     assert!(committed(queue(vec![action("a", '1'), action("b", '1')])));
     assert_eq!(pending(), [("c".into(), '1')]);
     assert!(committed(queue(vec![action("a", '2')])));
@@ -110,7 +118,7 @@ pub(crate) fn a_dropped_action_awaits_withdrawal_only_when_attempted_and_named(
         actions,
         dropped: dropped.iter().map(|id| (*id).to_owned()).collect(),
     };
-    let withdrawing = || ids(ledger.withdrawing_actions().unwrap());
+    let withdrawing = || ids(ledger.actions_in(SendState::Withdrawing).unwrap());
     let all = || vec![action("a", '1'), action("b", '1'), action("c", '1')];
     assert!(committed(queue(all(), &[])));
     assert!(committed(ActionChange::Attempt(action("a", '1'))));
@@ -119,20 +127,23 @@ pub(crate) fn a_dropped_action_awaits_withdrawal_only_when_attempted_and_named(
     assert!(committed(queue(vec![action("a", '1')], &["c"])));
     assert_eq!(withdrawing(), []);
     assert_eq!(
-        ids(ledger.pending_actions().unwrap()),
+        ids(ledger.actions_in(SendState::Pending).unwrap()),
         [("a".into(), '1'), ("b".into(), '1')]
     );
     assert!(!committed(queue(vec![action("a", '1')], &["a"])));
     assert!(committed(queue(vec![], &["a", "b"])));
     assert_eq!(withdrawing(), [("a".into(), '1'), ("b".into(), '1')]);
-    assert_eq!(ledger.pending_actions().unwrap(), []);
+    assert_eq!(ledger.actions_in(SendState::Pending).unwrap(), []);
     assert!(!committed(ActionChange::Attempt(action("a", '1'))));
     assert!(!committed(ActionChange::Withdrawn(action("a", '2'))));
     assert!(committed(ActionChange::Withdrawn(action("a", '1'))));
     assert!(!committed(ActionChange::Withdrawn(action("a", '1'))));
     assert!(committed(queue(vec![action("b", '1')], &[])));
     assert_eq!(withdrawing(), []);
-    assert_eq!(ids(ledger.pending_actions().unwrap()), [("b".into(), '1')]);
+    assert_eq!(
+        ids(ledger.actions_in(SendState::Pending).unwrap()),
+        [("b".into(), '1')]
+    );
     assert!(committed(queue(vec![], &["b"])));
     assert!(committed(queue(vec![], &[])));
     assert_eq!(withdrawing(), [("b".into(), '1')]);

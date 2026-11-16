@@ -2,8 +2,29 @@ use super::LedgerError;
 use vpt_domain::identity::RecordingId;
 
 pub trait ActionLedger {
-    fn pending_actions(&self) -> Result<Vec<QueuedAction>, LedgerError>;
-    fn withdrawing_actions(&self) -> Result<Vec<QueuedAction>, LedgerError>;
+    /// The saved actions in this state, ordered by recording and id.
+    fn actions_in(&self, state: SendState) -> Result<Vec<QueuedAction>, LedgerError>;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SendState {
+    Pending,
+    Sent,
+    Refused,
+    Withdrawing,
+}
+
+impl SendState {
+    pub const ALL: [SendState; 4] = [Self::Pending, Self::Sent, Self::Refused, Self::Withdrawing];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Sent => "sent",
+            Self::Refused => "refused",
+            Self::Withdrawing => "withdrawing",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
