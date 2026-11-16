@@ -10,6 +10,8 @@ mod mentions;
 mod output;
 #[path = "note/path.rs"]
 mod path;
+#[path = "note/path_terminal.rs"]
+mod path_terminal;
 #[path = "note/relation_confirm.rs"]
 mod relation_confirm;
 #[path = "note/relations.rs"]
