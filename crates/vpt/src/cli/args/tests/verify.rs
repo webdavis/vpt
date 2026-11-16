@@ -22,3 +22,24 @@ fn verification_requires_a_path_and_recording_and_accepts_global_options() {
         assert!(parsed(args).is_err(), "{args}");
     }
 }
+
+#[test]
+fn an_occasion_path_is_its_own_subcommand() {
+    assert_eq!(
+        parsed("path occasion meeting --stage brief --json")
+            .unwrap()
+            .verb,
+        Verb::OccasionPath {
+            id: "meeting".into(),
+            stage: "brief".into()
+        }
+    );
+    for line in [
+        "path --occasion meeting --stage brief",
+        "path occasion --stage brief",
+        "path occasion meeting",
+        "path memo occasion meeting --stage brief",
+    ] {
+        assert!(parsed(line).is_err(), "{line}");
+    }
+}
