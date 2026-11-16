@@ -23,13 +23,13 @@ pub(super) const KEYS: &[super::KeySpec] = &[
         "brief.trigger.enabled",
         Kind::Bool,
         "false",
-        "the calendar trigger behind --upcoming",
+        "the calendar trigger behind brief upcoming",
     ),
     key(
         "brief.trigger.lead_time",
         Kind::Duration,
         "\"24h\"",
-        "how far ahead --upcoming looks",
+        "how far ahead brief upcoming looks",
     ),
     key(
         "context.type",

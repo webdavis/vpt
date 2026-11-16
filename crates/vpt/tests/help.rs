@@ -32,6 +32,7 @@ const COMMANDS: &[&str] = &[
     "storage",
     "retention run",
     "brief",
+    "brief upcoming",
     "redact",
     "symlink deploy",
     "symlink verify",

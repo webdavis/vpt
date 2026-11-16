@@ -22,8 +22,8 @@ fn invalid_brief_arguments_and_disabled_trigger_are_observational_and_private() 
             "--duration-minutes",
             "18446744073709551615",
         ],
-        vec!["brief", "--upcoming"],
-        vec!["brief", "--upcoming", "--preview"],
+        vec!["brief", "upcoming"],
+        vec!["brief", "upcoming", "--preview"],
         vec!["brief", "--at", "2026-10-01T00:00:00Z"],
         vec![
             "brief",

@@ -1135,7 +1135,7 @@ every quoted line is a verbatim transcript span with its recording identity and 
 ```
 vpt brief <occasion-id> [--json] [--explain] [--preview]
 vpt brief --title <t> --at <rfc3339> [--duration-minutes <n>] [--participant <name>]... [--tag <t>]...
-vpt brief --upcoming [--json]
+vpt brief upcoming [--json]   
 vpt occasions [--json]
 ```
 
@@ -1201,10 +1201,10 @@ Completed tasks are excluded from both this array and the Markdown Open tasks se
 requires a present task-context status; an absent or failed half does not supply task records.
 
 A requested brief notifies nothing. The calendar trigger is `[brief.trigger] enabled` (default false)
-with `lead_time` (default `24h`): `vpt brief --upcoming` asks the context source for occasions starting
+with `lead_time` (default `24h`): `vpt brief upcoming` asks the context source for occasions starting
 inside the lead time, writes a brief for each not yet briefed (by occasion identity), and delivers one
 `vpt.event/1` (`event = "brief_written"`, occasion identity, counts, path) per brief written. A scheduler
-outside vpt runs `--upcoming` on an interval; with the trigger disabled the flag refuses with exit 2
+outside vpt runs `vpt brief upcoming` on an interval; with the trigger disabled it refuses with exit 2
 naming the key. A brief is never a redaction source in this version (section 8.5) and never automatically
 handed off.
 
@@ -1233,7 +1233,7 @@ selection is in the request, never a filter afterwards.
   commands contact no remote, so a brief never triggers a remote pull. Each `[context.dam] max_age` value
   (`<remote>=<duration>`) is passed to `agenda` as `--max-age`; dam's exit 4 with rule `stale_remote`
   fails the calendar half with the fixed detail `calendar data is stale: dam refused it under
-  context.dam.max_age`, which `--upcoming` reports in its error; rule `no_such_remote` fails it with
+  context.dam.max_age`, which `brief upcoming` reports in its error; rule `no_such_remote` fails it with
   `context.dam.max_age names a remote that dam does not know or that its token may not read; use a name from dam remote list`. A missing `dam` fails with the detail
   `dam was not found; install dam or set context.dam.command`, and exit 2, as from a `dam` without
   `agenda`, with `dam rejected the command line; dam agenda needs a newer dam`. Any other non-zero
@@ -1253,7 +1253,7 @@ Each half of the context is `present` or `absent` with a reason: `disabled` (`ty
 not requested), `unsupported` (Google supplies no tasks), or `failed` with a bounded detail (binary
 missing, non-zero exit, network error, malformed answer, deadline). A manual brief survives a collector
 failure: the brief is still written and the status appears in the `Occasion` section and in `context`.
-`brief --upcoming` exits 1 when occasion discovery fails, because it has nothing to brief. Fetched text
+`brief upcoming` exits 1 when occasion discovery fails, because it has nothing to brief. Fetched text
 is untrusted: titles go through the slug sanitizer before any path use, and every fetched string is
 rendered as quoted data with its source named.
 
@@ -1547,7 +1547,7 @@ under `--json`.
 | `vpt analyze <id> [--preview] [--resend-refused]`                                             | analysis note, tags, relations                                                                                                        | the record plus `{"verify": {"<class>": n}}`                                                                          | 0, 1 command failed, 2 not configured |
 | `vpt analyze --all [--since <RFC3339>] [--preview]` / `vpt analyze --stdin [--preview]`       | the same, per recording, under one write lock                                                                                         | `{"dry_run", "recordings": [{"id", "status", "summary_changed", "tags_added", "tags_removed"}]}`                      | 0, 1 any recording failed, 2 usage    |
 | `vpt verify-note <path> --recording <id>`                                                     | the owned artifact's annotations                                                                                                      | `{"flags": [{"class", "line", "range"}]}`                                                                             | 0, 1, 3                               |
-| `vpt brief <occasion> [--explain] [--preview]` / `--title --at ...` / `--upcoming`            | brief note, occasion row, events                                                                                                      | `vpt.brief/1`, or `{"written": [..]}` for `--upcoming`                                                                | 0, 2, 3                               |
+| `vpt brief <occasion> [--explain] [--preview]` / `--title --at ...` / `vpt brief upcoming`    | brief note, occasion row, events                                                                                                      | `vpt.brief/1`, or `{"written": [..]}` for `brief upcoming`                                                                | 0, 2, 3                               |
 | `vpt occasions`                                                                               | nothing                                                                                                                               | `{"occasions": [..]}`                                                                                                 | 0                                     |
 | `vpt redact <id> [--stage] [--to <dir>] [--title <t>]`                                        | released copy, draft report                                                                                                           | `{"written": "<path>", "report": "<path>", "masks": {"<class>": n}, "candidates": [..]}`                              | 0, 3 duplicate or residue             |
 | `vpt show <id>` / `vpt list [--stage <s>]`                                                    | nothing                                                                                                                               | the record / `{"recordings": [..]}`                                                                                   | 0, 2                                  |
@@ -1685,8 +1685,8 @@ canary-secret test.
 | `brief.lookback_days`                | int            | `180`                                                                     | how far back selection reaches                                                                               |
 | `brief.max_notes`                    | int            | `12`                                                                      | selection cap                                                                                                |
 | `brief.max_spans_per_note`           | int            | `5`                                                                       | quoted spans per selected note                                                                               |
-| `brief.trigger.enabled`              | bool           | `false`                                                                   | the calendar trigger behind `--upcoming`                                                                     |
-| `brief.trigger.lead_time`            | duration       | `24h`                                                                     | how far ahead `--upcoming` looks                                                                             |
+| `brief.trigger.enabled`              | bool           | `false`                                                                   | the calendar trigger behind `brief upcoming`                                                                     |
+| `brief.trigger.lead_time`            | duration       | `24h`                                                                     | how far ahead `brief upcoming` looks                                                                             |
 | `context.type`                       | enum           | `none`                                                                    | `none`, `dam` or `google`                                                                                    |
 | `context.calendars`                  | string list    | `[]`                                                                      | dam path prefixes or Google calendar ids; empty refuses                                                      |
 | `context.projects`                   | string list    | `[]`                                                                      | dam task path prefixes; empty refuses                                                                        |
@@ -1811,7 +1811,7 @@ Refused at startup, before any work, exit 2 or 3 as marked:
 - the `obsidian` profile with `note.obsidian.vault_root` empty, relative or not an existing directory
   (2).
 - the helper present with a different major version (3, `helper_version`).
-- `brief --upcoming` with the trigger disabled (2); `analyze` with no command (2); `show --redact`
+- `brief upcoming` with the trigger disabled (2); `analyze` with no command (2); `show --redact`
   without `--stage` or with `--stage released` (2).
 
 `vpt doctor` never refuses at startup: it runs every check, prints the whole result and exits 3 when any
@@ -1927,7 +1927,7 @@ each gate as a recipe and `just ship` runs them all in CI order.
   sources, deferring with exit 0 and a retry marker when the clone or a toolchain is absent, running
   `cargo build --release --locked` and `swift build -c release`, and installing `vpt` and `vpt-macos`
   with `install -m 755`; a LaunchAgent plist running `vpt run` on a `StartCalendarInterval` every 15
-  minutes plus `vpt brief --upcoming` when the trigger is enabled, with its loader; and a rendered config
+  minutes plus `vpt brief upcoming` when the trigger is enabled, with its loader; and a rendered config
   template carrying only what differs from the defaults plus the secret lookups. Those files are the
   dotfiles repository's, proposed in their own pull request; vpt's repository holds none of them and
   nothing in vpt reads them.

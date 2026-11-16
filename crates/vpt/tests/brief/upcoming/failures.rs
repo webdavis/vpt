@@ -12,7 +12,7 @@ fn completion_and_report_rollback_together_and_partial_success_keeps_its_identit
         &sandbox,
         vec![event("one", now + 3600), event("two", now + 7200)],
     );
-    let output = invoke(&sandbox, &["brief", "--upcoming", "--json"]);
+    let output = invoke(&sandbox, &["brief", "upcoming", "--json"]);
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
     assert!(!stderr(&output).contains("Private"));
     let error: Value = serde_json::from_slice(&output.stderr).unwrap();
@@ -31,7 +31,7 @@ fn completion_and_report_rollback_together_and_partial_success_keeps_its_identit
         .unwrap();
     drop(connection);
     assert_eq!(
-        json(&invoke(&sandbox, &["brief", "--upcoming", "--json"]))["written"],
+        json(&invoke(&sandbox, &["brief", "upcoming", "--json"]))["written"],
         json!([])
     );
     assert!(ledger.pending_publications().unwrap().is_empty());
@@ -54,7 +54,7 @@ fn broken_stdout_keeps_the_completed_upcoming_occasion_and_does_not_repeat_its_r
     let sandbox = configured();
     reply(&sandbox, vec![event("one", SystemClock.now().secs + 3600)]);
     let output = support::run_with_broken_stdout(
-        sandbox.vpt().args(["brief", "--upcoming", "--json"]),
+        sandbox.vpt().args(["brief", "upcoming", "--json"]),
         std::time::Duration::from_secs(5),
     );
     assert_eq!(output.status.code(), Some(1));
@@ -66,7 +66,7 @@ fn broken_stdout_keeps_the_completed_upcoming_occasion_and_does_not_repeat_its_r
         json!([reports[0]["fact"]["event"]["occasion"]])
     );
     assert_eq!(
-        json(&invoke(&sandbox, &["brief", "--upcoming", "--json"]))["written"],
+        json(&invoke(&sandbox, &["brief", "upcoming", "--json"]))["written"],
         json!([])
     );
     assert_eq!(super::reports(&sandbox).len(), 1);

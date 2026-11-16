@@ -1,4 +1,4 @@
-use super::{Verb, text::PrivateText, values};
+use super::{Verb, examples, text::PrivateText, values};
 use vpt_domain::occasion::{OccasionDetails, OccasionId, Participant, time::OccasionTime};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -15,16 +15,16 @@ pub(crate) struct Options {
 }
 
 const CAPACITY: usize = 256;
-const MANUAL: [&str; 2] = ["id", "upcoming"];
 
 #[derive(clap::Args)]
+#[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
 pub(super) struct Args {
     /// The saved occasion id.
     #[arg(
         value_name = "OCCASION_ID",
         value_parser = occasion_id,
-        required_unless_present_any = ["title", "upcoming"],
-        conflicts_with_all = ["title", "upcoming"]
+        required_unless_present = "title",
+        conflicts_with = "title"
     )]
     id: Option<OccasionId>,
     /// Show the brief without writing it.
@@ -33,21 +33,18 @@ pub(super) struct Args {
     /// Show the brief's sections and where each came from.
     #[arg(long)]
     explain: bool,
-    /// Write briefs for the meetings that start soon.
-    #[arg(long, conflicts_with_all = ["title", "dry_run", "explain"])]
-    upcoming: bool,
     /// Create a manual occasion with this title.
     #[arg(long, requires = "at", allow_hyphen_values = true)]
     title: Option<PrivateText>,
     /// The manual occasion's start, as an RFC 3339 time.
-    #[arg(long, requires = "title", conflicts_with_all = MANUAL, value_parser = values::time)]
+    #[arg(long, requires = "title", conflicts_with = "id", value_parser = values::time)]
     at: Option<OccasionTime>,
     /// The manual occasion's length in minutes.
     #[arg(
         long = "duration-minutes",
         value_name = "MINUTES",
         requires = "title",
-        conflicts_with_all = MANUAL,
+        conflicts_with = "id",
         value_parser = seconds
     )]
     duration_secs: Option<u64>,
@@ -56,13 +53,27 @@ pub(super) struct Args {
         long,
         value_name = "NAME",
         requires = "title",
-        conflicts_with_all = MANUAL,
+        conflicts_with = "id",
         allow_hyphen_values = true
     )]
     participant: Vec<PrivateText>,
     /// A tag of the manual occasion; repeat for more.
-    #[arg(long, requires = "title", conflicts_with_all = MANUAL, allow_hyphen_values = true)]
+    #[arg(
+        long,
+        requires = "title",
+        conflicts_with = "id",
+        allow_hyphen_values = true
+    )]
     tag: Vec<PrivateText>,
+    #[command(subcommand)]
+    upcoming: Option<Upcoming>,
+}
+
+#[derive(clap::Subcommand)]
+enum Upcoming {
+    /// Write briefs for the meetings that start soon.
+    #[command(after_long_help = examples::BRIEF_UPCOMING)]
+    Upcoming,
 }
 
 fn occasion_id(text: &str) -> Result<OccasionId, String> {
@@ -83,9 +94,10 @@ impl Args {
                 return Err(format!("{flag} exceeds capacity"));
             }
         }
-        let target = match (self.id, self.title, self.at) {
-            (Some(id), ..) => Target::Existing(id),
-            (None, Some(title), Some(at)) => {
+        let target = match (self.upcoming, self.id, self.title, self.at) {
+            (Some(Upcoming::Upcoming), ..) => Target::Upcoming,
+            (None, Some(id), ..) => Target::Existing(id),
+            (None, None, Some(title), Some(at)) => {
                 let details = OccasionDetails {
                     at,
                     title: title.as_str().into(),
@@ -105,7 +117,7 @@ impl Args {
                 }
                 Target::Manual(details)
             }
-            _ => Target::Upcoming,
+            _ => return Err("invalid manual occasion".into()),
         };
         Ok(Verb::Brief(Options {
             target,

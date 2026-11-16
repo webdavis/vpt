@@ -22,7 +22,7 @@ fn provider_label_selects_confirmed_evidence_and_report_hook_receives_only_safe_
     let mut row = event("one", SystemClock.now().secs + 3600);
     row["labels"] = json!(["planning"]);
     reply(&sandbox, vec![row]);
-    let result = json(&invoke(&sandbox, &["brief", "--upcoming", "--json"]));
+    let result = json(&invoke(&sandbox, &["brief", "upcoming", "--json"]));
     let occasion =
         vpt_domain::occasion::OccasionId::parse(result["written"][0].as_str().unwrap()).unwrap();
     let ledger = SqliteLedger::open_read_only(&sandbox.path().join("state/vpt"))
@@ -46,6 +46,6 @@ fn provider_label_selects_confirmed_evidence_and_report_hook_receives_only_safe_
     assert_eq!(event["counts"]["spans"], 1);
     assert!(!text.contains("Private accepted quote"));
     assert!(!text.contains("planning"));
-    json(&invoke(&sandbox, &["brief", "--upcoming", "--json"]));
+    json(&invoke(&sandbox, &["brief", "upcoming", "--json"]));
     assert_eq!(fs::read_to_string(capture).unwrap(), text);
 }

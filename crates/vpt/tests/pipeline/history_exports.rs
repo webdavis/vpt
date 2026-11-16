@@ -152,7 +152,7 @@ fn required_brief_history_precedes_manual_and_upcoming_collection() {
             "CREATE TRIGGER refuse_required_history BEFORE INSERT ON history_records BEGIN SELECT RAISE(ABORT,'private failure'); END",
         );
         let args: &[&str] = if automatic {
-            &["brief", "--upcoming"]
+            &["brief", "upcoming"]
         } else {
             &[
                 "brief",
@@ -200,7 +200,7 @@ fn later_commands_preserve_success_and_export_every_history_record_when_logging_
                     "--at",
                     "2026-10-01T10:00:00-06:00",
                 ],
-                "upcoming" => vec!["brief", "--upcoming"],
+                "upcoming" => vec!["brief", "upcoming"],
                 _ => vec![verb, row.id.as_str()],
             };
             let artifacts_before = ledger.retention_artifacts().unwrap();

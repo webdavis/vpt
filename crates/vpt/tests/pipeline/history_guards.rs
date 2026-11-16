@@ -57,7 +57,7 @@ pub(super) fn prepare() -> (Sandbox, Vec<Vec<String>>) {
         vec!["confirm", "relation", id, &relation],
         manual,
         vec!["brief", occasion.as_str()],
-        vec!["brief", "--upcoming"],
+        vec!["brief", "upcoming"],
         vec!["redact", id, "--stage", "transcript"],
         vec!["redact", id, "--stage", "analysis"],
         vec!["retention", "run"],

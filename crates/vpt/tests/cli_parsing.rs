@@ -76,6 +76,8 @@ fn private_text_never_appears_in_a_usage_error() {
         vec!["import", "--title", canary],
         vec!["redact", "--title", canary],
         vec!["brief", "--title", canary, "--upcoming"],
+        vec!["brief", "upcoming", canary],
+        vec!["brief", "upcoming", "--title", canary],
         vec!["brief", "--participant", canary],
         vec!["tag", "rename", canary],
         vec!["tag", "rename", "--Private canary", "new"],
