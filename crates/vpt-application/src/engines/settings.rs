@@ -45,6 +45,15 @@ impl EngineConfig {
             _ => true,
         }
     }
+    pub fn has_token(&self) -> bool {
+        matches!(
+            self.kind,
+            EngineKind::Whisply {
+                hf_token: Some(_),
+                ..
+            }
+        )
+    }
     pub fn lexical_classification(&self) -> bool {
         !matches!(self.kind, EngineKind::Command { .. })
     }

@@ -84,18 +84,24 @@ pub(super) fn transcribe(
 
 fn row(settings: &Settings, clip: &Clip, config: &EngineConfig) -> Row {
     let (result, seconds) = transcribe(settings, clip, config);
-    let sent = !config.local() && !matches!(result, Err(EngineFailure::Unavailable));
+    let ran = !matches!(result, Err(EngineFailure::Unavailable));
+    let token = ran && config.has_token();
     let notes = format!(
-        "{}{}",
+        "{}{}{}",
         languages(settings, &config.name),
-        if sent {
+        if ran && !config.local() {
             "; the made-up clip left the machine"
+        } else {
+            ""
+        },
+        if token {
+            "; sent the Hugging Face token to the engine"
         } else {
             ""
         }
     );
     let name = config.name.as_str();
-    match result {
+    let row = match result {
         Ok(output) => {
             let text: Vec<&str> = output
                 .transcript
@@ -122,7 +128,8 @@ fn row(settings: &Settings, clip: &Clip, config: &EngineConfig) -> Row {
             format!("failed in {seconds:.1} s: {}{notes}", cause(&failure)),
         )
         .advice("see `vpt doctor engines`, then the engine's own setup"),
-    }
+    };
+    row.token_sent(token)
 }
 
 fn languages(settings: &Settings, name: &str) -> String {

@@ -126,6 +126,7 @@ fn two_speaker_labels_are_ok_and_the_row_says_what_left_the_machine() {
     assert!(detail.starts_with("2 speaker labels in "), "{detail}");
     assert!(detail.contains("Hugging Face"), "{detail}");
     assert!(detail.contains("first use"), "{detail}");
+    assert_eq!(labels["token_sent"], true, "{document}");
     assert_eq!(std::fs::read_to_string(&logs.token).unwrap(), TOKEN);
     let arguments = std::fs::read_to_string(&logs.whisply).unwrap();
     assert!(arguments.lines().any(|line| line == "-a"), "{arguments}");
@@ -234,4 +235,49 @@ fn a_token_on_an_unselected_whisply_is_refused_naming_the_selection() {
         "{}",
         stderr(&output)
     );
+}
+
+fn engines_run(trial: &Trial) -> (Value, String) {
+    let clip = trial.path().join("clip-fixture.m4a");
+    script(
+        &trial.sandbox,
+        "say",
+        &format!("[ \"$1\" = -o ] || exit 64\n/bin/cp {clip:?} \"$2\""),
+    );
+    let human = trial.output(&["test", "engines"]);
+    let json = trial.output(&["test", "engines", "-o", "json"]);
+    for output in [&human, &json] {
+        assert!(!stdout(output).contains(TOKEN));
+        assert!(!stderr(output).contains(TOKEN));
+    }
+    let document: Value = serde_json::from_str(&stdout(&json)).unwrap();
+    (document, stdout(&human))
+}
+
+#[test]
+fn an_engines_row_says_when_whisply_got_the_token() {
+    let trial = Trial::new("test-engines-token");
+    speakers(&trial, &["SPEAKER_00", "SPEAKER_01"], true);
+    let (document, human) = engines_run(&trial);
+    let labels = crate::fixture::row(&document, "labels");
+    let detail = labels["detail"].as_str().unwrap();
+    assert!(
+        detail.contains("; sent the Hugging Face token to the engine"),
+        "{detail}"
+    );
+    assert_eq!(labels["token_sent"], true, "{document}");
+    assert!(
+        human.contains("sent the Hugging Face token to the engine"),
+        "{human}"
+    );
+}
+
+#[test]
+fn an_engines_row_without_a_token_says_nothing_of_one() {
+    let trial = Trial::new("test-engines-no-token");
+    speakers(&trial, &["SPEAKER_00", "SPEAKER_01"], false);
+    let (document, human) = engines_run(&trial);
+    let labels = crate::fixture::row(&document, "labels");
+    assert!(labels.get("token_sent").is_none(), "{document}");
+    assert!(!human.contains("Hugging Face"), "{human}");
 }

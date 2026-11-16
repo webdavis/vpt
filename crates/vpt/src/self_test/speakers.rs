@@ -26,15 +26,7 @@ pub(super) fn test(settings: &Settings) -> Result<Run<'_>, Row> {
     let engines = &settings.engines;
     let selected = engines.selected();
     let whisply = |engine: &&EngineConfig| matches!(engine.kind, EngineKind::Whisply { .. });
-    let tokened = |engine: &&EngineConfig| {
-        matches!(
-            engine.kind,
-            EngineKind::Whisply {
-                hf_token: Some(_),
-                ..
-            }
-        )
-    };
+    let tokened = |engine: &&EngineConfig| engine.has_token();
     let all = || engines.definitions.values().filter(whisply);
     if let Some(engine) = all()
         .filter(tokened)
@@ -77,11 +69,8 @@ fn rows(settings: &Settings, engine: &EngineConfig) -> Vec<Row> {
 fn labels(settings: &Settings, clip: &Clip, engine: &EngineConfig) -> Row {
     let (result, seconds) = transcribe(settings, clip, engine);
     let name = engine.name.as_str();
-    let reach = if matches!(result, Err(EngineFailure::Unavailable)) {
-        ""
-    } else {
-        REACH
-    };
+    let sent = !matches!(result, Err(EngineFailure::Unavailable));
+    let reach = if sent { REACH } else { "" };
     let output = match result {
         Ok(output) => output,
         Err(failure) => {
@@ -93,7 +82,7 @@ fn labels(settings: &Settings, clip: &Clip, engine: &EngineConfig) -> Row {
                 "see `vpt doctor speakers`, then whisply's own setup"
             };
             let detail = format!("failed in {seconds:.1} s: {}{reach}", cause(&failure));
-            return Row::issue(name, detail).advice(advice);
+            return Row::issue(name, detail).advice(advice).token_sent(sent);
         }
     };
     let found: BTreeSet<&str> = output
@@ -107,12 +96,13 @@ fn labels(settings: &Settings, clip: &Clip, engine: &EngineConfig) -> Row {
         "{} speaker label{plural} in {seconds:.1} s{reach}",
         found.len()
     );
-    if found.len() >= 2 {
+    let row = if found.len() >= 2 {
         Row::ok(name, detail)
     } else {
         Row::issue(name, detail).advice(
             "whisply ran but did not tell the two voices apart; check that its speaker \
              annotation works on a recording of two people",
         )
-    }
+    };
+    row.token_sent(sent)
 }
