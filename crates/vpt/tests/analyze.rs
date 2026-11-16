@@ -64,6 +64,8 @@ mod tag_defaults;
 mod tag_placeholders;
 #[path = "analyze/tag_renames.rs"]
 mod tag_renames;
+#[path = "analyze/terminal.rs"]
+mod terminal;
 #[path = "analyze/withdraw.rs"]
 mod withdraw;
 #[path = "analyze/withdraw_scope.rs"]
