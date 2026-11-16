@@ -3,6 +3,7 @@ mod analyze;
 mod confirm;
 mod ingest;
 mod list;
+mod note;
 mod review;
 mod run;
 mod search;
@@ -55,6 +56,8 @@ fn render(verb: &Verb) -> Option<Render> {
             Some(confirm::render)
         }
         Verb::TagRename { .. } => Some(tag::render),
+        Verb::NoteWrite { .. } => Some(note::write),
+        Verb::VerifyNote { .. } => Some(note::verify),
         _ => None,
     }
 }
