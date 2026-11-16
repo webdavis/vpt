@@ -3,9 +3,11 @@
 mod fixture;
 #[path = "redact/fixture.rs"]
 mod recording;
+#[path = "note/styled.rs"]
+mod styled;
 mod support;
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
-use support::{Sandbox, stderr};
+use support::{Sandbox, stderr, stdout};
 use vpt_adapters::SqliteLedger;
 use vpt_application::ports::*;
 fn invoke(sandbox: &Sandbox, args: &[&str]) -> std::process::Output {
@@ -150,5 +152,7 @@ fn redact_rejects_unsupported_options_and_private_values_stay_out_of_usage_error
 mod analysis;
 #[path = "redact/split.rs"]
 mod split;
+#[path = "redact/terminal.rs"]
+mod terminal;
 #[path = "redact/workflow.rs"]
 mod workflow;

@@ -45,8 +45,8 @@ string double-quoted. Without a format, commands print text for people. Naming t
 error, reported as text with exit code 2.
 
 When standard output is a terminal, `run`, `ingest`, `import`, `transcribe`, `analyze`, `list`,
-`search`, `storage`, `show` without `--stage`, `review list`, `confirm`, `tag rename`, `note write`
-and `note verify` print that text in the same style as `doctor`: one row per result, `name: detail`
+`search`, `storage`, `show` without `--stage`, `review list`, `confirm`, `tag rename`, `note write`,
+`note verify` and `redact` print that text in the same style as `doctor`: one row per result, `name: detail`
 marked `✓` for done, `·` for planned or skipped,
 `⚠` for a warning and `✗` for a failure, with advice under a row after `→`. A closing
 "Needs attention" section numbers every warning and failure, and appears only when there is one.
