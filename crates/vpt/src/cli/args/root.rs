@@ -1,4 +1,4 @@
-use super::{PathBuf, examples, verbs::Command};
+use super::{Format, PathBuf, examples, verbs::Command};
 
 /// Voice Processing Tool: archive, transcribe and analyze voice recordings.
 #[derive(clap::Parser)]
@@ -20,15 +20,15 @@ pub(super) struct Cli {
 #[derive(clap::Args)]
 #[command(next_help_heading = "Global options")]
 pub(super) struct Global {
-    /// Print the result as JSON.
-    #[arg(long, global = true, conflicts_with_all = ["toon", "yaml"])]
+    /// Print the result in this format.
+    #[arg(long, short = 'o', global = true, value_name = "FORMAT")]
+    pub output: Option<Format>,
+    /// Print the result as JSON, as --output json does.
+    #[arg(long, global = true, conflicts_with_all = ["toon", "output"])]
     pub json: bool,
-    /// Print the result as TOON.
-    #[arg(long, global = true, conflicts_with = "yaml")]
+    /// Print the result as TOON, as --output toon does.
+    #[arg(long, global = true, conflicts_with = "output")]
     pub toon: bool,
-    /// Print the result as YAML.
-    #[arg(long, global = true)]
-    pub yaml: bool,
     /// Report progress as JSON lines on stderr.
     #[arg(long, global = true)]
     pub progress: bool,

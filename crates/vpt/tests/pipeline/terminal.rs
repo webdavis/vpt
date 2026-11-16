@@ -78,7 +78,7 @@ fn a_dry_run_at_a_terminal_lists_what_it_would_do_and_leaves_machine_output_alon
             source.display()
         )
     );
-    for format in ["--json", "--toon", "--yaml"] {
+    for format in ["--json", "--toon", "--output=yaml"] {
         assert_eq!(
             shown(&sandbox, &["--preview", format]),
             piped(&sandbox, &["--preview", format]),

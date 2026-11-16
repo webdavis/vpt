@@ -17,7 +17,7 @@ shell.
 
 A flag takes its value as `--flag value` or `--flag=value`, and `--` ends the flags, so
 `vpt search -- --force` searches for `--force`. A mistyped command or flag is refused with exit 2
-and a tip naming the closest match; under `--json`, `--toon` or `--yaml` the tip is in the error
+and a tip naming the closest match; under `--output` (or `--json` or `--toon`) the tip is in the error
 document's `diagnostics`. A usage error names only vpt's own commands, flags and values, never a word
 you typed, so private text stays out of it.
 
@@ -32,14 +32,14 @@ workspace checks.
 
 ## Machine-readable output
 
-Every command accepts one of `--json`, `--toon` or `--yaml`, in any position. Each flag prints the
-same document: a `vpt.result/1` document on standard output when the command succeeds, or a
-`vpt.error/1` document on standard error when it fails, with the same exit code. `--json` prints the
-document as one line of compact JSON. `--toon` prints it as TOON (Token-Oriented Object Notation), with
-nesting by indentation, a declared length on every array and quotes only where a bare value would
-read as something else. `--yaml` prints it as block YAML with every string double-quoted. Without a
-flag, commands print text for people. Passing two different format flags is a usage error, reported
-as text with exit code 2.
+Every command accepts `--output json|toon|yaml`, or `-o` for short, in any position. `--json` is
+short for `--output json` and `--toon` for `--output toon`. Each format prints the same document: a
+`vpt.result/1` document on standard output when the command succeeds, or a `vpt.error/1` document on
+standard error when it fails, with the same exit code. JSON is the document as one line of compact
+JSON. TOON (Token-Oriented Object Notation) nests by indentation, with a declared length on every
+array and quotes only where a bare value would read as something else. YAML is block YAML with every
+string double-quoted. Without a format, commands print text for people. Naming two formats is a usage
+error, reported as text with exit code 2.
 
 When standard output is a terminal, `run`, `ingest`, `import`, `transcribe` and `analyze` print that
 text in the same style as `doctor`: one row per result, `name: detail` marked `✓` for done, `·` for
@@ -133,7 +133,7 @@ accepted. A machine with no marker, a deleted marker, or a changed `home.state_d
 a new machine. A write lost on a machine that never runs vpt again goes unnoticed, and nothing merges
 two histories.
 
-`vpt ledger show [--json|--toon|--yaml]` prints the folder, the database id, the write counter, the
+`vpt ledger show [--output json|toon|yaml]` prints the folder, the database id, the write counter, the
 recording count, this machine's last write and the finding, if any; it writes nothing. Its document
 holds `folder`, `database` (`id`, `write_counter`, `recordings`, or `null` before the first write),
 `this_machine` (`database_id`, `write_counter`, `write_token`, or `null`) and `finding` (`rule` and
@@ -164,7 +164,7 @@ that variable. Ordinary tests skip this host-dependent case.
 
 ## Ingestion and archive recovery
 
-`vpt ingest [--once <path>] [--preview] [--json|--toon|--yaml]` archives eligible Voice Memos recordings.
+`vpt ingest [--once <path>] [--preview] [--output json|toon|yaml]` archives eligible Voice Memos recordings.
 A sweep considers only immediate `.m4a` files; it excludes sidecars and nested folders. `--once`
 selects one recording inside that directory and applies the same eligibility checks. The defaults
 are a 2 GiB size limit and a 30-second quiet period. Dataless iCloud entries are deferred without
@@ -196,7 +196,7 @@ and preserve the changed file. Different content at an expected archive path is 
 
 ## Importing other files
 
-`vpt import <file> [--title <text>] [--captured-at <RFC 3339 time>] [--json|--toon|--yaml]` archives one audio or
+`vpt import <file> [--title <text>] [--captured-at <RFC 3339 time>] [--output json|toon|yaml]` archives one audio or
 video file from anywhere on disk. vpt never downloads; the caller provides a local file. A `.m4a` file is
 archived as it is. Any other file has its first audio stream converted to `.m4a` by the command in
 `[import] extract_command`, default `["ffmpeg"]`. vpt appends `-nostdin -loglevel error
@@ -215,7 +215,7 @@ differently, so re-importing a converted file after an ffmpeg upgrade can create
 
 ## Transcription command
 
-`vpt transcribe <id> [--language <tag>] [--preview] [--json|--toon|--yaml]` runs the configured main engine
+`vpt transcribe <id> [--language <tag>] [--preview] [--output json|toon|yaml]` runs the configured main engine
 and optional checker against a private copy of archived audio. It saves the accepted transcript
 and raw engine documents, then publishes the transcript note using the selected profile and
 readability settings. Interrupted publication resumes from saved bytes. Engine failures preserve the
@@ -268,7 +268,7 @@ successful work. Failed publication emits no review alert. Retranscription leave
 
 ## Pipeline
 
-`vpt run [--preview] [--resend-refused] [--json|--toon|--yaml]` composes ingestion, transcription, note publication, stale-finding
+`vpt run [--preview] [--resend-refused] [--output json|toon|yaml]` composes ingestion, transcription, note publication, stale-finding
 verification, configured analysis, and optional automatic redaction.
 It resumes pending or failed work in capture order, retries previously disabled incomplete stages,
 and preserves successful transcription and expired notes. Changed readability/profile settings refresh
@@ -297,11 +297,11 @@ interrupted, while preserving committed work and the normal operational-failure 
 
 ## Review and known terms
 
-`vpt review <id> [--json|--toon|--yaml]` displays ranked open lexical flags, alternatives, occurrence ranges and
+`vpt review <id> [--output json|toon|yaml]` displays ranked open lexical flags, alternatives, occurrence ranges and
 timecodes, with whole-recording diagnostics listed separately. It reads saved state without running an
 engine or changing files.
 
-`vpt review <id> --resolve <flag> --confirm|--correct <text>|--dismiss [--json|--toon|--yaml]` resolves a
+`vpt review <id> --resolve <flag> --confirm|--correct <text>|--dismiss [--output json|toon|yaml]` resolves a
 surfaced flag and rewrites the transcript note. Corrections remain separate from accepted words.
 Confirming proper-noun/agreed-unverified flags learns their record text; corrections learn the new
 text. Repeating the same action preserves its resolution time and avoids duplicate terms. Diagnostics
@@ -313,7 +313,7 @@ malformed notes and redirected term lists refuse the update. A changed content d
 analysis pending. JSON includes the resolved flag's state, whether it changed, its note path, and the
 remaining open flags. History omits correction and transcript text.
 
-`vpt confirm --term <text> [--json|--toon|--yaml]` adds a confirmed term without needing a recording or engine.
+`vpt confirm --term <text> [--output json|toon|yaml]` adds a confirmed term without needing a recording or engine.
 It normalizes whitespace, preserves existing list content, and recognizes whole-term Unicode/case
 variants as duplicates. New files are private. The ledger saves publication bytes and intent before
 writing, and mutating startup recovers interrupted updates. Changed files or a changed configured list
@@ -322,7 +322,7 @@ without undoing a completed confirmation.
 
 ## Inspecting saved state
 
-`vpt show <id> [--json|--toon|--yaml]` and `vpt list [--stage transcribe|note|analysis] [--json|--toon|--yaml]` expose
+`vpt show <id> [--output json|toon|yaml]` and `vpt list [--stage transcribe|note|analysis] [--output json|toon|yaml]` expose
 stage states, accepted engine metadata, requested/reported language, open flag and diagnostic counts,
 note paths, and artifact metadata. Artifacts distinguish published, pending publication, and expired
 files; expiration retains their recorded paths and digests. Stale verification findings are excluded
@@ -369,10 +369,10 @@ null. A `due` has its `date`, its `time` or null, its own `sources` and its own 
 finding is `unsourced` or `bad-reference`, `date` and `time` are null. An action's moment comes from
 the action's sources only. No stage needs an opt-in. A recording with no accepted transcript or proposal is an input error (2).
 
-`vpt storage [--json|--toon|--yaml]` reports current file counts, bytes, and oldest/newest timestamps for all seven
+`vpt storage [--output json|toon|yaml]` reports current file counts, bytes, and oldest/newest timestamps for all seven
 stores. It works independently of the recording source and ledger.
 
-`vpt doctor [check ...] [--fix] [--json|--toon|--yaml]` reads this machine and says what needs
+`vpt doctor [check ...] [--fix] [--output json|toon|yaml]` reads this machine and says what needs
 attention. It contacts nothing: no network, no model, no engine. The one program it starts is vpt's
 own helper, for its version. Without `--fix` it changes nothing on disk.
 
@@ -430,7 +430,7 @@ advice under it after `→`. "Needs attention" closes the report: one count line
 warning numbered, or `✓ nothing needs attention`. Doctor exits 1 when any row is an issue and 0
 otherwise, so warnings alone keep exit 0.
 
-`--json`, `--toon` and `--yaml` print the same values: `schema`, `command`, `version`, `checks` in
+Every `--output` format prints the same values: `schema`, `command`, `version`, `checks` in
 display order (each with `name`, `result`, `detail`, `advice` and `rows`, each row with `name`,
 `result`, `detail` and `advice`), and `needs_attention`, the issues and then the warnings, each with
 its `check`, `name`, `result`, `detail` and `advice`. `advice` is `null` when there is nothing to do,
@@ -448,7 +448,7 @@ name.
 
 ## vpt test
 
-`vpt test [part ...] [--json|--toon|--yaml]` makes each part do its real job once and reports. The
+`vpt test [part ...] [--output json|toon|yaml]` makes each part do its real job once and reports. The
 parts are `engines`, `speakers`, `summary`, `calendar` and `actions`, in that order. Name parts to
 test only those, as in `vpt test engines`. An unknown name is refused with exit 2 and the list of
 valid names. Bare `vpt test` tests every configured part. A named part with nothing to test is
@@ -507,13 +507,13 @@ follow-up in the ledger, and removes the temporary folder at the end, also when 
 
 The report has the same form as doctor's: the version line, a heading per part, rows marked `✓`,
 `⚠`, `✗` or `·`, advice after `→`, and "Needs attention". It goes to standard output. vpt exits 1
-when any row is an issue and 0 otherwise. `--json`, `--toon` and `--yaml` print the same fields as
+when any row is an issue and 0 otherwise. Every `--output` format prints the same fields as
 doctor, with `command` set to `test`. A program can run `vpt test summary --json`, read each
 row's `result` and `detail`, and act on its `advice`.
 
 ## Note writing
 
-`vpt note write <id> [--json|--toon|--yaml]` writes the transcript and any existing analysis note from saved ledger
+`vpt note write <id> [--output json|toon|yaml]` writes the transcript and any existing analysis note from saved ledger
 state without audio or an engine. Both notes link to the archived audio and to each other. It supports
 portable and Obsidian profiles, independent Markdown/wiki link settings, inline uncertainty and
 corrections, and the optional readability pass. The first filename is pinned;
@@ -557,7 +557,7 @@ Explicit regeneration of an expired transcript or analysis note retains saved op
 provenance is saved with accepted text, so new two-engine transcriptions retain both engines after
 raw-output removal. Older accepted state without checker metadata remains readable.
 
-`vpt path <id> --stage transcript|analysis [--json|--toon|--yaml]` returns the saved absolute pin, including when
+`vpt path <id> --stage transcript|analysis [--output json|toon|yaml]` returns the saved absolute pin, including when
 the artifact is missing, changed, or pending publication. It does not read the artifact or repair state.
 
 When a note pin is missing, `note write` scans its flat store for the recording identity. A unique
@@ -573,17 +573,17 @@ clear a failed analysis attempt. `analyze` creates the initial analysis note.
 
 ## Occasions and briefs
 
-`vpt occasions [--json|--toon|--yaml]` lists saved occasions, including those without a brief, in exact start-time
+`vpt occasions [--output json|toon|yaml]` lists saved occasions, including those without a brief, in exact start-time
 order. Output includes the occasion identity, start, source, duration, participants, tags, and saved
 brief path/status. Provider object keys stay private to the ledger.
 
-`vpt path --occasion <id> --stage brief [--json|--toon|--yaml]` returns the saved absolute brief path even when its
+`vpt path --occasion <id> --stage brief [--output json|toon|yaml]` returns the saved absolute brief path even when its
 file is missing. Both commands are observational: an absent ledger stays absent, and neither command
 publishes or repairs an artifact. Accepted brief packs and rendered text are stored together;
 mutating startup repairs pending brief publication and then marks the occasion briefed. Replaced
 files are preserved and recovery refuses to overwrite them.
 
-`vpt brief <occasion-id> [--preview|--explain] [--json|--toon|--yaml]` writes or previews a saved occasion's brief.
+`vpt brief <occasion-id> [--preview|--explain] [--output json|toon|yaml]` writes or previews a saved occasion's brief.
 Create a manual occasion with `vpt brief --title <title> --at <RFC3339>`, optionally adding
 `--duration-minutes <minutes>`, repeated `--participant <name>`, and repeated `--tag <tag>`.
 Repeated requests preserve the original brief path and first-write metadata, including after a
@@ -635,7 +635,7 @@ only `calendar.events.readonly`. Recurring events are expanded within the reques
 most ten pages per calendar and one 30-second deadline for refresh and collection. Google tasks are
 unsupported. Provider failures use fixed details without credentials or response bodies.
 
-Enable `[brief.trigger] enabled = true` to use `vpt brief --upcoming [--json|--toon|--yaml]`. The default lead time is
+Enable `[brief.trigger] enabled = true` to use `vpt brief --upcoming [--output json|toon|yaml]`. The default lead time is
 `24h`; discovery selects events with `now <= start < now + lead_time`. A writing run saves its start
 before collecting context. Failed calendar discovery exits 1 and records the failed run without
 saving an occasion or publishing a brief. Successful discovery writes each unbriefed provider identity
@@ -651,7 +651,7 @@ Requested briefs emit no automatic notification.
 
 ## Analysis
 
-`vpt analyze <id> [--preview] [--resend-refused] [--json|--toon|--yaml]` uses the configured `[analysis] command` argument list.
+`vpt analyze <id> [--preview] [--resend-refused] [--output json|toon|yaml]` uses the configured `[analysis] command` argument list.
 An empty command disables analysis and explicit invocation returns a configuration error. No model
 vendor is built in. The command receives `{transcript}`, `{id}`, `{language}`, `{captured_at}`,
 `{known_tags}`, and `{refused_tags}` substitutions and exact rendered transcript content on stdin; the
@@ -978,7 +978,7 @@ action text reaches only the command, never `events.jsonl` or vpt's output.
 
 ## Note verification
 
-`vpt verify-note <path> --recording <id> [--json|--toon|--yaml]` checks Markdown claims against the recording's
+`vpt verify-note <path> --recording <id> [--output json|toon|yaml]` checks Markdown claims against the recording's
 accepted transcript and current lexical flags. Findings are `unsourced`, `bad-reference`, `unsupported`,
 or `built-on-flagged-text`, in that priority order. The default citation tolerance is 15 seconds,
 configured by `analysis.grounding_window_secs`; no agent or transcription engine is run.
@@ -1011,7 +1011,7 @@ or alias. VPT saves every matched accepted-word range; ambiguous matches save th
 a link. Review confirmations include newly learned terms immediately. `run` refreshes changed
 matches without rerunning engines, and indexed external notes remain untouched.
 
-`vpt confirm <id> --relation <kind>:<target> [--json|--toon|--yaml]` confirms `continues`, `mentions`, `related`,
+`vpt confirm <id> --relation <kind>:<target> [--output json|toon|yaml]` confirms `continues`, `mentions`, `related`,
 or `supersedes`. Targets can be recording IDs or unique indexed note names, aliases, or absolute
 paths. `continues` and `supersedes` require a recording ID or a validated ledger-owned note.
 Ambiguous, unknown, and self targets are refused. Confirmation preserves existing proposal provenance
@@ -1020,18 +1020,18 @@ history. It also works before transcription and leaves expired notes expired.
 
 ## Tag confirmation
 
-`vpt confirm <id> --tag <tag> [--json|--toon|--yaml]` confirms a tag, updates `known-tags.txt`, and refreshes the
+`vpt confirm <id> --tag <tag> [--output json|toon|yaml]` confirms a tag, updates `known-tags.txt`, and refreshes the
 transcript and existing analysis notes when accepted text is available. It works without analysis or an engine. Existing
 vocabulary spelling is retained; new multiword tags become kebab-case. The configured confirmation
 limit applies without removing earlier tags. Repeating a confirmation keeps its saved tag timestamp
 and avoids rewriting an unchanged vocabulary file.
 
-`vpt confirm <id> --reject-tag <tag> [--json|--toon|--yaml]` removes the tag from managed tags or suggestions while
+`vpt confirm <id> --reject-tag <tag> [--output json|toon|yaml]` removes the tag from managed tags or suggestions while
 retaining operator tags and the global vocabulary. Expired notes remain expired; explicit `note write`
 can regenerate them. Tag state, note bytes, and pending vocabulary bytes commit together, and startup
 recovery completes interrupted publication while preserving operator edits.
 
-`vpt tag rename <old> <new> [--preview] [--json|--toon|--yaml]` renames one tag everywhere vpt owns
+`vpt tag rename <old> <new> [--preview] [--output json|toon|yaml]` renames one tag everywhere vpt owns
 it: the saved tag state of every recording, the transcript and analysis notes, and `known-tags.txt`.
 The ledger remembers the rename. Case and separator variants of `<old>` match. When a recording
 already carries `<new>`, the two merge into one entry; a hand-set state beats one a summary set, and
@@ -1049,7 +1049,7 @@ stores, plus `known-tags.txt`. Indexed external notes remain unchanged.
 
 ## Released copies
 
-`vpt redact <id> [--stage transcript|analysis] [--to <directory>] [--title <title>] [--json|--toon|--yaml]`
+`vpt redact <id> [--stage transcript|analysis] [--to <directory>] [--title <title>] [--output json|toon|yaml]`
 creates a released copy and a separate private report. Transcript is the default source. The source
 note stays unchanged. Copies contain minimal frontmatter and managed content with confirmed terms,
 indexed names/aliases, and configured pattern classes masked. Open flagged spans are omitted by default;
@@ -1082,7 +1082,7 @@ reports pending redaction without creating files or changing release history.
 
 ## Searching transcripts and analysis
 
-`vpt search <word>... [--limit <n>] [--json|--toon|--yaml]` finds every transcript segment and every
+`vpt search <word>... [--limit <n>] [--output json|toon|yaml]` finds every transcript segment and every
 analysis summary or action line that holds all the words, in any letter case. A word also matches inside
 a longer word. It reads the notes vpt last wrote, as saved in the ledger, and skips a note whose file is
 no longer at its path, such as one retention moved to the Trash. A saved note that cannot be read is

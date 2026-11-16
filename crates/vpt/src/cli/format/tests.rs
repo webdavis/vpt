@@ -29,7 +29,7 @@ fn decoded(format: Format, text: &str) -> Value {
 #[test]
 fn each_format_decodes_to_the_document_it_rendered() {
     for document in [awkward(), json!({}), json!({"one": "value"})] {
-        for (_, format) in Format::FLAGS {
+        for format in [Format::Json, Format::Toon, Format::Yaml] {
             let text = format.render(&document);
             assert!(text.ends_with('\n'), "{format:?}: {text:?}");
             assert_eq!(decoded(format, &text), document, "{format:?}\n{text}");
@@ -83,4 +83,28 @@ fn yaml_quotes_every_string_and_writes_list_items_compactly() {
                - \"x\"\n\
          ids: []\n"
     );
+}
+
+#[test]
+fn the_format_named_before_parsing_is_found_in_every_spelling() {
+    let words = |line: &str| -> Vec<std::ffi::OsString> {
+        std::iter::once("vpt")
+            .chain(line.split(' '))
+            .map(Into::into)
+            .collect()
+    };
+    for (line, format) in [
+        ("show --json", Some(Format::Json)),
+        ("--toon show", Some(Format::Toon)),
+        ("show --output yaml", Some(Format::Yaml)),
+        ("show -o json", Some(Format::Json)),
+        ("show --output=toon", Some(Format::Toon)),
+        ("show -oyaml", Some(Format::Yaml)),
+        ("show --json --toon", None),
+        ("show --output xml", None),
+        ("show --yaml", None),
+        ("search -- --json", None),
+    ] {
+        assert_eq!(super::named(&words(line)), format, "{line}");
+    }
 }

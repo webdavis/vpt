@@ -1,9 +1,11 @@
+mod named;
 mod toon;
 mod yaml;
 
+pub(crate) use named::named;
 use serde_json::Value;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
 pub(crate) enum Format {
     Json,
     Toon,
@@ -11,12 +13,6 @@ pub(crate) enum Format {
 }
 
 impl Format {
-    pub(crate) const FLAGS: [(&'static str, Format); 3] = [
-        ("--json", Format::Json),
-        ("--toon", Format::Toon),
-        ("--yaml", Format::Yaml),
-    ];
-
     pub(crate) fn render(self, document: &Value) -> String {
         match self {
             Format::Json => format!("{document}\n"),
