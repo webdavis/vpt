@@ -5,7 +5,7 @@ use serde_json::json;
 fn bulk_redo_sums_the_action_counts_of_every_recording_it_ran() {
     let (sandbox, rows) = note::configured_with(&[7, 8]);
     let log = actions::configure(&sandbox);
-    let result = note::success(&batch::bulk(&sandbox, &["--all"]));
+    let result = note::success(&batch::bulk(&sandbox, &["all"]));
     assert_eq!(result["recordings"].as_array().unwrap().len(), 2);
     assert_eq!(
         result["actions"],
@@ -24,9 +24,9 @@ fn bulk_redo_sums_the_action_counts_of_every_recording_it_ran() {
 fn bulk_redo_reports_no_action_counts_without_a_command_or_on_a_dry_run() {
     let (sandbox, _rows) = note::configured_with(&[7, 8]);
     agent(&sandbox, "");
-    let result = note::success(&batch::bulk(&sandbox, &["--all"]));
+    let result = note::success(&batch::bulk(&sandbox, &["all"]));
     assert!(result.get("actions").is_none(), "{result}");
     actions::configure(&sandbox);
-    let result = note::success(&batch::bulk(&sandbox, &["--all", "--preview"]));
+    let result = note::success(&batch::bulk(&sandbox, &["all", "--preview"]));
     assert!(result.get("actions").is_none(), "{result}");
 }

@@ -25,6 +25,7 @@ const COMMANDS: &[&str] = &[
     "actions list",
     "actions resend",
     "analyze",
+    "analyze all",
     "path",
     "path occasion",
     "note write",

@@ -8,7 +8,7 @@ pub(super) fn piped(sandbox: &Sandbox, input: &str, extra: &[&str]) -> std::proc
     support::run_with_budget(
         sandbox
             .vpt()
-            .args(["analyze", "--stdin", "--json"])
+            .args(["analyze", "-", "--json"])
             .args(extra)
             .stdin(fs::File::open(path).unwrap()),
         Duration::from_secs(20),

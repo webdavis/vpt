@@ -83,7 +83,7 @@ fn bulk_redo_reruns_every_accepted_recording_in_capture_order() {
     let ordered = [rows[1].clone(), rows[2].clone(), rows[0].clone()];
     let order = ids(&ordered);
     propose(&sandbox, "first words", &["alpha", "beta"]);
-    let result = note::success(&bulk(&sandbox, &["--all"]));
+    let result = note::success(&bulk(&sandbox, &["all"]));
     assert_eq!(result["command"], "analyze");
     assert_eq!(result["dry_run"], false);
     for (index, id) in order.iter().enumerate() {
@@ -95,7 +95,7 @@ fn bulk_redo_reruns_every_accepted_recording_in_capture_order() {
     }
     assert_eq!(result["recordings"].as_array().unwrap().len(), 3);
     propose(&sandbox, "first words", &["alpha", "gamma"]);
-    let output = bulk(&sandbox, &["--all"]);
+    let output = bulk(&sandbox, &["all"]);
     let result = note::success(&output);
     for (index, id) in order.iter().enumerate() {
         assert_eq!(
@@ -115,7 +115,7 @@ fn bulk_redo_carries_on_past_a_failed_recording() {
     bulk_agent(&sandbox);
     propose(&sandbox, "words", &["alpha"]);
     fs::write(sandbox.path().join("fail"), rows[1].id.as_str()).unwrap();
-    let output = bulk(&sandbox, &["--all"]);
+    let output = bulk(&sandbox, &["all"]);
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
     let error: Value = serde_json::from_str(&stderr(&output)).unwrap();
@@ -146,7 +146,7 @@ fn since_keeps_recordings_captured_at_or_after_the_time() {
     bulk_agent(&sandbox);
     propose(&sandbox, "words", &[]);
     let since = rows[1].captured_at.rfc3339();
-    let result = note::success(&bulk(&sandbox, &["--all", "--since", &since]));
+    let result = note::success(&bulk(&sandbox, &["all", "--since", &since]));
     let selected: Vec<_> = result["recordings"]
         .as_array()
         .unwrap()
@@ -163,7 +163,7 @@ fn a_dry_run_lists_the_recordings_without_starting_an_agent() {
     bulk_agent(&sandbox);
     propose(&sandbox, "words", &[]);
     let before = fixture::snapshot(&sandbox);
-    let result = note::success(&bulk(&sandbox, &["--all", "--preview"]));
+    let result = note::success(&bulk(&sandbox, &["all", "--preview"]));
     assert_eq!(result["dry_run"], true);
     assert_eq!(
         result["recordings"],
@@ -185,7 +185,7 @@ fn bulk_redo_refuses_while_another_writer_holds_the_lock() {
     propose(&sandbox, "words", &[]);
     let root = RootDir::open(&sandbox.path().join("state/vpt")).unwrap();
     let _held = WriteLock::acquire(&root, Duration::ZERO).unwrap();
-    let output = bulk(&sandbox, &["--all"]);
+    let output = bulk(&sandbox, &["all"]);
     assert_eq!(output.status.code(), Some(1));
     let error: Value = serde_json::from_str(&stderr(&output)).unwrap();
     assert_eq!(error["error"]["message"], "another VPT writer is running");

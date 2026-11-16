@@ -103,7 +103,7 @@ fn a_rejected_value_is_named_by_its_flag_and_never_echoed() {
     let sandbox = Sandbox::new("cli-value-not-echoed");
     let output = run(sandbox
         .vpt()
-        .args(["analyze", "--all", "--since", "Private time"]));
+        .args(["analyze", "all", "--since", "Private time"]));
     assert_eq!(output.status.code(), Some(2));
     let text = stderr(&output);
     assert!(!text.contains("Private"), "{text}");

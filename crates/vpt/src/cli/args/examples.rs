@@ -86,8 +86,12 @@ pub(super) const TAG_RENAME: &str = examples![
 ];
 pub(super) const ANALYZE: &str = examples![
     "vpt analyze 2026-08-24T144736-4f3ab19c02de",
-    "vpt analyze --all --since 2026-08-01T00:00:00Z --preview",
-    "vpt list --stage analysis | cut -d' ' -f1 | vpt analyze --stdin",
+    "vpt analyze 2026-08-24T144736-4f3ab19c02de --preview --json",
+    "vpt list --stage analysis | cut -d' ' -f1 | vpt analyze -",
+];
+pub(super) const ANALYZE_ALL: &str = examples![
+    "vpt analyze all",
+    "vpt analyze all --since 2026-08-01T00:00:00Z --preview",
 ];
 pub(super) const PATH: &str = examples![
     "vpt path 2026-08-24T144736-4f3ab19c02de --stage transcript",
