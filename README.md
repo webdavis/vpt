@@ -44,7 +44,7 @@ array and quotes only where a bare value would read as something else. YAML is b
 string double-quoted. Without a format, commands print text for people. Naming two formats is a usage
 error, reported as text with exit code 2.
 
-When standard output is a terminal, `run`, `ingest`, `import`, `transcribe`, `analyze`, `list`,
+When standard output is a terminal, `run`, `actions resend` without `--preview`, `ingest`, `import`, `transcribe`, `analyze`, `list`,
 `occasions`, `search`, `storage`, `show` without `--stage`, `review list`, `review confirm`, `review correct`, `review dismiss`, `confirm`, `tag rename`, `note write`,
 `note verify`, `redact`, `retention run`, `symlink`, `setup` and `brief upcoming` print that text in the same style as `doctor`: one row per result, `name: detail`
 marked `✓` for done, `·` for planned or skipped,
