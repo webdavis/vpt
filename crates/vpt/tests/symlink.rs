@@ -1,6 +1,10 @@
 #[path = "symlink/fixture.rs"]
 mod fixture;
+#[path = "note/styled.rs"]
+mod styled;
 mod support;
+#[path = "symlink/terminal.rs"]
+mod terminal;
 
 use fixture::{configured, error, snapshot, write_config};
 use support::{Sandbox, broken_output, run, stderr, stdout};
