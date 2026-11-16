@@ -103,8 +103,8 @@ fn unrelated_vocabulary_recovery_does_not_skip_an_explicit_analysis_request() {
     let failed = support::run_with_budget(
         sandbox.vpt().args([
             "confirm",
+            "tag",
             record.id.as_str(),
-            "--tag",
             "another-topic",
             "--json",
         ]),

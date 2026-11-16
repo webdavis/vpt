@@ -99,8 +99,32 @@ fn an_export_failure_preserves_confirmation_and_reports_a_safe_warning() {
 #[test]
 fn option_like_term_text_remains_data() {
     let (sandbox, path) = configured("confirm-option-text");
-    success(&invoke(&sandbox, "--json"));
-    assert_eq!(fs::read_to_string(&path).unwrap(), "--json\n");
+    success(&invoke(&sandbox, "--term"));
+    success(&support::run_with_budget(
+        sandbox
+            .vpt()
+            .args(["--json", "confirm", "term", "--", "--json"]),
+        std::time::Duration::from_secs(5),
+    ));
+    assert_eq!(fs::read_to_string(&path).unwrap(), "--term\n--json\n");
+}
+
+#[test]
+fn a_term_spelled_like_a_global_flag_is_refused_without_the_end_of_flags() {
+    let (sandbox, path) = configured("confirm-flag-spelled-term");
+    for words in [
+        &["confirm", "term", "--toon"][..],
+        &["--json", "confirm", "term", "--json"],
+    ] {
+        let output =
+            support::run_with_budget(sandbox.vpt().args(words), std::time::Duration::from_secs(5));
+        assert_eq!(output.status.code(), Some(2), "{words:?}");
+        assert!(output.stdout.is_empty(), "{words:?}");
+        let text = stderr(&output);
+        assert!(text.contains("<TERM> is required"), "{words:?}: {text}");
+        assert!(!text.contains(words[words.len() - 1]), "{words:?}: {text}");
+    }
+    assert!(!path.exists());
 }
 
 #[test]
@@ -146,7 +170,7 @@ fn human_output_and_custom_list_parent_work_without_changing_shared_permissions(
         &format!("[reconcile]\nknown_terms_path={path:?}\n"),
     );
     let output = support::run_with_budget(
-        sandbox.vpt().args(["confirm", "--term", "Private canary"]),
+        sandbox.vpt().args(["confirm", "term", "Private canary"]),
         std::time::Duration::from_secs(5),
     );
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));

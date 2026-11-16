@@ -58,8 +58,8 @@ pub(super) enum Command {
     #[command(subcommand, after_long_help = examples::DOCS)]
     Review(review::Review),
     /// Confirm a term, or confirm or reject a recording's tag or relation.
-    #[command(after_long_help = examples::CONFIRM)]
-    Confirm(confirm::Args),
+    #[command(subcommand, after_long_help = examples::DOCS)]
+    Confirm(confirm::Confirm),
     /// Manage tags across every note vpt owns.
     #[command(subcommand, after_long_help = examples::DOCS)]
     Tag(groups::Tag),
@@ -126,7 +126,7 @@ impl Command {
             Self::Show(args) => return args.verb(),
             Self::Transcribe(transcribe) => transcribe.verb(),
             Self::Review(review) => review.verb(),
-            Self::Confirm(args) => args.verb(),
+            Self::Confirm(confirm) => confirm.verb(),
             Self::Tag(tag) => tag.verb(),
             Self::Analyze(args) => args.verb(),
             Self::Path(path) => path.verb(),

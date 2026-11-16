@@ -3,7 +3,7 @@ use super::*;
 const PRIVATE: [&str; 5] = ["Alice", "Bob", "person@sample.test", "303-555-0123", "1234"];
 
 fn private(sandbox: &Sandbox) {
-    json(&invoke(sandbox, &["confirm", "--term", "Alice", "--json"]));
+    json(&invoke(sandbox, &["confirm", "term", "Alice", "--json"]));
     fs::write(
         sandbox.path().join("home/.vpt/transcripts/Bob.md"),
         "# Bob\n",
@@ -133,7 +133,7 @@ fn split(name: &str, term: Option<&str>, texts: &[&str], halves: &[(usize, &str)
             .collect();
         let id = super::recording::seed_segments(&sandbox, flags, texts);
         if let Some(term) = term {
-            json(&invoke(&sandbox, &["confirm", "--term", term, "--json"]));
+            json(&invoke(&sandbox, &["confirm", "term", term, "--json"]));
         }
         if mark {
             self::mark(&sandbox, "");

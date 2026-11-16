@@ -66,13 +66,10 @@ fn summary_command_receives_known_and_refused_tags_without_changing_its_input() 
     for tag in ["health", "spam"] {
         vpt(
             &sandbox,
-            &["confirm", record.id.as_str(), "--reject-tag", tag],
+            &["confirm", "reject-tag", record.id.as_str(), tag],
         );
     }
-    vpt(
-        &sandbox,
-        &["confirm", record.id.as_str(), "--tag", "billing"],
-    );
+    vpt(&sandbox, &["confirm", "tag", record.id.as_str(), "billing"]);
     vpt(&sandbox, &["tag", "rename", "billing", "invoice"]);
     let dry = invoke(&sandbox, record.id.as_str(), true);
     note::success(&dry);
@@ -82,7 +79,7 @@ fn summary_command_receives_known_and_refused_tags_without_changing_its_input() 
         "Prefer invoice (5), garden-club (2), health (1), quiet (0). Never billing -> invoice, spam."
     );
     assert_eq!(input_digest(&sandbox, &record), first);
-    vpt(&sandbox, &["confirm", record.id.as_str(), "--tag", "spam"]);
+    vpt(&sandbox, &["confirm", "tag", record.id.as_str(), "spam"]);
     assert_eq!(
         prompt(&sandbox, &record),
         "Prefer invoice (5), garden-club (2), spam (2), health (1), quiet (0). Never billing -> invoice."

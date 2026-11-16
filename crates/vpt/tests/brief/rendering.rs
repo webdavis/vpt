@@ -86,7 +86,7 @@ fn brief_profiles_keep_exact_evidence_inline_certainty_and_saved_provenance() {
                 previous = position;
             }
             assert!(content.contains("## Open tasks\n\nNone."));
-            assert!(content.contains("vpt confirm --term"));
+            assert!(content.contains("vpt confirm term"));
             for field in [
                 "vpt-kind: \"brief\"",
                 "vpt-occasion:",

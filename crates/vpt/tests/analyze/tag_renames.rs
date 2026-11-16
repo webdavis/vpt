@@ -72,7 +72,7 @@ fn proposed_tags_renamed_away_land_on_their_new_name_through_chains() {
     let (sandbox, rows, outside) = configured();
     vpt(
         &sandbox,
-        &["confirm", rows[1].id.as_str(), "--tag", "billing"],
+        &["confirm", "tag", rows[1].id.as_str(), "billing"],
     );
     vpt(&sandbox, &["tag", "rename", "billing", "invoice"]);
     let confirmed = vec![("invoice".to_owned(), State::Confirmed)];
@@ -113,13 +113,13 @@ fn a_hand_confirmed_old_name_is_kept_and_no_longer_renamed() {
     let (sandbox, rows, _) = configured();
     vpt(
         &sandbox,
-        &["confirm", rows[1].id.as_str(), "--tag", "billing"],
+        &["confirm", "tag", rows[1].id.as_str(), "billing"],
     );
     vpt(&sandbox, &["tag", "rename", "billing", "invoice"]);
     vpt(&sandbox, &["tag", "rename", "invoice", "bill"]);
     vpt(
         &sandbox,
-        &["confirm", rows[1].id.as_str(), "--tag", "billing"],
+        &["confirm", "tag", rows[1].id.as_str(), "billing"],
     );
     assert_eq!(
         summarize(&sandbox, &rows[0], &["billing"]),

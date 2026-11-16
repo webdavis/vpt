@@ -63,7 +63,7 @@ pub(super) fn prepare(request: &Request<'_>) -> Result<Prepared, BriefError> {
             term,
             matched_note,
             confirmation: (term == TermState::Unconfirmed)
-                .then(|| format!("vpt confirm --term '{}'", name.replace('\'', "'\\''"))),
+                .then(|| format!("vpt confirm term '{}'", name.replace('\'', "'\\''"))),
         });
     }
     let names: Vec<_> = known.keys().map(String::as_str).collect();

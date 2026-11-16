@@ -49,7 +49,7 @@ fn unknown_or_ambiguous_participant_never_selects_a_note_and_has_a_fix() {
     assert_eq!(missing.participants[0].term, TermState::Unconfirmed);
     assert_eq!(
         missing.participants[0].confirmation.as_deref(),
-        Some("vpt confirm --term 'Private Person'")
+        Some("vpt confirm term 'Private Person'")
     );
     for target in [TermTarget::Missing, TermTarget::Ambiguous] {
         let terms = [Term {

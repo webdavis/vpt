@@ -81,7 +81,7 @@ fn brief_markdown_keeps_provenance_inline_uncertainty_and_all_managed_sections()
     assert!(quote.contains(rows[0].recording.as_str()));
     assert!(quote.contains("[00:00.25]"));
     assert!(quote.contains("[[transcripts/Private call|Private call]]"));
-    assert!(rendered.contains("vpt confirm --term"));
+    assert!(rendered.contains("vpt confirm term"));
     assert!(rendered.contains("calendar: absent (disabled)"));
     assert!(rendered.contains("tasks: absent (disabled)"));
 }

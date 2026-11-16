@@ -93,7 +93,7 @@ impl Fixture {
         match verb {
             "run" => vec![verb],
             "note" => vec![verb, "write", &self.id],
-            "confirm" => vec![verb, &self.id, "--tag", "work"],
+            "confirm" => vec![verb, "tag", &self.id, "work"],
             "review" => vec![verb, "confirm", &self.id, &self.flag],
             "brief" => vec![
                 verb,

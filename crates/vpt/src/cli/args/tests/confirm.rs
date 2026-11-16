@@ -1,64 +1,37 @@
 use super::*;
+use vpt_domain::tags::Action;
+
+const LITERAL: [&str; 5] = ["Private topic", "-x", "--reject-tag", "--tag", "--term"];
 
 #[test]
-fn tag_actions_keep_private_values_literal_and_require_a_recording() {
-    for flag in ["--tag", "--reject-tag"] {
-        for value in ["Private topic", "--json", "--tag"] {
+fn tag_acts_keep_private_values_literal_and_out_of_debug() {
+    for (verb, expected) in [("tag", Action::Confirm), ("reject-tag", Action::Reject)] {
+        for value in LITERAL {
             let invocation =
-                parse(["vpt", "confirm", "recording", flag, value, "--json"].map(OsString::from))
+                parse(["vpt", "confirm", verb, "recording", value, "--json"].map(OsString::from))
                     .unwrap();
             assert_eq!(invocation.format, Some(Format::Json));
             assert!(!format!("{invocation:?}").contains(value));
             let Verb::ConfirmTag { id, tag, action } = invocation.verb else {
                 panic!("tag");
             };
-            assert_eq!(id, "recording");
-            assert_eq!(tag.as_str(), value);
             assert_eq!(
-                action,
-                if flag == "--tag" {
-                    vpt_domain::tags::Action::Confirm
-                } else {
-                    vpt_domain::tags::Action::Reject
-                }
+                (id.as_str(), tag.as_str(), action),
+                ("recording", value, expected)
             );
         }
-    }
-    for args in [
-        vec!["confirm", "--tag", "Private topic"],
-        vec![
-            "confirm",
-            "id",
-            "--tag",
-            "Private topic",
-            "--reject-tag",
-            "another",
-        ],
-        vec![
-            "confirm",
-            "id",
-            "--tag",
-            "Private topic",
-            "--term",
-            "another",
-        ],
-        vec!["show", "id", "--tag", "Private topic"],
-        vec!["confirm", "id", "--tag", "Private topic", "--preview"],
-    ] {
-        let error = parse(std::iter::once("vpt").chain(args).map(OsString::from)).unwrap_err();
-        assert!(!format!("{error:?}").contains("Private topic"));
     }
 }
 
 #[test]
-fn confirmation_keeps_text_values_private_and_separate_from_global_options() {
-    for term in ["Private canary", "--json", "--config", "--term"] {
+fn a_term_is_taken_literally_beside_global_options() {
+    for term in LITERAL {
         let invocation = parse(
             [
                 "vpt",
                 "--json",
                 "confirm",
-                "--term",
+                "term",
                 term,
                 "--config",
                 "settings.toml",
@@ -77,22 +50,48 @@ fn confirmation_keeps_text_values_private_and_separate_from_global_options() {
 }
 
 #[test]
-fn confirmation_requires_one_term_and_refuses_unrelated_options() {
-    for words in [
-        vec!["vpt", "confirm"],
-        vec!["vpt", "confirm", "--term"],
-        vec![
-            "vpt",
-            "confirm",
-            "--term",
-            "Private canary",
-            "--term",
-            "Other",
-        ],
-        vec!["vpt", "confirm", "--term", "Private canary", "--preview"],
-        vec!["vpt", "show", "id", "--term", "Private canary"],
+fn a_value_spelled_like_a_global_flag_follows_the_end_of_flags() {
+    let invocation =
+        parse(["vpt", "--json", "confirm", "term", "--", "--json"].map(OsString::from)).unwrap();
+    let Verb::ConfirmTerm { term } = invocation.verb else {
+        panic!("confirm")
+    };
+    assert_eq!(term.as_str(), "--json");
+}
+
+#[test]
+fn bare_confirm_shows_help_and_the_removed_flags_are_refused() {
+    let Verb::Print(help) = parsed("confirm").unwrap().verb else {
+        panic!("help");
+    };
+    assert!(help.contains("reject-tag"), "{help}");
+    for line in [
+        "confirm --term word",
+        "confirm memo --tag word",
+        "confirm memo --reject-tag word",
+        "confirm memo --relation related:x",
+        "confirm term",
+        "confirm tag memo",
+        "confirm term word --preview",
     ] {
-        let error = parse(words.into_iter().map(OsString::from)).unwrap_err();
-        assert!(!format!("{error:?}").contains("Private canary"));
+        assert!(parsed(line).is_err(), "{line}");
+    }
+}
+
+#[test]
+fn a_refused_confirmation_never_shows_its_value() {
+    for words in [
+        vec!["confirm", "term", "Private canary", "Other"],
+        vec!["confirm", "tag", "Private canary"],
+        vec!["confirm", "tag", "id", "Private canary", "Other"],
+        vec!["confirm", "reject-tag", "id", "Private canary", "--preview"],
+        vec!["confirm", "Private canary"],
+        vec!["show", "id", "--term", "Private canary"],
+    ] {
+        let error = parse(std::iter::once("vpt").chain(words).map(OsString::from)).unwrap_err();
+        assert!(
+            !format!("{error:?}").contains("Private canary"),
+            "{error:?}"
+        );
     }
 }

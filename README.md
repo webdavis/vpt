@@ -315,7 +315,10 @@ malformed notes and redirected term lists refuse the update. A changed content d
 analysis pending. JSON includes the resolved flag's state, whether it changed, its note path, and the
 remaining open flags. History omits correction and transcript text.
 
-`vpt confirm --term <text> [--output json|toon|yaml]` adds a confirmed term without needing a recording or engine.
+`vpt confirm term <text> [--output json|toon|yaml]` adds a confirmed term without needing a recording or engine.
+`vpt confirm` alone shows its subcommands: `term`, `tag`, `reject-tag` and `relation`. Each takes its
+term, tag or relation as typed, even when it starts with `-`. A value spelled exactly like one of
+vpt's own options, such as `--json`, goes after `--`: `vpt --json confirm term -- --json`.
 It normalizes whitespace, preserves existing list content, and recognizes whole-term Unicode/case
 variants as duplicates. New files are private. The ledger saves publication bytes and intent before
 writing, and mutating startup recovers interrupted updates. Changed files or a changed configured list
@@ -666,7 +669,7 @@ the arguments, never stdin, so it does not change the recorded input digest.
 `{known_tags}` expands to the indexed tags and `known-tags.txt` entries, most used first, each with
 the number of indexed notes that carry it, as in `invoice (14), garden-club (6)`. It lists at most 300
 tags. `{refused_tags}` lists each rename still in effect as `billing -> invoice`, then
-each tag refused with `confirm <id> --reject-tag` that no note carries and no recording confirms. A tag
+each tag refused with `confirm reject-tag` that no note carries and no recording confirms. A tag
 refused on one recording but carried elsewhere comes off that recording only and stays off the list.
 Neither list holds the other's tags. An empty list expands to nothing. Each list is cut at a whole
 entry, without a marker, so that it stays within 64 KiB and the expanded command within 1 MiB. Tags
@@ -1013,7 +1016,7 @@ or alias. VPT saves every matched accepted-word range; ambiguous matches save th
 a link. Review confirmations include newly learned terms immediately. `run` refreshes changed
 matches without rerunning engines, and indexed external notes remain untouched.
 
-`vpt confirm <id> --relation <kind>:<target> [--output json|toon|yaml]` confirms `continues`, `mentions`, `related`,
+`vpt confirm relation <id> <kind>:<target> [--output json|toon|yaml]` confirms `continues`, `mentions`, `related`,
 or `supersedes`. Targets can be recording IDs or unique indexed note names, aliases, or absolute
 paths. `continues` and `supersedes` require a recording ID or a validated ledger-owned note.
 Ambiguous, unknown, and self targets are refused. Confirmation preserves existing proposal provenance
@@ -1022,13 +1025,13 @@ history. It also works before transcription and leaves expired notes expired.
 
 ## Tag confirmation
 
-`vpt confirm <id> --tag <tag> [--output json|toon|yaml]` confirms a tag, updates `known-tags.txt`, and refreshes the
+`vpt confirm tag <id> <tag> [--output json|toon|yaml]` confirms a tag, updates `known-tags.txt`, and refreshes the
 transcript and existing analysis notes when accepted text is available. It works without analysis or an engine. Existing
 vocabulary spelling is retained; new multiword tags become kebab-case. The configured confirmation
 limit applies without removing earlier tags. Repeating a confirmation keeps its saved tag timestamp
 and avoids rewriting an unchanged vocabulary file.
 
-`vpt confirm <id> --reject-tag <tag> [--output json|toon|yaml]` removes the tag from managed tags or suggestions while
+`vpt confirm reject-tag <id> <tag> [--output json|toon|yaml]` removes the tag from managed tags or suggestions while
 retaining operator tags and the global vocabulary. Expired notes remain expired; explicit `note write`
 can regenerate them. Tag state, note bytes, and pending vocabulary bytes commit together, and startup
 recovery completes interrupted publication while preserving operator edits.
@@ -1067,7 +1070,7 @@ Masking covers only what vpt was told about: the configured pattern classes, the
 `known-terms.txt`, and the names and aliases of indexed notes. A person or company named in a recording
 that is on none of those lists stays readable, in a released copy and under `vpt show --redact` alike.
 A redacted copy has its known items removed; it is not anonymous. Read it before sharing it, or confirm
-the names as terms first with `vpt confirm --term`. `vpt redact` and `vpt show --redact` list the
+the names as terms first with `vpt confirm term`. `vpt redact` and `vpt show --redact` list the
 capitalized words that survived as `candidates`, each with its line, to help with that.
 
 Copies go to `[stores] released`, or the directory supplied with `--to`. Destinations inside private

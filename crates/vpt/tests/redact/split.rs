@@ -22,7 +22,7 @@ fn split(name: &str, term: Option<&str>, texts: &[&str], halves: &[(usize, &str)
             .collect();
         let id = recording::seed_segments(&sandbox, flags, texts);
         if let Some(term) = term {
-            json(&invoke(&sandbox, &["confirm", "--term", term, "--json"]));
+            json(&invoke(&sandbox, &["confirm", "term", term, "--json"]));
         }
         if mark {
             fixture::write_config(&sandbox, "[share.redact]\nflagged_spans = \"mark\"\n");

@@ -733,8 +733,8 @@ the note records `vpt-readability: true` when it ran.
 vpt review list <id> [--json]                print open flags, ranked: record text, alternative, timecode
 vpt review confirm|dismiss <id> <flag-id>    resolve a flag as it is, or dismiss it
 vpt review correct <id> <flag-id> <text>     resolve a flag with a correction
-vpt confirm --term <text>                      append to known-terms.txt (idempotent)
-vpt confirm <id> --tag <t> | --reject-tag <t> | --relation <kind>:<target>
+vpt confirm term <text>                        append to known-terms.txt (idempotent)
+vpt confirm tag|reject-tag <id> <t>  /  vpt confirm relation <id> <kind>:<target>
 vpt tag rename <old> <new> [--preview]         rename one tag on every note and list vpt owns
 ```
 
@@ -899,7 +899,7 @@ Indexing grants no write authority: vpt still writes into no note it did not cre
   note carries it, the line leaves `known-tags.txt` in the same journaled publication. Any other line
   stays.
 - `hold` (shipped default): a new tag is written to `vpt-suggested-tags` as `suggested` until
-  `vpt confirm <id> --tag <t>` promotes it or `--reject-tag` drops it.
+  `vpt confirm tag <id> <t>` promotes it or `vpt confirm reject-tag <id> <t>` drops it.
 
 Relations and links are always written, in both settings. The switch governs tags only.
 
@@ -911,7 +911,7 @@ vocabulary spelling when it already exists. A recording that carries both names 
 hand-set state beats one a proposal set, and otherwise the entry already named `<new>` wins, so a
 hand rejection of `<old>` rejects `<new>` on that recording unless the owner set `<new>` by hand.
 `known-tags.txt` gains `<new>` only where it held `<old>`. Each recording commits its tag state and note
-bytes together, as `vpt confirm --tag` does; the rename record and `known-tags.txt` commit first. A
+bytes together, as `vpt confirm tag` does; the rename record and `known-tags.txt` commit first. A
 recording whose step fails does not stop the others; the command exits non-zero with the failed
 recordings in `ids`, and running the same command again finishes the rename. Brief notes, expired
 notes and notes vpt did not create are never written; brief tags are the meeting's labels, which the
@@ -927,7 +927,7 @@ recording's accepted transcript as a whole-token, case-insensitive match and res
 name or alias in the index of section 7.3, exactly, never fuzzy; the matched transcript ranges are
 recorded on the relation; two index matches write no link and record the ambiguity), `related` (proposed
 by the agent command, written with its provenance shown in the link block), `supersedes` (recorded only
-by `vpt confirm --relation`). A fifth kind is a schema change.
+by `vpt confirm relation`). A fifth kind is a schema change.
 
 Filing is by store: the transcript note goes to `transcripts`, the analysis note to `analysis`, the brief
 to `briefs`, flat, named by the template above. That gives the five properties the ledger asks of
@@ -1176,7 +1176,7 @@ shared-tag anchors unless independently eligible. Selection expands before ranki
 Quoted spans come from the accepted transcript: for `participant` and `term`, the segments containing the
 term, in start-time order; for `tag` and `recent`, segments in start-time order. `max_spans_per_note` is
 applied after deduplication and the omitted segments are counted. A participant with no confirmed term
-selects nothing and appears in a `Not selected` section with the `vpt confirm --term` command that would
+selects nothing and appears in a `Not selected` section with the `vpt confirm term` command that would
 fix it. `--explain` prints every candidate, its selector and the matched value, rejected ones included,
 and writes nothing.
 
@@ -1313,7 +1313,7 @@ covers them. Residue is a
 refusal, exit 3, naming the mask label and never the value; the copy is not written. The private report (mode 0600, named above) maps every mask label to its
 real value and every released line to its source span, and a candidate report lists every capitalized
 non-sentence-initial token that survived, as a review prompt the operator reads with `--json` or in the
-run output. Confirming one of those tokens with `vpt confirm --term` masks it in every future copy.
+run output. Confirming one of those tokens with `vpt confirm term` masks it in every future copy.
 
 Names in the destination are standardized: `<date>-<stage>-<hash8>.md`, never the slug, because a title
 survives a perfect body redaction by riding in the filename. Before writing, vpt digests every regular
@@ -1540,7 +1540,7 @@ under `--json`.
 | `vpt import <file> [--title <t>] [--captured-at <RFC3339>]`                                   | clones, ledger rows                                                                                                                   | the `ingest` shape                                                                                                    | 0, 1 aborted, 2 no file, 3 refused    |
 | `vpt transcribe <id> [--language <tag>] [--preview]`                                          | engine outputs, flags, transcript note                                                                                                | the record plus `{"flags": {"<class>": n}}`                                                                           | 0, 1 engines failed, 3 refused        |
 | `vpt review list <id>` / `vpt review confirm\|correct\|dismiss <id> <flag> [<t>]`               | flag state, note rewrite, known-terms                                                                                                 | `{"flags": [{"id", "class", "at", "record", "alternative", "state"}]}`                                                | 0, 2 no such flag                     |
-| `vpt confirm --term <t>` / `vpt confirm <id> --tag <t>\|--reject-tag <t>\|--relation <k>:<t>` | the two lists, ledger, note rewrite                                                                                                   | `{"confirmed": {...}}`                                                                                                | 0, 2                                  |
+| `vpt confirm term <t>` / `vpt confirm tag\|reject-tag <id> <t>` / `confirm relation <id> <k>:<t>` | the two lists, ledger, note rewrite                                                                                                   | `{"confirmed": {...}}`                                                                                                | 0, 2                                  |
 | `vpt tag rename <old> <new> [--preview]`                                                      | tag state, owned note rewrite, `known-tags.txt`, the rename record                                                                    | `{"dry_run", "changed", "recordings": [{"id", "notes"}], "known_tags_changed", "untouched_briefs", "untouched_notes"}` | 0, 1 or 3 some recordings failed, 2   |
 | `vpt note write <id>`                                                                         | re-renders managed regions of both notes                                                                                              | the record                                                                                                            | 0, 3 markers                          |
 | `vpt path <id> --stage <stage>` / `vpt path --occasion <id> --stage brief`                    | nothing                                                                                                                               | `{"path": "<abs>"}`                                                                                                   | 0, 2                                  |
@@ -1961,7 +1961,7 @@ package with `--version` and `trash`, logged reports and alerts with optional co
 Ships the `Engine` port, the `apple` (helper `transcribe`), `whisply` and `command` adapters,
 `vpt.engine/1`, the two slots and `checker_runs`, per-language pairs, the same-family refusal, the
 normalizer, aligner and classifier, the accepted transcript and the flags in the ledger,
-`known-terms.txt`, `vpt transcribe`, `vpt review`, `vpt confirm --term`, the readability pass, the
+`known-terms.txt`, `vpt transcribe`, `vpt review`, `vpt confirm term`, the readability pass, the
 `review_needed` and `transcribe_failed` events, and a minimal transcript note in the portable profile
 (frontmatter, H1, the content region with the timecoded transcript and its inline markers) so a
 transcript is readable before stage 3. Depends on stage 1.
@@ -1969,7 +1969,7 @@ transcript is readable before stage 3. Depends on stage 1.
 ### Stage 3: Vault note
 
 Ships the full note renderer for both profiles, the managed link block, `vpt note write`, `vpt path`, the
-tag gate with `new_tags`, `known-tags.txt`, `vpt confirm --tag|--reject-tag|--relation`, the four
+tag gate with `new_tags`, `known-tags.txt`, `vpt confirm tag|reject-tag|relation`, the four
 relations, the output-tree index, rename recovery, the vault-related `doctor` checks, and `vpt run`
 composing stages 1 to 3. Depends on stage 2.
 

@@ -68,8 +68,8 @@ fn both_flat_note_paths_use_only_capture_title_and_identity_then_remain_pinned()
         note::success(&support::run_with_budget(
             sandbox.vpt().args([
                 "confirm",
+                "tag",
                 record.id.as_str(),
-                "--tag",
                 "Changed tag",
                 "--json",
             ]),

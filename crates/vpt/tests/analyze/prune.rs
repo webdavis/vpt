@@ -69,7 +69,7 @@ fn hand_set_tags_stay_at_zero_automatic_uses() {
     note::success(&support::run_with_budget(
         sandbox
             .vpt()
-            .args(["confirm", rows[0].id.as_str(), "--tag", "beta", "--json"]),
+            .args(["confirm", "tag", rows[0].id.as_str(), "beta", "--json"]),
         Duration::from_secs(5),
     ));
     redo(&sandbox, &rows[0], &[]);
