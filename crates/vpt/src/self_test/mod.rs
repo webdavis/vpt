@@ -1,3 +1,4 @@
+mod actions;
 mod calendar;
 mod engines;
 mod plan;
@@ -9,7 +10,7 @@ use crate::compose::{Environment, settings_from};
 use plan::Part;
 use std::path::Path;
 
-pub(crate) const NAMES: [&str; 4] = ["engines", "speakers", "summary", "calendar"];
+pub(crate) const NAMES: [&str; 5] = ["engines", "speakers", "summary", "calendar", "actions"];
 
 pub(crate) fn run(environment: &Environment, config: Option<&Path>, wanted: &[String]) -> Outcome {
     let settings = match settings_from(environment, config) {
@@ -36,6 +37,11 @@ pub(crate) fn run(environment: &Environment, config: Option<&Path>, wanted: &[St
             name: "calendar",
             blurb: "the calendar source lists the events of the current day; nothing is saved",
             run: calendar::test(&settings),
+        },
+        Part {
+            name: "actions",
+            blurb: "one made-up follow-up is sent, then withdrawn; nothing is queued",
+            run: actions::test(&settings),
         },
     ];
     let parts = parts
