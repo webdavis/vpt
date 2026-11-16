@@ -10,6 +10,8 @@ mod actions_env;
 mod actions_link;
 #[path = "analyze/actions_list.rs"]
 mod actions_list;
+#[path = "analyze/actions_resend.rs"]
+mod actions_resend;
 #[path = "analyze/batch.rs"]
 mod batch;
 #[path = "analyze/batch_actions.rs"]
@@ -57,8 +59,6 @@ mod redo;
 #[path = "analyze/related.rs"]
 mod related;
 mod report_hook;
-#[path = "analyze/resend_refused.rs"]
-mod resend_refused;
 mod support;
 #[path = "analyze/tag_defaults.rs"]
 mod tag_defaults;

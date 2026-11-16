@@ -86,7 +86,7 @@ fn redo(
     ledger: &RuntimeLedger,
 ) -> Entry {
     let before = snapshot(ledger, &id);
-    match mutation::locked(&id, settings, roots, state, false) {
+    match mutation::locked(&id, settings, roots, state) {
         Outcome::Success { document, .. } | Outcome::Findings { document, .. } => {
             let after = snapshot(ledger, &id);
             let change = Change {

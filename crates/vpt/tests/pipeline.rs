@@ -4,6 +4,8 @@
 mod absent_source;
 #[path = "pipeline/actions.rs"]
 mod actions;
+#[path = "pipeline/actions_resend.rs"]
+mod actions_resend;
 #[path = "pipeline/alerts.rs"]
 mod alerts;
 #[path = "pipeline/analysis.rs"]
@@ -40,8 +42,6 @@ mod mentions;
 mod observations;
 #[path = "pipeline/output.rs"]
 mod output;
-#[path = "pipeline/resend_refused.rs"]
-mod resend_refused;
 #[path = "pipeline/state_paths.rs"]
 mod state_paths;
 mod support;

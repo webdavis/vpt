@@ -9,7 +9,7 @@ fn attempts(log: &std::path::Path) -> usize {
 }
 
 #[test]
-fn run_resends_every_refused_action_once_only_with_the_flag() {
+fn actions_resend_sends_every_refused_action_once_without_running_analysis() {
     let sandbox = configured();
     enable(&sandbox);
     fs::write(sandbox.path().join("agent.proposal"), r#"{"schema":"vpt.proposal/1","by":"fixture","summary":[],"actions":[{"text":"call the bank","sources":["00:00-00:01"],"owner":"me"}],"tags":[],"relations":[]}"#).unwrap();
@@ -35,10 +35,19 @@ fn run_resends_every_refused_action_once_only_with_the_flag() {
     );
     fs::remove_file(log.with_extension("fail")).unwrap();
     json(&invoke(&sandbox, &[]));
-    json(&invoke(&sandbox, &["--resend-refused", "--preview"]));
+    let resend = |extra: &[&str]| {
+        json(&support::run_with_budget(
+            sandbox
+                .vpt()
+                .args(["actions", "resend", "--json"])
+                .args(extra),
+            std::time::Duration::from_secs(5),
+        ))
+    };
+    resend(&["--preview"]);
     assert_eq!(attempts(&log), 1);
     for sent in [1, 0] {
-        let result = json(&invoke(&sandbox, &["--resend-refused"]));
+        let result = resend(&[]);
         assert_eq!(
             result["actions"],
             serde_json::json!({"sent": sent, "failed": 0, "refused": 0})
@@ -49,9 +58,9 @@ fn run_resends_every_refused_action_once_only_with_the_flag() {
 }
 
 #[test]
-fn run_with_the_flag_and_no_actions_command_is_an_input_error() {
+fn actions_resend_without_an_actions_command_is_an_input_error() {
     let sandbox = configured();
-    let output = invoke(&sandbox, &["--resend-refused"]);
+    let output = support::run(sandbox.vpt().args(["actions", "resend"]));
     assert_eq!(output.status.code(), Some(2));
-    assert!(stderr(&output).contains("--resend-refused requires [actions] command"));
+    assert!(stderr(&output).contains("actions resend requires [actions] command"));
 }

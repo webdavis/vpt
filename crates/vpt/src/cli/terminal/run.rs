@@ -38,11 +38,7 @@ pub(super) fn render(document: &Value, diagnostics: &[String]) -> String {
         &document["retention"],
         document["dry_run"] == true,
     );
-    actions::rows(
-        &mut summary,
-        &document["actions"],
-        "vpt run --resend-refused",
-    );
+    actions::rows(&mut summary, &document["actions"], "vpt actions resend");
     actions::warnings(&mut summary, diagnostics);
     summary.finish("nothing to do")
 }

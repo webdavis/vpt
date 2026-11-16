@@ -26,16 +26,11 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
         Verb::OccasionPath { id, stage } => observe(invocation, |ledger| {
             commands::occasions::path(ledger, id, stage)
         }),
-        Verb::Analyze {
-            id,
-            dry_run,
-            resend_refused,
-        } => commands::analyze::run(
+        Verb::Analyze { id, dry_run } => commands::analyze::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
             id,
             *dry_run,
-            *resend_refused,
         ),
         Verb::AnalyzeBatch { scope, dry_run } => commands::analyze::batch::run(
             &compose::Environment::from_process(),
@@ -49,14 +44,10 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             path,
             recording,
         ),
-        Verb::Run {
-            dry_run,
-            resend_refused,
-        } => commands::pipeline::run(
+        Verb::Run { dry_run } => commands::pipeline::run(
             &compose::Environment::from_process(),
             invocation.config.as_deref(),
             *dry_run,
-            *resend_refused,
         ),
         Verb::ReviewResolve { id, flag, action } => commands::review::resolve(
             &compose::Environment::from_process(),
@@ -154,6 +145,12 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             options,
         ),
         Verb::Review { id } => observe(invocation, |ledger| commands::review::run(ledger, id)),
+        Verb::ActionsResend { id, preview } => commands::actions::resend(
+            &compose::Environment::from_process(),
+            invocation.config.as_deref(),
+            id.as_deref(),
+            *preview,
+        ),
         Verb::ActionsList { id } => observe(invocation, |ledger| {
             commands::actions::list(ledger, id.as_deref())
         }),

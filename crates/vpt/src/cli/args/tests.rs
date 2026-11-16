@@ -264,29 +264,65 @@ fn path_requires_one_identity_and_an_explicit_stage_with_global_options() {
 mod review;
 
 #[test]
-fn run_accepts_dry_run_and_global_flags_but_no_recording_or_once() {
+fn run_accepts_preview_and_global_flags_but_no_recording_or_resend() {
     assert_eq!(
         parsed("run --preview --json").unwrap().verb,
-        Verb::Run {
-            dry_run: true,
-            resend_refused: false
-        }
-    );
-    assert_eq!(
-        parsed("--config settings.toml run --resend-refused")
-            .unwrap()
-            .verb,
-        Verb::Run {
-            dry_run: false,
-            resend_refused: true
-        }
+        Verb::Run { dry_run: true }
     );
     for line in [
         "run memo",
         "run --once memo",
         "run --language fr",
         "run --preview --preview",
+        "run --resend-refused",
     ] {
-        assert!(parsed(line).is_err());
+        assert!(parsed(line).is_err(), "{line}");
+    }
+}
+
+#[test]
+fn actions_list_and_resend_take_an_optional_recording() {
+    for (line, verb) in [
+        ("actions list", Verb::ActionsList { id: None }),
+        (
+            "actions list memo --json",
+            Verb::ActionsList {
+                id: Some("memo".into()),
+            },
+        ),
+        (
+            "actions resend",
+            Verb::ActionsResend {
+                id: None,
+                preview: false,
+            },
+        ),
+        (
+            "actions resend memo -n",
+            Verb::ActionsResend {
+                id: Some("memo".into()),
+                preview: true,
+            },
+        ),
+    ] {
+        assert_eq!(parsed(line).expect(line).verb, verb);
+    }
+    assert!(
+        parsed("actions resend -n")
+            .unwrap()
+            .verb
+            .reads_ledger_only()
+    );
+    assert!(!parsed("actions resend").unwrap().verb.reads_ledger_only());
+    let Verb::Print(help) = parsed("actions").unwrap().verb else {
+        panic!("help");
+    };
+    assert!(help.contains("resend"), "{help}");
+    for line in [
+        "actions list one two",
+        "actions send",
+        "actions resend --all",
+    ] {
+        assert!(parsed(line).is_err(), "{line}");
     }
 }
