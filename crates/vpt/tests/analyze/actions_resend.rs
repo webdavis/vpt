@@ -4,7 +4,7 @@ use crate::actions::{configure_with, propose, sent};
 fn resend(sandbox: &Sandbox, id: &str, extra: &[&str]) -> std::process::Output {
     let mut command = sandbox.vpt();
     command
-        .args(["analyze", id, "--resend-refused", "--json"])
+        .args(["actions", "resend", id, "--json"])
         .args(extra);
     support::run_with_budget(&mut command, Duration::from_secs(5))
 }
@@ -27,7 +27,7 @@ fn attempts(log: &std::path::Path) -> usize {
 }
 
 #[test]
-fn the_flag_sends_refused_actions_once_without_running_the_agent_again() {
+fn resend_sends_refused_actions_once_without_running_the_agent_again() {
     let (sandbox, id, log) = refused();
     fs::remove_file(log.with_extension("fail")).unwrap();
     note::success(&invoke(&sandbox, &id, false));
@@ -37,6 +37,8 @@ fn the_flag_sends_refused_actions_once_without_running_the_agent_again() {
         r#"[{"text":"a reworded task","sources":[],"owner":"me"}]"#,
     );
     let result = note::success(&resend(&sandbox, &id, &[]));
+    assert_eq!(result["command"], "actions resend");
+    assert_eq!(result["preview"], false);
     assert_eq!(
         result["actions"],
         serde_json::json!({"sent": 4, "failed": 0, "refused": 0})
@@ -71,34 +73,42 @@ fn a_command_that_still_refuses_leaves_the_actions_refused() {
 }
 
 #[test]
-fn a_dry_run_with_the_flag_sends_nothing_and_keeps_the_actions_refused() {
+fn a_preview_lists_the_refused_actions_sends_nothing_and_keeps_them_refused() {
     let (sandbox, id, log) = refused();
     fs::remove_file(log.with_extension("fail")).unwrap();
-    note::success(&resend(&sandbox, &id, &["--preview"]));
+    let before = fixture::snapshot(&sandbox);
+    let preview = note::success(&resend(&sandbox, &id, &["--preview"]));
+    assert_eq!(preview["preview"], true);
+    let listed = preview["to_send"].as_array().unwrap();
+    assert_eq!(listed.len(), 4, "{preview}");
+    assert!(
+        listed.iter().all(|row| row["state"] == "refused"),
+        "{preview}"
+    );
+    assert_eq!(fixture::snapshot(&sandbox), before);
     note::success(&invoke(&sandbox, &id, false));
     assert_eq!(attempts(&log), 4);
 }
 
 #[test]
-fn the_flag_without_an_actions_command_is_an_input_error() {
+fn resend_without_an_actions_command_is_an_input_error() {
     let (sandbox, record) = note::configured();
     agent(&sandbox, "");
     for extra in [&[][..], &["--preview"]] {
         let output = resend(&sandbox, record.id.as_str(), extra);
         assert_eq!(output.status.code(), Some(2));
-        assert!(stderr(&output).contains("--resend-refused requires [actions] command"));
+        assert!(stderr(&output).contains("actions resend requires [actions] command"));
     }
 }
 
 #[test]
-fn the_flag_takes_one_recording() {
-    let (sandbox, _) = note::configured();
-    let output = support::run_with_budget(
-        sandbox
-            .vpt()
-            .args(["analyze", "--all", "--resend-refused", "--json"]),
-        Duration::from_secs(5),
-    );
-    assert_eq!(output.status.code(), Some(2));
-    assert!(stderr(&output).contains("--resend-refused"));
+fn the_removed_flag_is_refused_by_analyze_and_run() {
+    let (sandbox, record) = note::configured();
+    for words in [
+        &["analyze", record.id.as_str(), "--resend-refused"][..],
+        &["run", "--resend-refused"],
+    ] {
+        let output = support::run_with_budget(sandbox.vpt().args(words), Duration::from_secs(5));
+        assert_eq!(output.status.code(), Some(2), "{words:?}");
+    }
 }

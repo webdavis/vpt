@@ -268,7 +268,7 @@ successful work. Failed publication emits no review alert. Retranscription leave
 
 ## Pipeline
 
-`vpt run [--preview] [--resend-refused] [--output json|toon|yaml]` composes ingestion, transcription, note publication, stale-finding
+`vpt run [--preview] [--output json|toon|yaml]` composes ingestion, transcription, note publication, stale-finding
 verification, configured analysis, and optional automatic redaction.
 It resumes pending or failed work in capture order, retries previously disabled incomplete stages,
 and preserves successful transcription and expired notes. Changed readability/profile settings refresh
@@ -656,7 +656,7 @@ Requested briefs emit no automatic notification.
 
 ## Analysis
 
-`vpt analyze <id> [--preview] [--resend-refused] [--output json|toon|yaml]` uses the configured `[analysis] command` argument list.
+`vpt analyze <id> [--preview] [--output json|toon|yaml]` uses the configured `[analysis] command` argument list.
 An empty command disables analysis and explicit invocation returns a configuration error. No model
 vendor is built in. The command receives `{transcript}`, `{id}`, `{language}`, `{captured_at}`,
 `{known_tags}`, and `{refused_tags}` substitutions and exact rendered transcript content on stdin; the
@@ -937,7 +937,7 @@ Exit 0 withdraws the action and vpt forgets it, whatever the command printed: it
 twice, and if a later analysis holds the same id again, vpt sends it as a new action. An exit code
 in `final_exit_codes` means the tool refused the withdrawal for good. vpt forgets the action as well,
 counts it as refused and adds the warning `configured withdraw command refused a withdrawal`;
-`--resend-refused` does not try it again. Any other outcome adds the warning `configured withdraw
+`vpt actions resend` does not try it again. Any other outcome adds the warning `configured withdraw
 command failed`, counts it as failed, and the next run tries again. If `withdraw_command` is unset
 while withdrawals wait, they wait until it is set again. If a redo holds the id again before the
 withdrawal succeeds, vpt sends the action again instead. As with sends, if vpt stops between the
@@ -961,12 +961,15 @@ and `vpt analyze <id>` sends that recording's. With the default empty list every
 A final code may come from a rule you wrote in your own tool. vpt keeps no reason for a refusal; the
 tool's own output or log holds it.
 
-After you change the rule, `--resend-refused` sends the refused actions again once.
-`vpt analyze <id> --resend-refused` sends that recording's refused actions without running the
-analysis command, and `vpt run --resend-refused` sends every recording's refused actions with the
-rest of the run. Each refused action goes through the command once more and is counted as usual. If
-the command refuses it again, it stays refused. Without `[actions] command` the flag is refused with
-exit 2. With `--preview` it sends nothing and changes nothing.
+After you change the rule, `vpt actions resend [<id>] [--output json|toon|yaml]` sends the refused
+actions again once: every recording's, or only that recording's. It runs neither the analysis
+command nor the rest of the pipeline. Each refused action goes through the command once more and is
+counted as usual, together with any action still waiting to be sent or withdrawn in the same scope.
+If the command refuses it again, it stays refused. The result carries `"preview": false` and the
+same `"actions"` counts as `vpt run`. Without `[actions] command` it is refused with exit 2.
+`--preview` (`-n`) lists, as `"to_send"` rows shaped like `vpt actions list`, the refused and
+waiting actions it would send, plus those waiting to be withdrawn when `withdraw_command` is set,
+and sends nothing and changes nothing; with none it prints `nothing to send`.
 A send counts once the command exits 0. If vpt stops between that exit and saving the result, the
 next run sends the action again, so the command must accept a repeat. Previews send nothing.
 

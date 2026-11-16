@@ -110,6 +110,11 @@ pub(super) const ACTIONS_LIST: &str = examples![
     "vpt actions list 2026-08-24T144736-4f3ab19c02de",
     "vpt actions list --json",
 ];
+pub(super) const ACTIONS_RESEND: &str = examples![
+    "vpt actions resend --preview",
+    "vpt actions resend",
+    "vpt actions resend 2026-08-24T144736-4f3ab19c02de --json",
+];
 pub(super) const OCCASIONS: &str = examples!["vpt occasions", "vpt occasions --json"];
 pub(super) const LIST: &str = examples!["vpt list", "vpt list --stage analysis", "vpt list --json"];
 pub(super) const SEARCH: &str = examples![

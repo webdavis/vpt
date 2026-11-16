@@ -20,11 +20,10 @@ pub(super) fn run(
     id: &RecordingId,
     settings: &Settings,
     roots: &Roots,
-    resend_refused: bool,
 ) -> Result<Outcome, Box<ErrorDocument>> {
     let state = crate::compose::mutation::state(roots)?;
     let _lock = crate::compose::mutation::lock(&state)?;
-    Ok(locked(id, settings, roots, &state, resend_refused))
+    Ok(locked(id, settings, roots, &state))
 }
 
 pub(super) fn locked(
@@ -32,7 +31,6 @@ pub(super) fn locked(
     settings: &Settings,
     roots: &Roots,
     state: &RootDir,
-    resend_refused: bool,
 ) -> Outcome {
     let ledger = match SqliteLedger::open(state) {
         Ok(ledger) => ledger,
@@ -62,7 +60,7 @@ pub(super) fn locked(
         warnings.extend(recovered.retention.warnings.iter().copied());
         retention = Some(recovered);
         let input = observe::inputs(&ledger, id)?;
-        if !resend_refused && pending && resume::current(&input, settings, roots)? {
+        if pending && resume::current(&input, settings, roots)? {
             committed = true;
             return output::success(&ledger, id, &[]);
         }
@@ -72,19 +70,15 @@ pub(super) fn locked(
             &mut warnings,
         )?
         .run;
-        let written = if resend_refused {
-            output::success(&ledger, id, &[])
-        } else {
-            work::Writer {
-                mentions: None,
-                settings,
-                roots,
-                ledger: &ledger,
-                sink: &mut sink,
-                warnings: &mut warnings,
-            }
-            .run(input, run, &mut committed)
-        };
+        let written = work::Writer {
+            mentions: None,
+            settings,
+            roots,
+            ledger: &ledger,
+            sink: &mut sink,
+            warnings: &mut warnings,
+        }
+        .run(input, run, &mut committed);
         let result = written.and_then(|outcome| {
             crate::compose::actions::Delivery {
                 ledger: &ledger,
@@ -93,13 +87,13 @@ pub(super) fn locked(
                 warnings: &mut warnings,
                 run,
             }
-            .send(Some(id), resend_refused)
+            .send(Some(id))
             .map(|counts| with_counts(outcome, settings, counts))
         });
         let finished = (|| {
             let at = SystemClock.now();
             let mut facts = Vec::new();
-            if result.is_ok() && !resend_refused {
+            if result.is_ok() {
                 facts.extend(super::notification::fact(&ledger, id, at)?);
             }
             facts.push((

@@ -14,7 +14,6 @@ pub enum Verb {
     Analyze {
         id: String,
         dry_run: bool,
-        resend_refused: bool,
     },
     AnalyzeBatch {
         scope: analyze::Scope,
@@ -23,13 +22,16 @@ pub enum Verb {
     ActionsList {
         id: Option<String>,
     },
+    ActionsResend {
+        id: Option<String>,
+        preview: bool,
+    },
     VerifyNote {
         path: PathBuf,
         recording: String,
     },
     Run {
         dry_run: bool,
-        resend_refused: bool,
     },
     ReviewResolve {
         id: String,
@@ -130,6 +132,7 @@ impl Verb {
             | Self::Ingest { dry_run, .. }
             | Self::TagRename { dry_run, .. }
             | Self::RetentionRun { dry_run } => *dry_run,
+            Self::ActionsResend { preview, .. } => *preview,
             Self::Brief(options) => options.dry_run || options.explain,
             _ => false,
         }

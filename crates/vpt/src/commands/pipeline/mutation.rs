@@ -12,11 +12,7 @@ use vpt_application::{Settings, ports::*, review::alerts::ReviewQueue};
 use vpt_domain::run::RunKind;
 use vpt_protocol::error::ErrorDocument;
 
-pub(super) fn run(
-    settings: &Settings,
-    roots: &Roots,
-    resend_refused: bool,
-) -> Result<Outcome, Box<ErrorDocument>> {
+pub(super) fn run(settings: &Settings, roots: &Roots) -> Result<Outcome, Box<ErrorDocument>> {
     let state = crate::compose::mutation::state(roots)?;
     let _lock = crate::compose::mutation::lock(&state)?;
     let ledger = SqliteLedger::open(&state).map_err(|error| Box::new(open_error(error)))?;
@@ -48,7 +44,6 @@ pub(super) fn run(
             roots,
             state: &state,
             helper: &helper,
-            resend_refused,
         };
         let result = (|| {
             publications = super::retention::startup(&mut context, run, &mut report)?;

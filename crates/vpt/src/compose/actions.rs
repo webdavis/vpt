@@ -25,19 +25,14 @@ pub(crate) struct Delivery<'a, E> {
 
 impl<E: EventSink> Delivery<'_, E> {
     /// Sends the queued actions of one recording, or of every recording, then runs the withdraw
-    /// command for the ones awaiting withdrawal, and counts the outcomes. Resending refused
-    /// actions first makes that scope's refused actions pending again.
+    /// command for the ones awaiting withdrawal, and counts the outcomes.
     pub(crate) fn send(
         &mut self,
         only: Option<&RecordingId>,
-        resend_refused: bool,
     ) -> Result<Counts, Box<ErrorDocument>> {
         let mut total = Counts::start(self.settings);
         if self.settings.actions_command.is_empty() {
             return Ok(total);
-        }
-        if resend_refused {
-            resend::refused(self, only)?;
         }
         let in_scope = |queued: &QueuedAction| only.is_none_or(|only| *only == queued.recording);
         let mut pending = self.ledger.actions_in(SendState::Pending).map_err(error)?;

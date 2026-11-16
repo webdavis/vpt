@@ -30,7 +30,7 @@ pub(super) fn one(document: &Value, diagnostics: &[String]) -> String {
             .row(Verdict::Warning, id, &detail)
             .advice(&format!("vpt review list {id}"));
     }
-    let resend = format!("vpt analyze {id} --resend-refused");
+    let resend = format!("vpt actions resend {id}");
     actions::rows(&mut summary, &document["actions"], &resend);
     actions::warnings(&mut summary, diagnostics);
     summary.finish("")
@@ -59,7 +59,7 @@ pub(super) fn batch(document: &Value, diagnostics: &[String]) -> String {
     actions::rows(
         &mut summary,
         &document["actions"],
-        "vpt analyze <id> --resend-refused",
+        "vpt actions resend <id>",
     );
     actions::warnings(&mut summary, diagnostics);
     summary.finish("no recordings to analyze")

@@ -29,7 +29,6 @@ pub(super) struct Context<'a, E> {
     pub roots: &'a Roots,
     pub state: &'a RootDir,
     pub helper: &'a HelperClient,
-    pub resend_refused: bool,
 }
 
 pub(super) fn run<E: EventSink>(
@@ -79,7 +78,7 @@ pub(super) fn run<E: EventSink>(
         warnings: context.warnings,
         run,
     }
-    .send(None, context.resend_refused)?;
+    .send(None)?;
     report.actions = (!context.settings.actions_command.is_empty()).then_some(sent);
     staged?;
     super::retention::run(context, &stores, run, report)

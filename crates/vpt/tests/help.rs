@@ -23,6 +23,7 @@ const COMMANDS: &[&str] = &[
     "confirm relation",
     "tag rename",
     "actions list",
+    "actions resend",
     "analyze",
     "path",
     "path occasion",

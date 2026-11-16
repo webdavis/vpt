@@ -18,9 +18,6 @@ pub(super) struct Args {
     /// Show what would happen without changing anything.
     #[arg(long = "preview", short = 'n')]
     dry_run: bool,
-    /// Send actions the action command refused before.
-    #[arg(long, conflicts_with_all = ["all", "stdin"])]
-    resend_refused: bool,
     /// Analyze every recording with a transcript.
     #[arg(long, conflicts_with = "stdin")]
     all: bool,
@@ -44,7 +41,6 @@ impl Args {
                 return Verb::Analyze {
                     id,
                     dry_run: self.dry_run,
-                    resend_refused: self.resend_refused,
                 };
             }
             None if self.all => Scope::All { since: self.since },

@@ -7,15 +7,18 @@ pub(crate) fn require_command(settings: &Settings) -> Result<(), Box<ErrorDocume
     if settings.actions_command.is_empty() {
         return Err(Box::new(ErrorDocument::new(
             ErrorKind::Config,
-            "--resend-refused requires [actions] command",
+            "actions resend requires [actions] command",
         )));
     }
     Ok(())
 }
 
-pub(super) fn refused<E: EventSink>(
-    delivery: &mut Delivery<'_, E>,
-    only: Option<&RecordingId>,
-) -> Result<(), Box<ErrorDocument>> {
-    delivery.commit_change(only, ActionChange::ResendRefused(only.cloned()))
+impl<E: EventSink> Delivery<'_, E> {
+    /// Makes the refused actions of one recording, or of every recording, pending again.
+    pub(crate) fn resend_refused(
+        &mut self,
+        only: Option<&RecordingId>,
+    ) -> Result<(), Box<ErrorDocument>> {
+        self.commit_change(only, ActionChange::ResendRefused(only.cloned()))
+    }
 }
