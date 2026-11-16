@@ -2,7 +2,6 @@ mod dialogue;
 use crate::spawn::{self, SpawnError, Status};
 use crate::{digest_open, inspect_archived_audio};
 pub use dialogue::converse;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
@@ -41,11 +40,7 @@ fn failed(error: std::io::Error) -> SpeechError {
 }
 
 fn private_directory() -> Result<TempDir, SpeechError> {
-    tempfile::Builder::new()
-        .prefix("vpt-test-")
-        .permissions(std::fs::Permissions::from_mode(0o700))
-        .tempdir_in(std::env::temp_dir().canonicalize().map_err(failed)?)
-        .map_err(failed)
+    crate::private_tempdir().map_err(failed)
 }
 
 fn text_of(path: &Path) -> Result<&str, SpeechError> {

@@ -13,7 +13,7 @@ fn an_unknown_part_is_a_usage_error_naming_the_valid_ones() {
         text.lines()
             .next()
             .unwrap()
-            .ends_with("expected one of engines, speakers"),
+            .ends_with("expected one of engines, speakers, summary"),
         "{text}"
     );
 }

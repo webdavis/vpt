@@ -1,13 +1,14 @@
 mod engines;
 mod plan;
 mod speakers;
+mod summary;
 
 use crate::cli::output::Outcome;
 use crate::compose::{Environment, settings_from};
 use plan::Part;
 use std::path::Path;
 
-pub(crate) const NAMES: [&str; 2] = ["engines", "speakers"];
+pub(crate) const NAMES: [&str; 3] = ["engines", "speakers", "summary"];
 
 pub(crate) fn run(environment: &Environment, config: Option<&Path>, wanted: &[String]) -> Outcome {
     let settings = match settings_from(environment, config) {
@@ -24,6 +25,11 @@ pub(crate) fn run(environment: &Environment, config: Option<&Path>, wanted: &[St
             name: "speakers",
             blurb: "whisply labels the speakers in a made-up clip of two voices; nothing is kept",
             run: speakers::test(&settings),
+        },
+        Part {
+            name: "summary",
+            blurb: "the summary command answers a made-up transcript; nothing is saved",
+            run: summary::test(&settings),
         },
     ];
     let parts = parts

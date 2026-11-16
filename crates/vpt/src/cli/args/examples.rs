@@ -23,7 +23,11 @@ pub(super) const DOCTOR: &str = examples![
     "vpt doctor helper engines",
     "vpt doctor --fix --json"
 ];
-pub(super) const TEST: &str = examples!["vpt test", "vpt test engines", "vpt test engines --json"];
+pub(super) const TEST: &str = examples![
+    "vpt test",
+    "vpt test engines speakers",
+    "vpt test summary --json"
+];
 pub(super) const INGEST: &str = examples![
     "vpt ingest",
     "vpt ingest --dry-run",

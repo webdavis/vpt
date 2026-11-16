@@ -13,6 +13,8 @@ mod named;
 mod observations_fixture;
 #[path = "self_test/speakers.rs"]
 mod speakers;
+#[path = "self_test/summary.rs"]
+mod summary;
 #[allow(
     dead_code,
     reason = "shared integration support serves other test targets"

@@ -19,7 +19,7 @@ pub(super) fn changed() -> Box<ErrorDocument> {
         .rule("analysis_input_changed"),
     )
 }
-pub(super) fn command(error: AnalysisFailure) -> Box<ErrorDocument> {
+pub(crate) fn command(error: AnalysisFailure) -> Box<ErrorDocument> {
     let interrupted = matches!(error, AnalysisFailure::Interrupted);
     let message = match error {
         AnalysisFailure::Disabled => "analysis command is not configured",
