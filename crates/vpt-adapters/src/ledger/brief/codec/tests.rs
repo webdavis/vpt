@@ -50,7 +50,7 @@ pub(crate) fn snapshot() -> Snapshot {
                     participant: 0,
                     term: TermState::Unconfirmed,
                     matched_note: None,
-                    confirmation: Some("vpt confirm --term 'Private person'".into()),
+                    confirmation: Some("vpt confirm term 'Private person'".into()),
                 }],
                 selected: vec![3],
                 decisions: vec![Decision {

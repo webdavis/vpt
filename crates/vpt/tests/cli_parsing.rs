@@ -52,11 +52,18 @@ fn private_text_never_appears_in_a_usage_error() {
     let sandbox = Sandbox::new("cli-private-text");
     let canary = "Private canary";
     for args in [
-        vec!["confirm", "--term", canary, "--term", "other"],
-        vec!["confirm", "--term", canary, "--preview"],
+        vec!["confirm", "term", canary, "--term", "other"],
+        vec!["confirm", "term", canary, "--preview"],
         vec!["confirm", "--tag", canary],
-        vec!["confirm", "id", "--tag", canary, "--reject-tag", "other"],
-        vec!["confirm", "id", "--relation", canary, "--term", "other"],
+        vec!["confirm", "tag", "id", canary, "--reject-tag", "other"],
+        vec!["confirm", "relation", "id", canary, "--term", "other"],
+        vec!["confirm", "term", canary, "other"],
+        vec!["confirm", "--term", canary],
+        vec!["confirm", "tag", canary],
+        vec!["confirm", "tag", "id", canary, "other"],
+        vec!["confirm", "reject-tag", "id", canary, "extra"],
+        vec!["confirm", "relation", "id", canary, "extra"],
+        vec!["confirm", canary],
         vec!["show", "id", "--tag", canary],
         vec!["review", "memo", "--correct", canary],
         vec!["review", "list", "memo", "--correct", canary],

@@ -1,43 +1,59 @@
-use super::{Verb, text::PrivateText};
+use super::{Verb, examples, text::PrivateText};
 use vpt_domain::tags::Action;
 
-#[derive(clap::Args)]
-#[command(group(
-    clap::ArgGroup::new("confirmation")
-        .required(true)
-        .args(["term", "tag", "reject_tag", "relation"])
-))]
-pub(super) struct Args {
-    /// The recording id.
-    #[arg(required_unless_present = "term", conflicts_with = "term")]
-    id: Option<String>,
-    /// Add a confirmed term; takes no recording id.
-    #[arg(long, allow_hyphen_values = true)]
-    term: Option<PrivateText>,
-    /// Confirm a proposed tag of the recording.
-    #[arg(long, allow_hyphen_values = true)]
-    tag: Option<PrivateText>,
-    /// Reject a proposed tag of the recording.
-    #[arg(long, allow_hyphen_values = true)]
-    reject_tag: Option<PrivateText>,
-    /// Confirm a relation of the recording, as <kind>:<target>.
-    #[arg(long, allow_hyphen_values = true)]
-    relation: Option<PrivateText>,
+#[derive(clap::Subcommand)]
+pub(super) enum Confirm {
+    /// Add a confirmed term, used by every later transcription.
+    #[command(after_long_help = examples::CONFIRM_TERM)]
+    Term {
+        /// The term, taken as typed.
+        #[arg(allow_hyphen_values = true)]
+        term: PrivateText,
+    },
+    /// Confirm a proposed tag of a recording.
+    #[command(after_long_help = examples::CONFIRM_TAG)]
+    Tag {
+        /// The recording id.
+        id: String,
+        /// The tag, taken as typed.
+        #[arg(allow_hyphen_values = true)]
+        tag: PrivateText,
+    },
+    /// Reject a proposed tag of a recording.
+    #[command(after_long_help = examples::CONFIRM_REJECT_TAG)]
+    RejectTag {
+        /// The recording id.
+        id: String,
+        /// The tag, taken as typed.
+        #[arg(allow_hyphen_values = true)]
+        tag: PrivateText,
+    },
+    /// Confirm a relation of a recording.
+    #[command(after_long_help = examples::CONFIRM_RELATION)]
+    Relation {
+        /// The recording id.
+        id: String,
+        /// The relation, as <kind>:<target>.
+        #[arg(value_name = "KIND:TARGET", allow_hyphen_values = true)]
+        relation: PrivateText,
+    },
 }
 
-impl Args {
+impl Confirm {
     pub(super) fn verb(self) -> Verb {
-        if let Some(term) = self.term {
-            return Verb::ConfirmTerm { term };
+        match self {
+            Self::Term { term } => Verb::ConfirmTerm { term },
+            Self::Tag { id, tag } => Verb::ConfirmTag {
+                id,
+                tag,
+                action: Action::Confirm,
+            },
+            Self::RejectTag { id, tag } => Verb::ConfirmTag {
+                id,
+                tag,
+                action: Action::Reject,
+            },
+            Self::Relation { id, relation } => Verb::ConfirmRelation { id, relation },
         }
-        let id = self.id.unwrap_or_default();
-        if let Some(relation) = self.relation {
-            return Verb::ConfirmRelation { id, relation };
-        }
-        let (tag, action) = match (self.tag, self.reject_tag) {
-            (Some(tag), _) => (tag, Action::Confirm),
-            (None, tag) => (tag.unwrap_or_else(|| String::new().into()), Action::Reject),
-        };
-        Verb::ConfirmTag { id, tag, action }
     }
 }

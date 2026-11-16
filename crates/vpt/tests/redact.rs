@@ -24,7 +24,7 @@ fn ledger(sandbox: &Sandbox) -> SqliteLedger {
 fn configured(name: &str) -> (Sandbox, vpt_domain::identity::RecordingId) {
     let sandbox = fixture::configured(name);
     let id = recording::seed(&sandbox);
-    json(&invoke(&sandbox, &["confirm", "--term", "Alice", "--json"]));
+    json(&invoke(&sandbox, &["confirm", "term", "Alice", "--json"]));
     fs::write(
         sandbox.path().join("home/.vpt/transcripts/Bob.md"),
         "# Bob\n",

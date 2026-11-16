@@ -56,7 +56,7 @@ fn participant_confirmation_preserves_shell_quoting_and_unicode_matching() {
     let result = select(&request(&occasion, &[], &[])).unwrap();
     assert_eq!(
         result.participants[0].confirmation.as_deref(),
-        Some("vpt confirm --term 'Private O'\\''Neil $(touch sentinel)'")
+        Some("vpt confirm term 'Private O'\\''Neil $(touch sentinel)'")
     );
     occasion.participants[0].name = "ＳＴＲＡＳＳＥ".into();
     let terms = [term("Straße", "/index/person.md")];

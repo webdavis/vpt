@@ -64,10 +64,21 @@ pub(super) const REVIEW_DISMISS: &str = examples![
     "vpt review dismiss 2026-08-24T144736-4f3ab19c02de \"$FLAG\"",
     "vpt review dismiss 2026-08-24T144736-4f3ab19c02de \"$FLAG\" --json",
 ];
-pub(super) const CONFIRM: &str = examples![
-    "vpt confirm --term \"Kubernetes\"",
-    "vpt confirm 2026-08-24T144736-4f3ab19c02de --tag planning",
-    "vpt confirm 2026-08-24T144736-4f3ab19c02de --relation continues:2026-08-20T091500-0a1b2c3d4e5f",
+pub(super) const CONFIRM_TERM: &str = examples![
+    "vpt confirm term Kubernetes",
+    "vpt confirm term \"Acme Robotics\" --json",
+];
+pub(super) const CONFIRM_TAG: &str = examples![
+    "vpt confirm tag 2026-08-24T144736-4f3ab19c02de planning",
+    "vpt confirm tag 2026-08-24T144736-4f3ab19c02de planning --json",
+];
+pub(super) const CONFIRM_REJECT_TAG: &str = examples![
+    "vpt confirm reject-tag 2026-08-24T144736-4f3ab19c02de budget",
+    "vpt confirm reject-tag 2026-08-24T144736-4f3ab19c02de budget --json",
+];
+pub(super) const CONFIRM_RELATION: &str = examples![
+    "vpt confirm relation 2026-08-24T144736-4f3ab19c02de continues:2026-08-20T091500-0a1b2c3d4e5f",
+    "vpt confirm relation 2026-08-24T144736-4f3ab19c02de related:2026-08-20T091500-0a1b2c3d4e5f --json",
 ];
 pub(super) const TAG_RENAME: &str = examples![
     "vpt tag rename plannning planning --preview",

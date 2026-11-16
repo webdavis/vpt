@@ -28,8 +28,8 @@ fn related_selection_obeys_default_and_configured_limits_independently_of_tag_mo
             note::success(&support::run_with_budget(
                 sandbox.vpt().args([
                     "confirm",
+                    "relation",
                     record.id.as_str(),
-                    "--relation",
                     "related:Target0",
                     "--json",
                 ]),

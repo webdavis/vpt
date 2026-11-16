@@ -27,11 +27,11 @@ fn a_redo_drops_automatic_tags_the_new_proposal_omits_and_keeps_hand_set_ones() 
     );
     propose(&sandbox, &["alpha", "beta", "refused"]);
     note::success(&invoke(&sandbox, record.id.as_str(), false));
-    for (flag, tag) in [("--tag", "by-hand"), ("--reject-tag", "refused")] {
+    for (flag, tag) in [("tag", "by-hand"), ("reject-tag", "refused")] {
         note::success(&support::run_with_budget(
             sandbox
                 .vpt()
-                .args(["confirm", record.id.as_str(), flag, tag, "--json"]),
+                .args(["confirm", flag, record.id.as_str(), tag, "--json"]),
             Duration::from_secs(5),
         ));
     }

@@ -77,7 +77,7 @@ pub(super) fn seed(sandbox: &Sandbox) -> vpt_domain::identity::RecordingId {
     json(&invoke(sandbox, &["note", "write", id.as_str(), "--json"]));
     json(&invoke(
         sandbox,
-        &["confirm", id.as_str(), "--tag", "planning", "--json"],
+        &["confirm", "tag", id.as_str(), "planning", "--json"],
     ));
     id
 }
@@ -271,7 +271,7 @@ fn configured_zero_caps_preserve_omission_counts_and_confirmation_guidance() {
                 .unwrap()
                 .iter()
                 .any(|row| row["command"].as_str().is_some_and(|s| s
-                    .starts_with("vpt confirm --term")
+                    .starts_with("vpt confirm term")
                     && s.contains("Private person")))
         );
         assert_eq!(fixture::snapshot(&sandbox), before);

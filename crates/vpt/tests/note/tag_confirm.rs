@@ -41,7 +41,9 @@ fn configured_profile_vocabulary_preserves_external_spelling_and_never_edits_ext
 
 fn confirm(sandbox: &Sandbox, id: &str, flag: &str, tag: &str) -> std::process::Output {
     support::run_with_budget(
-        sandbox.vpt().args(["confirm", id, flag, tag, "--json"]),
+        sandbox
+            .vpt()
+            .args(["confirm", flag.trim_start_matches("--"), id, tag, "--json"]),
         std::time::Duration::from_secs(5),
     )
 }

@@ -45,7 +45,7 @@ fn brief_resolves_occasion_sources_and_keeps_operator_prose() {
     let (sandbox, id) = configured("show-brief");
     json(&invoke(
         &sandbox,
-        &["confirm", id.as_str(), "--tag", "planning", "--json"],
+        &["confirm", "tag", id.as_str(), "planning", "--json"],
     ));
     let result = json(&invoke(
         &sandbox,

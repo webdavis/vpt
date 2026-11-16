@@ -222,7 +222,7 @@ fn unconfirmed_participants_and_omitted_notes_remain_visible_in_json() {
     assert!(json["occasion"]["participants"][0]["matched_note"].is_null());
     assert_eq!(
         json["not_selected"][0]["command"],
-        "vpt confirm --term 'Private person'"
+        "vpt confirm term 'Private person'"
     );
     assert_eq!(json["not_selected"][1]["reason"], "note-limit");
     assert_eq!(json["selection"]["omitted_notes"], 1);

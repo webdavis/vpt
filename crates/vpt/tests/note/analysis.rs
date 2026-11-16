@@ -151,7 +151,7 @@ fn tags_update_both_notes_and_expired_analysis_requires_explicit_regeneration() 
     let (sandbox, row) = seeded("");
     success(&command(
         &sandbox,
-        &["confirm", row.id.as_str(), "--tag", "project"],
+        &["confirm", "tag", row.id.as_str(), "project"],
     ));
     for note in [saved(&sandbox, &row), analysis(&sandbox, &row)] {
         assert!(
@@ -166,7 +166,7 @@ fn tags_update_both_notes_and_expired_analysis_requires_explicit_regeneration() 
     fs::remove_file(&old.target).unwrap();
     success(&command(
         &sandbox,
-        &["confirm", row.id.as_str(), "--tag", "later"],
+        &["confirm", "tag", row.id.as_str(), "later"],
     ));
     assert!(!old.target.exists());
     assert_eq!(analysis(&sandbox, &row), old);
@@ -208,7 +208,7 @@ fn renamed_analysis_updates_both_links_and_invalid_analysis_refuses_the_whole_ch
         .unwrap()
         .replace("<!-- vpt:content end -->", "");
     fs::write(&renamed, &invalid).unwrap();
-    let output = command(&sandbox, &["confirm", row.id.as_str(), "--tag", "refused"]);
+    let output = command(&sandbox, &["confirm", "tag", row.id.as_str(), "refused"]);
     assert_eq!(output.status.code(), Some(3), "{}", stderr(&output));
     assert_eq!(saved(&sandbox, &row), before);
     assert_eq!(fs::read_to_string(&before.target).unwrap(), before.text);
@@ -309,7 +309,7 @@ fn analysis_transaction_failure_rolls_back_both_note_changes_and_the_tag() {
         &sandbox,
         "CREATE TRIGGER reject_analysis BEFORE UPDATE ON owned_notes WHEN NEW.stage='analysis' BEGIN SELECT RAISE(ABORT, 'private canary'); END",
     );
-    let output = command(&sandbox, &["confirm", row.id.as_str(), "--tag", "rejected"]);
+    let output = command(&sandbox, &["confirm", "tag", row.id.as_str(), "rejected"]);
     assert_eq!(output.status.code(), Some(1), "{}", stderr(&output));
     assert!(!stderr(&output).contains("private canary"));
     assert!(output.stdout.is_empty());
@@ -330,7 +330,7 @@ fn tag_confirmation_updates_live_analysis_without_regenerating_expired_transcrip
     fs::remove_file(&old.target).unwrap();
     success(&command(
         &sandbox,
-        &["confirm", row.id.as_str(), "--tag", "analysis-only"],
+        &["confirm", "tag", row.id.as_str(), "analysis-only"],
     ));
     assert!(!old.target.exists());
     assert_eq!(saved(&sandbox, &row), old);
@@ -360,7 +360,7 @@ fn relation_confirmation_updates_both_notes_without_changing_external_targets() 
     let before = [saved(&sandbox, &row), analysis(&sandbox, &row)];
     let output = command(
         &sandbox,
-        &["confirm", row.id.as_str(), "--relation", "related:Alias"],
+        &["confirm", "relation", row.id.as_str(), "related:Alias"],
     );
     success(&output);
     assert!(!stdout(&output).contains("Private"));

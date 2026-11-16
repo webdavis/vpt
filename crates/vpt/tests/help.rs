@@ -17,7 +17,10 @@ const COMMANDS: &[&str] = &[
     "review confirm",
     "review correct",
     "review dismiss",
-    "confirm",
+    "confirm term",
+    "confirm tag",
+    "confirm reject-tag",
+    "confirm relation",
     "tag rename",
     "analyze",
     "path",
@@ -74,7 +77,7 @@ fn help_is_available_at_every_depth() {
 #[test]
 fn a_command_group_typed_alone_shows_its_help() {
     let sandbox = Sandbox::new("help-groups");
-    for group in ["tag", "note", "retention", "symlink", "review"] {
+    for group in ["tag", "note", "retention", "symlink", "review", "confirm"] {
         let text = help(&sandbox, &[group]);
         assert!(text.contains(&format!("Usage: vpt {group}")), "{text}");
     }
@@ -105,7 +108,7 @@ fn every_command_help_carries_two_or_three_examples() {
 #[test]
 fn short_help_is_terse_and_long_help_ends_with_the_docs_link() {
     let sandbox = Sandbox::new("help-short-long");
-    let groups = ["tag", "note", "retention", "symlink", "review"];
+    let groups = ["tag", "note", "retention", "symlink", "review", "confirm"];
     for command in [""].iter().chain(&groups).chain(COMMANDS) {
         let words: Vec<&str> = command.split(' ').filter(|w| !w.is_empty()).collect();
         let short = help(&sandbox, &[words.as_slice(), &["-h"]].concat());

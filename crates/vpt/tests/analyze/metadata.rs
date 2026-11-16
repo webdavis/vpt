@@ -124,15 +124,12 @@ fn repeated_analysis_preserves_manual_tag_and_relation_decisions() {
     )
     .unwrap();
     note::success(&invoke(&sandbox, record.id.as_str(), false));
-    for arguments in [
-        ["--reject-tag", "new-topic"],
-        ["--relation", "related:Project"],
-    ] {
+    for arguments in [["reject-tag", "new-topic"], ["relation", "related:Project"]] {
         note::success(&support::run_with_budget(
             sandbox.vpt().args([
                 "confirm",
-                record.id.as_str(),
                 arguments[0],
+                record.id.as_str(),
                 arguments[1],
                 "--json",
             ]),

@@ -8,7 +8,7 @@ fn confirm(sandbox: &Sandbox, id: &str, relation: &str) -> std::process::Output 
     support::run_with_budget(
         sandbox
             .vpt()
-            .args(["confirm", id, "--relation", relation, "--json"]),
+            .args(["confirm", "relation", id, relation, "--json"]),
         std::time::Duration::from_secs(5),
     )
 }
