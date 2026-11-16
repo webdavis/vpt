@@ -29,7 +29,7 @@ pub mod proposal;
 mod record_lock;
 mod spawn;
 mod speech;
-pub use speech::{Clip, SpeechError, speak};
+pub use speech::{Clip, SpeechError, converse, speak};
 mod sqlite_open;
 mod stores;
 mod symlink;

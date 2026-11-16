@@ -1,5 +1,7 @@
+mod dialogue;
 use crate::spawn::{self, SpawnError, Status};
 use crate::{digest_open, inspect_archived_audio};
+pub use dialogue::converse;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -10,8 +12,8 @@ const DEADLINE: Duration = Duration::from_secs(120);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpeechError {
-    Missing,
-    Failed(String),
+    Missing(&'static str),
+    Failed(&'static str, String),
 }
 
 pub struct Clip {
@@ -28,31 +30,57 @@ impl Clip {
 }
 
 pub fn speak(text: &str, maximum: u64) -> Result<Clip, SpeechError> {
-    let failed = |error: std::io::Error| SpeechError::Failed(error.kind().to_string());
-    let directory = tempfile::Builder::new()
+    let directory = private_directory()?;
+    let path = directory.path().join("clip.m4a");
+    run("say", &["-o", text_of(&path)?, text], &path)?;
+    clip("say", directory, path, maximum)
+}
+
+fn failed(error: std::io::Error) -> SpeechError {
+    SpeechError::Failed("say", error.kind().to_string())
+}
+
+fn private_directory() -> Result<TempDir, SpeechError> {
+    tempfile::Builder::new()
         .prefix("vpt-test-")
         .permissions(std::fs::Permissions::from_mode(0o700))
         .tempdir_in(std::env::temp_dir().canonicalize().map_err(failed)?)
-        .map_err(failed)?;
-    let path = directory.path().join("clip.m4a");
-    let output = path
-        .to_str()
-        .ok_or_else(|| SpeechError::Failed("path is not UTF-8".into()))?;
-    let argv = ["say", "-o", output, text].map(str::to_owned);
+        .map_err(failed)
+}
+
+fn text_of(path: &Path) -> Result<&str, SpeechError> {
+    path.to_str()
+        .ok_or_else(|| SpeechError::Failed("say", "path is not UTF-8".into()))
+}
+
+fn run(program: &'static str, arguments: &[&str], made: &Path) -> Result<(), SpeechError> {
+    let argv: Vec<String> = std::iter::once(program)
+        .chain(arguments.iter().copied())
+        .map(str::to_owned)
+        .collect();
     let outcome =
         spawn::run(&argv, b"", DEADLINE, spawn::OUTPUT_LIMIT).map_err(|error| match error {
-            SpawnError::NotFound(_) => SpeechError::Missing,
-            SpawnError::Io(detail) => SpeechError::Failed(detail),
+            SpawnError::NotFound(_) => SpeechError::Missing(program),
+            SpawnError::Io(detail) => SpeechError::Failed(program, detail),
         })?;
-    match outcome.status {
-        Status::Exited(0) if path.is_file() => {}
-        Status::Exited(0) => return Err(SpeechError::Failed("wrote no audio file".into())),
-        Status::Exited(code) => return Err(SpeechError::Failed(format!("exited {code}"))),
-        status => return Err(SpeechError::Failed(format!("{status:?}"))),
-    }
+    let reason = match outcome.status {
+        Status::Exited(0) if made.is_file() => return Ok(()),
+        Status::Exited(0) => "wrote no audio file".into(),
+        Status::Exited(code) => format!("exited {code}"),
+        status => format!("{status:?}"),
+    };
+    Err(SpeechError::Failed(program, reason))
+}
+
+fn clip(
+    program: &'static str,
+    directory: TempDir,
+    path: PathBuf,
+    maximum: u64,
+) -> Result<Clip, SpeechError> {
     let digest = digest_open(&mut std::fs::File::open(&path).map_err(failed)?).map_err(failed)?;
     let duration = inspect_archived_audio(directory.path(), &path, digest, maximum)
-        .map_err(|error| SpeechError::Failed(format!("unreadable audio: {error:?}")))?;
+        .map_err(|error| SpeechError::Failed(program, format!("unreadable audio: {error:?}")))?;
     Ok(Clip {
         path,
         digest,

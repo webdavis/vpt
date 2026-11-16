@@ -376,8 +376,9 @@ named, so doctor exits 1.
 
 Doctor never runs a part to see whether it works. Each configured part ends with a `test` row,
 `not tested`, whose advice names the command that tries it for real, such as `vpt test engines`.
-`vpt test` has only the `engines` part so far; until the others arrive, it refuses their names. A part that is not configured is one `not_run` row naming the config
-key that turns it on; that is not an issue. A configured part whose program is missing is an issue.
+`vpt test` has the `engines` and `speakers` parts so far; until the others arrive, it refuses their
+names. A part that is not configured is one `not_run` row naming the config key that turns it on;
+that is not an issue. A configured part whose program is missing is an issue.
 Where a part sends data off the machine when it runs, its row says so.
 
 Speaker labels need a Hugging Face token on a whisply engine that the default pair or a language
@@ -413,10 +414,11 @@ name.
 ## vpt test
 
 `vpt test [part ...] [--json|--toon|--yaml]` makes each part do its real job once and reports. The
-only part so far is `engines`. Name parts to test only those, as in `vpt test engines`. An unknown
+parts so far are `engines` and `speakers`. Name parts to test only those, as in `vpt test engines`. An unknown
 name is refused with exit 2 and the list of valid names. Bare `vpt test` tests every configured part.
-A named part with nothing to test is refused with exit 2. In a bare run it is a `not_run` row, and a
-run that tests nothing exits 1. The configuration must load; otherwise vpt prints the configuration
+A named part with nothing to test is refused with exit 2, and the message names the config key that
+would let it run. In a bare run it is a `not_run` row naming that key, and a run that tests nothing
+exits 1. The configuration must load; otherwise vpt prints the configuration
 error and exits 2.
 
 `engines` runs macOS `say`, found on `PATH`, to speak a fixed made-up English sentence into a clip
@@ -429,12 +431,22 @@ many seconds the engine took. An engine that only a language override selects st
 English clip, and its row names that language. When `say` is missing or fails, the `clip` row is an
 issue and no engine runs.
 
+`speakers` needs a Hugging Face token on a whisply engine that the default pair or a language
+override selects. It runs `say` twice, with the voices Samantha and Fred, to speak two made-up
+lines, joins the two recordings and encodes them with macOS `afconvert` into one clip. That whisply
+engine then transcribes the clip with speaker annotation, the way `vpt transcribe` runs it. The row
+is `ok` when whisply returns a valid document whose segments carry at least two different speaker
+labels, and it says how many labels came back and how long whisply took. When whisply fails while
+asked for speakers, the advice asks the token's account to accept the terms of
+`pyannote/speaker-diarization-3.1` and `pyannote/segmentation-3.0`, the usual first failure.
+
 Nothing is kept. vpt writes nothing to the ledger, the archive, the notes or any store, and it
 removes the temporary folder at the end, also when an engine fails.
 
 | Part | What leaves the machine |
 | --- | --- |
 | `engines` | Nothing for Apple, whisply or a command engine declared local. A command engine declared remote receives the made-up clip, and its row says so. Anything an engine does on its own, such as downloading a model on first use, happens as it does in `vpt transcribe`. |
+| `speakers` | Whisply sends the token to Hugging Face and downloads the two speaker models on first use; the clip stays on the machine. The row says so. |
 
 The report has the same form as doctor's: the version line, a heading per part, rows marked `✓`,
 `⚠`, `✗` or `·`, advice after `→`, and "Needs attention". It goes to standard output. vpt exits 1

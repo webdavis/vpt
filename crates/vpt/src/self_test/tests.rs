@@ -3,6 +3,13 @@ use crate::report::Row;
 use crate::style::Verdict;
 use std::cell::Cell;
 
+fn unready() -> Row {
+    Row::not_run(
+        "configured",
+        "not configured, set `absent.key` in the config",
+    )
+}
+
 fn ran() -> Vec<Row> {
     vec![Row::ok("one", "ran")]
 }
@@ -18,17 +25,18 @@ fn a_named_part_with_nothing_to_test_is_refused_before_anything_runs() {
         Part {
             name: "ready",
             blurb: "",
-            run: Some(&run),
+            run: Ok(Box::new(run)),
         },
         Part {
             name: "absent",
             blurb: "",
-            run: None,
+            run: Err(unready()),
         },
     ];
     let error = checks(parts, true).err().unwrap();
     assert_eq!(error.kind.exit_code(), 2);
     assert!(error.message.contains("absent"), "{}", error.message);
+    assert!(error.message.contains("`absent.key`"), "{}", error.message);
     assert!(!error.message.contains("ready"), "{}", error.message);
     assert!(!called.get());
 }
@@ -39,12 +47,12 @@ fn a_bare_run_marks_an_unconfigured_part_not_run_and_runs_the_rest() {
         Part {
             name: "ready",
             blurb: "",
-            run: Some(&ran),
+            run: Ok(Box::new(ran)),
         },
         Part {
             name: "absent",
             blurb: "",
-            run: None,
+            run: Err(unready()),
         },
     ];
     let checks = checks(parts, false).unwrap();
@@ -59,7 +67,7 @@ fn a_bare_run_that_tests_nothing_ends_with_an_issue() {
     let parts = vec![Part {
         name: "absent",
         blurb: "",
-        run: None,
+        run: Err(unready()),
     }];
     let checks = checks(parts, false).unwrap();
     let last = checks.last().unwrap();
