@@ -979,7 +979,16 @@ actions vpt tried to send or withdraw logs one `actions_sent` report with the `r
 2 withdrawn` when `withdraw_command` is set, in state `failed` when any send or withdrawal failed or
 was refused and `done` otherwise, and invokes the configured report command. Only analyses published
 while the command is set are recorded, so setting it does not send earlier analyses' actions. The
-action text reaches only the command, never `events.jsonl` or vpt's output.
+action text reaches the command and never `events.jsonl`; of vpt's own output, only
+`vpt show --stage analysis` and `vpt actions list` print it.
+
+`vpt actions` alone shows its subcommands. `vpt actions list [<id>] [--output json|toon|yaml]` lists
+every follow-up vpt has saved, for all recordings or for one, with its state: `pending` (waiting to be
+sent), `sent`, `refused` (the tool refused it for good) or `withdrawing` (dropped by a redo and waiting
+to be withdrawn). It reads the ledger and writes nothing. Each row carries the `recording`, the
+action `id` your tool received, the `state` and the `text`; `text` is null once the recording's
+accepted analysis no longer holds the action as it was sent. With nothing saved it prints
+`no follow-ups`, and `"actions": []` under `--json`, and exits 0.
 
 ## Note verification
 

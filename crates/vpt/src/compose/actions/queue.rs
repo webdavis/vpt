@@ -34,7 +34,7 @@ pub(crate) fn queue(
     })
 }
 
-pub(super) fn queued(recording: &RecordingId, proposal: &CheckedProposal) -> Vec<QueuedAction> {
+pub(crate) fn queued(recording: &RecordingId, proposal: &CheckedProposal) -> Vec<QueuedAction> {
     action_ids(recording, &proposal.actions)
         .into_iter()
         .zip(&proposal.actions)

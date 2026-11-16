@@ -11,6 +11,7 @@ use vpt_domain::digest::Sha256Digest;
 use vpt_domain::identity::RecordingId;
 use vpt_domain::time::UtcInstant;
 use vpt_protocol::error::ErrorDocument;
+mod actions;
 mod notes;
 mod proposals;
 mod review;
