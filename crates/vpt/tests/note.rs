@@ -8,6 +8,8 @@ mod confirm_terminal;
 mod fixture;
 #[path = "note/mentions.rs"]
 mod mentions;
+#[path = "note/note_terminal.rs"]
+mod note_terminal;
 #[path = "note/output.rs"]
 mod output;
 #[path = "note/path.rs"]
