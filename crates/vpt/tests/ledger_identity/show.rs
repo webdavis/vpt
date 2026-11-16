@@ -32,7 +32,10 @@ fn ledger_show_reports_the_set_and_this_machine_in_every_format() {
         assert!(human.contains(words), "{words}: {human}");
     }
     assert!(human.contains("this_machine: "), "{human}");
-    let yaml = stdout(&crate::succeeds(&sandbox, &["ledger", "show", "--yaml"]));
+    let yaml = stdout(&crate::succeeds(
+        &sandbox,
+        &["ledger", "show", "--output", "yaml"],
+    ));
     assert!(yaml.contains("write_counter: 2"), "{yaml}");
     crate::succeeds(&sandbox, &["ledger", "show", "--toon"]);
     assert_eq!(snapshot(&sandbox), before);

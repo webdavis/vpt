@@ -77,23 +77,40 @@ fn configured(name: &str) -> Sandbox {
     sandbox
 }
 
-fn decoded(flag: &str, text: &str) -> Value {
-    match flag {
-        "--json" => serde_json::from_str(text).map_err(|error| error.to_string()),
-        "--toon" => toon_format::decode_default(text).map_err(|error| error.to_string()),
+const JSON: &[&str] = &["--json"];
+const TOON: &[&str] = &["--toon"];
+const YAML: &[&str] = &["--output", "yaml"];
+const SPELLINGS: [&[&str]; 6] = [
+    JSON,
+    TOON,
+    YAML,
+    &["-o", "json"],
+    &["--output=toon"],
+    &["-o", "yaml"],
+];
+
+fn decoded(flag: &[&str], text: &str) -> Value {
+    match flag.concat().as_str() {
+        "--json" | "-ojson" => serde_json::from_str(text).map_err(|error| error.to_string()),
+        "--toon" | "--output=toon" | "-otoon" => {
+            toon_format::decode_default(text).map_err(|error| error.to_string())
+        }
         _ => serde_yaml_ng::from_str(text).map_err(|error| error.to_string()),
     }
-    .unwrap_or_else(|error| panic!("{flag} did not decode: {error}\n{text}"))
+    .unwrap_or_else(|error| panic!("{flag:?} did not decode: {error}\n{text}"))
 }
 
-fn document(flag: &str, output: &Output) -> (Option<i32>, bool, Value) {
+fn document(flag: &[&str], output: &Output) -> (Option<i32>, bool, Value) {
     let on_stdout = !output.stdout.is_empty();
     let text = if on_stdout {
         stdout(output)
     } else {
         stderr(output)
     };
-    assert!(text.ends_with('\n'), "{flag} ends with a newline: {text:?}");
+    assert!(
+        text.ends_with('\n'),
+        "{flag:?} ends with a newline: {text:?}"
+    );
     (output.status.code(), on_stdout, decoded(flag, &text))
 }
 
@@ -101,22 +118,23 @@ fn document(flag: &str, output: &Output) -> (Option<i32>, bool, Value) {
 fn every_verb_prints_the_same_document_in_each_format() {
     let sandbox = configured("formats-every-verb");
     for args in EVERY_VERB {
-        let [json, toon, yaml] = ["--json", "--toon", "--yaml"]
-            .map(|flag| document(flag, &run(sandbox.vpt().args(*args).arg(flag))));
-        assert_eq!(json, toon, "{args:?} as TOON");
-        assert_eq!(json, yaml, "{args:?} as YAML");
+        let json = document(JSON, &run(sandbox.vpt().args(*args).args(JSON)));
+        for flag in &SPELLINGS[1..] {
+            let other = document(flag, &run(sandbox.vpt().args(*args).args(*flag)));
+            assert_eq!(json, other, "{args:?} with {flag:?}");
+        }
     }
 }
 
 #[test]
 fn a_usage_error_is_one_document_in_the_chosen_format() {
     let sandbox = Sandbox::new("formats-usage-error");
-    for flag in ["--json", "--toon", "--yaml"] {
-        let (code, on_stdout, error) = document(flag, &run(sandbox.vpt().args([flag, "show"])));
-        assert_eq!((code, on_stdout), (Some(2), false), "{flag}");
-        assert_eq!(error["schema"], "vpt.error/1", "{flag}");
-        assert_eq!(error["error"]["kind"], "usage", "{flag}");
-        assert_eq!(error["error"]["message"], "<ID> is required", "{flag}");
+    for flag in SPELLINGS {
+        let (code, on_stdout, error) = document(flag, &run(sandbox.vpt().args(flag).arg("show")));
+        assert_eq!((code, on_stdout), (Some(2), false), "{flag:?}");
+        assert_eq!(error["schema"], "vpt.error/1", "{flag:?}");
+        assert_eq!(error["error"]["kind"], "usage", "{flag:?}");
+        assert_eq!(error["error"]["message"], "<ID> is required", "{flag:?}");
     }
 }
 
@@ -124,17 +142,22 @@ fn a_usage_error_is_one_document_in_the_chosen_format() {
 fn two_format_flags_are_refused_in_plain_text_with_the_usage() {
     let sandbox = configured("formats-two-flags");
     for pair in [
-        ["--json", "--toon"],
-        ["--toon", "--yaml"],
-        ["--yaml", "--json"],
+        [JSON, TOON],
+        [TOON, YAML],
+        [YAML, JSON],
+        [&["-o", "json"], JSON],
     ] {
-        let output = run(sandbox.vpt().arg("list").args(pair));
+        let output = run(sandbox.vpt().arg("list").args(pair.concat()));
         assert_eq!(output.status.code(), Some(2), "{pair:?}");
         assert_eq!(stdout(&output), "", "{pair:?}");
         let text = stderr(&output);
         let first = text.lines().next().unwrap_or_default();
         assert!(first.contains("cannot be used with"), "{text}");
-        assert!(pair.iter().all(|flag| first.contains(flag)), "{text}");
+        assert!(
+            pair.iter()
+                .all(|flag| first.contains(flag[0]) || first.contains("--output")),
+            "{text}"
+        );
         assert!(text.contains("vpt help"), "{text}");
     }
 }
@@ -142,9 +165,19 @@ fn two_format_flags_are_refused_in_plain_text_with_the_usage() {
 #[test]
 fn toon_and_yaml_are_not_json() {
     let sandbox = configured("formats-not-json");
-    for flag in ["--toon", "--yaml"] {
-        let text = stdout(&run(sandbox.vpt().args(["list", flag])));
-        assert!(!text.starts_with('{'), "{flag}: {text}");
-        assert!(text.contains("command: "), "{flag}: {text}");
+    for flag in [TOON, YAML] {
+        let text = stdout(&run(sandbox.vpt().arg("list").args(flag)));
+        assert!(!text.starts_with('{'), "{flag:?}: {text}");
+        assert!(text.contains("command: "), "{flag:?}: {text}");
+    }
+}
+
+#[test]
+fn the_removed_yaml_flag_and_an_unknown_format_are_usage_errors() {
+    let sandbox = configured("formats-removed-yaml");
+    for words in [&["list", "--yaml"][..], &["list", "--output", "xml"]] {
+        let output = run(sandbox.vpt().args(words));
+        assert_eq!(output.status.code(), Some(2), "{words:?}");
+        assert_eq!(stdout(&output), "", "{words:?}");
     }
 }
