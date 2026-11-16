@@ -86,22 +86,22 @@ fn analyze_all_at_a_terminal_gives_each_recording_one_row() {
     propose(&sandbox, "words", &["alpha"]);
     let [one, two] = [&rows[0].id, &rows[1].id];
     assert_eq!(
-        shown(&sandbox, &["--all", "--preview"]),
+        shown(&sandbox, &["all", "--preview"]),
         format!("  · {one}: would analyze\n  · {two}: would analyze\n")
     );
     assert_eq!(
-        piped(&sandbox, &["--all", "--preview"]),
+        piped(&sandbox, &["all", "--preview"]),
         format!("Would analyze {one}\nWould analyze {two}\n")
     );
     assert_eq!(
-        shown(&sandbox, &["--all"]),
+        shown(&sandbox, &["all"]),
         format!(
             "  ✓ {one}: summary changed, 1 tag added, 0 removed\n\
              \x20 ✓ {two}: summary changed, 1 tag added, 0 removed\n"
         )
     );
     assert_eq!(
-        piped(&sandbox, &["--all"]),
+        piped(&sandbox, &["all"]),
         format!(
             "Analyzed {one}; summary unchanged; 0 tag(s) added, 0 removed\n\
              Analyzed {two}; summary unchanged; 0 tag(s) added, 0 removed\n"
@@ -113,9 +113,6 @@ fn analyze_all_at_a_terminal_gives_each_recording_one_row() {
 fn analyze_all_with_no_recordings_says_so_in_one_line_at_a_terminal() {
     let (sandbox, _) = note::configured_with(&[]);
     bulk_agent(&sandbox);
-    assert_eq!(
-        shown(&sandbox, &["--all"]),
-        "  · no recordings to analyze\n"
-    );
-    assert_eq!(piped(&sandbox, &["--all"]), "no recordings\n");
+    assert_eq!(shown(&sandbox, &["all"]), "  · no recordings to analyze\n");
+    assert_eq!(piped(&sandbox, &["all"]), "no recordings\n");
 }

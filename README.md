@@ -676,9 +676,9 @@ entry, without a marker, so that it stays within 64 KiB and the expanded command
 never reach stdin, so a tag change does not change the recorded input digest or make `run` redo a
 summary. A command without either placeholder runs exactly as before.
 
-`vpt analyze --all [--since <RFC3339>] [--preview]` reruns analysis for every recording with an
+`vpt analyze all [--since <RFC3339>] [--preview]` reruns analysis for every recording with an
 accepted transcript, in capture order; `--since` keeps those captured at or after the time.
-`vpt analyze --stdin [--preview]` reads one recording id per line instead, so `vpt list` or
+`vpt analyze - [--preview]` reads one recording id per line from standard input instead, so `vpt list` or
 `vpt search` output can choose the set. Both rerun the command even when the saved analysis is current,
 so a changed prompt reaches old recordings, and both carry on past a recording that fails. The result
 lists each recording with `summary_changed`, `tags_added` and `tags_removed` counts; tag names stay out
@@ -975,8 +975,8 @@ next run sends the action again, so the command must accept a repeat. Previews s
 
 When the command is set, the result of `vpt analyze <id>` and of `vpt run` carries `"actions":
 {"sent", "failed", "refused"}` counts, and a `"withdrawn"` count as well when `withdraw_command` is
-set. The failed and refused counts include withdrawals. The result of `vpt analyze --all` and
-`--stdin` carries the same counts, summed over the recordings it analyzed. Each recording whose
+set. The failed and refused counts include withdrawals. The result of `vpt analyze all` and
+`vpt analyze -` carries the same counts, summed over the recordings it analyzed. Each recording whose
 actions vpt tried to send or withdraw logs one `actions_sent` report with the `recording`,
 `paths.note` and a `detail` such as `3 sent, 1 failed, 0 refused`, or `3 sent, 1 failed, 0 refused,
 2 withdrawn` when `withdraw_command` is set, in state `failed` when any send or withdrawal failed or
