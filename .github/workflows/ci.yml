@@ -6,32 +6,60 @@ on:
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 jobs:
-  gates:
+  lint:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install command tools
-        run: brew install gitleaks just swiftformat swiftlint
-      - name: Toolchain
-        run: |
-          rustup show active-toolchain
-          xcodebuild -version
-          swift --version
+        run: brew install gitleaks just
       - name: Format
         run: just fmt
-      - name: Clippy
-        run: just clippy
-      - name: Test
-        run: just test
-      - name: Docs
-        run: just doc
-      - name: Secrets scan
-        run: just gitleaks
       - name: File size
         run: just file-size
+      - name: Secrets scan
+        run: just gitleaks
+      - name: Keep built dependencies between runs
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Clippy
+        run: just clippy
+      - name: Docs
+        run: just doc
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install command tools
+        run: brew install just
+      - name: Toolchain
+        run: rustup show active-toolchain
+      - name: Keep built dependencies between runs
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Test
+        run: just test
+  swift:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install command tools
+        run: brew install just swiftformat swiftlint
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
       - name: Swift format
         run: just swift-format
       - name: Swift lint
