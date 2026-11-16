@@ -68,10 +68,10 @@ fn collector_reads_the_selected_agenda_window_then_shows_only_selected_events() 
     assert_eq!(
         calls,
         concat!(
-            "agenda\npath:calendar/work/ | path:calendar/home/\n--json\n",
+            "agenda\npath:calendar/work/ | path:calendar/home/\n--global\n-o\njson\n",
             "--from\n2026-10-01T23:00:00Z\n--to\n2026-10-02T01:00:00Z\n",
-            "show\ninside\n--json\n",
-            "ls\nkind:task & path:work/team/ & !done\n--json\n",
+            "show\ninside\n-o\njson\n",
+            "ls\nkind:task & path:work/team/ & !done\n--global\n-o\njson\n",
         )
     );
 }
@@ -164,7 +164,7 @@ fn max_age_is_passed_to_agenda_and_a_stale_refusal_fails_only_the_calendar() {
     assert!(!format!("{snapshot:?}").contains("PRIVATE"));
     let calls = fs::read_to_string(dir.path().join("calls")).unwrap();
     assert!(
-        calls.starts_with("agenda\npath:calendar/\n--json\n--from\n2026-10-01T23:00:00Z\n--to\n2026-10-02T01:00:00Z\n--max-age\ngcal=15m\n--max-age\nwork=1h\nls\n"),
+        calls.starts_with("agenda\npath:calendar/\n--global\n-o\njson\n--from\n2026-10-01T23:00:00Z\n--to\n2026-10-02T01:00:00Z\n--max-age\ngcal=15m\n--max-age\nwork=1h\nls\n"),
         "{calls}"
     );
 }

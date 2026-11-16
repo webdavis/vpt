@@ -6,8 +6,8 @@ pub(super) struct Query {
     pub text: String,
 }
 impl Query {
-    pub fn args(&self) -> [String; 3] {
-        ["ls", &self.text, "--json"].map(String::from)
+    pub fn args(&self) -> [String; 5] {
+        ["ls", &self.text, "--global", "-o", "json"].map(String::from)
     }
 }
 pub(super) struct Agenda {
@@ -52,7 +52,9 @@ pub(super) fn make(
         let args = [
             "agenda",
             &query,
-            "--json",
+            "--global",
+            "-o",
+            "json",
             "--from",
             &window.start.rfc3339(),
             "--to",
