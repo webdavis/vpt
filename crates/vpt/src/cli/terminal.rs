@@ -3,6 +3,7 @@ mod analyze;
 mod ingest;
 mod list;
 mod run;
+mod search;
 mod storage;
 mod transcribe;
 
@@ -43,6 +44,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::AnalyzeBatch { .. } => Some(analyze::batch),
         Verb::List { .. } => Some(list::render),
         Verb::Storage => Some(storage::render),
+        Verb::Search(_) => Some(search::render),
         _ => None,
     }
 }

@@ -4,6 +4,8 @@ mod record;
 #[path = "search/fixture.rs"]
 mod seed;
 mod support;
+#[path = "search/terminal.rs"]
+mod terminal;
 use serde_json::{Value, json};
 use support::{Sandbox, stderr, stdout};
 
