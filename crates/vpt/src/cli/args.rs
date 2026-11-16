@@ -5,6 +5,7 @@ mod completion;
 mod confirm;
 mod examples;
 mod groups;
+mod help;
 pub(crate) mod import;
 mod invocation;
 pub(crate) mod ledger;
@@ -32,6 +33,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Invocation, Usa
                 .map_err(|_| UsageError::new("arguments must be valid UTF-8"))
         })
         .collect::<Result<_, _>>()?;
+    if let Some(help) = help::rendered(&words) {
+        return help.map(Invocation::print).map_err(UsageError::new);
+    }
     let cli = match <root::Cli as clap::Parser>::try_parse_from(words) {
         Ok(cli) => cli,
         Err(error) => return usage::from_clap(&error),

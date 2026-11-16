@@ -10,7 +10,10 @@ The design is [the approved specification](docs/superpowers/specs/2026-09-20-vpt
 
 `vpt` alone or `vpt help` lists the commands. `vpt help <command>` and `vpt <command> --help` show
 one command's flags and examples and end with a link to this section; `-h` shows the flags alone. A
-group such as `vpt tag` alone shows its subcommands.
+group such as `vpt tag` alone shows its subcommands. `vpt help [command ...] -o json` (or `toon`,
+`yaml`) prints the same help as a `vpt.result/1` document with `name`, `path`, `about`, `usage`,
+`arguments`, `options`, `subcommands` and `examples`, read from the command definitions, for a
+program that drives vpt. An unknown command name is a usage error.
 Help prints on stdout and exits 0.
 `vpt completion bash`, `zsh`, `fish`, `powershell` or `elvish` prints a completion script for that
 shell.
