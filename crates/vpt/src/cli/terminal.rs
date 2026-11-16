@@ -1,4 +1,5 @@
 mod actions;
+mod ingest;
 mod run;
 
 use super::{args::Verb, format::Format, output::Outcome};
@@ -32,6 +33,7 @@ pub(crate) fn styled(outcome: Outcome, verb: &Verb, format: Option<Format>) -> O
 fn render(verb: &Verb) -> Option<Render> {
     match verb {
         Verb::Run { .. } => Some(run::render),
+        Verb::Ingest { .. } | Verb::Import(_) => Some(ingest::render),
         _ => None,
     }
 }

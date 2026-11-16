@@ -3,6 +3,8 @@
 #[path = "show_list_storage/fixture.rs"]
 mod fixture;
 mod support;
+#[path = "import/terminal.rs"]
+mod terminal;
 
 use fixture::write_config;
 use std::os::unix::fs::PermissionsExt;
