@@ -49,7 +49,8 @@ When standard output is a terminal, `run`, `ingest`, `import`, `transcribe`, `an
 as `doctor`: one row per result, `name: detail` marked `✓` for done, `·` for planned or skipped,
 `⚠` for a warning and `✗` for a failure, with advice under a row after `→`. A closing
 "Needs attention" section numbers every warning and failure, and appears only when there is one.
-A command with nothing to do says so in one line:
+`path` prints the bare path at a terminal too, so it can be pasted. A command with nothing to do
+says so in one line:
 
 ```text
 $ vpt run
