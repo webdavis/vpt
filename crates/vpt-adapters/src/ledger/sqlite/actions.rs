@@ -1,16 +1,14 @@
 use super::{SqliteLedger, map, migrations};
 use crate::ledger::actions::{check, conflict};
 use rusqlite::{Connection, params};
-use vpt_application::ports::{ActionChange, ActionLedger, LedgerError, QueuedAction, WorkDelta};
+use vpt_application::ports::{
+    ActionChange, ActionLedger, LedgerError, QueuedAction, SendState, WorkDelta,
+};
 use vpt_domain::identity::RecordingId;
 
 impl ActionLedger for SqliteLedger {
-    fn pending_actions(&self) -> Result<Vec<QueuedAction>, LedgerError> {
-        self.snapshot(|connection| in_state(connection, "pending"))
-    }
-
-    fn withdrawing_actions(&self) -> Result<Vec<QueuedAction>, LedgerError> {
-        self.snapshot(|connection| in_state(connection, "withdrawing"))
+    fn actions_in(&self, state: SendState) -> Result<Vec<QueuedAction>, LedgerError> {
+        self.snapshot(|connection| in_state(connection, state.name()))
     }
 }
 

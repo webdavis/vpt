@@ -40,11 +40,14 @@ impl<E: EventSink> Delivery<'_, E> {
             resend::refused(self, only)?;
         }
         let in_scope = |queued: &QueuedAction| only.is_none_or(|only| *only == queued.recording);
-        let mut pending = self.ledger.pending_actions().map_err(error)?;
+        let mut pending = self.ledger.actions_in(SendState::Pending).map_err(error)?;
         pending.retain(in_scope);
         let mut withdrawing = Vec::new();
         if total.withdrawn.is_some() {
-            withdrawing = self.ledger.withdrawing_actions().map_err(error)?;
+            withdrawing = self
+                .ledger
+                .actions_in(SendState::Withdrawing)
+                .map_err(error)?;
             withdrawing.retain(in_scope);
         }
         let mut recordings: Vec<_> = pending
