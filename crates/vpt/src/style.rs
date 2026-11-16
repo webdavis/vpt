@@ -1,3 +1,6 @@
+mod summary;
+pub(crate) use summary::{Summary, counted};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Verdict {
     Ok,
