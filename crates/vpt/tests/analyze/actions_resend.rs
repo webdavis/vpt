@@ -9,7 +9,7 @@ fn resend(sandbox: &Sandbox, id: &str, extra: &[&str]) -> std::process::Output {
     support::run_with_budget(&mut command, Duration::from_secs(5))
 }
 
-fn refused() -> (Sandbox, String, std::path::PathBuf) {
+pub(super) fn refused() -> (Sandbox, String, std::path::PathBuf) {
     let (sandbox, mut rows) = note::configured_saying(&[7], "um private words tomorrow");
     let id = rows.remove(0).id.as_str().to_owned();
     let log = configure_with(&sandbox, "final_exit_codes = [4]\n");

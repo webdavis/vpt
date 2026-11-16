@@ -59,6 +59,10 @@ mod redo;
 #[path = "analyze/related.rs"]
 mod related;
 mod report_hook;
+#[path = "analyze/resend_terminal.rs"]
+mod resend_terminal;
+#[path = "note/styled.rs"]
+mod styled;
 mod support;
 #[path = "analyze/tag_defaults.rs"]
 mod tag_defaults;

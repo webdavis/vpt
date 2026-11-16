@@ -7,6 +7,7 @@ mod list;
 mod note;
 mod occasions;
 mod redact;
+mod resend;
 mod resolve;
 mod retention;
 mod review;
@@ -65,6 +66,7 @@ fn render(verb: &Verb) -> Option<Render> {
         Verb::Review { .. } => Some(review::render),
         Verb::ReviewResolve { .. } => Some(resolve::render),
         Verb::Occasions => Some(occasions::render),
+        Verb::ActionsResend { preview: false, .. } => Some(resend::render),
         Verb::ConfirmTerm { .. } | Verb::ConfirmTag { .. } | Verb::ConfirmRelation { .. } => {
             Some(confirm::render)
         }
