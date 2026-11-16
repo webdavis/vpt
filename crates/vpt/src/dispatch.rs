@@ -221,5 +221,6 @@ pub(crate) fn run(invocation: &Invocation) -> i32 {
             options,
         ),
     };
+    let outcome = crate::cli::terminal::styled(outcome, &invocation.verb, invocation.format);
     emit(outcome, invocation.format)
 }

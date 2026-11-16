@@ -3,6 +3,8 @@ pub(crate) mod capture;
 pub mod dam;
 mod diagnostic;
 pub(crate) mod process;
+#[allow(dead_code, reason = "used only by tests of what a terminal shows")]
+pub mod terminal;
 mod turn;
 
 use capture::Capture;

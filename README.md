@@ -38,6 +38,38 @@ read as something else. `--yaml` prints it as block YAML with every string doubl
 flag, commands print text for people. Passing two different format flags is a usage error, reported
 as text with exit code 2.
 
+When standard output is a terminal, `run` prints that text in the same style as `doctor`: one row per result, `name: detail` marked `✓` for done, `·` for
+planned or skipped, `⚠` for a warning and `✗` for a failure, with advice under a row after `→`. A
+closing "Needs attention" section numbers every warning and failure, and appears only when there is
+one. A command with nothing to do says so in one line:
+
+```text
+$ vpt run
+  ✓ ingested: 2 recordings
+  ✓ transcribed: 2 recordings
+  ✓ notes: 2 published
+  ⚠ 2026-08-24T144736-a54e6be96482: single-engine
+  ⚠ 2026-08-24T144756-fb30bcd9737b: single-engine
+
+Needs attention
+  ⚠ 2 warnings to look at
+  1. 2026-08-24T144736-a54e6be96482: single-engine
+  2. 2026-08-24T144756-fb30bcd9737b: single-engine
+```
+
+When standard output is a pipe or a file, it prints plain lines, one item per line,
+exactly as before, so scripts that read them keep working:
+
+```text
+$ vpt run | cat
+Run complete: 2 ingested, 2 transcribed, 2 notes, 0 analyzed, 0 released
+Warning: 2026-08-24T144736-a54e6be96482: single-engine
+Warning: 2026-08-24T144756-fb30bcd9737b: single-engine
+Moved 0 file(s); kept 0
+```
+
+Errors still print as `vpt: <message>` on standard error.
+
 `--progress`, in any position, adds progress lines on standard error while `run`, `transcribe` or
 `analyze` works. Each engine run and each analysis command writes one line of compact JSON when it
 starts and one when it ends: `{"schema": "vpt.progress/1", "recording", "step", "state", "audio_secs",
