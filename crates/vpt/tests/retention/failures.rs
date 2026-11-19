@@ -11,7 +11,7 @@ fn log_export_failure_preserves_move_and_still_delivers_report() {
     std::fs::create_dir(&log).unwrap();
     report_command(
         &sandbox,
-        &format!("[{:?}, \"command-sink\"]", support::FAKE_ENGINE),
+        &format!("[{:?}, \"command-sink\"]", support::fake_engine()),
     );
     let result = json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     assert_eq!(result["completed"], serde_json::json!([row.id.as_str()]));

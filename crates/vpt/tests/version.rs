@@ -80,7 +80,6 @@ fn version_with_both_output_streams_broken_exits_one() {
     assert_eq!(stderr(&output), "");
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn version_uses_path_helper_only_when_selected_configuration_is_absent() {
     let sandbox = Sandbox::new("version-fallback");
@@ -93,7 +92,6 @@ fn version_uses_path_helper_only_when_selected_configuration_is_absent() {
     assert_eq!(document["helper_version"], "1.0.0");
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn version_honors_environment_configuration_and_explicit_override() {
     use std::os::unix::fs::PermissionsExt;
@@ -141,7 +139,6 @@ fn version_honors_environment_configuration_and_explicit_override() {
     assert_eq!(document["helper_version"], "1.0.0");
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn invalid_existing_configuration_keeps_version_success_without_path_fallback() {
     use std::os::unix::fs::PermissionsExt;
@@ -168,7 +165,6 @@ fn invalid_existing_configuration_keeps_version_success_without_path_fallback() 
     assert!(!text.contains("CANARY"));
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn unreadable_existing_configuration_keeps_version_success_without_path_fallback() {
     let sandbox = Sandbox::new("version-unreadable");

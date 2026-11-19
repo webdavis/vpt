@@ -1,4 +1,3 @@
-#![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared command fixtures")]
 #[path = "pipeline/absent_source.rs"]
 mod absent_source;

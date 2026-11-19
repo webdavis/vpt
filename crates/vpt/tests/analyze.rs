@@ -1,4 +1,3 @@
-#![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared CLI fixtures")]
 #[path = "analyze/actions.rs"]
 mod actions;

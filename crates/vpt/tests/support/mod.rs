@@ -15,6 +15,7 @@ use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
 pub const VPT: &str = env!("CARGO_BIN_EXE_vpt");
@@ -29,9 +30,30 @@ pub const CLEANUP_BOUND: Duration = WATCHDOG.saturating_add(GRACE).saturating_ad
 /// Bounds a whole vpt command so that only a hang fails its test. Commands run in parallel on a
 /// loaded machine, so a test's own budget is raised to this floor and never asserts speed.
 pub const HANG_BOUND: Duration = Duration::from_secs(60);
-#[cfg(feature = "dev-tools")]
+
+/// Returns the fake engine and helper that tests spawn. Cargo builds an example only for an
+/// unfiltered `cargo test`, so the first call in each test process builds it.
 #[allow(dead_code, reason = "used only by helper integration tests")]
-pub const FAKE_ENGINE: &str = env!("CARGO_BIN_EXE_vpt-fake-engine");
+pub fn fake_engine() -> &'static str {
+    static PATH: LazyLock<String> = LazyLock::new(|| {
+        let build = Command::new(env!("CARGO"))
+            .args(["build", "--quiet", "--message-format=json"])
+            .args(["--example", "vpt-fake-engine", "--manifest-path"])
+            .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"))
+            .stderr(Stdio::inherit())
+            .output()
+            .expect("cargo builds the fake engine");
+        assert!(build.status.success(), "cargo build of the fake engine");
+        String::from_utf8(build.stdout)
+            .expect("cargo messages")
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .find(|message| message["target"]["name"] == "vpt-fake-engine")
+            .and_then(|message| message["executable"].as_str().map(str::to_owned))
+            .expect("fake engine executable")
+    });
+    &PATH
+}
 
 pub fn broken_output() -> (OwnedFd, UnixStream) {
     let (writer, peer) = UnixStream::pair().expect("local socket pair");
@@ -86,10 +108,9 @@ impl Sandbox {
         self.path().join("config/vpt/config.toml")
     }
 
-    #[cfg(feature = "dev-tools")]
     #[allow(dead_code, reason = "used only by helper integration tests")]
     pub fn install_fake_helper(&self) {
-        std::os::unix::fs::symlink(FAKE_ENGINE, self.path().join("bin/vpt-macos"))
+        std::os::unix::fs::symlink(fake_engine(), self.path().join("bin/vpt-macos"))
             .expect("fake helper");
         std::fs::create_dir_all(self.path().join("trash")).expect("fake trash");
     }

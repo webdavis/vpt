@@ -19,7 +19,6 @@ mod rendering_fixture;
 mod rendering_recovery;
 #[path = "brief/rendering_rewrite.rs"]
 mod rendering_rewrite;
-#[cfg(feature = "dev-tools")]
 #[path = "brief/retention.rs"]
 mod retention;
 #[path = "note/styled.rs"]

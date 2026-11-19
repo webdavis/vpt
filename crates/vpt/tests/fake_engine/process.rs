@@ -65,7 +65,7 @@ fn public_environment_wrapper_delivers_exact_arguments_and_input_with_owned_envi
         .collect::<Vec<_>>();
     let arguments = ["one two", "one", "two", "", "$(literal);*'\"", "{artifact}"];
     let mut argv = vec![
-        env!("CARGO_BIN_EXE_vpt-fake-engine").to_owned(),
+        crate::support::fake_engine().to_owned(),
         "process-exchange".into(),
     ];
     argv.extend(arguments.iter().map(|arg| (*arg).to_owned()));

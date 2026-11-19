@@ -63,7 +63,7 @@ pub fn run_command(sandbox: &Sandbox, answer: Answer<'_>, path: &str, args: &[&s
     };
     support::capture::nonblocking(&master).expect("nonblocking master");
     let environment = sandbox.vpt();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_vpt-fake-engine"));
+    let mut command = Command::new(support::fake_engine());
     command
         .arg("terminal-exec")
         .arg(path)

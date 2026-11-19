@@ -1156,7 +1156,7 @@ data. After installing both binaries into an isolated prefix, run:
 
 ```sh
 VPT_TEST_INSTALL_ROOT=/absolute/install/prefix TMPDIR=/private/tmp \
-  cargo test -p vpt --features dev-tools --test installation -- --ignored --test-threads=1
+  cargo test -p vpt --test installation -- --ignored --test-threads=1
 ```
 
 Implemented mutating commands log reports and alerts by default. Optional `[report].command` and

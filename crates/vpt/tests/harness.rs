@@ -263,12 +263,11 @@ fn watchdog_kills_a_direct_child_that_ignores_term() {
     assert!(started.elapsed() < support::CLEANUP_BOUND);
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn watchdog_parent_reaps_its_same_group_descendant() {
     let sandbox = Sandbox::new("descendant-reaping");
     let environment = sandbox.vpt();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_vpt-fake-engine"));
+    let mut command = Command::new(support::fake_engine());
     command
         .env("UNOWNED_SENTINEL", "present")
         .env_clear()

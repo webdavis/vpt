@@ -191,5 +191,5 @@ fn doctor_does_not_refresh_titles_or_run_hooks() {
 }
 
 fn support_engine() -> &'static str {
-    crate::support::FAKE_ENGINE
+    crate::support::fake_engine()
 }

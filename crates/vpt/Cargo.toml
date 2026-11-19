@@ -10,13 +10,9 @@ workspace = true
 name = "vpt"
 path = "src/main.rs"
 
-[features]
-dev-tools = ["dep:libc"]
-
-[[bin]]
+[[example]]
 name = "vpt-fake-engine"
-path = "src/bin/vpt-fake-engine.rs"
-required-features = ["dev-tools"]
+test = true
 
 [dependencies]
 vpt-adapters = { path = "../vpt-adapters" }
@@ -24,7 +20,6 @@ vpt-application = { path = "../vpt-application" }
 vpt-domain = { path = "../vpt-domain" }
 vpt-protocol = { path = "../vpt-protocol" }
 serde_json = { version = "1.0.151", features = ["preserve_order"] }
-libc = { version = "0.2.189", optional = true }
 clap = { version = "4.6.7", default-features = false, features = ["std", "derive", "help", "usage", "error-context", "suggestions"] }
 clap_complete = "4.6.11"
 

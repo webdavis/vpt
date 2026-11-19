@@ -2,7 +2,6 @@
 mod failures;
 #[path = "upcoming/report.rs"]
 mod report;
-#[cfg(feature = "dev-tools")]
 #[path = "upcoming/retention.rs"]
 mod retention;
 #[path = "upcoming/terminal.rs"]
