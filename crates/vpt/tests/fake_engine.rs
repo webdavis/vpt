@@ -1,5 +1,3 @@
-#![cfg(feature = "dev-tools")]
-
 #[path = "fake_engine/process.rs"]
 mod process;
 mod support;
@@ -12,7 +10,7 @@ use support::{Sandbox, broken_output, run, stderr, stdout};
 
 fn fake(sandbox: &Sandbox) -> Command {
     let environment = sandbox.vpt();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_vpt-fake-engine"));
+    let mut command = Command::new(support::fake_engine());
     command
         .env_clear()
         .envs(

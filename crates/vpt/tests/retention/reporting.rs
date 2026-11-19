@@ -108,7 +108,7 @@ fn completed_move_sends_one_private_safe_report_document() {
     expired_audio(&sandbox);
     report_command(
         &sandbox,
-        &format!("[{:?}, \"command-sink\"]", support::FAKE_ENGINE),
+        &format!("[{:?}, \"command-sink\"]", support::fake_engine()),
     );
     json(&run(sandbox.vpt().args(["retention", "run", "-o", "json"])));
     let log = std::fs::read_to_string(sandbox.fake_log()).unwrap();

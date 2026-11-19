@@ -1,5 +1,3 @@
-#![cfg(feature = "dev-tools")]
-
 #[allow(
     dead_code,
     reason = "shared fixture has consumers in other test binaries"

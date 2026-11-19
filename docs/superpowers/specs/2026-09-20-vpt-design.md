@@ -1861,8 +1861,9 @@ and its table goes in each pull request.
 
 What the tests use instead of the world:
 
-- **Fake engines.** A Rust test binary, `vpt-fake-engine`, behind `required-features = ["dev-tools"]` in
-  the command crate, prints a `vpt.engine/1` document chosen by an argument (`--fixture <name>`,
+- **Fake engines.** A Rust test program, `vpt-fake-engine`, an example of the command crate that the
+  test support builds on first use, prints a `vpt.engine/1` document chosen by an argument
+  (`--fixture <name>`,
   `--fail`, `--empty`, `--hang`), so the `command` adapter, the same-family refusal, the deadline kill
   and both-engines-fail are exercised with no engine installed. The Apple and whisply adapters are tested
   by pointing `helper.path` and `engines.whisply.command` at the fake.
@@ -1872,7 +1873,7 @@ What the tests use instead of the world:
   subdirectories, a `.waveform` sidecar, and a fixture `CloudRecordings.db` with the `ZCUSTOMLABEL` and
   `ZPATH` columns plus a `-wal`. `SF_DATALESS` is tested through the port with a fake that reports the
   flag, never by setting it on disk.
-- **A fake helper.** The same dev-tools binary answers `transcribe` and `trash` with recorded
+- **A fake helper.** The same test program answers `transcribe` and `trash` with recorded
   documents, so speech and retention are tested without real destinations.
 - **Fake report and alert commands.** Owned fixtures capture the exact argument list and JSON stdin,
   including privacy canaries, and exercise nonzero exits and deadlines. Default-empty commands log
@@ -1906,7 +1907,7 @@ never part of the automated suite.
 
 CI runs on a macOS runner: `cargo fmt --all -- --check`,
 `cargo clippy --workspace --all-targets -- -D warnings`,
-`cargo test --workspace --no-fail-fast --features dev-tools`,
+`cargo test --workspace --no-fail-fast`,
 `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`, `gitleaks git --no-banner` over the tree,
 the file-size check (no handwritten `.rs` file above 500 lines, tests included, measured after `rustfmt`
 with the standard's awk command; 300 total and 200 implementation as warnings), and

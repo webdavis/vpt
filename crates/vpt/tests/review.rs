@@ -1,4 +1,3 @@
-#![cfg(feature = "dev-tools")]
 #![allow(dead_code, reason = "shared CLI fixtures")]
 #![allow(clippy::single_range_in_vec_init, reason = "Flags contain word ranges")]
 #[path = "show_list_storage/fixture.rs"]

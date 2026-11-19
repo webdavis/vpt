@@ -1,6 +1,4 @@
-#[path = "fake_engine/commands.rs"]
 mod commands;
-#[path = "fake_engine/exchange.rs"]
 mod exchange;
 
 fn main() {

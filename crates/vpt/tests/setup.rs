@@ -9,13 +9,11 @@ mod styled;
 #[path = "setup/styled_result.rs"]
 mod styled_result;
 mod support;
-#[cfg(feature = "dev-tools")]
 #[path = "setup/terminal.rs"]
 mod terminal;
 use std::os::unix::fs::PermissionsExt;
 use support::{Sandbox, run, stderr, stdout};
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn setup_under_owned_terminal_writes_private_config_and_directories() {
     use std::os::unix::fs::PermissionsExt;
@@ -50,7 +48,6 @@ fn setup_under_owned_terminal_writes_private_config_and_directories() {
     assert!(sandbox.path().join("state/vpt").is_dir());
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn setup_json_terminal_success_keeps_the_prompt_off_standard_streams() {
     let sandbox = Sandbox::new("setup-json-pty");
@@ -68,7 +65,6 @@ fn setup_json_terminal_success_keeps_the_prompt_off_standard_streams() {
     assert_eq!(stderr(&output), "");
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn setup_terminal_eof_refuses_without_writing() {
     let sandbox = Sandbox::new("setup-eof");
@@ -78,7 +74,6 @@ fn setup_terminal_eof_refuses_without_writing() {
     assert!(!sandbox.config_path().exists());
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn setup_overwrite_replaces_existing_config_with_selected_engine() {
     let sandbox = Sandbox::new("setup-overwrite");
@@ -101,7 +96,6 @@ fn setup_overwrite_replaces_existing_config_with_selected_engine() {
     assert!(!config.contains("PRIVATE-OLD-CONTENT-PLACEHOLDER"));
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn setup_terminal_answer_timeout_reaps_the_owned_command() {
     let sandbox = Sandbox::new("setup-timeout");
@@ -115,7 +109,6 @@ fn setup_terminal_answer_timeout_reaps_the_owned_command() {
     assert!(!sandbox.config_path().exists());
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn setup_terminal_exit_before_prompt_reports_status_and_output() {
     let sandbox = Sandbox::new("setup-before-prompt");
@@ -132,7 +125,6 @@ fn setup_terminal_exit_before_prompt_reports_status_and_output() {
     assert!(!sandbox.config_path().exists());
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn setup_terminal_missing_prompt_escapes_and_bounds_captured_bytes() {
     let sandbox = Sandbox::new("setup-diagnostic-bytes");
@@ -172,7 +164,6 @@ fn setup_terminal_missing_prompt_escapes_and_bounds_captured_bytes() {
     assert!(!message.contains(&"A".repeat(64)), "{message}");
 }
 
-#[cfg(feature = "dev-tools")]
 #[test]
 fn setup_terminal_timeout_assertion_rejects_pre_prompt_exit() {
     let sandbox = Sandbox::new("setup-timeout-classification");
@@ -190,7 +181,6 @@ fn setup_terminal_timeout_assertion_rejects_pre_prompt_exit() {
     );
 }
 
-#[cfg(feature = "dev-tools")]
 fn is_command_deadline(outcome: &std::thread::Result<std::process::Output>) -> bool {
     outcome
         .as_ref()
@@ -209,7 +199,6 @@ fn is_command_deadline(outcome: &std::thread::Result<std::process::Output>) -> b
         })
 }
 
-#[cfg(feature = "dev-tools")]
 fn terminal_panic_message(failure: &Box<dyn std::any::Any + Send>) -> &str {
     failure
         .downcast_ref::<String>()

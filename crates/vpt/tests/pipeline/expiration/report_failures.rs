@@ -5,7 +5,7 @@ fn enable_report(sandbox: &Sandbox) {
         sandbox,
         &format!(
             "\n[report]\ncommand=[{:?}, 'command-sink']\n",
-            support::FAKE_ENGINE
+            support::fake_engine()
         ),
     );
 }

@@ -12,7 +12,7 @@ fn pipeline_recovery_and_new_moves_emit_one_combined_retention_event() {
         &sandbox,
         &format!(
             "\n[report]\ncommand=[{:?}, 'command-sink']\n",
-            support::FAKE_ENGINE
+            support::fake_engine()
         ),
     );
     age(artifacts.iter().map(|a| &a.path));
@@ -44,7 +44,7 @@ fn retention_log_and_hook_report_actual_counts_for_each_store() {
         &sandbox,
         &format!(
             "\n[report]\ncommand=[{:?}, 'command-sink']\n",
-            support::FAKE_ENGINE
+            support::fake_engine()
         ),
     );
     age(artifacts.iter().map(|a| &a.path));
